@@ -1,0 +1,39 @@
+{
+  "name": "janus-scheduller",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/**",
+    "demo/*"
+  ],
+  "scripts": {
+    "dev:core": "npm run dev -w @janus-scheduler/core",
+    "dev:react-demo": "npm run dev -w react-demo",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test -w @janus-scheduler/core",
+    "clean": "rm -rf packages/*/dist demo/dist",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.56.0",
+    "@typescript-eslint/parser": "^8.56.0",
+    "eslint": "^10.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^5.5.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "git add"
+    ]
+  }
+}
