@@ -1,1 +1,1 @@
-Add the react sample project here
+Add the react sample project here - add only peer dep
