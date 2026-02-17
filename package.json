@@ -14,7 +14,9 @@
     "clean": "rm -rf packages/*/dist demo/dist",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
-    "prepare": "husky"
+    "prepare": "husky install",
+    "format": "prettier \"**/*.{ts,tsx,js,json,md}\" --write",
+    "validate": "npm run lint && npm run build --workspaces --if-present"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",
@@ -24,16 +26,22 @@
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
     "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "typescript": "^5.5.0"
   },
   "lint-staged": {
-    "*.{ts,tsx}": [
+    "*.{ts,tsx,js,jsx}": [
       "eslint --fix",
-      "git add"
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
     ]
   }
 }
