@@ -2,20 +2,20 @@ export interface AssignmentData {
   id: string;
   eventId: string;
   resourceId: string;
-  role?: 'organizer' | 'attendee';
+  role?: "organizer" | "attendee";
 }
 
 export class Assignment {
   id: string;
   eventId: string;
   resourceId: string;
-  role: 'organizer' | 'attendee';
+  role: "organizer" | "attendee";
 
   constructor(data: AssignmentData) {
     this.id = data.id;
     this.eventId = data.eventId;
     this.resourceId = data.resourceId;
-    this.role = data.role || 'attendee';
+    this.role = data.role || "attendee";
   }
 
   // Check if assignment data is valid
@@ -23,3 +23,5 @@ export class Assignment {
     return !!(this.id && this.eventId && this.resourceId);
   }
 }
+
+// chathura test
