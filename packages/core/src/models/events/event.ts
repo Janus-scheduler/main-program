@@ -1,12 +1,4 @@
-export interface EventData {
-  id: string;
-  title: string;
-  startTime: string;
-  endTime: string;
-  resourceId: string;
-  status?: "draft" | "confirmed" | "cancelled";
-  description?: string;
-}
+import { EventData } from "../../types/event.types";
 
 export class Event {
   id: string;

@@ -1,6 +1,7 @@
-import { EventData, Event } from "../events/event";
-import { Resource, ResourceData } from "../resources/resources";
-import { Assignment, AssignmentData } from "../assignments/assignments";
+import { Event } from "../models/events/event";
+import { Resource, ResourceData } from "../models/resources/resources";
+import { Assignment, AssignmentData } from "../models/assignments/assignments";
+import { EventData } from "../types/event.types";
 
 /**
  * Main scheduler manager class
