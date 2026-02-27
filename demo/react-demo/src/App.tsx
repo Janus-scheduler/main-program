@@ -1,7 +1,12 @@
 import "./App.css";
+import Scheduler from "./../../../packages/wrappers/react-wrapper/cards/Scheduler";
 
 function App() {
-  return <div>React demo project created with Vite</div>;
+  return (
+    <div>
+      <Scheduler onClose={() => console.log("Scheduler closed")} />
+    </div>
+  );
 }
 
 export default App;
