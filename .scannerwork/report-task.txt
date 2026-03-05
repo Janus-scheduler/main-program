@@ -1,0 +1,7 @@
+organization=janus-scheduler
+projectKey=Janus-scheduler_main-program
+serverUrl=https://sonarcloud.io
+serverVersion=8.0.0.82112
+dashboardUrl=https://sonarcloud.io/dashboard?id=Janus-scheduler_main-program
+ceTaskId=AZyf6t8OFT95F1vSOHbT
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AZyf6t8OFT95F1vSOHbT
