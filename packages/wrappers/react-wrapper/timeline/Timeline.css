@@ -125,6 +125,15 @@ html, body, #root {
   color: var(--text-1); margin-left: 8px; letter-spacing: -0.3px;
 }
 
+.tl-nav__date--short {
+  display: none;   /* hidden by default, shown via media query */
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-left: 8px;
+  letter-spacing: -0.2px;
+}
+
 /* Right actions */
 .tl-topbar__right {
   display: flex; align-items: center; gap: 8px;
@@ -520,10 +529,34 @@ html, body, #root {
 /* ══════════════════════════════════════════════════════════════════════════════
    RESPONSIVE
 ══════════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1100px) {
+  .tl-nav__date { font-size: 15px; }
+}
+
 @media (max-width: 900px) {
   :root { --sidebar-w: 180px; --res-col-w: 180px; }
-  .tl-nav__date  { font-size: 14px; }
+  .tl-nav__date  { font-size: 13px; }
   .tl-brand__name { font-size: 16px; }
+}
+
+@media (max-width: 768px) {
+  :root { --sidebar-w: 160px; --res-col-w: 160px; }
+
+  /* Shorten date: hide weekday name on tablets */
+  .tl-nav__date { display: none; }
+  .tl-nav__date--short { 
+    display: block;
+    font-size: 13px; font-weight: 600;
+    color: var(--text-1); margin-left: 8px;
+  }
+
+  /* Shrink today button */
+  .tl-nav__today { padding: 4px 8px; font-size: 12px; }
+
+  /* Tighten topbar */
+  .tl-topbar { padding: 0 12px; gap: 8px; }
+  .tl-brand { width: var(--sidebar-w); }
 }
 
 @media (max-width: 640px) {
@@ -532,5 +565,25 @@ html, body, #root {
   .tl-brand { width: auto; }
   .tl-res-sub    { display: none; }
   .tl-res-name   { font-size: 12px; }
-  .tl-nav__date  { font-size: 13px; }
+
+  /* Hide full date, show only short version */
+  .tl-nav__date  { display: none; }
+
+  /* Compress view toggle */
+  .tl-view-toggle__btn { padding: 4px 10px; font-size: 12px; }
+
+  /* Tighten topbar further */
+  .tl-topbar { padding: 0 10px; gap: 6px; }
+}
+
+@media (max-width: 480px) {
+  /* Hide Month/Timeline toggle on very small screens */
+  .tl-view-toggle { display: none; }
+
+  /* Shrink brand */
+  .tl-brand__name { font-size: 14px; }
+  .tl-brand__icon { width: 26px; height: 26px; font-size: 13px; }
+
+  /* Smaller icon buttons */
+  .tl-icon-btn { width: 28px; height: 28px; }
 }

@@ -549,6 +549,13 @@ export default function Timeline({
             <ChevronRight />
           </button>
           <span className="tl-nav__date">{formatDate(currentDate)}</span>
+          {/* Short date — shown only on small screens */}
+          <span className="tl-nav__date--short">
+            {currentDate.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+            })}
+          </span>
         </nav>
 
         <div className="tl-topbar__right">
