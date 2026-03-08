@@ -134,6 +134,21 @@ const TagIcon = () => (
   </svg>
 );
 
+const ChevronDownIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
 const avatarPalette: { [key: string]: string } = {
   "John Doe": "orange",
   "Sarah Chen": "blue",
@@ -182,6 +197,7 @@ export default function Scheduler({ onClose }: { onClose: () => void }) {
     "Discussing the Q4 roadmap and resource allocation for upcoming projects.",
   );
   const [activeColor, setActiveColor] = useState("orange");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const dateRef = useRef<HTMLInputElement>(null);
   const startTimeRef = useRef<HTMLInputElement>(null);
@@ -213,7 +229,7 @@ export default function Scheduler({ onClose }: { onClose: () => void }) {
     >
       <div className="modal" role="dialog" aria-modal="true">
         {/* ── LEFT SIDEBAR ── */}
-        <aside className="sidebar">
+        <aside className={`sidebar${sidebarOpen ? " sidebar--open" : ""}`}>
           <div className={`sidebar-accent color-${activeColor}`} />
 
           <div className="sidebar-top">
@@ -306,11 +322,65 @@ export default function Scheduler({ onClose }: { onClose: () => void }) {
 
         {/* ── RIGHT PANEL ── */}
         <div className="panel">
+          {/* Panel header — contains mobile summary toggle */}
           <div className="panel-header">
-            <span className="panel-heading">Edit Event</span>
+            <div className="panel-header-left">
+              {/* Mobile: summary pill that toggles sidebar */}
+              <button
+                className="mobile-summary-btn"
+                onClick={() => setSidebarOpen((v) => !v)}
+                aria-label="Toggle event summary"
+              >
+                <div className={`dot dot-${activeColor}`} />
+                <span className="mobile-summary-title">
+                  {title || "Untitled"}
+                </span>
+                <span className={`chevron${sidebarOpen ? " chevron--up" : ""}`}>
+                  <ChevronDownIcon />
+                </span>
+              </button>
+
+              {/* Desktop: static heading */}
+              <span className="panel-heading">Edit Event</span>
+            </div>
             <button className="close-btn" onClick={onClose} aria-label="Close">
               <XIcon />
             </button>
+          </div>
+
+          {/* Mobile collapsible summary */}
+          <div
+            className={`mobile-summary-panel${sidebarOpen ? " mobile-summary-panel--open" : ""}`}
+          >
+            <div className="mobile-summary-grid">
+              <div className="msummary-item">
+                <span className="meta-label">Date</span>
+                <span className="meta-value">
+                  {date ? formatDate(date) : "—"}
+                </span>
+              </div>
+              <div className="msummary-item">
+                <span className="meta-label">Time</span>
+                <span className="meta-value">{timeDisplay}</span>
+              </div>
+              <div className="msummary-item">
+                <span className="meta-label">Participants</span>
+                <span className="meta-value">{participants.length} people</span>
+              </div>
+              <div className="msummary-item">
+                <span className="meta-label">Color</span>
+                <div className="swatches swatches--sm">
+                  {COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className={`swatch swatch-${c}${activeColor === c ? " active" : ""}`}
+                      onClick={() => setActiveColor(c)}
+                      aria-label={`${c} color`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="panel-body">
@@ -329,7 +399,6 @@ export default function Scheduler({ onClose }: { onClose: () => void }) {
                 />
               </div>
 
-              {/* Date */}
               <div className="form-group">
                 <label>Date</label>
                 <div
@@ -349,7 +418,6 @@ export default function Scheduler({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
 
-              {/* Time row */}
               <div className="form-row">
                 <div className="form-group">
                   <label>Start Time</label>
@@ -455,10 +523,15 @@ export default function Scheduler({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="panel-footer">
-            <button className="btn-cancel" onClick={onClose}>
-              Cancel
+            <button className="btn-delete btn-delete--footer">
+              <TrashIcon /> Delete
             </button>
-            <button className="btn-save">Save Changes</button>
+            <div className="footer-right">
+              <button className="btn-cancel" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="btn-save">Save Changes</button>
+            </div>
           </div>
         </div>
       </div>
