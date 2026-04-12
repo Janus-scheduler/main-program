@@ -1,39 +1,88 @@
 # Janus Scheduler
 
-Janus Scheduler is a modern, framework-agnostic scheduling and event management component library. Designed as a monorepo, it provides a robust core engine along with seamless wrappers for popular frontend frameworks like React, Angular, and Vue.
+Janus Scheduler is a modern, **framework-agnostic** scheduling and event management component library. Built on [Lit](https://lit.dev/) Web Components, it follows the **DRY principle** by centralizing all UI in a single `@janus-scheduler/ui` package and providing thin framework adapters that wrap it — rather than duplicating UI logic per framework.
+
+## Architecture Overview
+
+```
+                    ┌──────────────────────┐
+                    │  @janus-scheduler/ui │  ← Lit Web Component
+                    │   <janus-scheduler>  │     (framework-agnostic)
+                    └──────────┬───────────┘
+                               │ wraps
+              ┌────────────────┼────────────────┐
+              ▼                ▼                ▼
+   @janus-scheduler/  @janus-scheduler/  @janus-scheduler/
+       react            angular              vue
+   (react-wrapper)   (angular-wrapper)  (vue-wrapper)
+```
+
+The core Web Component (`<janus-scheduler>`) is defined once using Lit, then each framework wrapper exposes it as a native component using the framework's own adapter (e.g. `@lit/react` for React).
 
 ## Project Structure
 
-This project uses npm workspaces to manage its multi-package architecture. It is organized into main `packages` and `demo` applications:
+This project uses **npm workspaces** to manage its multi-package monorepo:
 
 ```text
 ├── packages/
-│   ├── core/               # Core business logic, models, state management, and services
-│   ├── utils/              # Shared utility functions and helpers
+│   ├── core/                    # Core business logic, models, services, state
+│   ├── ui/                      # @janus-scheduler/ui — Lit Web Component library
+│   │   └── src/
+│   │       ├── janus-scheduler.ts   # <janus-scheduler> custom element (LitElement)
+│   │       ├── styles.ts            # Component styles (encapsulated via Shadow DOM)
+│   │       └── index.ts             # Public package entry point
+│   ├── utils/                   # Shared utility functions and helpers
 │   └── wrappers/
-│       ├── angular-wrapper/ # Angular integration and components
-│       ├── react-wrapper/   # React integration, including the Scheduler UI components
-│       └── vue-wrapper/     # Vue integration and components
+│       ├── react-wrapper/       # @janus-scheduler/react — React adapter via @lit/react
+│       ├── angular-wrapper/     # Angular integration (planned)
+│       └── vue-wrapper/         # Vue integration (planned)
 ├── demo/
-│   ├── angular-demo/       # Example application using the Angular wrapper
-│   └── react-demo/         # Example application using the React wrapper (Vite)
+│   ├── react-demo/              # Vite + React demo consuming @janus-scheduler/react
+│   └── angular-demo/            # Angular demo application
 ```
+
+## Packages
+
+| Package                           | Name                     | Description                                                                     |
+| --------------------------------- | ------------------------ | ------------------------------------------------------------------------------- |
+| `packages/core`                   | `@janus-scheduler/core`  | Business logic, models (events, resources), interactions, services              |
+| `packages/ui`                     | `@janus-scheduler/ui`    | Lit-based `<janus-scheduler>` Web Component — the single source of truth for UI |
+| `packages/wrappers/react-wrapper` | `@janus-scheduler/react` | React adapter wrapping the Lit component via `@lit/react`                       |
 
 ## Features
 
-- **Core Engine (`@janus-scheduler/core`)**: Handles the heavy lifting for events, resources, modeling, and API interactions decoupled from any UI framework.
-- **Framework Wrappers**: Drop-in UI components for React, Angular, and Vue. For example, the `react-wrapper` provides a fully styled, customizable `<Scheduler />` modal card supporting:
-  - Event title, description, date, and time configuration
-  - Participant management
-  - Color tagging and customizable event layouts
-- **Demo Applications**: Ready-to-run demo applications to preview the scheduler components in their respective frameworks.
+### `@janus-scheduler/ui` — Lit Web Component
+
+The `<janus-scheduler>` custom element is a fully self-contained scheduling modal built with Lit. It supports:
+
+- **Event title, date, and time range** configuration (start/end times)
+- **Participant management** — add via keyboard (Enter / comma), remove with one click
+- **Color tagging** — 5 color options (orange, blue, green, yellow, purple)
+- **Event description** field
+- **Responsive layout** — collapsible sidebar with mobile summary panel
+- **Shadow DOM encapsulation** — styles are fully scoped, no CSS bleeding
+- Fires a `close` custom event when the modal is dismissed
+
+### `@janus-scheduler/react` — React Wrapper
+
+Wraps the Lit Web Component into a native React component using `@lit/react`:
+
+```tsx
+import { Scheduler } from "@janus-scheduler/react";
+
+function App() {
+  return <Scheduler onClose={() => console.log("closed")} />;
+}
+```
+
+The `onClose` prop is automatically mapped to the `close` DOM custom event.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18+)
-- npm (v9+)
+- Node.js v18+
+- npm v9+
 
 ### Installation
 
@@ -44,58 +93,98 @@ This project uses npm workspaces to manage its multi-package architecture. It is
    cd main-program
    ```
 
-2. Install all workspace dependencies:
+2. Install all workspace dependencies from the root:
    ```bash
    npm install
    ```
 
-### Running the Project Locally
+### Running the React Demo
 
-The project includes several helpful npm scripts to run, test, and build the packages:
+```bash
+# Option 1 — via root script
+npm run dev:react-demo
 
-- **Run React Demo**: Starts the Vite dev server for the React example app.
-  ```bash
-  npm run dev:react-demo
-  ```
-- **Run Core in Dev Mode**:
-  ```bash
-  npm run dev:core
-  ```
+# Option 2 — directly
+cd demo/react-demo
+npm run dev
+```
 
-### Build & Validate
+The demo will be available at `http://localhost:5173`.
 
-- **Build all packages and demos**:
-  ```bash
-  npm run build
-  ```
-- **Lint the codebase**:
-  ```bash
-  npm run lint
-  ```
-- **Run validation (lint + build)**:
-  ```bash
-  npm run validate
-  ```
-- **Run tests (Core)**:
-  ```bash
-  npm run test
-  ```
+### Building Packages
 
-## Development & Contribution
+Build the `@janus-scheduler/ui` Lit component (watch mode for development):
 
-### Code Quality and Formatting
+```bash
+cd packages/ui
+npm run dev      # watch mode
+npm run build    # single build
+```
 
-This repository enforces high code-quality standards using `eslint`, `prettier`, and `husky` for git hooks (commitlint and lint-staged).
-Run `npm run format` to auto-format your code or `npm run lint:fix` to fix linting errors.
+Build the React wrapper:
 
-### Future Developments
+```bash
+cd packages/wrappers/react-wrapper
+npm run build
+```
 
-When contributing new features:
+Build everything at once from the root:
 
-1. **Business Logic**: Any non-visual logic, models, or state management should be placed in `packages/core`.
-2. **Framework Specific UI**: Place framework-specific UI bindings and components inside their respective `packages/wrappers/*`.
-3. **Utilities**: Any generic string/date manipulaton or pure functions can reside in `packages/utils`.
-4. **Validation**: Test the components visually inside the corresponding `demo/*` applications.
+```bash
+npm run build
+```
+
+## Development
+
+### Code Quality
+
+This repo enforces quality via `eslint`, `prettier`, and `husky` git hooks (commitlint + lint-staged).
+
+```bash
+npm run lint        # Check for lint errors
+npm run lint:fix    # Auto-fix lint errors
+npm run format      # Format all files with Prettier
+npm run test        # Run core tests
+npm run validate    # lint + build all packages
+```
+
+#### ESLint Configuration Notes
+
+- The root `eslint.config.js` uses **flat config** (ESLint v9+).
+- Type-aware parsing (`project: true`) is **intentionally disabled** at the root level to avoid `tsconfigRootDir` ambiguity across multiple workspaces. Each package can define its own ESLint config if type-aware rules are needed.
+- `endOfLine: "auto"` is set in prettier to handle CRLF/LF differences on Windows.
+
+### Adding a New Framework Wrapper
+
+1. Create a new directory under `packages/wrappers/<framework>-wrapper/`.
+2. Import `JanusScheduler` from `@janus-scheduler/ui`.
+3. Use the framework's Web Component adapter (e.g. `@angular/elements` for Angular) to expose it as a native component.
+4. Add a corresponding demo under `demo/<framework>-demo/`.
+
+### Contributing Guidelines
+
+| Area                          | Location                                 |
+| ----------------------------- | ---------------------------------------- |
+| Business logic, models, state | `packages/core/src/`                     |
+| Shared UI component           | `packages/ui/src/janus-scheduler.ts`     |
+| Styles                        | `packages/ui/src/styles.ts`              |
+| Framework bindings            | `packages/wrappers/<framework>-wrapper/` |
+| Visual validation             | `demo/<framework>-demo/`                 |
+
+> **Rule:** Any new visual feature belongs in `packages/ui`. Framework wrappers should remain thin adapters — no UI logic should be duplicated per framework.
+
+## Tech Stack
+
+| Tool                                                                                              | Purpose                                          |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| [Lit](https://lit.dev/)                                                                           | Web Component authoring (`@janus-scheduler/ui`)  |
+| [@lit/react](https://github.com/lit/lit/tree/main/packages/react)                                 | React ↔ Web Component bridge                     |
+| [Vite](https://vitejs.dev/) + [vite-plugin-dts](https://github.com/qmhc/vite-plugin-dts)          | Package bundling and type declaration generation |
+| [TypeScript](https://www.typescriptlang.org/)                                                     | Static typing across all packages                |
+| [ESLint](https://eslint.org/) + [Prettier](https://prettier.io/)                                  | Code quality and formatting                      |
+| [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/okonet/lint-staged) | Pre-commit hooks                                 |
+| [Commitlint](https://commitlint.js.org/)                                                          | Conventional commit message enforcement          |
+| npm Workspaces                                                                                    | Monorepo package management                      |
 
 ## License
 
