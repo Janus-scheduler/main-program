@@ -2,6 +2,7 @@
   "name": "janus-scheduller",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "workspaces": [
     "packages/**",
     "demo/*"

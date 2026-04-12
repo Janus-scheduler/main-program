@@ -1,5 +1,5 @@
 import "./App.css";
-import Scheduler from "./../../../packages/wrappers/react-wrapper/cards/Scheduler";
+import { Scheduler } from "@janus-scheduler/react";
 
 function App() {
   return (
