@@ -1,5 +1,5 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import { schedulerStyles } from "./styles";
 
 const COLORS = ["orange", "blue", "green", "yellow", "purple"];

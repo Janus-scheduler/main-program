@@ -1,3 +1,8 @@
 node_modules
 package-lock.json
 dist
+coverage
+*.local
+fix.cjs
+eslint-errors.*
+lint_output.txt

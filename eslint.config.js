@@ -74,6 +74,9 @@ export default [
       "**/node_modules/**",
       "**/build/**",
       "**/.angular/**",
+      "**/coverage/**",
+      "reference/**",
+      "fix.cjs",
     ],
   },
 ];
