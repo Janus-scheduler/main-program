@@ -1,7 +1,12 @@
 import "./App.css";
+import { Scheduler } from "@janus-scheduler/react";
 
 function App() {
-  return <div>React demo project created with Vite</div>;
+  return (
+    <div>
+      <Scheduler onClose={() => console.log("Scheduler closed")} />
+    </div>
+  );
 }
 
 export default App;
