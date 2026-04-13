@@ -1,1 +1,1 @@
-//main export file for the core package
+export { SchedulerManager } from "./services/SchedulerManager.service";
