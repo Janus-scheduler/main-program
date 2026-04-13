@@ -1,5 +1,5 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, state, property } from "lit/decorators.js";
 import { schedulerStyles } from "./styles";
 
 const COLORS = ["orange", "blue", "green", "yellow", "purple"];
@@ -186,10 +186,39 @@ export class JanusScheduler extends LitElement {
     "Discussing the Q4 roadmap and resource allocation for upcoming projects.";
   @state() activeColor = "orange";
   @state() sidebarOpen = false;
+  @property({ type: String }) error: string | null = null;
 
   private _onClose() {
     this.dispatchEvent(
       new CustomEvent("close", { bubbles: true, composed: true }),
+    );
+  }
+
+  private _onSave() {
+    this.dispatchEvent(
+      new CustomEvent("save", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          title: this.title,
+          date: this.date,
+          startTime: this.startTime,
+          endTime: this.endTime,
+          participants: this.participants,
+          description: this.description,
+          activeColor: this.activeColor,
+        },
+      }),
+    );
+  }
+
+  private _onDelete() {
+    this.dispatchEvent(
+      new CustomEvent("delete", {
+        bubbles: true,
+        composed: true,
+        detail: { title: this.title },
+      }),
     );
   }
 
@@ -294,7 +323,9 @@ export class JanusScheduler extends LitElement {
               </div>
             </div>
             <div class="sidebar-footer">
-              <button class="btn-delete">${TrashIcon()} Delete Event</button>
+              <button class="btn-delete" @click=${this._onDelete}>
+                ${TrashIcon()} Delete Event
+              </button>
             </div>
           </aside>
 
@@ -365,6 +396,14 @@ export class JanusScheduler extends LitElement {
             </div>
 
             <div class="panel-body">
+              ${this.error
+                ? html`
+                    <div class="error-alert">
+                      <span class="error-icon">!</span>
+                      <span class="error-message">${this.error}</span>
+                    </div>
+                  `
+                : nothing}
               <div class="form-section">
                 <div class="section-label">Basic Info</div>
                 <div class="form-group">
@@ -486,14 +525,19 @@ export class JanusScheduler extends LitElement {
             </div>
 
             <div class="panel-footer">
-              <button class="btn-delete btn-delete--footer">
+              <button
+                class="btn-delete btn-delete--footer"
+                @click=${this._onDelete}
+              >
                 ${TrashIcon()} Delete
               </button>
               <div class="footer-right">
                 <button class="btn-cancel" @click=${this._onClose}>
                   Cancel
                 </button>
-                <button class="btn-save">Save Changes</button>
+                <button class="btn-save" @click=${this._onSave}>
+                  Save Changes
+                </button>
               </div>
             </div>
           </div>
