@@ -5,13 +5,8 @@ import {
   JanusTimeline as JanusTimelineWC,
 } from "@janus-scheduler/ui";
 
-// Register the custom elements if they haven't been registered yet
-if (!customElements.get("janus-scheduler")) {
-  customElements.define("janus-scheduler", JanusSchedulerWC);
-}
-if (!customElements.get("janus-timeline")) {
-  customElements.define("janus-timeline", JanusTimelineWC);
-}
+// The Lit @customElement decorator auto-registers the web components
+// when the module is imported, so no manual customElements.define() needed.
 
 export const Scheduler = createComponent({
   tagName: "janus-scheduler",

@@ -1,36 +1,20 @@
 /**
  * @janus-scheduler/angular
  *
- * Angular wrapper for the Janus Scheduler core library.
+ * Angular wrapper for the Janus Scheduler UI web components.
+ *
+ * This package is a thin adapter that wraps the framework-agnostic
+ * Lit-based web components from @janus-scheduler/ui, making them
+ * easy to use with Angular bindings and signals.
  *
  * Public API surface:
- *  – Components   : SchedulerComponent, EventCardComponent
- *  – Service      : SchedulerService
- *  – NgModule     : SchedulerModule  (for module-based apps)
- *  – Types        : all interfaces/types
+ *  – Components   : SchedulerComponent, TimelineComponent
+ *  – Types        : TimelineEvent, TimelineResource (re-exported from @janus-scheduler/ui)
  */
 
 // Components
 export { SchedulerComponent } from "./lib/scheduler.component";
-export { EventCardComponent } from "./lib/event-card.component";
+export { TimelineComponent } from "./lib/timeline.component";
 
-// Service
-export { SchedulerService } from "./lib/scheduler.service";
-
-// NgModule (backwards-compatible)
-export { SchedulerModule } from "./lib/scheduler.module";
-
-// Types — re-exported so consumers don't need to import from deep paths
-export type {
-  JanusEventData,
-  JanusResourceData,
-  JanusAssignmentData,
-  SchedulerConfig,
-  SchedulerState,
-  SchedulerView,
-  EventClickPayload,
-  EventCreatePayload,
-  EventUpdatePayload,
-  EventDeletePayload,
-  ResourceClickPayload,
-} from "./lib/types";
+// Types — re-exported so consumers don't need to import from @janus-scheduler/ui
+export type { TimelineEvent, TimelineResource } from "./lib/types";
