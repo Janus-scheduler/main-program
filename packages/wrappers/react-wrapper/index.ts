@@ -14,6 +14,8 @@ export const Scheduler = createComponent({
   react: React,
   events: {
     onClose: "close",
+    onSave: "save",
+    onDelete: "delete",
   },
 });
 
