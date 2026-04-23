@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import "./App.css";
 import { Timeline, Scheduler } from "@janus-scheduler/react";
+import { SchedulerManager } from "@janus-scheduler/core";
 
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
@@ -70,12 +71,59 @@ const SettingsIcon = () => (
 
 function App() {
   const [showScheduler, setShowScheduler] = useState(false);
+  const [schedulerError, setSchedulerError] = useState<string | null>(null);
+
+  // Initialize the core manager once
+  const manager = useMemo(() => new SchedulerManager(), []);
 
   // When adding an event or clicking one, we'll open the scheduler modal
-  const handleAddEvent = () => setShowScheduler(true);
-  const handleEventClick = (e: unknown) => {
-    console.log("Clicked event:", e);
+  const handleAddEvent = () => {
+    setSchedulerError(null);
     setShowScheduler(true);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEventClick = (e: any) => {
+    console.log("Clicked event:", e);
+    setSchedulerError(null);
+    setShowScheduler(true);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleSave = (e: any) => {
+    const data = e.detail;
+    console.log("Saving event with data:", data);
+
+    try {
+      // 1. Data Processing: Transform UI data into core EventData format
+      const eventData = {
+        id: `evt_${Date.now()}`,
+        title: data.title,
+        startTime: `${data.date}T${data.startTime}:00Z`,
+        endTime: `${data.date}T${data.endTime}:00Z`,
+        resourceId: data.participants[0] || "unassigned",
+        description: data.description,
+        status: "confirmed" as const,
+      };
+
+      // 2. Core Processing: Use the SchedulerManager to add the event
+      manager.addEvent(eventData);
+
+      console.log("✅ Event successfully added to core manager");
+      setShowScheduler(false);
+      setSchedulerError(null);
+    } catch (err: any) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      console.error("❌ Failed to save event:", err);
+      // Pass the error back to the UI component
+      setSchedulerError(err.message || "An unexpected error occurred");
+    }
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleDelete = (e: any) => {
+    console.log("Delete requested for:", e.detail.title);
+    // Logic for deletion if we had an ID
+    setShowScheduler(false);
   };
 
   return (
@@ -115,7 +163,14 @@ function App() {
         <Timeline onAddEvent={handleAddEvent} onEventClick={handleEventClick} />
 
         {/* Render the scheduler modal if active */}
-        {showScheduler && <Scheduler onClose={() => setShowScheduler(false)} />}
+        {showScheduler && (
+          <Scheduler
+            error={schedulerError}
+            onSave={handleSave}
+            onDelete={handleDelete}
+            onClose={() => setShowScheduler(false)}
+          />
+        )}
       </main>
     </div>
   );

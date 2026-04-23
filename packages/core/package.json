@@ -2,12 +2,25 @@
   "name": "@janus-scheduler/core",
   "version": "1.0.0",
   "type": "module",
-  "main": "",
+  "main": "./dist/janus-scheduler.cjs.js",
+  "module": "./dist/janus-scheduler.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/janus-scheduler.es.js",
+      "require": "./dist/janus-scheduler.cjs.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "build": "vite build"
   },
   "keywords": [
     "schedule-core"
