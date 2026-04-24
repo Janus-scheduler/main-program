@@ -2,13 +2,13 @@
   "name": "@janus-scheduler/ui",
   "version": "1.0.0",
   "type": "module",
-  "main": "./dist/janus-scheduler-ui.umd.cjs",
-  "module": "./dist/janus-scheduler-ui.js",
+  "main": "./dist/janus-scheduler-ui.umd.js",
+  "module": "./dist/janus-scheduler-ui.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/janus-scheduler-ui.js",
-      "require": "./dist/janus-scheduler-ui.umd.cjs",
+      "import": "./dist/janus-scheduler-ui.es.js",
+      "require": "./dist/janus-scheduler-ui.umd.js",
       "types": "./dist/index.d.ts"
     }
   },

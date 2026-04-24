@@ -1,59 +1,45 @@
-# AngularDemo
+# Janus Scheduler — Angular Demo
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.1.4.
+This is the Angular implementation of the Janus Scheduler demo. It demonstrates how to consume the framework-agnostic `@janus-scheduler/ui` web components within an Angular application using the `@janus-scheduler/angular` wrapper.
 
-## Development server
+## UI Consistency
 
-To start a local development server, run:
+The Angular demo is styled to match the React demo exactly, using the same **glassmorphism** design, sidebar layout, and professional color palette. Because both demos share the same underlying `@janus-scheduler/ui` package, they look and behave identically.
 
-```bash
-ng serve
-```
+## Key Features
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+- **Sidebar Navigation**: Professional layout with brand icon and functional navigation items.
+- **Timeline View**: Resource-based scheduling view with support for color-coded events.
+- **Scheduler Modal**: Pop-up modal for editing and adding events, featuring a summary sidebar and detailed form.
+- **Framework Agnostic**: The UI is rendered via Lit Web Components; Angular acts as a thin orchestration layer.
 
-## Code scaffolding
+## Development
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+### Prerequisites
 
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+Ensure you have built the core and UI packages first:
 
 ```bash
-ng generate --help
+# From the root
+npm install
+npm run build -w @janus-scheduler/ui
+npm run build -w @janus-scheduler/angular
 ```
 
-## Building
-
-To build the project run:
+### Run Server
 
 ```bash
-ng build
+npm run dev
+# or directly
+npx ng serve
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Open `http://localhost:4200` to see the demo.
 
-## Running unit tests
+## Implementation Details
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+The demo uses:
 
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- **Standalone Components**: `App` component is standalone.
+- **ViewEncapsulation.None**: Used in the main `App` component to allow the shared CSS variables and shell styles to apply globally (matching the React demo's behavior).
+- **Control Flow**: Uses Angular 17+ `@if` block syntax for the conditional scheduler modal.
