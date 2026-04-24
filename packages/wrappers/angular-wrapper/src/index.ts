@@ -17,4 +17,8 @@ export { SchedulerComponent } from "./lib/scheduler.component";
 export { TimelineComponent } from "./lib/timeline.component";
 
 // Types — re-exported so consumers don't need to import from @janus-scheduler/ui
-export type { TimelineEvent, TimelineResource } from "./lib/types";
+export type {
+  TimelineEvent,
+  TimelineResource,
+  SchedulerSaveData,
+} from "./lib/types";

@@ -57,9 +57,13 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly addEvent = output<void>();
 
   private _eventClickHandler = (e: Event) => {
+    e.stopPropagation();
     this.eventClick.emit((e as CustomEvent).detail);
   };
-  private _addEventHandler = () => this.addEvent.emit();
+  private _addEventHandler = (e: Event) => {
+    e.stopPropagation();
+    this.addEvent.emit();
+  };
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
