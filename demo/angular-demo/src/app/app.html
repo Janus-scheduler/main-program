@@ -59,7 +59,12 @@
     />
 
     @if (showScheduler) {
-      <janus-scheduler-ng (close)="closeScheduler()" />
+      <janus-scheduler-ng
+        [error]="schedulerError"
+        (save)="handleSave($event)"
+        (delete)="handleDelete($event)"
+        (close)="closeScheduler()"
+      />
     }
   </main>
 </div>
