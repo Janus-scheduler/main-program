@@ -112,11 +112,11 @@ function App() {
       console.log("✅ Event successfully added to core manager");
       setShowScheduler(false);
       setSchedulerError(null);
-    } catch (err: any) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      console.error("❌ Failed to save event:", err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error("❌ Failed to save event:", error);
       // Pass the error back to the UI component
-      setSchedulerError(err.message || "An unexpected error occurred");
+      setSchedulerError(error.message || "An unexpected error occurred");
     }
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
