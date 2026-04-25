@@ -54,8 +54,12 @@
 
   <main class="app-main">
     <janus-timeline-ng
+      [resources]="resources"
       (eventClick)="handleEventClick($event)"
       (addEvent)="handleAddEvent()"
+      (eventMove)="handleEventMove($event)"
+      (eventResize)="handleEventResize($event)"
+      (eventCreate)="handleEventCreate($event)"
     />
 
     @if (showScheduler) {

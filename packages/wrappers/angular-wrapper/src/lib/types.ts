@@ -4,7 +4,13 @@
  * Re-exports the framework-agnostic types from @janus-scheduler/ui
  * so consumers can import everything from @janus-scheduler/angular.
  */
-export type { TimelineEvent, TimelineResource } from "@janus-scheduler/ui";
+export type {
+  TimelineEvent,
+  TimelineResource,
+  EventMoveDetail,
+  EventResizeDetail,
+  EventCreateDetail,
+} from "@janus-scheduler/ui";
 
 export interface SchedulerSaveData {
   title: string;

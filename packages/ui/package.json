@@ -7,11 +7,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/janus-scheduler-ui.es.js",
-      "require": "./dist/janus-scheduler-ui.umd.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/janus-scheduler-ui.umd.js"
     }
   },
+  "sideEffects": true,
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",

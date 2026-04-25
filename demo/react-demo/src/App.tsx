@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import "./App.css";
 import { Timeline, Scheduler } from "@janus-scheduler/react";
 import { SchedulerManager } from "@janus-scheduler/core";
+import { SAMPLE } from "@janus-scheduler/ui";
+import type { TimelineResource, TimelineEvent } from "@janus-scheduler/ui";
 
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
@@ -72,6 +74,7 @@ const SettingsIcon = () => (
 function App() {
   const [showScheduler, setShowScheduler] = useState(false);
   const [schedulerError, setSchedulerError] = useState<string | null>(null);
+  const [resources, setResources] = useState(SAMPLE);
 
   // Initialize the core manager once
   const manager = useMemo(() => new SchedulerManager(), []);
@@ -126,6 +129,112 @@ function App() {
     setShowScheduler(false);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEventMove = (e: any) => {
+    const { event, oldResourceId, newResourceId, newStartTime, newEndTime } =
+      e.detail;
+    console.log("📦 Event moved:", e.detail);
+
+    setResources((prev) => {
+      // Remove from old resource
+      const oldResIndex = prev.findIndex(
+        (r: TimelineResource) => r.id === oldResourceId,
+      );
+      if (oldResIndex === -1) return prev;
+
+      const next = [...prev];
+      const oldRes = {
+        ...next[oldResIndex],
+        events: [...next[oldResIndex].events],
+      };
+      const eventIndex = oldRes.events.findIndex(
+        (ev: TimelineEvent) => ev.id === event.id,
+      );
+
+      if (eventIndex === -1) return prev;
+
+      const movedEvent = { ...oldRes.events[eventIndex] };
+      oldRes.events.splice(eventIndex, 1);
+      next[oldResIndex] = oldRes;
+
+      // Update event times
+      movedEvent.startTime = newStartTime;
+      movedEvent.endTime = newEndTime;
+
+      // Add to new resource
+      const newResIndex = next.findIndex(
+        (r: TimelineResource) => r.id === newResourceId,
+      );
+      if (newResIndex !== -1) {
+        const newRes = { ...next[newResIndex] };
+        newRes.events = [...newRes.events, movedEvent];
+        next[newResIndex] = newRes;
+      }
+
+      return next;
+    });
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEventResize = (e: any) => {
+    const { event, resourceId, newStartTime, newEndTime } = e.detail;
+    console.log("↔️ Event resized:", e.detail);
+
+    setResources((prev) => {
+      const resIndex = prev.findIndex(
+        (r: TimelineResource) => r.id === resourceId,
+      );
+      if (resIndex === -1) return prev;
+
+      const next = [...prev];
+      const res = { ...next[resIndex] };
+      const eventIndex = res.events.findIndex(
+        (ev: TimelineEvent) => ev.id === event.id,
+      );
+
+      if (eventIndex !== -1) {
+        res.events = [...res.events];
+        res.events[eventIndex] = {
+          ...res.events[eventIndex],
+          startTime: newStartTime,
+          endTime: newEndTime,
+        };
+        next[resIndex] = res;
+      }
+      return next;
+    });
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleEventCreate = (e: any) => {
+    const { resourceId, startTime, endTime, date } = e.detail;
+    console.log("✨ New event created:", e.detail);
+
+    setResources((prev) => {
+      const resIndex = prev.findIndex(
+        (r: TimelineResource) => r.id === resourceId,
+      );
+      if (resIndex === -1) return prev;
+
+      const next = [...prev];
+      const res = { ...next[resIndex] };
+
+      const newEvent = {
+        id: `evt_${Date.now()}`,
+        title: "New Event",
+        startTime,
+        endTime,
+        color: "blue" as const,
+        date,
+      };
+
+      res.events = [...res.events, newEvent];
+      next[resIndex] = res;
+
+      return next;
+    });
+  };
+
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
@@ -159,8 +268,14 @@ function App() {
       </aside>
 
       <main className="app-main">
-        {/* The timeline component acts as the main view area */}
-        <Timeline onAddEvent={handleAddEvent} onEventClick={handleEventClick} />
+        <Timeline
+          resources={resources}
+          onAddEvent={handleAddEvent}
+          onEventClick={handleEventClick}
+          onEventMove={handleEventMove}
+          onEventResize={handleEventResize}
+          onEventCreate={handleEventCreate}
+        />
 
         {/* Render the scheduler modal if active */}
         {showScheduler && (

@@ -16,3 +16,25 @@ export interface TimelineResource {
   groupLabel?: string;
   events: TimelineEvent[];
 }
+
+export interface EventMoveDetail {
+  event: TimelineEvent;
+  oldResourceId: string;
+  newResourceId: string;
+  newStartTime: string;
+  newEndTime: string;
+}
+
+export interface EventResizeDetail {
+  event: TimelineEvent;
+  resourceId: string;
+  newStartTime: string;
+  newEndTime: string;
+}
+
+export interface EventCreateDetail {
+  resourceId: string;
+  startTime: string;
+  endTime: string;
+  date: string;
+}
