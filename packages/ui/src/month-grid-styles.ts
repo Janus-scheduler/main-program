@@ -1,7 +1,7 @@
 import { css } from "lit";
 
 export const monthGridStyles = css`
-  /* ── Design tokens (identical to timeline so both components feel unified) ── */
+  /* ── Design tokens ── */
   :host {
     --white: #ffffff;
     --bg: #f4f4f5;
@@ -59,9 +59,8 @@ export const monthGridStyles = css`
     overflow: hidden;
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
-     TOP BAR  (identical structure to .tl-topbar)
-  ══════════════════════════════════════════════════════════════════════════ */
+  /* ── Top Bar ──────────────────────────────────────────────────────────────── */
+  
   .mg-topbar {
     height: var(--topbar-h);
     min-height: var(--topbar-h);
@@ -209,9 +208,8 @@ export const monthGridStyles = css`
     border: 1.5px solid var(--white);
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
-     MAIN PANEL
-  ══════════════════════════════════════════════════════════════════════════ */
+  /* ── Main Panel ──────────────────────────────────────────────────────────────── */
+
   .mg-panel {
     flex: 1;
     min-height: 0;
@@ -221,7 +219,7 @@ export const monthGridStyles = css`
     background: var(--white);
   }
 
-  /* ── Weekday header row (MON TUE … SUN) ─────────────────────────────── */
+  /* ── Weekday header row (MON TUE … SUN) ── */
   .mg-day-header {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -250,7 +248,7 @@ export const monthGridStyles = css`
     border-right: none;
   }
 
-  /* ── Calendar grid ───────────────────────────────────────────────────── */
+  /* ── Calendar grid ── */
   .mg-grid {
     flex: 1;
     min-height: 0;
@@ -270,7 +268,7 @@ export const monthGridStyles = css`
     border-bottom: none;
   }
 
-  /* ── Day cell ────────────────────────────────────────────────────────── */
+  /* ── Day cell ── */
   .mg-day-cell {
     border-right: 1px solid var(--border);
     padding: 8px 6px 6px;
@@ -305,7 +303,7 @@ export const monthGridStyles = css`
     background: var(--today-bg);
   }
 
-  /* ── Day number ──────────────────────────────────────────────────────── */
+  /* ── Day number ── */
   .mg-day-cell__top {
     display: flex;
     align-items: center;
@@ -344,7 +342,7 @@ export const monthGridStyles = css`
     letter-spacing: 0.4px;
   }
 
-  /* ── Event chips ─────────────────────────────────────────────────────── */
+  /* ── Event chips ── */
   .mg-event {
     display: flex;
     align-items: center;
@@ -424,9 +422,8 @@ export const monthGridStyles = css`
     padding: 1px 4px;
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
-     FAB
-  ══════════════════════════════════════════════════════════════════════════ */
+  /* ── Fab ──────────────────────────────────────────────────────────────── */
+
   .mg-fab {
     position: absolute;
     bottom: calc(var(--aicard-area-h) + 16px);
@@ -455,9 +452,8 @@ export const monthGridStyles = css`
     transform: scale(0.96);
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
-     AI BAR  (identical to timeline)
-  ══════════════════════════════════════════════════════════════════════════ */
+  /* ── AI Bar ──────────────────────────────────────────────────────────────── */
+
   .mg-ai-wrap {
     height: var(--aicard-area-h);
     min-height: var(--aicard-area-h);
@@ -525,9 +521,7 @@ export const monthGridStyles = css`
     transform: scale(0.97);
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
-     SCROLLBAR
-  ══════════════════════════════════════════════════════════════════════════ */
+  /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
   .mg-grid::-webkit-scrollbar {
     width: 6px;
   }
@@ -545,9 +539,8 @@ export const monthGridStyles = css`
     background: #a1a1aa;
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════
-     RESPONSIVE
-  ══════════════════════════════════════════════════════════════════════════ */
+  /* ── Responsive ──────────────────────────────────────────────────────────────── */
+
   @media (max-width: 900px) {
     .mg-nav__month {
       font-size: 14px;

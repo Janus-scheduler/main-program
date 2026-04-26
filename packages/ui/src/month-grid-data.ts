@@ -11,7 +11,6 @@ function ds(day: number): string {
 const todayDay = new Date().getDate();
 
 export const MONTH_SAMPLE: MonthEvent[] = [
-  // Today's events
   {
     id: "m1",
     title: "Design Sync",
@@ -21,7 +20,6 @@ export const MONTH_SAMPLE: MonthEvent[] = [
     endTime: "10:00",
   },
 
-  // Earlier this month
   {
     id: "m2",
     title: "Strategy Workshop",
@@ -39,7 +37,6 @@ export const MONTH_SAMPLE: MonthEvent[] = [
     endTime: "12:30",
   },
 
-  // Later this month
   {
     id: "m4",
     title: "Patient X Scan",

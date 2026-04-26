@@ -18,7 +18,7 @@ import {
   BellIcon,
   SparkleIcon,
   PlusIcon,
-} from "./timeline-icons"; // ← reuse existing icons, no duplication
+} from "./timeline-icons"; // reuse existing icons
 
 @customElement("janus-month-grid")
 export class JanusMonthGrid extends LitElement {

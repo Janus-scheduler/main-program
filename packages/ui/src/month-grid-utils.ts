@@ -28,16 +28,10 @@ export function toDateStr(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
-/** Today as "YYYY-MM-DD" */
 export function todayStr(): string {
   return toDateStr(new Date());
 }
 
-/**
- * Build the 6-row × 7-col calendar grid for a given year/month.
- * Week starts on Monday (matching the design image).
- * Days from prev/next month fill the edges (isCurrentMonth = false).
- */
 export function buildCalendarGrid(
   year: number,
   month: number, // 0-based (Jan = 0)
@@ -61,7 +55,6 @@ export function buildCalendarGrid(
   const jsDay = firstOfMonth.getDay(); // 0=Sun … 6=Sat
   const offset = jsDay === 0 ? 6 : jsDay - 1; // convert to Mon-based
 
-  // Build flat list of days (always 6 weeks = 42 cells)
   const days: CalendarDay[] = [];
   const startDate = new Date(year, month, 1 - offset);
 
