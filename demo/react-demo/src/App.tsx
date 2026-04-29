@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import "./App.css";
-import { Timeline, Scheduler } from "@janus-scheduler/react";
+import { Timeline, Scheduler, MonthGrid } from "@janus-scheduler/react";
 import { SchedulerManager } from "@janus-scheduler/core";
 
 const GridIcon = () => (
@@ -71,10 +71,18 @@ const SettingsIcon = () => (
 
 function App() {
   const [showScheduler, setShowScheduler] = useState(false);
+  const [currentView, setCurrentView] = useState<"Timeline" | "Month">(
+    "Timeline",
+  );
   const [schedulerError, setSchedulerError] = useState<string | null>(null);
 
   // Initialize the core manager once
   const manager = useMemo(() => new SchedulerManager(), []);
+
+  const handleViewChange = (e: Event) => {
+    const view = (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail.view;
+    setCurrentView(view);
+  };
 
   // When adding an event or clicking one, we'll open the scheduler modal
   const handleAddEvent = () => {
@@ -160,7 +168,22 @@ function App() {
 
       <main className="app-main">
         {/* The timeline component acts as the main view area */}
-        <Timeline onAddEvent={handleAddEvent} onEventClick={handleEventClick} />
+        {/* <Timeline onAddEvent={handleAddEvent} onEventClick={handleEventClick} />*/}
+
+        {currentView === "Timeline" && (
+          <Timeline
+            onAddEvent={handleAddEvent}
+            onEventClick={handleEventClick}
+            onViewChange={handleViewChange}
+          />
+        )}
+        {currentView === "Month" && (
+          <MonthGrid
+            onAddEvent={handleAddEvent}
+            onEventClick={handleEventClick}
+            onViewChange={handleViewChange}
+          />
+        )}
 
         {/* Render the scheduler modal if active */}
         {showScheduler && (
