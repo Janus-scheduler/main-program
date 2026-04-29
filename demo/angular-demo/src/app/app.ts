@@ -1,7 +1,15 @@
 import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { SchedulerComponent, TimelineComponent } from '@janus-scheduler/angular';
-import type { TimelineEvent, SchedulerSaveData } from '@janus-scheduler/angular';
+import type {
+  TimelineEvent,
+  SchedulerSaveData,
+  EventMoveDetail,
+  EventResizeDetail,
+  EventCreateDetail,
+} from '@janus-scheduler/angular';
 import { SchedulerManager } from '@janus-scheduler/core';
+import { SAMPLE } from '@janus-scheduler/ui';
+import type { TimelineResource } from '@janus-scheduler/ui';
 
 @Component({
   selector: 'app-root',
@@ -15,6 +23,7 @@ import { SchedulerManager } from '@janus-scheduler/core';
 export class App {
   showScheduler = false;
   schedulerError: string | null = null;
+  resources: TimelineResource[] = JSON.parse(JSON.stringify(SAMPLE));
   private manager = new SchedulerManager();
 
   handleAddEvent(): void {
@@ -64,5 +73,88 @@ export class App {
 
   closeScheduler(): void {
     this.showScheduler = false;
+  }
+
+  handleEventMove(data: EventMoveDetail): void {
+    const { event, oldResourceId, newResourceId, newStartTime, newEndTime } = data;
+    console.log('📦 Event moved:', data);
+
+    const next = [...this.resources];
+
+    // Remove from old resource
+    const oldResIndex = next.findIndex((r) => r.id === oldResourceId);
+    if (oldResIndex === -1) return;
+
+    const oldRes = { ...next[oldResIndex], events: [...next[oldResIndex].events] };
+    const eventIndex = oldRes.events.findIndex((ev) => ev.id === event.id);
+
+    if (eventIndex === -1) return;
+
+    const movedEvent = { ...oldRes.events[eventIndex] };
+    oldRes.events.splice(eventIndex, 1);
+    next[oldResIndex] = oldRes;
+
+    // Update event times
+    movedEvent.startTime = newStartTime;
+    movedEvent.endTime = newEndTime;
+
+    // Add to new resource
+    const newResIndex = next.findIndex((r) => r.id === newResourceId);
+    if (newResIndex !== -1) {
+      const newRes = { ...next[newResIndex] };
+      newRes.events = [...newRes.events, movedEvent];
+      next[newResIndex] = newRes;
+    }
+
+    this.resources = next;
+  }
+
+  handleEventResize(data: EventResizeDetail): void {
+    const { event, resourceId, newStartTime, newEndTime } = data;
+    console.log('↔️ Event resized:', data);
+
+    const next = [...this.resources];
+    const resIndex = next.findIndex((r) => r.id === resourceId);
+    if (resIndex === -1) return;
+
+    const res = { ...next[resIndex] };
+    const eventIndex = res.events.findIndex((ev) => ev.id === event.id);
+
+    if (eventIndex !== -1) {
+      res.events = [...res.events];
+      res.events[eventIndex] = {
+        ...res.events[eventIndex],
+        startTime: newStartTime,
+        endTime: newEndTime,
+      };
+      next[resIndex] = res;
+    }
+
+    this.resources = next;
+  }
+
+  handleEventCreate(data: EventCreateDetail): void {
+    const { resourceId, startTime, endTime, date } = data;
+    console.log('✨ New event created:', data);
+
+    const next = [...this.resources];
+    const resIndex = next.findIndex((r) => r.id === resourceId);
+    if (resIndex === -1) return;
+
+    const res = { ...next[resIndex] };
+
+    const newEvent = {
+      id: `evt_${Date.now()}`,
+      title: 'New Event',
+      startTime,
+      endTime,
+      color: 'blue' as const,
+      date,
+    };
+
+    res.events = [...res.events, newEvent];
+    next[resIndex] = res;
+
+    this.resources = next;
   }
 }

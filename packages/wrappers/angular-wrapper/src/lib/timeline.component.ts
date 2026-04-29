@@ -11,8 +11,16 @@ import {
   ChangeDetectionStrategy,
 } from "@angular/core";
 // Side-effect import: ensures the <janus-timeline> custom element is registered
-import "@janus-scheduler/ui";
-import type { TimelineResource, TimelineEvent } from "@janus-scheduler/ui";
+import { JanusTimeline } from "@janus-scheduler/ui";
+// Ensure the class is not dropped
+const _ = JanusTimeline;
+import type {
+  TimelineResource,
+  TimelineEvent,
+  EventMoveDetail,
+  EventResizeDetail,
+  EventCreateDetail,
+} from "@janus-scheduler/ui";
 
 /**
  * TimelineComponent
@@ -56,6 +64,15 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Emitted when the "add event" FAB is clicked */
   readonly addEvent = output<void>();
 
+  /** Emitted when an event is moved via drag-and-drop */
+  readonly eventMove = output<EventMoveDetail>();
+
+  /** Emitted when an event is resized via drag */
+  readonly eventResize = output<EventResizeDetail>();
+
+  /** Emitted when a new event is created by dragging on empty space */
+  readonly eventCreate = output<EventCreateDetail>();
+
   private _eventClickHandler = (e: Event) => {
     e.stopPropagation();
     this.eventClick.emit((e as CustomEvent).detail);
@@ -64,11 +81,26 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.addEvent.emit();
   };
+  private _eventMoveHandler = (e: Event) => {
+    e.stopPropagation();
+    this.eventMove.emit((e as CustomEvent).detail);
+  };
+  private _eventResizeHandler = (e: Event) => {
+    e.stopPropagation();
+    this.eventResize.emit((e as CustomEvent).detail);
+  };
+  private _eventCreateHandler = (e: Event) => {
+    e.stopPropagation();
+    this.eventCreate.emit((e as CustomEvent).detail);
+  };
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
     el.addEventListener("event-click", this._eventClickHandler);
     el.addEventListener("add-event", this._addEventHandler);
+    el.addEventListener("event-move", this._eventMoveHandler);
+    el.addEventListener("event-resize", this._eventResizeHandler);
+    el.addEventListener("event-create", this._eventCreateHandler);
     this._syncResources();
   }
 
@@ -80,6 +112,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     const el = this._elRef()?.nativeElement;
     el?.removeEventListener("event-click", this._eventClickHandler);
     el?.removeEventListener("add-event", this._addEventHandler);
+    el?.removeEventListener("event-move", this._eventMoveHandler);
+    el?.removeEventListener("event-resize", this._eventResizeHandler);
+    el?.removeEventListener("event-create", this._eventCreateHandler);
   }
 
   private _syncResources(): void {
