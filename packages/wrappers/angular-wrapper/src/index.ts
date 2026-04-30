@@ -21,4 +21,7 @@ export type {
   TimelineEvent,
   TimelineResource,
   SchedulerSaveData,
+  EventMoveDetail,
+  EventResizeDetail,
+  EventCreateDetail,
 } from "./lib/types";

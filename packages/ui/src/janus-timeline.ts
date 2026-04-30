@@ -17,6 +17,9 @@ import {
   HOUR_START,
   HOUR_WIDTH,
   VISIBLE_HOURS,
+  ROW_HEIGHT,
+  GROUP_LABEL_HEIGHT,
+  HOUR_HEADER_HEIGHT,
   fmt12,
   getInitials,
   avatarColor,
@@ -27,6 +30,7 @@ import {
   formatDateShort,
 } from "./timeline-utils";
 import { SAMPLE } from "./timeline-data";
+import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
 @customElement("janus-timeline")
 export class JanusTimeline extends LitElement {
@@ -37,9 +41,15 @@ export class JanusTimeline extends LitElement {
   @state() view: "Timeline" | "Month" = "Timeline";
   @state() currentDate = new Date();
   @state() aiPrompt = "";
+  @state() private _dragVersion = 0; // bumped to trigger re-render during drag
 
   @query(".tl-res-col") resColRef!: HTMLElement;
   @query(".tl-time-scroll") gridScrollRef!: HTMLElement;
+
+  private _drag = new TimelineDragController(() => {
+    this._dragVersion++;
+  });
+  private _wasDragging = false;
 
   firstUpdated() {
     // On mount: scroll horizontally so 8:00 AM is the first visible hour
@@ -70,7 +80,14 @@ export class JanusTimeline extends LitElement {
     this.currentDate = new Date();
   }
 
-  private _handleEventClick(ev: TimelineEvent) {
+  private _handleEventClick(e: Event, ev: TimelineEvent) {
+    // Don't fire click if we just finished a drag
+    if (this._wasDragging) {
+      this._wasDragging = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     this.dispatchEvent(
       new CustomEvent("event-click", {
         detail: ev,
@@ -86,6 +103,81 @@ export class JanusTimeline extends LitElement {
     );
   }
 
+  // ── Drag-and-drop handlers ────────────────────────────────────────
+
+  private _onEventPointerDown(
+    e: PointerEvent,
+    ev: TimelineEvent,
+    resourceId: string,
+  ) {
+    // Only left mouse button
+    if (e.button !== 0) return;
+    this._drag.startMove(e, ev, resourceId);
+    this._addDragUpListener();
+  }
+
+  private _onResizePointerDown(
+    e: PointerEvent,
+    ev: TimelineEvent,
+    resourceId: string,
+    edge: "start" | "end",
+  ) {
+    if (e.button !== 0) return;
+    this._drag.startResize(e, ev, resourceId, edge);
+    this._addDragUpListener();
+  }
+
+  private _onRowPointerDown(e: PointerEvent, resourceId: string) {
+    if (e.button !== 0) return;
+    this._drag.startCreate(e, resourceId);
+    if (this._drag.mode === "creating") {
+      this._addDragUpListener();
+    }
+  }
+
+  private _addDragUpListener() {
+    const handler = (_e: PointerEvent) => {
+      document.removeEventListener("pointerup", handler);
+      const result = this._drag.completeAndGetResult();
+      if (result) {
+        this._wasDragging = true;
+        // Set the current date on create events
+        if (result.type === "event-create") {
+          result.detail.date = toDateStr(this.currentDate);
+        }
+        this.dispatchEvent(
+          new CustomEvent(result.type, {
+            detail: result.detail,
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      }
+    };
+    document.addEventListener("pointerup", handler);
+  }
+
+  // ── Resource layout computation ───────────────────────────────────
+
+  private _computeResourceLayout(
+    groups: { label: string; items: TimelineResource[] }[],
+  ): ResourceLayout[] {
+    const layout: ResourceLayout[] = [];
+    let y = HOUR_HEADER_HEIGHT;
+    let idx = 0;
+    for (const g of groups) {
+      if (g.label) y += GROUP_LABEL_HEIGHT;
+      for (const r of g.items) {
+        layout.push({ id: r.id, yOffset: y, index: idx });
+        y += ROW_HEIGHT;
+        idx++;
+      }
+    }
+    return layout;
+  }
+
+  // ── Rendering helpers ─────────────────────────────────────────────
+
   private renderAvatar(r: TimelineResource) {
     if (r.avatarType === "initials") {
       return html`<span
@@ -98,6 +190,22 @@ export class JanusTimeline extends LitElement {
       <span class="tl-avatar tl-avatar--icon tl-avatar--${r.avatarIcon}">
         ${r.avatarIcon === "room" ? RoomIcon() : EquipmentIcon()}
       </span>
+    `;
+  }
+
+  private _renderDragGhost() {
+    if (!this._drag.active) return nothing;
+    // Reference _dragVersion to ensure Lit tracks this dependency
+    void this._dragVersion;
+    const g = this._drag.ghost;
+    return html`
+      <div
+        class="tl-drag-ghost tl-drag-ghost--${g.color}"
+        style="left: ${g.left}px; top: ${g.top}px; width: ${g.width}px;"
+      >
+        <span class="tl-drag-ghost__title">${g.title}</span>
+        <span class="tl-drag-ghost__time">${g.timeLabel}</span>
+      </div>
     `;
   }
 
@@ -124,6 +232,10 @@ export class JanusTimeline extends LitElement {
         groups.push(cur);
       }
     }
+
+    // Update drag controller with current layout
+    const resourceLayout = this._computeResourceLayout(groups);
+    this._drag.updateLayout(this.gridScrollRef, resourceLayout);
 
     const totalW = VISIBLE_HOURS.length * HOUR_WIDTH;
     const nl = nowLeft();
@@ -252,7 +364,12 @@ export class JanusTimeline extends LitElement {
                         : nothing}
                       ${g.items.map(
                         (r) => html`
-                          <div class="tl-event-row">
+                          <div
+                            class="tl-event-row"
+                            data-resource-id=${r.id}
+                            @pointerdown=${(e: PointerEvent) =>
+                              this._onRowPointerDown(e, r.id)}
+                          >
                             ${VISIBLE_HOURS.map(
                               (h) =>
                                 html`<div
@@ -263,11 +380,28 @@ export class JanusTimeline extends LitElement {
                             )}
                             ${r.events.map(
                               (ev) => html`
-                                <button
-                                  class="tl-event tl-event--${ev.color}"
+                                <div
+                                  class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
+                                    ev,
+                                  )
+                                    ? "tl-event--dragging"
+                                    : ""}"
                                   style=${eventStyle(ev)}
-                                  @click=${() => this._handleEventClick(ev)}
+                                  @pointerdown=${(e: PointerEvent) =>
+                                    this._onEventPointerDown(e, ev, r.id)}
+                                  @click=${(e: Event) =>
+                                    this._handleEventClick(e, ev)}
                                 >
+                                  <div
+                                    class="tl-event-resize-handle tl-event-resize-handle--start"
+                                    @pointerdown=${(e: PointerEvent) =>
+                                      this._onResizePointerDown(
+                                        e,
+                                        ev,
+                                        r.id,
+                                        "start",
+                                      )}
+                                  ></div>
                                   <span class="tl-event__title"
                                     >${ev.title}</span
                                   >
@@ -275,7 +409,17 @@ export class JanusTimeline extends LitElement {
                                     >${fmt12(ev.startTime)} –
                                     ${fmt12(ev.endTime)}</span
                                   >
-                                </button>
+                                  <div
+                                    class="tl-event-resize-handle tl-event-resize-handle--end"
+                                    @pointerdown=${(e: PointerEvent) =>
+                                      this._onResizePointerDown(
+                                        e,
+                                        ev,
+                                        r.id,
+                                        "end",
+                                      )}
+                                  ></div>
+                                </div>
                               `,
                             )}
                           </div>
@@ -284,6 +428,7 @@ export class JanusTimeline extends LitElement {
                     </div>
                   `,
                 )}
+                ${this._renderDragGhost()}
               </div>
             </div>
           </div>

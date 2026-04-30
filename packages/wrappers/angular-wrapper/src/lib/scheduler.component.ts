@@ -11,7 +11,9 @@ import {
   ChangeDetectionStrategy,
 } from "@angular/core";
 // Side-effect import: ensures the <janus-scheduler> custom element is registered
-import "@janus-scheduler/ui";
+import { JanusScheduler } from "@janus-scheduler/ui";
+// Ensure the class is not dropped
+const _ = JanusScheduler;
 import { SchedulerSaveData } from "./types";
 
 /**

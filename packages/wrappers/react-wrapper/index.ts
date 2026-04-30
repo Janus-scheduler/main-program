@@ -28,6 +28,9 @@ export const Timeline = createComponent({
     onEventClick: "event-click",
     onAddEvent: "add-event",
     onViewChange: "view-change",
+    onEventMove: "event-move",
+    onEventResize: "event-resize",
+    onEventCreate: "event-create",
   },
 });
 
