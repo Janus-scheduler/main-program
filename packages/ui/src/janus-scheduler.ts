@@ -137,6 +137,18 @@ const ChevronDownIcon = () =>
     <polyline points="6 9 12 15 18 9" />
   </svg>`;
 
+//  Moon icon for overnight indicator
+const MoonIcon = () =>
+  html`<svg
+    width="11"
+    height="11"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    stroke="none"
+  >
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>`;
+
 const avatarPalette: Record<string, string> = {
   "John Doe": "orange",
   "Sarah Chen": "blue",
@@ -164,6 +176,12 @@ function formatDate(isoDate: string): string {
   });
 }
 
+function formatDateShort(isoDate: string): string {
+  if (!isoDate) return "";
+  const d = new Date(isoDate);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function formatTime(timeVal: string): string {
   if (!timeVal) return "";
   const [h, m] = timeVal.split(":").map(Number);
@@ -171,6 +189,31 @@ function formatTime(timeVal: string): string {
   const hour = h % 12 || 12;
   return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`;
 }
+
+/**
+ * Adds one calendar day to an ISO date string (YYYY-MM-DD).
+ */
+function addOneDay(isoDate: string): string {
+  if (!isoDate) return isoDate;
+  const d = new Date(isoDate);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Returns true when endTime (HH:mm) <= startTime (HH:mm),
+ * meaning the event crosses midnight into the next day.
+ */
+function crossesMidnight(startTime: string, endTime: string): boolean {
+  if (!startTime || !endTime) return false;
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  return eh * 60 + em <= sh * 60 + sm;
+}
+
+// Hour / Minute arrays
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
 @customElement("janus-scheduler")
 export class JanusScheduler extends LitElement {
@@ -186,8 +229,25 @@ export class JanusScheduler extends LitElement {
     "Discussing the Q4 roadmap and resource allocation for upcoming projects.";
   @state() activeColor = "orange";
   @state() sidebarOpen = false;
+
+  // Time-picker dropdown open states
+  @state() startPickerOpen = false;
+  @state() endPickerOpen = false;
+
   @property({ type: String }) error: string | null = null;
 
+  // Computed helpers
+
+  private get _overnight(): boolean {
+    return crossesMidnight(this.startTime, this.endTime);
+  }
+
+  /** The effective end date: same day normally, next day if overnight. */
+  private get _endDate(): string {
+    return this._overnight ? addOneDay(this.date) : this.date;
+  }
+
+  //  Event dispatchers
   private _onClose() {
     this.dispatchEvent(
       new CustomEvent("close", { bubbles: true, composed: true }),
@@ -202,8 +262,10 @@ export class JanusScheduler extends LitElement {
         detail: {
           title: this.title,
           date: this.date,
+          endDate: this._endDate,
           startTime: this.startTime,
           endTime: this.endTime,
+          overnight: this._overnight,
           participants: this.participants,
           description: this.description,
           activeColor: this.activeColor,
@@ -241,11 +303,118 @@ export class JanusScheduler extends LitElement {
     }
   }
 
+  //  Time picker helpers
+
+  private _parseTime(timeVal: string): { h: number; m: number } {
+    if (!timeVal) return { h: 0, m: 0 };
+    const [h, m] = timeVal.split(":").map(Number);
+    return { h, m };
+  }
+
+  private _setStartTime(h: number, m: number) {
+    this.startTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  }
+
+  private _setEndTime(h: number, m: number) {
+    this.endTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  }
+
+  /** Close pickers when clicking outside the shadow DOM */
+  connectedCallback() {
+    super.connectedCallback();
+    this._handleOutsideClick = this._handleOutsideClick.bind(this);
+    document.addEventListener("click", this._handleOutsideClick);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener("click", this._handleOutsideClick);
+  }
+
+  private _handleOutsideClick(_e: MouseEvent) {
+    // Clicking anywhere outside the component closes pickers
+    if (this.startPickerOpen || this.endPickerOpen) {
+      this.startPickerOpen = false;
+      this.endPickerOpen = false;
+    }
+  }
+
+  // Time Picker Dropdown template
+
+  private _timePicker(
+    currentTime: string,
+    onHour: (h: number) => void,
+    onMinute: (m: number) => void,
+  ) {
+    const { h: selH, m: selM } = this._parseTime(currentTime);
+
+    return html`
+      <div
+        class="time-picker-dropdown"
+        @click=${(e: Event) => e.stopPropagation()}
+      >
+        <div class="time-picker-header">Select Time</div>
+        <div class="time-picker-body">
+          <!-- Hour column -->
+          <div class="time-col">
+            <div class="time-col-label">Hour</div>
+            <div class="time-scroll">
+              ${HOURS.map((h) => {
+                const ampm = h >= 12 ? "PM" : "AM";
+                const label = `${h % 12 || 12} ${ampm}`;
+                return html`<button
+                  class="time-cell ${selH === h ? "time-cell--active" : ""}"
+                  @click=${() => onHour(h)}
+                >
+                  ${label}
+                </button>`;
+              })}
+            </div>
+          </div>
+
+          <div class="time-divider">:</div>
+
+          <!-- Minute column -->
+          <div class="time-col">
+            <div class="time-col-label">Min</div>
+            <div class="time-scroll">
+              ${MINUTES.map(
+                (m) =>
+                  html`<button
+                    class="time-cell ${selM === m ? "time-cell--active" : ""}"
+                    @click=${() => onMinute(m)}
+                  >
+                    ${m.toString().padStart(2, "0")}
+                  </button>`,
+              )}
+            </div>
+          </div>
+        </div>
+
+        <!-- Live preview -->
+        <div class="time-picker-preview">${formatTime(currentTime)}</div>
+      </div>
+    `;
+  }
+
+  // Render ─
+
   render() {
-    const timeDisplay =
-      this.startTime && this.endTime
-        ? `${formatTime(this.startTime)} – ${formatTime(this.endTime)}`
-        : "—";
+    const overnight = this._overnight;
+
+    // Sidebar time display: shows date range if overnight
+    let timeDisplay: string;
+    if (overnight) {
+      timeDisplay = `${formatDateShort(this.date)} ${formatTime(this.startTime)} – ${formatDateShort(this._endDate)} ${formatTime(this.endTime)}`;
+    } else {
+      timeDisplay =
+        this.startTime && this.endTime
+          ? `${formatTime(this.startTime)} – ${formatTime(this.endTime)}`
+          : "–";
+    }
+
+    const { h: startH, m: startM } = this._parseTime(this.startTime);
+    const { h: endH, m: endM } = this._parseTime(this.endTime);
 
     return html`
       <div
@@ -265,7 +434,12 @@ export class JanusScheduler extends LitElement {
                 <div>
                   <div class="meta-label">Date</div>
                   <div class="meta-value">
-                    ${this.date ? formatDate(this.date) : "—"}
+                    ${overnight
+                      ? html`${formatDate(this.date)} –
+                        ${formatDate(this._endDate)}`
+                      : this.date
+                        ? formatDate(this.date)
+                        : "–"}
                   </div>
                 </div>
               </div>
@@ -273,7 +447,14 @@ export class JanusScheduler extends LitElement {
                 <span class="meta-icon">${ClockIcon()}</span>
                 <div>
                   <div class="meta-label">Time</div>
-                  <div class="meta-value">${timeDisplay}</div>
+                  <div class="meta-value time-value-row">
+                    ${timeDisplay}
+                    ${overnight
+                      ? html`<span class="overnight-badge">
+                          ${MoonIcon()} Overnight
+                        </span>`
+                      : nothing}
+                  </div>
                 </div>
               </div>
               <div class="meta-item">
@@ -365,7 +546,7 @@ export class JanusScheduler extends LitElement {
                 <div class="msummary-item">
                   <span class="meta-label">Date</span>
                   <span class="meta-value"
-                    >${this.date ? formatDate(this.date) : "—"}</span
+                    >${this.date ? formatDate(this.date) : "–"}</span
                   >
                 </div>
                 <div class="msummary-item">
@@ -430,36 +611,95 @@ export class JanusScheduler extends LitElement {
                     />
                   </div>
                 </div>
+
+                <!-- ── Custom time pickers ── -->
                 <div class="form-row">
+                  <!-- START TIME -->
                   <div class="form-group">
                     <label>Start Time</label>
-                    <div class="input-icon-wrap">
-                      <span class="input-icon">${ClockIcon()}</span>
-                      <input
-                        type="time"
-                        .value=${this.startTime}
-                        @input=${(e: Event) =>
-                          (this.startTime = (
-                            e.target as HTMLInputElement
-                          ).value)}
-                        class="date-time-input"
-                      />
+                    <div class="time-picker-wrap">
+                      <button
+                        class="time-trigger ${this.startPickerOpen
+                          ? "time-trigger--open"
+                          : ""}"
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          this.startPickerOpen = !this.startPickerOpen;
+                          this.endPickerOpen = false;
+                        }}
+                        type="button"
+                      >
+                        <span class="time-trigger-icon">${ClockIcon()}</span>
+                        <span class="time-trigger-value">
+                          ${formatTime(this.startTime)}
+                        </span>
+                        <span class="time-trigger-chevron">
+                          ${ChevronDownIcon()}
+                        </span>
+                      </button>
+                      ${this.startPickerOpen
+                        ? this._timePicker(
+                            this.startTime,
+                            (h) => this._setStartTime(h, startM),
+                            (m) => this._setStartTime(startH, m),
+                          )
+                        : nothing}
                     </div>
                   </div>
+
+                  <!-- END TIME -->
                   <div class="form-group">
-                    <label>End Time</label>
-                    <div class="input-icon-wrap">
-                      <span class="input-icon">${ClockIcon()}</span>
-                      <input
-                        type="time"
-                        .value=${this.endTime}
-                        @input=${(e: Event) =>
-                          (this.endTime = (e.target as HTMLInputElement).value)}
-                        class="date-time-input"
-                      />
+                    <label>
+                      End Time
+                      ${overnight
+                        ? html`<span class="next-day-badge">
+                            ${MoonIcon()} +1 day
+                          </span>`
+                        : nothing}
+                    </label>
+                    <div class="time-picker-wrap">
+                      <button
+                        class="time-trigger ${this.endPickerOpen
+                          ? "time-trigger--open"
+                          : ""} ${overnight ? "time-trigger--overnight" : ""}"
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          this.endPickerOpen = !this.endPickerOpen;
+                          this.startPickerOpen = false;
+                        }}
+                        type="button"
+                      >
+                        <span class="time-trigger-icon">${ClockIcon()}</span>
+                        <span class="time-trigger-value">
+                          ${formatTime(this.endTime)}
+                        </span>
+                        <span class="time-trigger-chevron">
+                          ${ChevronDownIcon()}
+                        </span>
+                      </button>
+                      ${this.endPickerOpen
+                        ? this._timePicker(
+                            this.endTime,
+                            (h) => this._setEndTime(h, endM),
+                            (m) => this._setEndTime(endH, m),
+                          )
+                        : nothing}
                     </div>
                   </div>
                 </div>
+
+                <!-- Overnight notice -->
+                ${overnight
+                  ? html`
+                      <div class="overnight-notice">
+                        ${MoonIcon()}
+                        <span>
+                          This event runs overnight — it ends on
+                          <strong>${formatDate(this._endDate)}</strong>.
+                        </span>
+                      </div>
+                    `
+                  : nothing}
               </div>
 
               <div class="form-section">
