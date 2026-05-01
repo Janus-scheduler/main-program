@@ -3,6 +3,7 @@ import { createComponent } from "@lit/react";
 import {
   JanusScheduler as JanusSchedulerWC,
   JanusTimeline as JanusTimelineWC,
+  JanusMonthGrid as JanusMonthGridWC,
 } from "@janus-scheduler/ui";
 
 // The Lit @customElement decorator auto-registers the web components
@@ -26,8 +27,21 @@ export const Timeline = createComponent({
   events: {
     onEventClick: "event-click",
     onAddEvent: "add-event",
+    onViewChange: "view-change",
     onEventMove: "event-move",
     onEventResize: "event-resize",
     onEventCreate: "event-create",
+  },
+});
+
+export const MonthGrid = createComponent({
+  tagName: "janus-month-grid",
+  elementClass: JanusMonthGridWC,
+  react: React,
+  events: {
+    onEventClick: "event-click",
+    onDayClick: "day-click",
+    onAddEvent: "add-event",
+    onViewChange: "view-change",
   },
 });
