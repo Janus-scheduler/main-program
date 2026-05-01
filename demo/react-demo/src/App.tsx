@@ -70,10 +70,9 @@ const SettingsIcon = () => (
 
 function App() {
   const [showScheduler, setShowScheduler] = useState(false);
-  const [currentView, setCurrentView] = useState<"Timeline" | "Month">(
-    "Timeline",
-  );
   const [schedulerError, setSchedulerError] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<"Timeline" | "Month">("Month");
+  console.log("current view", currentView);
 
   // Initialize the core manager once and populate initial data
   const manager = useMemo(() => {
@@ -258,10 +257,8 @@ function App() {
 
         {currentView === "Timeline" && (
           <Timeline
-            resources={resources}
             onAddEvent={handleAddEvent}
             onEventClick={handleEventClick}
-            onViewChange={handleViewChange}
             onEventMove={handleEventMove}
             onEventResize={handleEventResize}
             onEventCreate={handleEventCreate}

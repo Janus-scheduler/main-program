@@ -10,7 +10,6 @@ import {
   formatMonthYear,
   fmt12,
 } from "./month-grid-utils";
-import { MONTH_SAMPLE } from "./month-grid-data";
 import {
   ChevronLeft,
   ChevronRight,
@@ -20,12 +19,45 @@ import {
   PlusIcon,
 } from "./timeline-icons"; // reuse existing icons
 
+import { schedulerStore } from "@janus-scheduler/core";
+
 @customElement("janus-month-grid")
 export class JanusMonthGrid extends LitElement {
   static readonly styles = monthGridStyles;
 
-  // ── Public properties (consumers can pass these in) ───────────────────
-  @property({ type: Array }) events: MonthEvent[] = MONTH_SAMPLE;
+  // ── Internal state ────────────────────────────────────────────────────
+  @state() private events: MonthEvent[] = [];
+  private _unsubStore?: () => void;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._unsubStore = schedulerStore.subscribe((state) => {
+      this._syncFromStore(state);
+    });
+    this._syncFromStore(schedulerStore.getState());
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._unsubStore) this._unsubStore();
+  }
+
+  private _syncFromStore(state: any) {
+    const coreEvents = Object.values(state.events) as any[];
+    this.events = coreEvents.map((e) => {
+      const startD = new Date(e.startTime);
+      const endD = new Date(e.endTime);
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      return {
+        id: e.id,
+        title: e.title,
+        color: "blue", // Use default color or grab from resource if desired
+        date: startD.toISOString().split("T")[0],
+        startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
+        endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+      };
+    });
+  }
 
   // ── Internal state ────────────────────────────────────────────────────
   @state() private _year = new Date().getFullYear();

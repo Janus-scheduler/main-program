@@ -372,16 +372,7 @@ export class JanusTimeline extends LitElement {
                     class="tl-view-toggle__btn ${this.view === v
                       ? "active"
                       : ""}"
-                    @click=${() => {
-                      this.view = v;
-                      this.dispatchEvent(
-                        new CustomEvent("view-change", {
-                          detail: { view: v },
-                          bubbles: true,
-                          composed: true,
-                        }),
-                      );
-                    }}
+                    @click=${() => (this.view = v)}
                   >
                     ${v}
                   </button>

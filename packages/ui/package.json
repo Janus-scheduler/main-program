@@ -16,8 +16,7 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "preview": "vite"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "@janus-scheduler/core": "^1.0.0",
