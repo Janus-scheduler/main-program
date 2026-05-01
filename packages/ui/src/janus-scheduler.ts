@@ -4,6 +4,8 @@ import { schedulerStyles } from "./styles";
 
 const COLORS = ["orange", "blue", "green", "yellow", "purple"];
 
+// ─── Icons ───────────────────────────────────────────────────────────────────
+
 const CalendarIcon = () =>
   html`<svg
     width="15"
@@ -20,6 +22,7 @@ const CalendarIcon = () =>
     <line x1="8" y1="2" x2="8" y2="6" />
     <line x1="3" y1="10" x2="21" y2="10" />
   </svg>`;
+
 const ClockIcon = () =>
   html`<svg
     width="15"
@@ -34,6 +37,7 @@ const ClockIcon = () =>
     <circle cx="12" cy="12" r="10" />
     <polyline points="12 6 12 12 16 14" />
   </svg>`;
+
 const SearchIcon = () =>
   html`<svg
     width="13"
@@ -48,6 +52,7 @@ const SearchIcon = () =>
     <circle cx="11" cy="11" r="8" />
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>`;
+
 const BellIcon = () =>
   html`<svg
     width="14"
@@ -62,6 +67,7 @@ const BellIcon = () =>
     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </svg>`;
+
 const TrashIcon = () =>
   html`<svg
     width="14"
@@ -77,6 +83,7 @@ const TrashIcon = () =>
     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
     <path d="M10 11v6M14 11v6M9 6V4h6v2" />
   </svg>`;
+
 const XIcon = () =>
   html`<svg
     width="14"
@@ -91,6 +98,7 @@ const XIcon = () =>
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
   </svg>`;
+
 const UsersIcon = () =>
   html`<svg
     width="15"
@@ -107,6 +115,7 @@ const UsersIcon = () =>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>`;
+
 const TagIcon = () =>
   html`<svg
     width="15"
@@ -123,6 +132,7 @@ const TagIcon = () =>
     />
     <line x1="7" y1="7" x2="7.01" y2="7" />
   </svg>`;
+
 const ChevronDownIcon = () =>
   html`<svg
     width="14"
@@ -137,17 +147,35 @@ const ChevronDownIcon = () =>
     <polyline points="6 9 12 15 18 9" />
   </svg>`;
 
-//  Moon icon for overnight indicator
-const MoonIcon = () =>
+const ChevronLeftIcon = () =>
   html`<svg
-    width="11"
-    height="11"
+    width="14"
+    height="14"
     viewBox="0 0 24 24"
-    fill="currentColor"
-    stroke="none"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
   >
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    <polyline points="15 18 9 12 15 6" />
   </svg>`;
+
+const ChevronRightIcon = () =>
+  html`<svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polyline points="9 18 15 12 9 6" />
+  </svg>`;
+
+// ─── Avatar helpers ───────────────────────────────────────────────────────────
 
 const avatarPalette: Record<string, string> = {
   "John Doe": "orange",
@@ -160,15 +188,17 @@ function avatarHtml(name: string) {
     .map((n) => n[0])
     .join("")
     .slice(0, 2);
-  const colorClass = avatarPalette[name]
+  const cls = avatarPalette[name]
     ? `avatar-${avatarPalette[name]}`
     : "avatar-orange";
-  return html`<span class="avatar ${colorClass}">${initials}</span>`;
+  return html`<span class="avatar ${cls}">${initials}</span>`;
 }
 
-function formatDate(isoDate: string): string {
-  if (!isoDate) return "";
-  const d = new Date(isoDate);
+// ─── Formatting helpers ───────────────────────────────────────────────────────
+
+function formatDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -176,52 +206,82 @@ function formatDate(isoDate: string): string {
   });
 }
 
-function formatDateShort(isoDate: string): string {
-  if (!isoDate) return "";
-  const d = new Date(isoDate);
+function formatDateShort(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function formatTime(timeVal: string): string {
-  if (!timeVal) return "";
-  const [h, m] = timeVal.split(":").map(Number);
-  const ampm = h >= 12 ? "PM" : "AM";
-  const hour = h % 12 || 12;
-  return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`;
+function formatTime(t: string): string {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
 
-/**
- * Adds one calendar day to an ISO date string (YYYY-MM-DD).
- */
-function addOneDay(isoDate: string): string {
-  if (!isoDate) return isoDate;
-  const d = new Date(isoDate);
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+// ─── Validation ───────────────────────────────────────────────────────────────
+
+function isEndBeforeStart(
+  sd: string,
+  st: string,
+  ed: string,
+  et: string,
+): boolean {
+  if (!sd || !st || !ed || !et) return false;
+  return new Date(`${ed}T${et}`).getTime() <= new Date(`${sd}T${st}`).getTime();
 }
 
-/**
- * Returns true when endTime (HH:mm) <= startTime (HH:mm),
- * meaning the event crosses midnight into the next day.
- */
-function crossesMidnight(startTime: string, endTime: string): boolean {
-  if (!startTime || !endTime) return false;
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  return eh * 60 + em <= sh * 60 + sm;
+// ─── Calendar helpers ─────────────────────────────────────────────────────────
+
+const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+interface CalState {
+  viewYear: number;
+  viewMonth: number;
 }
 
-// Hour / Minute arrays
+function calDays(year: number, month: number): (number | null)[] {
+  const firstDay = new Date(year, month, 1).getDay();
+  const total = new Date(year, month + 1, 0).getDate();
+  const cells: (number | null)[] = Array(firstDay).fill(null);
+  for (let d = 1; d <= total; d++) cells.push(d);
+  return cells;
+}
+
+function isoFromParts(y: number, m: number, d: number): string {
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+// ─── Time data ────────────────────────────────────────────────────────────────
+
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+type OpenPicker = "startDate" | "startTime" | "endDate" | "endTime" | null;
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 @customElement("janus-scheduler")
 export class JanusScheduler extends LitElement {
   static styles = schedulerStyles;
 
   @state() title = "Strategy Workshop";
-  @state() date = "2023-10-30";
+  @state() startDate = "2026-04-30";
   @state() startTime = "14:00";
+  @state() endDate = "2026-04-30";
   @state() endTime = "15:00";
   @state() participants = ["John Doe", "Sarah Chen"];
   @state() participantInput = "";
@@ -229,25 +289,43 @@ export class JanusScheduler extends LitElement {
     "Discussing the Q4 roadmap and resource allocation for upcoming projects.";
   @state() activeColor = "orange";
   @state() sidebarOpen = false;
-
-  // Time-picker dropdown open states
-  @state() startPickerOpen = false;
-  @state() endPickerOpen = false;
+  @state() openPicker: OpenPicker = null;
+  @state() startCal: CalState = { viewYear: 2026, viewMonth: 3 };
+  @state() endCal: CalState = { viewYear: 2026, viewMonth: 3 };
 
   @property({ type: String }) error: string | null = null;
 
-  // Computed helpers
+  // ─── Computed ──────────────────────────────────────────────────────────────
 
-  private get _overnight(): boolean {
-    return crossesMidnight(this.startTime, this.endTime);
+  private get _invalid() {
+    return isEndBeforeStart(
+      this.startDate,
+      this.startTime,
+      this.endDate,
+      this.endTime,
+    );
   }
 
-  /** The effective end date: same day normally, next day if overnight. */
-  private get _endDate(): string {
-    return this._overnight ? addOneDay(this.date) : this.date;
+  // ─── Lifecycle ─────────────────────────────────────────────────────────────
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._outsideClick = this._outsideClick.bind(this);
+    document.addEventListener("click", this._outsideClick);
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    document.removeEventListener("click", this._outsideClick);
+  }
+  private _outsideClick() {
+    if (this.openPicker) this.openPicker = null;
+  }
+  private _toggle(p: OpenPicker) {
+    this.openPicker = this.openPicker === p ? null : p;
   }
 
-  //  Event dispatchers
+  // ─── Dispatchers ───────────────────────────────────────────────────────────
+
   private _onClose() {
     this.dispatchEvent(
       new CustomEvent("close", { bubbles: true, composed: true }),
@@ -255,17 +333,17 @@ export class JanusScheduler extends LitElement {
   }
 
   private _onSave() {
+    if (this._invalid) return;
     this.dispatchEvent(
       new CustomEvent("save", {
         bubbles: true,
         composed: true,
         detail: {
           title: this.title,
-          date: this.date,
-          endDate: this._endDate,
+          startDate: this.startDate,
           startTime: this.startTime,
+          endDate: this.endDate,
           endTime: this.endTime,
-          overnight: this._overnight,
           participants: this.participants,
           description: this.description,
           activeColor: this.activeColor,
@@ -284,8 +362,10 @@ export class JanusScheduler extends LitElement {
     );
   }
 
-  private _removeParticipant(nameToRemove: string) {
-    this.participants = this.participants.filter((p) => p !== nameToRemove);
+  // ─── Participants ──────────────────────────────────────────────────────────
+
+  private _removeParticipant(name: string) {
+    this.participants = this.participants.filter((p) => p !== name);
   }
 
   private _handleParticipantKey(e: KeyboardEvent) {
@@ -303,51 +383,104 @@ export class JanusScheduler extends LitElement {
     }
   }
 
-  //  Time picker helpers
+  // ─── Time helpers ──────────────────────────────────────────────────────────
 
-  private _parseTime(timeVal: string): { h: number; m: number } {
-    if (!timeVal) return { h: 0, m: 0 };
-    const [h, m] = timeVal.split(":").map(Number);
+  private _parseTime(t: string) {
+    if (!t) return { h: 0, m: 0 };
+    const [h, m] = t.split(":").map(Number);
     return { h, m };
   }
 
-  private _setStartTime(h: number, m: number) {
-    this.startTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
+  private _setTime(which: "start" | "end", h: number, m: number) {
+    const val = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    if (which === "start") this.startTime = val;
+    else this.endTime = val;
   }
 
-  private _setEndTime(h: number, m: number) {
-    this.endTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-  }
+  // ─── Calendar date selection ───────────────────────────────────────────────
 
-  /** Close pickers when clicking outside the shadow DOM */
-  connectedCallback() {
-    super.connectedCallback();
-    this._handleOutsideClick = this._handleOutsideClick.bind(this);
-    document.addEventListener("click", this._handleOutsideClick);
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    document.removeEventListener("click", this._handleOutsideClick);
-  }
-
-  private _handleOutsideClick(_e: MouseEvent) {
-    // Clicking anywhere outside the component closes pickers
-    if (this.startPickerOpen || this.endPickerOpen) {
-      this.startPickerOpen = false;
-      this.endPickerOpen = false;
-    }
-  }
-
-  // Time Picker Dropdown template
-
-  private _timePicker(
-    currentTime: string,
-    onHour: (h: number) => void,
-    onMinute: (m: number) => void,
+  private _selectDate(
+    which: "start" | "end",
+    y: number,
+    mo: number,
+    d: number,
   ) {
-    const { h: selH, m: selM } = this._parseTime(currentTime);
+    const iso = isoFromParts(y, mo, d);
+    if (which === "start") {
+      this.startDate = iso;
+      this.startCal = { viewYear: y, viewMonth: mo };
+      // If end is now before start on the same day, nudge end date forward
+      if (isEndBeforeStart(iso, this.startTime, this.endDate, this.endTime)) {
+        this.endDate = iso;
+        this.endCal = { viewYear: y, viewMonth: mo };
+      }
+    } else {
+      this.endDate = iso;
+      this.endCal = { viewYear: y, viewMonth: mo };
+    }
+    this.openPicker = null;
+  }
 
+  // ─── Calendar dropdown ─────────────────────────────────────────────────────
+
+  private _calPicker(
+    which: "start" | "end",
+    selectedIso: string,
+    cal: CalState,
+    onNav: (d: -1 | 1) => void,
+  ) {
+    const { viewYear: vy, viewMonth: vm } = cal;
+    const days = calDays(vy, vm);
+    const [selY, selM, selD] = selectedIso
+      ? selectedIso.split("-").map(Number)
+      : [0, 0, 0];
+    const now = new Date();
+    const todY = now.getFullYear(),
+      todM = now.getMonth(),
+      todD = now.getDate();
+
+    return html`
+      <div class="cal-dropdown" @click=${(e: Event) => e.stopPropagation()}>
+        <div class="cal-header">
+          <button class="cal-nav-btn" type="button" @click=${() => onNav(-1)}>
+            ${ChevronLeftIcon()}
+          </button>
+          <span class="cal-month-label">${MONTH_NAMES[vm]} ${vy}</span>
+          <button class="cal-nav-btn" type="button" @click=${() => onNav(1)}>
+            ${ChevronRightIcon()}
+          </button>
+        </div>
+        <div class="cal-weekdays">
+          ${WEEKDAYS.map((w) => html`<span class="cal-wd">${w}</span>`)}
+        </div>
+        <div class="cal-grid">
+          ${days.map((d) => {
+            if (d === null) return html`<span class="cal-empty"></span>`;
+            const isSel = d === selD && vm === selM - 1 && vy === selY;
+            const isToday = d === todD && vm === todM && vy === todY;
+            return html`<button
+              type="button"
+              class="cal-day ${isSel ? "cal-day--selected" : ""} ${isToday &&
+              !isSel
+                ? "cal-day--today"
+                : ""}"
+              @click=${() => this._selectDate(which, vy, vm, d)}
+            >
+              ${d}
+            </button>`;
+          })}
+        </div>
+        <div class="cal-preview">
+          ${selectedIso ? formatDate(selectedIso) : "No date selected"}
+        </div>
+      </div>
+    `;
+  }
+
+  // ─── Time picker dropdown ──────────────────────────────────────────────────
+
+  private _timePicker(which: "start" | "end", currentTime: string) {
+    const { h: selH, m: selM } = this._parseTime(currentTime);
     return html`
       <div
         class="time-picker-dropdown"
@@ -355,66 +488,109 @@ export class JanusScheduler extends LitElement {
       >
         <div class="time-picker-header">Select Time</div>
         <div class="time-picker-body">
-          <!-- Hour column -->
           <div class="time-col">
             <div class="time-col-label">Hour</div>
             <div class="time-scroll">
-              ${HOURS.map((h) => {
-                const ampm = h >= 12 ? "PM" : "AM";
-                const label = `${h % 12 || 12} ${ampm}`;
-                return html`<button
-                  class="time-cell ${selH === h ? "time-cell--active" : ""}"
-                  @click=${() => onHour(h)}
-                >
-                  ${label}
-                </button>`;
-              })}
+              ${HOURS.map(
+                (h) =>
+                  html`<button
+                    type="button"
+                    class="time-cell ${selH === h ? "time-cell--active" : ""}"
+                    @click=${() => this._setTime(which, h, selM)}
+                  >
+                    ${h % 12 || 12} ${h >= 12 ? "PM" : "AM"}
+                  </button>`,
+              )}
             </div>
           </div>
-
           <div class="time-divider">:</div>
-
-          <!-- Minute column -->
           <div class="time-col">
             <div class="time-col-label">Min</div>
             <div class="time-scroll">
               ${MINUTES.map(
                 (m) =>
                   html`<button
+                    type="button"
                     class="time-cell ${selM === m ? "time-cell--active" : ""}"
-                    @click=${() => onMinute(m)}
+                    @click=${() => this._setTime(which, selH, m)}
                   >
-                    ${m.toString().padStart(2, "0")}
+                    ${String(m).padStart(2, "0")}
                   </button>`,
               )}
             </div>
           </div>
         </div>
-
-        <!-- Live preview -->
         <div class="time-picker-preview">${formatTime(currentTime)}</div>
       </div>
     `;
   }
 
-  // Render ─
+  // ─── Shared trigger button ─────────────────────────────────────────────────
+
+  private _triggerBtn(
+    icon: unknown,
+    value: string,
+    isOpen: boolean,
+    isInvalid: boolean,
+    pickerId: OpenPicker,
+  ) {
+    const cls = [
+      "time-trigger",
+      isOpen ? "time-trigger--open" : "",
+      isInvalid ? "time-trigger--invalid" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return html`
+      <button
+        type="button"
+        class="${cls}"
+        @click=${(e: Event) => {
+          e.stopPropagation();
+          this._toggle(pickerId);
+        }}
+      >
+        <span class="time-trigger-icon">${icon}</span>
+        <span class="time-trigger-value">${value || "—"}</span>
+        <span class="time-trigger-chevron">${ChevronDownIcon()}</span>
+      </button>
+    `;
+  }
+
+  // ─── Calendar nav helper ───────────────────────────────────────────────────
+
+  private _navCal(which: "start" | "end", delta: -1 | 1) {
+    const prev = which === "start" ? this.startCal : this.endCal;
+    let { viewYear: y, viewMonth: m } = prev;
+    m += delta;
+    if (m < 0) {
+      m = 11;
+      y--;
+    }
+    if (m > 11) {
+      m = 0;
+      y++;
+    }
+    const next: CalState = { viewYear: y, viewMonth: m };
+    if (which === "start") this.startCal = next;
+    else this.endCal = next;
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   render() {
-    const overnight = this._overnight;
+    const invalid = this._invalid;
 
-    // Sidebar time display: shows date range if overnight
-    let timeDisplay: string;
-    if (overnight) {
-      timeDisplay = `${formatDateShort(this.date)} ${formatTime(this.startTime)} – ${formatDateShort(this._endDate)} ${formatTime(this.endTime)}`;
-    } else {
-      timeDisplay =
-        this.startTime && this.endTime
-          ? `${formatTime(this.startTime)} – ${formatTime(this.endTime)}`
-          : "–";
-    }
+    const multiDay = this.startDate !== this.endDate;
 
-    const { h: startH, m: startM } = this._parseTime(this.startTime);
-    const { h: endH, m: endM } = this._parseTime(this.endTime);
+    const sidebarDate = multiDay
+      ? `${formatDateShort(this.startDate)} – ${formatDateShort(this.endDate)}`
+      : formatDate(this.startDate);
+
+    // When multi-day, attach the date to each time so the sidebar is unambiguous
+    const sidebarTime = multiDay
+      ? `${formatDateShort(this.startDate)}, ${formatTime(this.startTime)} – ${formatDateShort(this.endDate)}, ${formatTime(this.endTime)}`
+      : `${formatTime(this.startTime)} – ${formatTime(this.endTime)}`;
 
     return html`
       <div
@@ -422,6 +598,7 @@ export class JanusScheduler extends LitElement {
         @click=${(e: Event) => e.target === e.currentTarget && this._onClose()}
       >
         <div class="modal" role="dialog" aria-modal="true">
+          <!-- ── Sidebar ─────────────────────────────────────────────────── -->
           <aside class="sidebar ${this.sidebarOpen ? "sidebar--open" : ""}">
             <div class="sidebar-accent color-${this.activeColor}"></div>
             <div class="sidebar-top">
@@ -433,28 +610,14 @@ export class JanusScheduler extends LitElement {
                 <span class="meta-icon">${CalendarIcon()}</span>
                 <div>
                   <div class="meta-label">Date</div>
-                  <div class="meta-value">
-                    ${overnight
-                      ? html`${formatDate(this.date)} –
-                        ${formatDate(this._endDate)}`
-                      : this.date
-                        ? formatDate(this.date)
-                        : "–"}
-                  </div>
+                  <div class="meta-value">${sidebarDate || "—"}</div>
                 </div>
               </div>
               <div class="meta-item">
                 <span class="meta-icon">${ClockIcon()}</span>
                 <div>
                   <div class="meta-label">Time</div>
-                  <div class="meta-value time-value-row">
-                    ${timeDisplay}
-                    ${overnight
-                      ? html`<span class="overnight-badge">
-                          ${MoonIcon()} Overnight
-                        </span>`
-                      : nothing}
-                  </div>
+                  <div class="meta-value">${sidebarTime}</div>
                 </div>
               </div>
               <div class="meta-item">
@@ -466,9 +629,7 @@ export class JanusScheduler extends LitElement {
                     ${this.participants.length === 1 ? "person" : "people"}
                   </div>
                   <div class="avatar-stack">
-                    ${this.participants
-                      .slice(0, 4)
-                      .map((name) => avatarHtml(name))}
+                    ${this.participants.slice(0, 4).map((n) => avatarHtml(n))}
                     ${this.participants.length > 4
                       ? html`<span class="avatar avatar-more"
                           >+${this.participants.length - 4}</span
@@ -510,6 +671,7 @@ export class JanusScheduler extends LitElement {
             </div>
           </aside>
 
+          <!-- ── Panel ───────────────────────────────────────────────────── -->
           <div class="panel">
             <div class="panel-header">
               <div class="panel-header-left">
@@ -537,6 +699,7 @@ export class JanusScheduler extends LitElement {
               </button>
             </div>
 
+            <!-- Mobile summary strip -->
             <div
               class="mobile-summary-panel ${this.sidebarOpen
                 ? "mobile-summary-panel--open"
@@ -544,14 +707,18 @@ export class JanusScheduler extends LitElement {
             >
               <div class="mobile-summary-grid">
                 <div class="msummary-item">
-                  <span class="meta-label">Date</span>
+                  <span class="meta-label">Start</span>
                   <span class="meta-value"
-                    >${this.date ? formatDate(this.date) : "–"}</span
+                    >${formatDateShort(this.startDate)}
+                    ${formatTime(this.startTime)}</span
                   >
                 </div>
                 <div class="msummary-item">
-                  <span class="meta-label">Time</span>
-                  <span class="meta-value">${timeDisplay}</span>
+                  <span class="meta-label">End</span>
+                  <span class="meta-value"
+                    >${formatDateShort(this.endDate)}
+                    ${formatTime(this.endTime)}</span
+                  >
                 </div>
                 <div class="msummary-item">
                   <span class="meta-label">Participants</span>
@@ -578,13 +745,13 @@ export class JanusScheduler extends LitElement {
 
             <div class="panel-body">
               ${this.error
-                ? html`
-                    <div class="error-alert">
-                      <span class="error-icon">!</span>
-                      <span class="error-message">${this.error}</span>
-                    </div>
-                  `
+                ? html` <div class="error-alert">
+                    <span class="error-icon">!</span>
+                    <span class="error-message">${this.error}</span>
+                  </div>`
                 : nothing}
+
+              <!-- Basic Info -->
               <div class="form-section">
                 <div class="section-label">Basic Info</div>
                 <div class="form-group">
@@ -598,110 +765,94 @@ export class JanusScheduler extends LitElement {
                     placeholder="Add a title…"
                   />
                 </div>
-                <div class="form-group">
-                  <label>Date</label>
-                  <div class="input-icon-wrap">
-                    <span class="input-icon">${CalendarIcon()}</span>
-                    <input
-                      type="date"
-                      .value=${this.date}
-                      @input=${(e: Event) =>
-                        (this.date = (e.target as HTMLInputElement).value)}
-                      class="date-time-input"
-                    />
+              </div>
+
+              <!-- Date & Time -->
+              <div class="form-section">
+                <div class="section-label">Date &amp; Time</div>
+
+                <!-- START -->
+                <div class="dt-row-label">Start</div>
+                <div class="dt-row">
+                  <!-- Start date trigger + dropdown -->
+                  <div class="dt-cell dt-cell--date">
+                    ${this._triggerBtn(
+                      CalendarIcon(),
+                      formatDateShort(this.startDate),
+                      this.openPicker === "startDate",
+                      false,
+                      "startDate",
+                    )}
+                    ${this.openPicker === "startDate"
+                      ? this._calPicker(
+                          "start",
+                          this.startDate,
+                          this.startCal,
+                          (d) => this._navCal("start", d),
+                        )
+                      : nothing}
+                  </div>
+                  <!-- Start time trigger + dropdown -->
+                  <div class="dt-cell dt-cell--time">
+                    ${this._triggerBtn(
+                      ClockIcon(),
+                      formatTime(this.startTime),
+                      this.openPicker === "startTime",
+                      false,
+                      "startTime",
+                    )}
+                    ${this.openPicker === "startTime"
+                      ? this._timePicker("start", this.startTime)
+                      : nothing}
                   </div>
                 </div>
 
-                <!-- ── Custom time pickers ── -->
-                <div class="form-row">
-                  <!-- START TIME -->
-                  <div class="form-group">
-                    <label>Start Time</label>
-                    <div class="time-picker-wrap">
-                      <button
-                        class="time-trigger ${this.startPickerOpen
-                          ? "time-trigger--open"
-                          : ""}"
-                        @click=${(e: Event) => {
-                          e.stopPropagation();
-                          this.startPickerOpen = !this.startPickerOpen;
-                          this.endPickerOpen = false;
-                        }}
-                        type="button"
-                      >
-                        <span class="time-trigger-icon">${ClockIcon()}</span>
-                        <span class="time-trigger-value">
-                          ${formatTime(this.startTime)}
-                        </span>
-                        <span class="time-trigger-chevron">
-                          ${ChevronDownIcon()}
-                        </span>
-                      </button>
-                      ${this.startPickerOpen
-                        ? this._timePicker(
-                            this.startTime,
-                            (h) => this._setStartTime(h, startM),
-                            (m) => this._setStartTime(startH, m),
-                          )
-                        : nothing}
-                    </div>
+                <!-- END -->
+                <div class="dt-row-label dt-row-label--end">End</div>
+                <div class="dt-row">
+                  <!-- End date trigger + dropdown -->
+                  <div class="dt-cell dt-cell--date">
+                    ${this._triggerBtn(
+                      CalendarIcon(),
+                      formatDateShort(this.endDate),
+                      this.openPicker === "endDate",
+                      invalid,
+                      "endDate",
+                    )}
+                    ${this.openPicker === "endDate"
+                      ? this._calPicker("end", this.endDate, this.endCal, (d) =>
+                          this._navCal("end", d),
+                        )
+                      : nothing}
                   </div>
-
-                  <!-- END TIME -->
-                  <div class="form-group">
-                    <label>
-                      End Time
-                      ${overnight
-                        ? html`<span class="next-day-badge">
-                            ${MoonIcon()} +1 day
-                          </span>`
-                        : nothing}
-                    </label>
-                    <div class="time-picker-wrap">
-                      <button
-                        class="time-trigger ${this.endPickerOpen
-                          ? "time-trigger--open"
-                          : ""} ${overnight ? "time-trigger--overnight" : ""}"
-                        @click=${(e: Event) => {
-                          e.stopPropagation();
-                          this.endPickerOpen = !this.endPickerOpen;
-                          this.startPickerOpen = false;
-                        }}
-                        type="button"
-                      >
-                        <span class="time-trigger-icon">${ClockIcon()}</span>
-                        <span class="time-trigger-value">
-                          ${formatTime(this.endTime)}
-                        </span>
-                        <span class="time-trigger-chevron">
-                          ${ChevronDownIcon()}
-                        </span>
-                      </button>
-                      ${this.endPickerOpen
-                        ? this._timePicker(
-                            this.endTime,
-                            (h) => this._setEndTime(h, endM),
-                            (m) => this._setEndTime(endH, m),
-                          )
-                        : nothing}
-                    </div>
+                  <!-- End time trigger + dropdown -->
+                  <div class="dt-cell dt-cell--time">
+                    ${this._triggerBtn(
+                      ClockIcon(),
+                      formatTime(this.endTime),
+                      this.openPicker === "endTime",
+                      invalid,
+                      "endTime",
+                    )}
+                    ${this.openPicker === "endTime"
+                      ? this._timePicker("end", this.endTime)
+                      : nothing}
                   </div>
                 </div>
 
-                <!-- Overnight notice -->
-                ${overnight
-                  ? html`
-                      <div class="overnight-notice">
-                        ${MoonIcon()}
-                        <span>
-                          This event runs overnight — it ends on
-                          <strong>${formatDate(this._endDate)}</strong>.
-                        </span>
-                      </div>
-                    `
+                <!-- Validation warning -->
+                ${invalid
+                  ? html` <div class="dt-invalid-notice">
+                      <span>⚠</span>
+                      <span
+                        >End must be after start. Please adjust the date or
+                        time.</span
+                      >
+                    </div>`
                   : nothing}
               </div>
 
+              <!-- People -->
               <div class="form-section">
                 <div class="section-label">People</div>
                 <div class="form-group">
@@ -714,8 +865,8 @@ export class JanusScheduler extends LitElement {
                         ?.focus()}
                   >
                     ${this.participants.map(
-                      (name) => html`
-                        <span class="chip">
+                      (name) =>
+                        html` <span class="chip">
                           ${avatarHtml(name)} ${name}
                           <button
                             class="chip-remove"
@@ -726,8 +877,7 @@ export class JanusScheduler extends LitElement {
                           >
                             ${XIcon()}
                           </button>
-                        </span>
-                      `,
+                        </span>`,
                     )}
                     <input
                       id="participant-input"
@@ -746,19 +896,20 @@ export class JanusScheduler extends LitElement {
                 </div>
               </div>
 
+              <!-- Details -->
               <div class="form-section">
                 <div class="section-label">Details</div>
                 <div class="form-group">
                   <label for="description">Description</label>
                   <textarea
                     id="description"
+                    rows="4"
                     .value=${this.description}
                     @input=${(e: Event) =>
                       (this.description = (
                         e.target as HTMLTextAreaElement
                       ).value)}
                     placeholder="Add a description…"
-                    rows="4"
                   ></textarea>
                 </div>
               </div>
@@ -775,7 +926,11 @@ export class JanusScheduler extends LitElement {
                 <button class="btn-cancel" @click=${this._onClose}>
                   Cancel
                 </button>
-                <button class="btn-save" @click=${this._onSave}>
+                <button
+                  class="btn-save"
+                  ?disabled=${invalid}
+                  @click=${this._onSave}
+                >
                   Save Changes
                 </button>
               </div>

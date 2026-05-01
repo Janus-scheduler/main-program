@@ -14,7 +14,7 @@ export const schedulerStyles = css`
   :host {
     --orange: #f97316;
     --orange-light: #fff7ed;
-    --orange-glow: rgba(249, 115, 22, 0.15);
+    --orange-glow: meta-labelrgba(249, 115, 22, 0.15);
 
     --border: #e4e4e7;
     --text-primary: #18181b;
@@ -663,6 +663,336 @@ export const schedulerStyles = css`
     flex-shrink: 0;
     color: #8b5cf6;
   }
+.cal-dropdown,
+.time-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 200;
+  background: #ffffff;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+  overflow: hidden;
+  animation: picker-in 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+ 
+@keyframes picker-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+ 
+/* ── Date & Time two-column layout ───────────────────────────────────────── */
+ 
+.dt-row-label {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 10px 0 5px;
+  color: var(--text-secondary);
+}
+ 
+.dt-row-label--end {
+  margin-top: 10px;
+}
+ 
+.dt-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+ 
+.dt-cell {
+  position: relative; /* anchor for dropdown */
+}
+ 
+/* ── Trigger button (shared by date and time) ────────────────────────────── */
+ 
+.time-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--input-radius);
+  cursor: pointer;
+  font-family: "Roboto", sans-serif;
+  font-size: 13px;
+  color: var(--text-primary);
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+}
+ 
+.time-trigger:hover {
+  border-color: #d1d1d6;
+}
+ 
+.time-trigger--open {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--orange-glow);
+}
+ 
+.time-trigger--invalid {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+ 
+.time-trigger-icon {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+ 
+.time-trigger-value {
+  flex: 1;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ 
+.time-trigger-chevron {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+ 
+.time-trigger--open .time-trigger-chevron {
+  transform: rotate(180deg);
+}
+ 
+/* ── Validation notice ───────────────────────────────────────────────────── */
+ 
+.dt-invalid-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 9px 13px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: #b91c1c;
+}
+ 
+/* ── Calendar dropdown ───────────────────────────────────────────────────── */
+ 
+.cal-dropdown {
+  width: 256px;
+}
+ 
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+ 
+.cal-month-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+ 
+.cal-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background 0.12s, color 0.12s;
+}
+ 
+.cal-nav-btn:hover {
+  background: var(--orange-light);
+  color: var(--orange);
+}
+ 
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 6px 8px 2px;
+}
+ 
+.cal-wd {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 2px 0;
+}
+ 
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  padding: 2px 8px 8px;
+}
+ 
+.cal-empty {
+  display: block;
+}
+ 
+.cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-family: "Roboto", sans-serif;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+ 
+.cal-day:hover {
+  background: var(--orange-light);
+  color: var(--orange);
+}
+ 
+.cal-day--today {
+  font-weight: 700;
+  color: var(--orange);
+}
+ 
+.cal-day--selected {
+  background: var(--orange) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+ 
+.cal-preview {
+  padding: 7px 12px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--orange);
+  background: var(--orange-light);
+}
+ 
+/* ── Time picker dropdown ────────────────────────────────────────────────── */
+ 
+.time-picker-dropdown {
+  width: 240px;
+}
+ 
+.time-picker-header {
+  padding: 10px 14px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+ 
+.time-picker-body {
+  display: flex;
+  align-items: flex-start;
+}
+ 
+.time-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+ 
+.time-col-label {
+  padding: 6px 0 4px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+ 
+.time-scroll {
+  max-height: 168px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #e4e4e7 transparent;
+  display: flex;
+  flex-direction: column;
+}
+ 
+.time-scroll::-webkit-scrollbar { width: 4px; }
+.time-scroll::-webkit-scrollbar-thumb { background: #e4e4e7; border-radius: 4px; }
+ 
+.time-cell {
+  padding: 7px 0;
+  text-align: center;
+  font-size: 13px;
+  font-family: "Roboto", sans-serif;
+  font-weight: 400;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  margin: 1px 6px;
+  transition: background 0.1s, color 0.1s;
+}
+ 
+.time-cell:hover {
+  background: var(--orange-light);
+  color: var(--orange);
+}
+ 
+.time-cell--active {
+  background: var(--orange);
+  color: #ffffff;
+  font-weight: 600;
+}
+ 
+.time-cell--active:hover {
+  background: var(--orange);
+  color: #ffffff;
+}
+ 
+.time-divider {
+  padding-top: 38px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-muted);
+  user-select: none;
+}
+ 
+.time-picker-preview {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--orange);
+  background: var(--orange-light);
+}
+ 
+/* ── Save button disabled state ──────────────────────────────────────────── */
+ 
+.btn-save:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
   /* Mobile summary panel (collapsed by default) */
   .mobile-summary-panel {
