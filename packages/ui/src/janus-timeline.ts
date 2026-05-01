@@ -30,7 +30,6 @@ import {
   formatDateFull,
   formatDateShort,
 } from "./timeline-utils";
-import { SAMPLE } from "./timeline-data";
 import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
 @customElement("janus-timeline")
