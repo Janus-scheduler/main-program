@@ -2,9 +2,6 @@ import { useState, useMemo } from "react";
 import "./App.css";
 import { Timeline, Scheduler } from "@janus-scheduler/react";
 import { SchedulerManager } from "@janus-scheduler/core";
-import { SAMPLE } from "@janus-scheduler/ui";
-import type { TimelineResource, TimelineEvent } from "@janus-scheduler/ui";
-
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
     <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -74,10 +71,54 @@ const SettingsIcon = () => (
 function App() {
   const [showScheduler, setShowScheduler] = useState(false);
   const [schedulerError, setSchedulerError] = useState<string | null>(null);
-  const [resources, setResources] = useState(SAMPLE);
 
-  // Initialize the core manager once
-  const manager = useMemo(() => new SchedulerManager(), []);
+  // Initialize the core manager once and populate initial data
+  const manager = useMemo(() => {
+    const mgr = new SchedulerManager();
+    // Only populate if empty (for hot reloading safety)
+    if (mgr.getResourceCount() === 0) {
+      mgr.addResource({
+        id: "r1",
+        name: "Dr. Sarah Chena",
+        type: "person",
+      });
+      mgr.addResource({
+        id: "r2",
+        name: "Dr. Michael Ross",
+        type: "person",
+      });
+      mgr.addResource({
+        id: "r3",
+        name: "Operating Room 1",
+        type: "room",
+      });
+      mgr.addResource({
+        id: "r4",
+        name: "MRI Scanner A",
+        type: "equipment",
+      });
+
+      // Add a couple of initial events for today
+      const today = new Date().toISOString().split("T")[0];
+      mgr.addEvent({
+        id: "e1",
+        title: "Appendectomy",
+        startTime: `${today}T09:00:00Z`,
+        endTime: `${today}T11:30:00Z`,
+        resourceId: "r1",
+        status: "confirmed",
+      });
+      mgr.addEvent({
+        id: "e2",
+        title: "Pre-op Assessment",
+        startTime: `${today}T13:00:00Z`,
+        endTime: `${today}T14:00:00Z`,
+        resourceId: "r2",
+        status: "confirmed",
+      });
+    }
+    return mgr;
+  }, []);
 
   // When adding an event or clicking one, we'll open the scheduler modal
   const handleAddEvent = () => {
@@ -98,13 +139,13 @@ function App() {
     console.log("Saving event with data:", data);
 
     try {
-      // 1. Data Processing: Transform UI data into core EventData format
+      const today = new Date().toISOString().split("T")[0];
       const eventData = {
         id: `evt_${Date.now()}`,
         title: data.title,
-        startTime: `${data.date}T${data.startTime}:00Z`,
-        endTime: `${data.date}T${data.endTime}:00Z`,
-        resourceId: data.participants[0] || "unassigned",
+        startTime: `${data.date || today}T${data.startTime}:00Z`,
+        endTime: `${data.date || today}T${data.endTime}:00Z`,
+        resourceId: data.participants[0] || "r1",
         description: data.description,
         status: "confirmed" as const,
       };
@@ -125,83 +166,34 @@ function App() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDelete = (e: any) => {
     console.log("Delete requested for:", e.detail.title);
-    // Logic for deletion if we had an ID
+    if (e.detail.id) {
+      manager.deleteEvent(e.detail.id);
+    }
     setShowScheduler(false);
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEventMove = (e: any) => {
-    const { event, oldResourceId, newResourceId, newStartTime, newEndTime } =
-      e.detail;
+    const { event, newResourceId, newStartTime, newEndTime } = e.detail;
     console.log("📦 Event moved:", e.detail);
 
-    setResources((prev) => {
-      // Remove from old resource
-      const oldResIndex = prev.findIndex(
-        (r: TimelineResource) => r.id === oldResourceId,
-      );
-      if (oldResIndex === -1) return prev;
-
-      const next = [...prev];
-      const oldRes = {
-        ...next[oldResIndex],
-        events: [...next[oldResIndex].events],
-      };
-      const eventIndex = oldRes.events.findIndex(
-        (ev: TimelineEvent) => ev.id === event.id,
-      );
-
-      if (eventIndex === -1) return prev;
-
-      const movedEvent = { ...oldRes.events[eventIndex] };
-      oldRes.events.splice(eventIndex, 1);
-      next[oldResIndex] = oldRes;
-
-      // Update event times
-      movedEvent.startTime = newStartTime;
-      movedEvent.endTime = newEndTime;
-
-      // Add to new resource
-      const newResIndex = next.findIndex(
-        (r: TimelineResource) => r.id === newResourceId,
-      );
-      if (newResIndex !== -1) {
-        const newRes = { ...next[newResIndex] };
-        newRes.events = [...newRes.events, movedEvent];
-        next[newResIndex] = newRes;
-      }
-
-      return next;
+    const today = event.date || new Date().toISOString().split("T")[0];
+    manager.updateEvent(event.id, {
+      resourceId: newResourceId,
+      startTime: `${today}T${newStartTime}:00Z`,
+      endTime: `${today}T${newEndTime}:00Z`,
     });
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEventResize = (e: any) => {
-    const { event, resourceId, newStartTime, newEndTime } = e.detail;
+    const { event, newStartTime, newEndTime } = e.detail;
     console.log("↔️ Event resized:", e.detail);
 
-    setResources((prev) => {
-      const resIndex = prev.findIndex(
-        (r: TimelineResource) => r.id === resourceId,
-      );
-      if (resIndex === -1) return prev;
-
-      const next = [...prev];
-      const res = { ...next[resIndex] };
-      const eventIndex = res.events.findIndex(
-        (ev: TimelineEvent) => ev.id === event.id,
-      );
-
-      if (eventIndex !== -1) {
-        res.events = [...res.events];
-        res.events[eventIndex] = {
-          ...res.events[eventIndex],
-          startTime: newStartTime,
-          endTime: newEndTime,
-        };
-        next[resIndex] = res;
-      }
-      return next;
+    const today = event.date || new Date().toISOString().split("T")[0];
+    manager.updateEvent(event.id, {
+      startTime: `${today}T${newStartTime}:00Z`,
+      endTime: `${today}T${newEndTime}:00Z`,
     });
   };
 
@@ -210,28 +202,14 @@ function App() {
     const { resourceId, startTime, endTime, date } = e.detail;
     console.log("✨ New event created:", e.detail);
 
-    setResources((prev) => {
-      const resIndex = prev.findIndex(
-        (r: TimelineResource) => r.id === resourceId,
-      );
-      if (resIndex === -1) return prev;
-
-      const next = [...prev];
-      const res = { ...next[resIndex] };
-
-      const newEvent = {
-        id: `evt_${Date.now()}`,
-        title: "New Event",
-        startTime,
-        endTime,
-        color: "blue" as const,
-        date,
-      };
-
-      res.events = [...res.events, newEvent];
-      next[resIndex] = res;
-
-      return next;
+    const today = date || new Date().toISOString().split("T")[0];
+    manager.addEvent({
+      id: `evt_${Date.now()}`,
+      title: "New Event",
+      startTime: `${today}T${startTime}:00Z`,
+      endTime: `${today}T${endTime}:00Z`,
+      resourceId,
+      status: "confirmed",
     });
   };
 
@@ -269,7 +247,6 @@ function App() {
 
       <main className="app-main">
         <Timeline
-          resources={resources}
           onAddEvent={handleAddEvent}
           onEventClick={handleEventClick}
           onEventMove={handleEventMove}

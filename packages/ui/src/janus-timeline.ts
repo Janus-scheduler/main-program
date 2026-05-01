@@ -1,6 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
+import { schedulerStore } from "@janus-scheduler/core";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
 import {
@@ -36,7 +37,7 @@ import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
 
-  @property({ type: Array }) resources: TimelineResource[] = SAMPLE;
+  @property({ type: Array }) resources: TimelineResource[] = [];
 
   @state() view: "Timeline" | "Month" = "Timeline";
   @state() currentDate = new Date();
@@ -50,6 +51,56 @@ export class JanusTimeline extends LitElement {
     this._dragVersion++;
   });
   private _wasDragging = false;
+  private _unsubStore?: () => void;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._unsubStore = schedulerStore.subscribe((state) => {
+      this._syncFromStore(state);
+    });
+    this._syncFromStore(schedulerStore.getState());
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._unsubStore) this._unsubStore();
+  }
+
+  private _syncFromStore(state: any) {
+    const newResources: TimelineResource[] = [];
+    const coreEvents = Object.values(state.events) as any[];
+
+    for (const res of Object.values(state.resources) as any[]) {
+      const resEvents = coreEvents
+        .filter((e) => e.resourceId === res.id)
+        .map((e) => {
+          const startD = new Date(e.startTime);
+          const endD = new Date(e.endTime);
+          const pad = (n: number) => n.toString().padStart(2, "0");
+          return {
+            id: e.id,
+            title: e.title,
+            startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
+            endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+            color: "blue",
+            date: startD.toISOString().split("T")[0],
+          } as TimelineEvent;
+        });
+
+      newResources.push({
+        id: res.id,
+        name: res.name,
+        subtitle: res.type,
+        avatarType: "initials",
+        events: resEvents,
+      });
+    }
+
+    // Only overwrite if store has data, otherwise we might wipe initial props
+    if (newResources.length > 0) {
+      this.resources = newResources;
+    }
+  }
 
   firstUpdated() {
     // On mount: scroll horizontally so 8:00 AM is the first visible hour
