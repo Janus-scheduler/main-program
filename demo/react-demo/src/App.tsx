@@ -246,13 +246,26 @@ function App() {
       </aside>
 
       <main className="app-main">
-        <Timeline
-          onAddEvent={handleAddEvent}
-          onEventClick={handleEventClick}
-          onEventMove={handleEventMove}
-          onEventResize={handleEventResize}
-          onEventCreate={handleEventCreate}
-        />
+        {/* The timeline component acts as the main view area */}
+
+        {currentView === "Timeline" && (
+          <Timeline
+            resources={resources}
+            onAddEvent={handleAddEvent}
+            onEventClick={handleEventClick}
+            onViewChange={handleViewChange}
+            onEventMove={handleEventMove}
+            onEventResize={handleEventResize}
+            onEventCreate={handleEventCreate}
+          />
+        )}
+        {currentView === "Month" && (
+          <MonthGrid
+            onAddEvent={handleAddEvent}
+            onEventClick={handleEventClick}
+            onViewChange={handleViewChange}
+          />
+        )}
 
         {/* Render the scheduler modal if active */}
         {showScheduler && (
