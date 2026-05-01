@@ -69,7 +69,25 @@ export class JanusTimeline extends LitElement {
     const newResources: TimelineResource[] = [];
     const coreEvents = Object.values(state.events) as any[];
 
-    for (const res of Object.values(state.resources) as any[]) {
+    // First, convert object values to arrays and sort them by type so groups cluster correctly
+    const coreResources = Object.values(state.resources) as any[];
+
+    // Define ordering for types
+    const typeOrder: Record<string, number> = {
+      person: 1,
+      room: 2,
+      equipment: 3,
+    };
+    coreResources.sort(
+      (a, b) =>
+        (typeOrder[a.type || "person"] || 99) -
+        (typeOrder[b.type || "person"] || 99),
+    );
+
+    // Keep track of which group we are currently in so we only set groupLabel on the first item of that group
+    let currentGroupType = "";
+
+    for (const res of coreResources) {
       const resEvents = coreEvents
         .filter((e) => e.resourceId === res.id)
         .map((e) => {
@@ -86,11 +104,39 @@ export class JanusTimeline extends LitElement {
           } as TimelineEvent;
         });
 
+      let avatarType: "initials" | "icon" = "initials";
+      let avatarIcon: "room" | "equipment" | undefined = undefined;
+      let groupLabel: string | undefined = undefined;
+
+      const type = res.type || "person";
+
+      if (type !== currentGroupType) {
+        currentGroupType = type;
+        if (type === "person") groupLabel = "STAFF";
+        else if (type === "room") groupLabel = "ROOMS";
+        else if (type === "equipment") groupLabel = "EQUIPMENT";
+      }
+
+      if (type === "room") {
+        avatarType = "icon";
+        avatarIcon = "room";
+      } else if (type === "equipment") {
+        avatarType = "icon";
+        avatarIcon = "equipment";
+      }
+
       newResources.push({
         id: res.id,
         name: res.name,
-        subtitle: res.type,
-        avatarType: "initials",
+        subtitle:
+          res.type === "person"
+            ? "Staff"
+            : res.type === "room"
+              ? "Facility"
+              : "Equipment",
+        avatarType,
+        avatarIcon,
+        groupLabel,
         events: resEvents,
       });
     }
