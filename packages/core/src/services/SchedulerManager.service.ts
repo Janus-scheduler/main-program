@@ -2,39 +2,23 @@ import { Event } from "../models/events/event";
 import { Resource, ResourceData } from "../models/resources/resources";
 import { Assignment, AssignmentData } from "../models/assignments/assignments";
 import { EventData } from "../types/event.types";
+import { schedulerStore } from "../store/scheduler.store";
 
 /**
  * Main scheduler manager class
  * Handles all CRUD operations for events, resources, and assignments
+ * Now powered by Zustand vanilla store for reactivity!
  */
 export class SchedulerManager {
-  private events: Map<string, Event> = new Map();
-  private resources: Map<string, Resource> = new Map();
-  private assignments: Map<string, Assignment> = new Map();
-
   // ============ EVENT FUNCTIONS ============
 
   /**
    * Add a new event
    * @param data - Event data
    * @returns Created event
-   * @throws Error if event data is invalid
-   * @example
-   * manager.addEvent({
-   *   id: 'evt_001',
-   *   title: 'Team Meeting',
-   *   startTime: '2025-02-18T14:00:00Z',
-   *   endTime: '2025-02-18T15:00:00Z',
-   *   resourceId: 'res_001'
-   * });
    */
   addEvent(data: EventData): Event {
-    const event = new Event(data);
-    if (!event.isValid()) {
-      throw new Error("Invalid event data");
-    }
-
-    this.events.set(event.id, event);
+    const event = schedulerStore.getState().addEvent(data);
     console.log(`Event added: ${event.title}`);
     return event;
   }
@@ -45,7 +29,7 @@ export class SchedulerManager {
    * @returns Event if found, undefined otherwise
    */
   getEvent(id: string): Event | undefined {
-    return this.events.get(id);
+    return schedulerStore.getState().events[id];
   }
 
   /**
@@ -53,7 +37,7 @@ export class SchedulerManager {
    * @returns Array of all events
    */
   getAllEvents(): Event[] {
-    return Array.from(this.events.values());
+    return Object.values(schedulerStore.getState().events);
   }
 
   /**
@@ -61,33 +45,9 @@ export class SchedulerManager {
    * @param id - Event ID
    * @param updates - Partial event data to update
    * @returns Updated event
-   * @throws Error if event not found
-   * @example
-   * manager.updateEvent('evt_001', { title: 'Updated Meeting' });
    */
   updateEvent(id: string, updates: Partial<EventData>): Event {
-    const event = this.events.get(id);
-    if (!event) {
-      throw new Error(`Event ${id} not found`);
-    }
-
-    // Update only provided fields
-    if (updates.title) {
-      event.title = updates.title;
-    }
-    if (updates.startTime) {
-      event.startTime = updates.startTime;
-    }
-    if (updates.endTime) {
-      event.endTime = updates.endTime;
-    }
-    if (updates.status) {
-      event.status = updates.status;
-    }
-    if (updates.description !== undefined) {
-      event.description = updates.description;
-    }
-
+    const event = schedulerStore.getState().updateEvent(id, updates);
     console.log(`✅ Event updated: ${event.title}`);
     return event;
   }
@@ -98,7 +58,7 @@ export class SchedulerManager {
    * @returns true if deleted, false if not found
    */
   deleteEvent(id: string): boolean {
-    const deleted = this.events.delete(id);
+    const deleted = schedulerStore.getState().deleteEvent(id);
     if (deleted) {
       console.log(`Event deleted: ${id}`);
     } else {
@@ -135,22 +95,9 @@ export class SchedulerManager {
    * Add a new resource
    * @param data - Resource data
    * @returns Created resource
-   * @throws Error if resource data is invalid
-   * @example
-   * manager.addResource({
-   *   id: 'res_001',
-   *   name: 'Dr. Alice Smith',
-   *   type: 'person',
-   *   email: 'alice@example.com'
-   * });
    */
   addResource(data: ResourceData): Resource {
-    const resource = new Resource(data);
-    if (!resource.isValid()) {
-      throw new Error("Invalid resource data");
-    }
-
-    this.resources.set(resource.id, resource);
+    const resource = schedulerStore.getState().addResource(data);
     console.log(`Resource added: ${resource.name}`);
     return resource;
   }
@@ -161,7 +108,7 @@ export class SchedulerManager {
    * @returns Resource if found, undefined otherwise
    */
   getResource(id: string): Resource | undefined {
-    return this.resources.get(id);
+    return schedulerStore.getState().resources[id];
   }
 
   /**
@@ -169,7 +116,7 @@ export class SchedulerManager {
    * @returns Array of all resources
    */
   getAllResources(): Resource[] {
-    return Array.from(this.resources.values());
+    return Object.values(schedulerStore.getState().resources);
   }
 
   /**
@@ -177,24 +124,9 @@ export class SchedulerManager {
    * @param id - Resource ID
    * @param updates - Partial resource data to update
    * @returns Updated resource
-   * @throws Error if resource not found
    */
   updateResource(id: string, updates: Partial<ResourceData>): Resource {
-    const resource = this.resources.get(id);
-    if (!resource) {
-      throw new Error(`Resource ${id} not found`);
-    }
-
-    if (updates.name) {
-      resource.name = updates.name;
-    }
-    if (updates.type) {
-      resource.type = updates.type;
-    }
-    if (updates.email !== undefined) {
-      resource.email = updates.email;
-    }
-
+    const resource = schedulerStore.getState().updateResource(id, updates);
     console.log(`Resource updated: ${resource.name}`);
     return resource;
   }
@@ -203,16 +135,9 @@ export class SchedulerManager {
    * Delete a resource
    * @param id - Resource ID
    * @returns true if deleted
-   * @throws Error if resource has assigned events
    */
   deleteResource(id: string): boolean {
-    // Check if resource has events
-    const hasEvents = this.getEventsByResource(id).length > 0;
-    if (hasEvents) {
-      throw new Error(`Cannot delete resource ${id} - has assigned events`);
-    }
-
-    const deleted = this.resources.delete(id);
+    const deleted = schedulerStore.getState().deleteResource(id);
     if (deleted) {
       console.log(`Resource deleted: ${id}`);
     }
@@ -225,25 +150,9 @@ export class SchedulerManager {
    * Add a new assignment (link event to resource)
    * @param data - Assignment data
    * @returns Created assignment
-   * @throws Error if assignment data is invalid or references don't exist
    */
   addAssignment(data: AssignmentData): Assignment {
-    const assignment = new Assignment(data);
-    if (!assignment.isValid()) {
-      throw new Error("Invalid assignment data");
-    }
-
-    // Check if event exists
-    if (!this.events.has(assignment.eventId)) {
-      throw new Error(`Event ${assignment.eventId} not found`);
-    }
-
-    // Check if resource exists
-    if (!this.resources.has(assignment.resourceId)) {
-      throw new Error(`Resource ${assignment.resourceId} not found`);
-    }
-
-    this.assignments.set(assignment.id, assignment);
+    const assignment = schedulerStore.getState().addAssignment(data);
     console.log(`Assignment created: ${assignment.id}`);
     return assignment;
   }
@@ -254,7 +163,7 @@ export class SchedulerManager {
    * @returns Array of assignments
    */
   getAssignmentsByEvent(eventId: string): Assignment[] {
-    return Array.from(this.assignments.values()).filter(
+    return Object.values(schedulerStore.getState().assignments).filter(
       (a) => a.eventId === eventId,
     );
   }
@@ -265,7 +174,7 @@ export class SchedulerManager {
    * @returns Array of assignments
    */
   getAssignmentsByResource(resourceId: string): Assignment[] {
-    return Array.from(this.assignments.values()).filter(
+    return Object.values(schedulerStore.getState().assignments).filter(
       (a) => a.resourceId === resourceId,
     );
   }
@@ -276,7 +185,7 @@ export class SchedulerManager {
    * @returns true if deleted, false if not found
    */
   deleteAssignment(id: string): boolean {
-    const deleted = this.assignments.delete(id);
+    const deleted = schedulerStore.getState().deleteAssignment(id);
     if (deleted) {
       console.log(`Assignment deleted: ${id}`);
     }
@@ -290,7 +199,7 @@ export class SchedulerManager {
    * @returns Number of events
    */
   getEventCount(): number {
-    return this.events.size;
+    return Object.keys(schedulerStore.getState().events).length;
   }
 
   /**
@@ -298,16 +207,14 @@ export class SchedulerManager {
    * @returns Number of resources
    */
   getResourceCount(): number {
-    return this.resources.size;
+    return Object.keys(schedulerStore.getState().resources).length;
   }
 
   /**
    * Clear all data
    */
   clearAll(): void {
-    this.events.clear();
-    this.resources.clear();
-    this.assignments.clear();
+    schedulerStore.getState().clearAll();
     console.log("All data cleared");
   }
 
@@ -316,79 +223,14 @@ export class SchedulerManager {
    */
   printSummary(): void {
     console.log("\n=== SCHEDULER SUMMARY ===");
-    console.log(`Events: ${this.events.size}`);
-    console.log(`Resources: ${this.resources.size}`);
-    console.log(`Assignments: ${this.assignments.size}`);
+    console.log(`Events: ${this.getEventCount()}`);
+    console.log(`Resources: ${this.getResourceCount()}`);
+    console.log(
+      `Assignments: ${Object.keys(schedulerStore.getState().assignments).length}`,
+    );
     console.log("========================\n");
   }
 }
-
-// ========================================
-// Example Usage
-// ========================================
-
-// Create manager
-const manager = new SchedulerManager();
-
-// Add resources
-manager.addResource({
-  id: "res_001",
-  name: "Dr. Alice Smith",
-  type: "person",
-  email: "alice@example.com",
-});
-
-manager.addResource({
-  id: "res_002",
-  name: "Conference Room A",
-  type: "room",
-});
-
-// Add events
-manager.addEvent({
-  id: "evt_001",
-  title: "Team Meeting",
-  startTime: "2025-02-18T14:00:00Z",
-  endTime: "2025-02-18T15:00:00Z",
-  resourceId: "res_001",
-  description: "Weekly team sync",
-});
-
-manager.addEvent({
-  id: "evt_002",
-  title: "Client Presentation",
-  startTime: "2025-02-18T16:00:00Z",
-  endTime: "2025-02-18T17:00:00Z",
-  resourceId: "res_002",
-  status: "confirmed",
-});
-
-// View event
-const event = manager.getEvent("evt_001");
-console.log(`
-  Event details: ${event?.title} - Duration: ${event?.getDuration()} minutes
-  `);
-
-// Update event
-manager.updateEvent("evt_001", {
-  title: "Updated Team Meeting",
-  status: "confirmed",
-});
-
-// Get all events
-console.log("\nAll events:");
-manager.getAllEvents().forEach((e) => {
-  console.log(`- ${e.title} (${e.status})`);
-});
-
-// Get events by resource
-console.log("\nEvents for Dr. Alice:");
-manager.getEventsByResource("res_001").forEach((e) => {
-  console.log(`- ${e.title}`);
-});
-
-// Print summary
-manager.printSummary();
 
 // Export for use in other files
 export default SchedulerManager;

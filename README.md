@@ -5,19 +5,25 @@ Janus Scheduler is a modern, **framework-agnostic** scheduling and event managem
 ## Architecture Overview
 
 ```
-                    ┌──────────────────────┐
-                    │  @janus-scheduler/ui │  ← Lit Web Component
-                    │   <janus-scheduler>  │     (framework-agnostic)
-                    └──────────┬───────────┘
-                               │ wraps
-              ┌────────────────┼────────────────┐
-              ▼                ▼                ▼
-   @janus-scheduler/  @janus-scheduler/  @janus-scheduler/
-       react            angular              vue
-   (react-wrapper)   (angular-wrapper)  (vue-wrapper)
+                    ┌──────────────────────────────────────────────┐
+                    │               @janus-scheduler/core          │
+                    │   (Zustand State Store: Events, Resources)   │
+                    └──────────────────────┬───────────────────────┘
+                                           │ subscribes
+                    ┌──────────────────────┴───────────────────────┐
+                    │               @janus-scheduler/ui            │
+                    │   <janus-scheduler>, <janus-timeline>,       │
+                    │   <janus-month-grid>                         │
+                    └──────────────────────┬───────────────────────┘
+                                           │ wraps
+               ┌───────────────────────────┼───────────────────────────┐
+               ▼                           ▼                           ▼
+    @janus-scheduler/              @janus-scheduler/           @janus-scheduler/
+         react                          angular                       vue
+    (react-wrapper)                 (angular-wrapper)             (vue-wrapper)
 ```
 
-The core Web Component (`<janus-scheduler>`) is defined once using Lit, then each framework wrapper exposes it as a native component using the framework's own adapter (e.g. `@lit/react` for React).
+The core data (events, resources) lives centrally in `@janus-scheduler/core` using a framework-agnostic **Zustand** store. The Lit Web Components (`<janus-scheduler>`, `<janus-timeline>`, `<janus-month-grid>`) automatically subscribe to this store and react to changes. Finally, each framework wrapper exposes these web components natively using the framework's own adapter (e.g., `@lit/react` for React).
 
 ## Project Structure
 
@@ -25,11 +31,12 @@ This project uses **npm workspaces** to manage its multi-package monorepo:
 
 ```text
 ├── packages/
-│   ├── core/                    # Core business logic, models, services, state
-│   ├── ui/                      # @janus-scheduler/ui — Lit Web Component library
+│   ├── core/                    # Core business logic, Zustand state, models, services
+│   ├── ui/                      # @janus-scheduler/ui — Lit Web Components library
 │   │   └── src/
-│   │       ├── janus-scheduler.ts   # <janus-scheduler> custom element (LitElement)
-│   │       ├── styles.ts            # Component styles (encapsulated via Shadow DOM)
+│   │       ├── janus-scheduler.ts   # <janus-scheduler> modal element
+│   │       ├── janus-timeline.ts    # <janus-timeline> grid view element
+│   │       ├── janus-month-grid.ts  # <janus-month-grid> calendar element
 │   │       └── index.ts             # Public package entry point
 │   ├── utils/                   # Shared utility functions and helpers
 │   └── wrappers/
@@ -43,35 +50,48 @@ This project uses **npm workspaces** to manage its multi-package monorepo:
 
 ## Packages
 
-| Package                           | Name                     | Description                                                                     |
-| --------------------------------- | ------------------------ | ------------------------------------------------------------------------------- |
-| `packages/core`                   | `@janus-scheduler/core`  | Business logic, models (events, resources), interactions, services              |
-| `packages/ui`                     | `@janus-scheduler/ui`    | Lit-based `<janus-scheduler>` Web Component — the single source of truth for UI |
-| `packages/wrappers/react-wrapper` | `@janus-scheduler/react` | React adapter wrapping the Lit component via `@lit/react`                       |
+| Package                           | Name                     | Description                                                                   |
+| --------------------------------- | ------------------------ | ----------------------------------------------------------------------------- |
+| `packages/core`                   | `@janus-scheduler/core`  | Business logic, models, **Zustand reactive store**, and scheduling services   |
+| `packages/ui`                     | `@janus-scheduler/ui`    | Lit Web Components — Timeline, Month Grid, and Scheduling Modal UI components |
+| `packages/wrappers/react-wrapper` | `@janus-scheduler/react` | React adapter wrapping the Lit components via `@lit/react`                    |
 
 ## Features
 
-### `@janus-scheduler/ui` — Lit Web Component
+### `@janus-scheduler/core` — Reactive State Management
 
-The `<janus-scheduler>` custom element is a fully self-contained scheduling modal built with Lit. It supports:
+Instead of each wrapper managing its own state, the core layer implements a framework-agnostic reactive store using **Zustand** (vanilla JS).
 
-- **Event title, date, and time range** configuration (start/end times)
-- **Participant management** — add via keyboard (Enter / comma), remove with one click
-- **Color tagging** — 5 color options (orange, blue, green, yellow, purple)
-- **Event description** field
-- **Responsive layout** — collapsible sidebar with mobile summary panel
-- **Shadow DOM encapsulation** — styles are fully scoped, no CSS bleeding
-- Fires a `close` custom event when the modal is dismissed
+- Exposes a robust `SchedulerManager` facade to initialize and interact with the state.
+- Enables single-source-of-truth reactivity: Web Components subscribe directly to the core store.
+
+### `@janus-scheduler/ui` — Lit Web Components
+
+The UI library contains fully self-contained scheduling Web Components built with Lit:
+
+- **`<janus-timeline>`**: A responsive daily/weekly timeline grid supporting drag-and-drop event creation, resizing, and moving. Resources are automatically grouped by type.
+- **`<janus-month-grid>`**: A classic monthly calendar view summarizing events per day.
+- **`<janus-scheduler>`**: A modal component supporting event configuration, participant management, and color tagging.
+
+Features:
+
+- Shadow DOM encapsulation prevents CSS bleeding.
+- Responsive layouts and modern UI aesthetics.
 
 ### `@janus-scheduler/react` — React Wrapper
 
 Wraps the Lit Web Component into a native React component using `@lit/react`:
 
 ```tsx
-import { Scheduler } from "@janus-scheduler/react";
+import { Timeline, MonthGrid, Scheduler } from "@janus-scheduler/react";
+import { SchedulerManager } from "@janus-scheduler/core";
+
+// Initialize core state manager
+const manager = new SchedulerManager();
+manager.addResource({ id: "1", name: "Alice", type: "person" });
 
 function App() {
-  return <Scheduler onClose={() => console.log("closed")} />;
+  return <Timeline onAddEvent={() => console.log("Add event clicked")} />;
 }
 ```
 
@@ -177,6 +197,7 @@ npm run validate    # lint + build all packages
 
 | Tool                                                                                              | Purpose                                          |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| [Zustand](https://zustand-demo.pmnd.rs/)                                                          | Framework-agnostic centralized state management  |
 | [Lit](https://lit.dev/)                                                                           | Web Component authoring (`@janus-scheduler/ui`)  |
 | [@lit/react](https://github.com/lit/lit/tree/main/packages/react)                                 | React ↔ Web Component bridge                     |
 | [Vite](https://vitejs.dev/) + [vite-plugin-dts](https://github.com/qmhc/vite-plugin-dts)          | Package bundling and type declaration generation |

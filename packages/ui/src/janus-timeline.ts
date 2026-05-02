@@ -1,6 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
+import { schedulerStore } from "@janus-scheduler/core";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
 import {
@@ -29,14 +30,13 @@ import {
   formatDateFull,
   formatDateShort,
 } from "./timeline-utils";
-import { SAMPLE } from "./timeline-data";
 import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
 @customElement("janus-timeline")
 export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
 
-  @property({ type: Array }) resources: TimelineResource[] = SAMPLE;
+  @property({ type: Array }) resources: TimelineResource[] = [];
 
   @state() view: "Timeline" | "Month" = "Timeline";
   @state() currentDate = new Date();
@@ -50,6 +50,102 @@ export class JanusTimeline extends LitElement {
     this._dragVersion++;
   });
   private _wasDragging = false;
+  private _unsubStore?: () => void;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._unsubStore = schedulerStore.subscribe((state) => {
+      this._syncFromStore(state);
+    });
+    this._syncFromStore(schedulerStore.getState());
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._unsubStore) this._unsubStore();
+  }
+
+  private _syncFromStore(state: any) {
+    const newResources: TimelineResource[] = [];
+    const coreEvents = Object.values(state.events) as any[];
+
+    // First, convert object values to arrays and sort them by type so groups cluster correctly
+    const coreResources = Object.values(state.resources) as any[];
+
+    // Define ordering for types
+    const typeOrder: Record<string, number> = {
+      person: 1,
+      room: 2,
+      equipment: 3,
+    };
+    coreResources.sort(
+      (a, b) =>
+        (typeOrder[a.type || "person"] || 99) -
+        (typeOrder[b.type || "person"] || 99),
+    );
+
+    // Keep track of which group we are currently in so we only set groupLabel on the first item of that group
+    let currentGroupType = "";
+
+    for (const res of coreResources) {
+      const resEvents = coreEvents
+        .filter((e) => e.resourceId === res.id)
+        .map((e) => {
+          const startD = new Date(e.startTime);
+          const endD = new Date(e.endTime);
+          const pad = (n: number) => n.toString().padStart(2, "0");
+          return {
+            id: e.id,
+            title: e.title,
+            startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
+            endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+            color: "blue",
+            date: startD.toISOString().split("T")[0],
+          } as TimelineEvent;
+        });
+
+      let avatarType: "initials" | "icon" = "initials";
+      let avatarIcon: "room" | "equipment" | undefined = undefined;
+      let groupLabel: string | undefined = undefined;
+
+      const type = res.type || "person";
+
+      if (type !== currentGroupType) {
+        currentGroupType = type;
+        if (type === "person") groupLabel = "STAFF";
+        else if (type === "room") groupLabel = "ROOMS";
+        else if (type === "equipment") groupLabel = "EQUIPMENT";
+      }
+
+      if (type === "room") {
+        avatarType = "icon";
+        avatarIcon = "room";
+      } else if (type === "equipment") {
+        avatarType = "icon";
+        avatarIcon = "equipment";
+      }
+
+      newResources.push({
+        id: res.id,
+        name: res.name,
+        subtitle:
+          res.type === "person"
+            ? "Staff"
+            : res.type === "room"
+              ? "Facility"
+              : "Equipment",
+        avatarType,
+        avatarIcon,
+        groupLabel,
+        events: resEvents,
+      });
+    }
+
+    // Only overwrite if store has data, otherwise we might wipe initial props
+    if (newResources.length > 0) {
+      this.resources = newResources;
+    }
+  }
 
   firstUpdated() {
     // On mount: scroll horizontally so 8:00 AM is the first visible hour
@@ -276,16 +372,7 @@ export class JanusTimeline extends LitElement {
                     class="tl-view-toggle__btn ${this.view === v
                       ? "active"
                       : ""}"
-                    @click=${() => {
-                      this.view = v;
-                      this.dispatchEvent(
-                        new CustomEvent("view-change", {
-                          detail: { view: v },
-                          bubbles: true,
-                          composed: true,
-                        }),
-                      );
-                    }}
+                    @click=${() => (this.view = v)}
                   >
                     ${v}
                   </button>
