@@ -1,6 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
+import { schedulerStore } from "@janus-scheduler/core";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
 import {
@@ -17,6 +18,9 @@ import {
   HOUR_START,
   HOUR_WIDTH,
   VISIBLE_HOURS,
+  ROW_HEIGHT,
+  GROUP_LABEL_HEIGHT,
+  HOUR_HEADER_HEIGHT,
   fmt12,
   getInitials,
   avatarColor,
@@ -26,20 +30,122 @@ import {
   formatDateFull,
   formatDateShort,
 } from "./timeline-utils";
-import { SAMPLE } from "./timeline-data";
+import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
 @customElement("janus-timeline")
 export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
 
-  @property({ type: Array }) resources: TimelineResource[] = SAMPLE;
+  @property({ type: Array }) resources: TimelineResource[] = [];
 
   @state() view: "Timeline" | "Month" = "Timeline";
   @state() currentDate = new Date();
   @state() aiPrompt = "";
+  @state() private _dragVersion = 0; // bumped to trigger re-render during drag
 
   @query(".tl-res-col") resColRef!: HTMLElement;
   @query(".tl-time-scroll") gridScrollRef!: HTMLElement;
+
+  private _drag = new TimelineDragController(() => {
+    this._dragVersion++;
+  });
+  private _wasDragging = false;
+  private _unsubStore?: () => void;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._unsubStore = schedulerStore.subscribe((state) => {
+      this._syncFromStore(state);
+    });
+    this._syncFromStore(schedulerStore.getState());
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._unsubStore) this._unsubStore();
+  }
+
+  private _syncFromStore(state: any) {
+    const newResources: TimelineResource[] = [];
+    const coreEvents = Object.values(state.events) as any[];
+
+    // First, convert object values to arrays and sort them by type so groups cluster correctly
+    const coreResources = Object.values(state.resources) as any[];
+
+    // Define ordering for types
+    const typeOrder: Record<string, number> = {
+      person: 1,
+      room: 2,
+      equipment: 3,
+    };
+    coreResources.sort(
+      (a, b) =>
+        (typeOrder[a.type || "person"] || 99) -
+        (typeOrder[b.type || "person"] || 99),
+    );
+
+    // Keep track of which group we are currently in so we only set groupLabel on the first item of that group
+    let currentGroupType = "";
+
+    for (const res of coreResources) {
+      const resEvents = coreEvents
+        .filter((e) => e.resourceId === res.id)
+        .map((e) => {
+          const startD = new Date(e.startTime);
+          const endD = new Date(e.endTime);
+          const pad = (n: number) => n.toString().padStart(2, "0");
+          return {
+            id: e.id,
+            title: e.title,
+            startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
+            endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+            color: "blue",
+            date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
+          } as TimelineEvent;
+        });
+
+      let avatarType: "initials" | "icon" = "initials";
+      let avatarIcon: "room" | "equipment" | undefined = undefined;
+      let groupLabel: string | undefined = undefined;
+
+      const type = res.type || "person";
+
+      if (type !== currentGroupType) {
+        currentGroupType = type;
+        if (type === "person") groupLabel = "STAFF";
+        else if (type === "room") groupLabel = "ROOMS";
+        else if (type === "equipment") groupLabel = "EQUIPMENT";
+      }
+
+      if (type === "room") {
+        avatarType = "icon";
+        avatarIcon = "room";
+      } else if (type === "equipment") {
+        avatarType = "icon";
+        avatarIcon = "equipment";
+      }
+
+      newResources.push({
+        id: res.id,
+        name: res.name,
+        subtitle:
+          res.type === "person"
+            ? "Staff"
+            : res.type === "room"
+              ? "Facility"
+              : "Equipment",
+        avatarType,
+        avatarIcon,
+        groupLabel,
+        events: resEvents,
+      });
+    }
+
+    // Only overwrite if store has data, otherwise we might wipe initial props
+    if (newResources.length > 0) {
+      this.resources = newResources;
+    }
+  }
 
   firstUpdated() {
     // On mount: scroll horizontally so 8:00 AM is the first visible hour
@@ -70,7 +176,14 @@ export class JanusTimeline extends LitElement {
     this.currentDate = new Date();
   }
 
-  private _handleEventClick(ev: TimelineEvent) {
+  private _handleEventClick(e: Event, ev: TimelineEvent) {
+    // Don't fire click if we just finished a drag
+    if (this._wasDragging) {
+      this._wasDragging = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     this.dispatchEvent(
       new CustomEvent("event-click", {
         detail: ev,
@@ -86,6 +199,81 @@ export class JanusTimeline extends LitElement {
     );
   }
 
+  // ── Drag-and-drop handlers ────────────────────────────────────────
+
+  private _onEventPointerDown(
+    e: PointerEvent,
+    ev: TimelineEvent,
+    resourceId: string,
+  ) {
+    // Only left mouse button
+    if (e.button !== 0) return;
+    this._drag.startMove(e, ev, resourceId);
+    this._addDragUpListener();
+  }
+
+  private _onResizePointerDown(
+    e: PointerEvent,
+    ev: TimelineEvent,
+    resourceId: string,
+    edge: "start" | "end",
+  ) {
+    if (e.button !== 0) return;
+    this._drag.startResize(e, ev, resourceId, edge);
+    this._addDragUpListener();
+  }
+
+  private _onRowPointerDown(e: PointerEvent, resourceId: string) {
+    if (e.button !== 0) return;
+    this._drag.startCreate(e, resourceId);
+    if (this._drag.mode === "creating") {
+      this._addDragUpListener();
+    }
+  }
+
+  private _addDragUpListener() {
+    const handler = (_e: PointerEvent) => {
+      document.removeEventListener("pointerup", handler);
+      const result = this._drag.completeAndGetResult();
+      if (result) {
+        this._wasDragging = true;
+        // Set the current date on create events
+        if (result.type === "event-create") {
+          result.detail.date = toDateStr(this.currentDate);
+        }
+        this.dispatchEvent(
+          new CustomEvent(result.type, {
+            detail: result.detail,
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      }
+    };
+    document.addEventListener("pointerup", handler);
+  }
+
+  // ── Resource layout computation ───────────────────────────────────
+
+  private _computeResourceLayout(
+    groups: { label: string; items: TimelineResource[] }[],
+  ): ResourceLayout[] {
+    const layout: ResourceLayout[] = [];
+    let y = HOUR_HEADER_HEIGHT;
+    let idx = 0;
+    for (const g of groups) {
+      if (g.label) y += GROUP_LABEL_HEIGHT;
+      for (const r of g.items) {
+        layout.push({ id: r.id, yOffset: y, index: idx });
+        y += ROW_HEIGHT;
+        idx++;
+      }
+    }
+    return layout;
+  }
+
+  // ── Rendering helpers ─────────────────────────────────────────────
+
   private renderAvatar(r: TimelineResource) {
     if (r.avatarType === "initials") {
       return html`<span
@@ -98,6 +286,22 @@ export class JanusTimeline extends LitElement {
       <span class="tl-avatar tl-avatar--icon tl-avatar--${r.avatarIcon}">
         ${r.avatarIcon === "room" ? RoomIcon() : EquipmentIcon()}
       </span>
+    `;
+  }
+
+  private _renderDragGhost() {
+    if (!this._drag.active) return nothing;
+    // Reference _dragVersion to ensure Lit tracks this dependency
+    void this._dragVersion;
+    const g = this._drag.ghost;
+    return html`
+      <div
+        class="tl-drag-ghost tl-drag-ghost--${g.color}"
+        style="left: ${g.left}px; top: ${g.top}px; width: ${g.width}px;"
+      >
+        <span class="tl-drag-ghost__title">${g.title}</span>
+        <span class="tl-drag-ghost__time">${g.timeLabel}</span>
+      </div>
     `;
   }
 
@@ -124,6 +328,10 @@ export class JanusTimeline extends LitElement {
         groups.push(cur);
       }
     }
+
+    // Update drag controller with current layout
+    const resourceLayout = this._computeResourceLayout(groups);
+    this._drag.updateLayout(this.gridScrollRef, resourceLayout);
 
     const totalW = VISIBLE_HOURS.length * HOUR_WIDTH;
     const nl = nowLeft();
@@ -243,7 +451,12 @@ export class JanusTimeline extends LitElement {
                         : nothing}
                       ${g.items.map(
                         (r) => html`
-                          <div class="tl-event-row">
+                          <div
+                            class="tl-event-row"
+                            data-resource-id=${r.id}
+                            @pointerdown=${(e: PointerEvent) =>
+                              this._onRowPointerDown(e, r.id)}
+                          >
                             ${VISIBLE_HOURS.map(
                               (h) =>
                                 html`<div
@@ -254,11 +467,28 @@ export class JanusTimeline extends LitElement {
                             )}
                             ${r.events.map(
                               (ev) => html`
-                                <button
-                                  class="tl-event tl-event--${ev.color}"
+                                <div
+                                  class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
+                                    ev,
+                                  )
+                                    ? "tl-event--dragging"
+                                    : ""}"
                                   style=${eventStyle(ev)}
-                                  @click=${() => this._handleEventClick(ev)}
+                                  @pointerdown=${(e: PointerEvent) =>
+                                    this._onEventPointerDown(e, ev, r.id)}
+                                  @click=${(e: Event) =>
+                                    this._handleEventClick(e, ev)}
                                 >
+                                  <div
+                                    class="tl-event-resize-handle tl-event-resize-handle--start"
+                                    @pointerdown=${(e: PointerEvent) =>
+                                      this._onResizePointerDown(
+                                        e,
+                                        ev,
+                                        r.id,
+                                        "start",
+                                      )}
+                                  ></div>
                                   <span class="tl-event__title"
                                     >${ev.title}</span
                                   >
@@ -266,7 +496,17 @@ export class JanusTimeline extends LitElement {
                                     >${fmt12(ev.startTime)} –
                                     ${fmt12(ev.endTime)}</span
                                   >
-                                </button>
+                                  <div
+                                    class="tl-event-resize-handle tl-event-resize-handle--end"
+                                    @pointerdown=${(e: PointerEvent) =>
+                                      this._onResizePointerDown(
+                                        e,
+                                        ev,
+                                        r.id,
+                                        "end",
+                                      )}
+                                  ></div>
+                                </div>
                               `,
                             )}
                           </div>
@@ -275,6 +515,7 @@ export class JanusTimeline extends LitElement {
                     </div>
                   `,
                 )}
+                ${this._renderDragGhost()}
               </div>
             </div>
           </div>

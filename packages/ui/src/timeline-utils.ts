@@ -47,7 +47,14 @@ export function eventStyle(ev: TimelineEvent): string {
 }
 
 export function toDateStr(d: Date): string {
-  return d.toISOString().split("T")[0];
+  // Use LOCAL date components so the date string always matches what the
+  // user sees on their calendar, regardless of timezone.
+  // toISOString() would convert a local-midnight Date to UTC, shifting the
+  // date back by one day for any UTC+ timezone (e.g. IST UTC+5:30).
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function nowLeft(): number {
@@ -69,4 +76,31 @@ export function formatDateFull(d: Date): string {
 
 export function formatDateShort(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// ── Drag-and-drop constants ───────────────────────────────────────────
+export const ROW_HEIGHT = 72;
+export const GROUP_LABEL_HEIGHT = 32;
+export const HOUR_HEADER_HEIGHT = 40;
+export const SNAP_MINUTES = 15;
+export const DRAG_THRESHOLD = 5;
+
+// ── Drag-and-drop helpers ─────────────────────────────────────────────
+export function pxToMinutes(px: number): number {
+  return (px / HOUR_WIDTH) * 60;
+}
+
+export function minutesToPx(min: number): number {
+  return (min / 60) * HOUR_WIDTH;
+}
+
+export function snapMinutes(min: number, snap: number = SNAP_MINUTES): number {
+  return Math.round(min / snap) * snap;
+}
+
+export function minutesToTimeStr(totalMin: number): string {
+  const clamped = Math.max(0, Math.min(totalMin, 24 * 60 - 1));
+  const h = Math.floor(clamped / 60);
+  const m = Math.round(clamped % 60);
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
 }

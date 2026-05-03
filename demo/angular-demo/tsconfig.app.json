@@ -4,8 +4,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/app",
+    "rootDir": "../../",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "../../packages/wrappers/angular-wrapper/src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts"]
 }

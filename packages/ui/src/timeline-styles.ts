@@ -523,6 +523,123 @@ export const timelineStyles = css`
   }
 
   /* ══════════════════════════════════════════════════════════════════════════════
+     DRAG-AND-DROP
+  ══════════════════════════════════════════════════════════════════════════════ */
+
+  /* Resize handles — thin strips on left/right edges */
+  .tl-event-resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 2;
+    border-radius: 2px;
+    transition: background 0.15s;
+  }
+
+  .tl-event-resize-handle--start {
+    left: 0;
+  }
+
+  .tl-event-resize-handle--end {
+    right: 0;
+  }
+
+  .tl-event:hover .tl-event-resize-handle {
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  .tl-event-resize-handle:hover {
+    background: rgba(0, 0, 0, 0.18) !important;
+  }
+
+  /* Event being dragged — dim the original */
+  .tl-event--dragging {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  /* Ghost preview during drag */
+  .tl-drag-ghost {
+    position: absolute;
+    height: 56px;
+    border-radius: 7px;
+    border-left: 3px solid transparent;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    z-index: 100;
+    pointer-events: none;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.15),
+      0 2px 8px rgba(0, 0, 0, 0.08);
+    opacity: 0.9;
+    transition: top 0.08s ease-out;
+  }
+
+  .tl-drag-ghost__title {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tl-drag-ghost__time {
+    font-size: 11px;
+    font-family: "DM Mono", monospace;
+    white-space: nowrap;
+    opacity: 0.85;
+  }
+
+  .tl-drag-ghost--orange {
+    background: var(--c-orange-bg);
+    border-color: var(--c-orange-bd);
+    color: var(--c-orange-tx);
+  }
+
+  .tl-drag-ghost--blue {
+    background: var(--c-blue-bg);
+    border-color: var(--c-blue-bd);
+    color: var(--c-blue-tx);
+  }
+
+  .tl-drag-ghost--yellow {
+    background: var(--c-yellow-bg);
+    border-color: var(--c-yellow-bd);
+    color: var(--c-yellow-tx);
+  }
+
+  .tl-drag-ghost--purple {
+    background: var(--c-purple-bg);
+    border-color: var(--c-purple-bd);
+    color: var(--c-purple-tx);
+  }
+
+  .tl-drag-ghost--green {
+    background: var(--c-green-bg);
+    border-color: var(--c-green-bd);
+    color: var(--c-green-tx);
+  }
+
+  /* Empty-space creation cursor */
+  .tl-event-row {
+    cursor: crosshair;
+  }
+
+  .tl-event {
+    cursor: grab;
+  }
+
+  .tl-event:active {
+    cursor: grabbing;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════
      FAB
   ══════════════════════════════════════════════════════════════════════════════ */
   .tl-fab {

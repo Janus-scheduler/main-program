@@ -13,7 +13,11 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
-    "module": "preserve"
+    "module": "preserve",
+    "paths": {
+      "@janus-scheduler/angular": ["../../packages/wrappers/angular-wrapper/src/index.ts"],
+      "@janus-scheduler/angular/*": ["../../packages/wrappers/angular-wrapper/src/*"]
+    }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

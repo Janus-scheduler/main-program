@@ -2,124 +2,245 @@ import { Event } from "../models/events/event";
 import { Resource, ResourceData } from "../models/resources/resources";
 import { Assignment, AssignmentData } from "../models/assignments/assignments";
 import { EventData } from "../types/event.types";
+import { schedulerStore } from "../store/scheduler.store";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lifecycle hooks — provided by the host application.
+//
+// Pattern: Optimistic Update + Automatic Rollback (Option C)
+//
+//  1. The store is updated immediately → UI re-renders with no perceived lag.
+//  2. The async hook fires (e.g. your fetch() to a backend API).
+//  3a. Hook resolves → done, nothing more to do.
+//  3b. Hook rejects → the store change is automatically rolled back and
+//      `onError` is called so you can display an error to the user.
+//
+// All hooks are optional. Omit any you do not need.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface SchedulerHooks {
+  // ── Event lifecycle ────────────────────────────────────────────────────────
+  onEventAdd?: (event: Event) => void | Promise<void>;
+  onEventUpdate?: (event: Event) => void | Promise<void>;
+  onEventDelete?: (id: string) => void | Promise<void>;
+
+  // ── Resource lifecycle ─────────────────────────────────────────────────────
+  onResourceAdd?: (resource: Resource) => void | Promise<void>;
+  onResourceUpdate?: (resource: Resource) => void | Promise<void>;
+  onResourceDelete?: (id: string) => void | Promise<void>;
+
+  // ── Assignment lifecycle ───────────────────────────────────────────────────
+  onAssignmentAdd?: (assignment: Assignment) => void | Promise<void>;
+  onAssignmentDelete?: (id: string) => void | Promise<void>;
+
+  // ── Error handler ──────────────────────────────────────────────────────────
+  /**
+   * Called whenever any hook fails — either throws synchronously or returns a
+   * rejected Promise (e.g. a failed fetch()). The store change that triggered
+   * the hook has already been rolled back by the time this fires, so the UI
+   * has reverted to the previous state.
+   *
+   * Use this hook to show an error notification to your user, e.g.:
+   *   onError: ({ operation, error }) => toast.error(`${operation} failed: ${error.message}`)
+   *
+   * @param ctx.operation  - Name of the method that failed, e.g. "addEvent"
+   * @param ctx.error      - The raw thrown/rejected value from your hook
+   * @param ctx.reverted   - Always true — the store was rolled back automatically
+   */
+  onError?: (ctx: {
+    operation: string;
+    error: unknown;
+    reverted: boolean;
+  }) => void;
+}
 
 /**
- * Main scheduler manager class
- * Handles all CRUD operations for events, resources, and assignments
+ * SchedulerManager
+ *
+ * The single public API surface for reading and writing scheduler data.
+ * Internally it writes to the Zustand vanilla store (which drives UI reactivity)
+ * and then fires the matching lifecycle hook so the host application can persist
+ * the change to its own backend.
+ *
+ * If the async hook rejects (e.g. a network error), the store is automatically
+ * rolled back and `onError` is called — the host only needs to display a message.
+ *
+ * @example
+ * ```ts
+ * const manager = new SchedulerManager({
+ *   onEventAdd: async (event) => {
+ *     await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) });
+ *   },
+ *   onEventUpdate: async (event) => {
+ *     await fetch(`/api/events/${event.id}`, { method: 'PATCH', body: JSON.stringify(event) });
+ *   },
+ *   onEventDelete: async (id) => {
+ *     await fetch(`/api/events/${id}`, { method: 'DELETE' });
+ *   },
+ *   onError: ({ operation, error }) => {
+ *     // The UI has already reverted — just show a notification
+ *     toast.error(`"${operation}" failed. Your change has been undone.`);
+ *     console.error(error);
+ *   },
+ * });
+ * ```
  */
 export class SchedulerManager {
-  private events: Map<string, Event> = new Map();
-  private resources: Map<string, Resource> = new Map();
-  private assignments: Map<string, Assignment> = new Map();
+  private readonly _hooks: SchedulerHooks;
+
+  constructor(hooks: SchedulerHooks = {}) {
+    this._hooks = hooks;
+  }
+
+  // ── Private helper ─────────────────────────────────────────────────────────
+
+  /**
+   * Invokes an optional lifecycle hook inside a try/catch and, if it fails
+   * (synchronous throw OR async rejection), runs the rollback then calls onError.
+   *
+   * The hook is passed as a **thunk** (`() => hook?.()`) so that invocation
+   * happens inside the try block. Without this, a synchronous throw would
+   * escape at the call site before _fireHook was entered, bypassing rollback.
+   *
+   * @param operation   - Method name shown in the error context, e.g. "addEvent"
+   * @param invokeHook  - Zero-arg function that calls the hook and returns its result
+   * @param rollback    - Undoes the optimistic store write
+   */
+  private _fireHook(
+    operation: string,
+    invokeHook: () => void | Promise<void>,
+    rollback: () => void,
+  ): void {
+    let result: void | Promise<void>;
+    try {
+      result = invokeHook();
+    } catch (error: unknown) {
+      // Synchronous throw — treat identically to an async rejection.
+      rollback();
+      this._hooks.onError?.({ operation, error, reverted: true });
+      return;
+    }
+    // Async rejection path.
+    result?.catch((error: unknown) => {
+      rollback();
+      this._hooks.onError?.({ operation, error, reverted: true });
+    });
+  }
 
   // ============ EVENT FUNCTIONS ============
 
   /**
-   * Add a new event
-   * @param data - Event data
-   * @returns Created event
-   * @throws Error if event data is invalid
-   * @example
-   * manager.addEvent({
-   *   id: 'evt_001',
-   *   title: 'Team Meeting',
-   *   startTime: '2025-02-18T14:00:00Z',
-   *   endTime: '2025-02-18T15:00:00Z',
-   *   resourceId: 'res_001'
-   * });
+   * Optimistically adds an event to the store, then fires `onEventAdd`.
+   * If the hook rejects, the event is removed from the store and `onError` fires.
+   *
+   * @param data - Raw event data
+   * @returns The created Event instance (already visible in the UI)
    */
   addEvent(data: EventData): Event {
-    const event = new Event(data);
-    if (!event.isValid()) {
-      throw new Error("Invalid event data");
-    }
+    const event = schedulerStore.getState().addEvent(data);
 
-    this.events.set(event.id, event);
-    console.log(`Event added: ${event.title}`);
+    this._fireHook(
+      "addEvent",
+      () => this._hooks.onEventAdd?.(event),
+      () => schedulerStore.getState().deleteEvent(event.id),
+    );
+
     return event;
   }
 
   /**
-   * Get an event by ID
+   * Get a single event by ID.
    * @param id - Event ID
    * @returns Event if found, undefined otherwise
    */
   getEvent(id: string): Event | undefined {
-    return this.events.get(id);
+    return schedulerStore.getState().events[id];
   }
 
   /**
-   * Get all events
-   * @returns Array of all events
+   * Get all events currently in the store.
+   * @returns Array of all Event instances
    */
   getAllEvents(): Event[] {
-    return Array.from(this.events.values());
+    return Object.values(schedulerStore.getState().events);
   }
 
   /**
-   * Update an event
-   * @param id - Event ID
-   * @param updates - Partial event data to update
-   * @returns Updated event
-   * @throws Error if event not found
-   * @example
-   * manager.updateEvent('evt_001', { title: 'Updated Meeting' });
+   * Optimistically updates an event in the store, then fires `onEventUpdate`.
+   * If the hook rejects, the event is restored to its previous state and `onError` fires.
+   *
+   * @param id      - Event ID
+   * @param updates - Partial event fields to update
+   * @returns The updated Event instance (already visible in the UI)
    */
   updateEvent(id: string, updates: Partial<EventData>): Event {
-    const event = this.events.get(id);
-    if (!event) {
-      throw new Error(`Event ${id} not found`);
-    }
+    // Shallow-clone the primitive fields BEFORE the store writes.
+    // Without the spread, `snapshot` would be a reference to the same
+    // object that updateEvent() mutates in-place — meaning the rollback
+    // would read already-updated values and restore nothing.
+    const existing = schedulerStore.getState().events[id];
+    const snapshot = existing ? { ...existing } : null;
 
-    // Update only provided fields
-    if (updates.title) {
-      event.title = updates.title;
-    }
-    if (updates.startTime) {
-      event.startTime = updates.startTime;
-    }
-    if (updates.endTime) {
-      event.endTime = updates.endTime;
-    }
-    if (updates.status) {
-      event.status = updates.status;
-    }
-    if (updates.description !== undefined) {
-      event.description = updates.description;
-    }
+    const event = schedulerStore.getState().updateEvent(id, updates);
 
-    console.log(`✅ Event updated: ${event.title}`);
+    this._fireHook(
+      "updateEvent",
+      () => this._hooks.onEventUpdate?.(event),
+      () => {
+        if (snapshot) {
+          // All fields are primitive strings — snapshot holds the original values.
+          schedulerStore.getState().updateEvent(id, {
+            title: snapshot.title,
+            startTime: snapshot.startTime,
+            endTime: snapshot.endTime,
+            status: snapshot.status,
+            description: snapshot.description,
+            resourceId: snapshot.resourceId,
+          });
+        }
+      },
+    );
+
     return event;
   }
 
   /**
-   * Delete an event
+   * Optimistically deletes an event from the store, then fires `onEventDelete`.
+   * If the hook rejects, the event is re-added to the store and `onError` fires.
+   *
    * @param id - Event ID
-   * @returns true if deleted, false if not found
+   * @returns true if the event was found and deleted, false otherwise
    */
   deleteEvent(id: string): boolean {
-    const deleted = this.events.delete(id);
+    // Snapshot before deletion so we can restore it
+    const snapshot = schedulerStore.getState().events[id];
+    const deleted = schedulerStore.getState().deleteEvent(id);
+
     if (deleted) {
-      console.log(`Event deleted: ${id}`);
-    } else {
-      console.log(`Event not found: ${id}`);
+      this._fireHook(
+        "deleteEvent",
+        () => this._hooks.onEventDelete?.(id),
+        () => {
+          if (snapshot) schedulerStore.getState().addEvent(snapshot);
+        },
+      );
     }
+
     return deleted;
   }
 
   /**
-   * Get events for a specific resource
+   * Get all events assigned to a specific resource.
    * @param resourceId - Resource ID
-   * @returns Array of events for the resource
+   * @returns Filtered array of Event instances
    */
   getEventsByResource(resourceId: string): Event[] {
     return this.getAllEvents().filter((e) => e.resourceId === resourceId);
   }
 
   /**
-   * Get events for a specific date
-   * @param date - Date string (YYYY-MM-DD)
-   * @returns Array of events on that date
+   * Get all events that start on a specific calendar date.
+   * @param date - Date string in YYYY-MM-DD format
+   * @returns Filtered array of Event instances
    */
   getEventsByDate(date: string): Event[] {
     const targetDate = new Date(date).toISOString().split("T")[0];
@@ -132,263 +253,191 @@ export class SchedulerManager {
   // ============ RESOURCE FUNCTIONS ============
 
   /**
-   * Add a new resource
-   * @param data - Resource data
-   * @returns Created resource
-   * @throws Error if resource data is invalid
-   * @example
-   * manager.addResource({
-   *   id: 'res_001',
-   *   name: 'Dr. Alice Smith',
-   *   type: 'person',
-   *   email: 'alice@example.com'
-   * });
+   * Optimistically adds a resource to the store, then fires `onResourceAdd`.
+   * If the hook rejects, the resource is removed from the store and `onError` fires.
+   *
+   * @param data - Raw resource data
+   * @returns The created Resource instance (already visible in the UI)
    */
   addResource(data: ResourceData): Resource {
-    const resource = new Resource(data);
-    if (!resource.isValid()) {
-      throw new Error("Invalid resource data");
-    }
+    const resource = schedulerStore.getState().addResource(data);
 
-    this.resources.set(resource.id, resource);
-    console.log(`Resource added: ${resource.name}`);
+    this._fireHook(
+      "addResource",
+      () => this._hooks.onResourceAdd?.(resource),
+      () => schedulerStore.getState().deleteResource(resource.id),
+    );
+
     return resource;
   }
 
   /**
-   * Get a resource by ID
+   * Get a single resource by ID.
    * @param id - Resource ID
    * @returns Resource if found, undefined otherwise
    */
   getResource(id: string): Resource | undefined {
-    return this.resources.get(id);
+    return schedulerStore.getState().resources[id];
   }
 
   /**
-   * Get all resources
-   * @returns Array of all resources
+   * Get all resources currently in the store.
+   * @returns Array of all Resource instances
    */
   getAllResources(): Resource[] {
-    return Array.from(this.resources.values());
+    return Object.values(schedulerStore.getState().resources);
   }
 
   /**
-   * Update a resource
-   * @param id - Resource ID
-   * @param updates - Partial resource data to update
-   * @returns Updated resource
-   * @throws Error if resource not found
+   * Optimistically updates a resource in the store, then fires `onResourceUpdate`.
+   * If the hook rejects, the resource is restored to its previous state and `onError` fires.
+   *
+   * @param id      - Resource ID
+   * @param updates - Partial resource fields to update
+   * @returns The updated Resource instance (already visible in the UI)
    */
   updateResource(id: string, updates: Partial<ResourceData>): Resource {
-    const resource = this.resources.get(id);
-    if (!resource) {
-      throw new Error(`Resource ${id} not found`);
-    }
+    // Shallow-clone before the store write — same reason as updateEvent.
+    // Without the spread, `snapshot` is a reference that the store may
+    // mutate in-place, causing the rollback to restore the new values.
+    const existing = schedulerStore.getState().resources[id];
+    const snapshot = existing ? { ...existing } : null;
 
-    if (updates.name) {
-      resource.name = updates.name;
-    }
-    if (updates.type) {
-      resource.type = updates.type;
-    }
-    if (updates.email !== undefined) {
-      resource.email = updates.email;
-    }
+    const resource = schedulerStore.getState().updateResource(id, updates);
 
-    console.log(`Resource updated: ${resource.name}`);
+    this._fireHook(
+      "updateResource",
+      () => this._hooks.onResourceUpdate?.(resource),
+      () => {
+        if (snapshot) {
+          schedulerStore.getState().updateResource(id, {
+            name: snapshot.name,
+            type: snapshot.type,
+            email: snapshot.email,
+          });
+        }
+      },
+    );
+
     return resource;
   }
 
   /**
-   * Delete a resource
+   * Optimistically deletes a resource from the store, then fires `onResourceDelete`.
+   * If the hook rejects, the resource is re-added to the store and `onError` fires.
+   * Will throw synchronously if the resource has assigned events (store-level guard).
+   *
    * @param id - Resource ID
-   * @returns true if deleted
-   * @throws Error if resource has assigned events
+   * @returns true if the resource was found and deleted
    */
   deleteResource(id: string): boolean {
-    // Check if resource has events
-    const hasEvents = this.getEventsByResource(id).length > 0;
-    if (hasEvents) {
-      throw new Error(`Cannot delete resource ${id} - has assigned events`);
+    const snapshot = schedulerStore.getState().resources[id];
+    const deleted = schedulerStore.getState().deleteResource(id);
+
+    if (deleted) {
+      this._fireHook(
+        "deleteResource",
+        () => this._hooks.onResourceDelete?.(id),
+        () => {
+          if (snapshot) schedulerStore.getState().addResource(snapshot);
+        },
+      );
     }
 
-    const deleted = this.resources.delete(id);
-    if (deleted) {
-      console.log(`Resource deleted: ${id}`);
-    }
     return deleted;
   }
 
   // ============ ASSIGNMENT FUNCTIONS ============
 
   /**
-   * Add a new assignment (link event to resource)
+   * Optimistically creates an assignment, then fires `onAssignmentAdd`.
+   * If the hook rejects, the assignment is deleted from the store and `onError` fires.
+   *
    * @param data - Assignment data
-   * @returns Created assignment
-   * @throws Error if assignment data is invalid or references don't exist
+   * @returns The created Assignment instance (already visible in the UI)
    */
   addAssignment(data: AssignmentData): Assignment {
-    const assignment = new Assignment(data);
-    if (!assignment.isValid()) {
-      throw new Error("Invalid assignment data");
-    }
+    const assignment = schedulerStore.getState().addAssignment(data);
 
-    // Check if event exists
-    if (!this.events.has(assignment.eventId)) {
-      throw new Error(`Event ${assignment.eventId} not found`);
-    }
+    this._fireHook(
+      "addAssignment",
+      () => this._hooks.onAssignmentAdd?.(assignment),
+      () => schedulerStore.getState().deleteAssignment(assignment.id),
+    );
 
-    // Check if resource exists
-    if (!this.resources.has(assignment.resourceId)) {
-      throw new Error(`Resource ${assignment.resourceId} not found`);
-    }
-
-    this.assignments.set(assignment.id, assignment);
-    console.log(`Assignment created: ${assignment.id}`);
     return assignment;
   }
 
   /**
-   * Get all assignments for an event
+   * Get all assignments for a specific event.
    * @param eventId - Event ID
-   * @returns Array of assignments
+   * @returns Array of Assignment instances
    */
   getAssignmentsByEvent(eventId: string): Assignment[] {
-    return Array.from(this.assignments.values()).filter(
+    return Object.values(schedulerStore.getState().assignments).filter(
       (a) => a.eventId === eventId,
     );
   }
 
   /**
-   * Get all assignments for a resource
+   * Get all assignments for a specific resource.
    * @param resourceId - Resource ID
-   * @returns Array of assignments
+   * @returns Array of Assignment instances
    */
   getAssignmentsByResource(resourceId: string): Assignment[] {
-    return Array.from(this.assignments.values()).filter(
+    return Object.values(schedulerStore.getState().assignments).filter(
       (a) => a.resourceId === resourceId,
     );
   }
 
   /**
-   * Delete an assignment
+   * Optimistically deletes an assignment, then fires `onAssignmentDelete`.
+   * If the hook rejects, the assignment is re-added to the store and `onError` fires.
+   *
    * @param id - Assignment ID
    * @returns true if deleted, false if not found
    */
   deleteAssignment(id: string): boolean {
-    const deleted = this.assignments.delete(id);
+    const snapshot = schedulerStore.getState().assignments[id];
+    const deleted = schedulerStore.getState().deleteAssignment(id);
+
     if (deleted) {
-      console.log(`Assignment deleted: ${id}`);
+      this._fireHook(
+        "deleteAssignment",
+        () => this._hooks.onAssignmentDelete?.(id),
+        () => {
+          if (snapshot) schedulerStore.getState().addAssignment(snapshot);
+        },
+      );
     }
+
     return deleted;
   }
 
   // ============ UTILITY FUNCTIONS ============
 
   /**
-   * Get total count of events
-   * @returns Number of events
+   * Total number of events currently in the store.
    */
   getEventCount(): number {
-    return this.events.size;
+    return Object.keys(schedulerStore.getState().events).length;
   }
 
   /**
-   * Get total count of resources
-   * @returns Number of resources
+   * Total number of resources currently in the store.
    */
   getResourceCount(): number {
-    return this.resources.size;
+    return Object.keys(schedulerStore.getState().resources).length;
   }
 
   /**
-   * Clear all data
+   * Remove all events, resources, and assignments from the store.
+   * Does NOT fire individual delete hooks — use this only for full resets
+   * (e.g. on logout or when switching tenants).
    */
   clearAll(): void {
-    this.events.clear();
-    this.resources.clear();
-    this.assignments.clear();
-    console.log("All data cleared");
-  }
-
-  /**
-   * Summary
-   */
-  printSummary(): void {
-    console.log("\n=== SCHEDULER SUMMARY ===");
-    console.log(`Events: ${this.events.size}`);
-    console.log(`Resources: ${this.resources.size}`);
-    console.log(`Assignments: ${this.assignments.size}`);
-    console.log("========================\n");
+    schedulerStore.getState().clearAll();
   }
 }
 
-// ========================================
-// Example Usage
-// ========================================
-
-// Create manager
-const manager = new SchedulerManager();
-
-// Add resources
-manager.addResource({
-  id: "res_001",
-  name: "Dr. Alice Smith",
-  type: "person",
-  email: "alice@example.com",
-});
-
-manager.addResource({
-  id: "res_002",
-  name: "Conference Room A",
-  type: "room",
-});
-
-// Add events
-manager.addEvent({
-  id: "evt_001",
-  title: "Team Meeting",
-  startTime: "2025-02-18T14:00:00Z",
-  endTime: "2025-02-18T15:00:00Z",
-  resourceId: "res_001",
-  description: "Weekly team sync",
-});
-
-manager.addEvent({
-  id: "evt_002",
-  title: "Client Presentation",
-  startTime: "2025-02-18T16:00:00Z",
-  endTime: "2025-02-18T17:00:00Z",
-  resourceId: "res_002",
-  status: "confirmed",
-});
-
-// View event
-const event = manager.getEvent("evt_001");
-console.log(`
-  Event details: ${event?.title} - Duration: ${event?.getDuration()} minutes
-  `);
-
-// Update event
-manager.updateEvent("evt_001", {
-  title: "Updated Team Meeting",
-  status: "confirmed",
-});
-
-// Get all events
-console.log("\nAll events:");
-manager.getAllEvents().forEach((e) => {
-  console.log(`- ${e.title} (${e.status})`);
-});
-
-// Get events by resource
-console.log("\nEvents for Dr. Alice:");
-manager.getEventsByResource("res_001").forEach((e) => {
-  console.log(`- ${e.title}`);
-});
-
-// Print summary
-manager.printSummary();
-
-// Export for use in other files
 export default SchedulerManager;

@@ -1,0 +1,300 @@
+import { LitElement, html, nothing } from "lit";
+import { customElement, state } from "lit/decorators.js";
+import { monthGridStyles } from "./month-grid-styles";
+import { MonthEvent } from "./month-grid-types";
+
+import {
+  WEEK_DAYS,
+  CalendarDay,
+  buildCalendarGrid,
+  formatMonthYear,
+  fmt12,
+} from "./month-grid-utils";
+import {
+  ChevronLeft,
+  ChevronRight,
+  SearchIcon,
+  BellIcon,
+  SparkleIcon,
+  PlusIcon,
+} from "./timeline-icons"; // reuse existing icons
+
+import { schedulerStore } from "@janus-scheduler/core";
+
+@customElement("janus-month-grid")
+export class JanusMonthGrid extends LitElement {
+  static readonly styles = monthGridStyles;
+
+  // ── Internal state ────────────────────────────────────────────────────
+  @state() private events: MonthEvent[] = [];
+  private _unsubStore?: () => void;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._unsubStore = schedulerStore.subscribe((state) => {
+      this._syncFromStore(state);
+    });
+    this._syncFromStore(schedulerStore.getState());
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._unsubStore) this._unsubStore();
+  }
+
+  private _syncFromStore(state: any) {
+    const coreEvents = Object.values(state.events) as any[];
+    this.events = coreEvents.map((e) => {
+      const startD = new Date(e.startTime);
+      const endD = new Date(e.endTime);
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      // Use LOCAL date so event.date matches the calendar cell dateStr,
+      // which is also derived from local date components (see month-grid-utils toDateStr).
+      const localDate = `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`;
+      return {
+        id: e.id,
+        title: e.title,
+        color: "blue",
+        date: localDate,
+        startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
+        endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+      };
+    });
+  }
+
+  // ── Internal state ────────────────────────────────────────────────────
+  @state() private _year = new Date().getFullYear();
+  @state() private _month = new Date().getMonth(); // 0-based
+  @state() private _view: "Timeline" | "Month" = "Month";
+  @state() private _aiPrompt = "";
+
+  // ── Navigation ────────────────────────────────────────────────────────
+  private _prevMonth() {
+    if (this._month === 0) {
+      this._month = 11;
+      this._year -= 1;
+    } else {
+      this._month -= 1;
+    }
+  }
+
+  private _nextMonth() {
+    if (this._month === 11) {
+      this._month = 0;
+      this._year += 1;
+    } else {
+      this._month += 1;
+    }
+  }
+
+  private _goToToday() {
+    const now = new Date();
+    this._year = now.getFullYear();
+    this._month = now.getMonth();
+  }
+
+  // ── Event dispatchers ─────────────────────────────────────────────────
+  private _handleEventClick(ev: MonthEvent) {
+    this.dispatchEvent(
+      new CustomEvent("event-click", {
+        detail: ev,
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _handleDayClick(day: CalendarDay) {
+    this.dispatchEvent(
+      new CustomEvent("day-click", {
+        detail: { date: day.dateStr },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _handleAddEvent() {
+    this.dispatchEvent(
+      new CustomEvent("add-event", { bubbles: true, composed: true }),
+    );
+  }
+
+  private _handleViewSwitch(v: "Timeline" | "Month") {
+    this._view = v;
+    // Let the parent app know so it can swap components if needed
+    this.dispatchEvent(
+      new CustomEvent("view-change", {
+        detail: { view: v },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  // ── Render helpers ────────────────────────────────────────────────────
+
+  /** Renders a single event chip inside a day cell */
+  private _renderEventChip(ev: MonthEvent) {
+    const timeLabel = ev.startTime ? `${fmt12(ev.startTime)} · ` : "";
+    return html`
+      <button
+        class="mg-event mg-event--${ev.color}"
+        @click=${(e: Event) => {
+          e.stopPropagation(); // don't also fire day-click
+          this._handleEventClick(ev);
+        }}
+        title="${timeLabel}${ev.title}"
+      >
+        <span class="mg-event__title">${ev.title}</span>
+      </button>
+    `;
+  }
+
+  /** Renders one day cell */
+  private _renderDay(day: CalendarDay) {
+    const MAX_VISIBLE = 3; // how many chips to show before "+N more"
+    const visible = day.events.slice(0, MAX_VISIBLE);
+    const overflow = day.events.length - MAX_VISIBLE;
+
+    const classes = [
+      "mg-day-cell",
+      day.isCurrentMonth ? "" : "mg-day-cell--other",
+      day.isToday ? "mg-day-cell--today" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return html`
+      <div class=${classes} @click=${() => this._handleDayClick(day)}>
+        <div class="mg-day-cell__top">
+          ${day.isToday
+            ? html`
+                <span class="mg-today-badge">${day.dayNum}</span>
+                <span class="mg-today-label">TODAY</span>
+              `
+            : html`<span class="mg-day-cell__num">${day.dayNum}</span>`}
+        </div>
+
+        ${visible.map((ev) => this._renderEventChip(ev))}
+        ${overflow > 0
+          ? html`<span class="mg-event mg-event--more">+${overflow} more</span>`
+          : nothing}
+      </div>
+    `;
+  }
+
+  // ── Main render ───────────────────────────────────────────────────────
+  render() {
+    const grid = buildCalendarGrid(this._year, this._month, this.events);
+    const monthLabel = formatMonthYear(this._year, this._month);
+    const rowCount = grid.length;
+
+    return html`
+      <div class="mg-shell">
+        <!-- ── Top bar ── -->
+        <header class="mg-topbar">
+          <nav class="mg-nav">
+            <button
+              class="mg-nav__arrow"
+              aria-label="Previous month"
+              @click=${this._prevMonth}
+            >
+              ${ChevronLeft()}
+            </button>
+            <span class="mg-nav__month">${monthLabel}</span>
+            <button
+              class="mg-nav__arrow"
+              aria-label="Next month"
+              @click=${this._nextMonth}
+            >
+              ${ChevronRight()}
+            </button>
+          </nav>
+
+          <div class="mg-topbar__right">
+            <div class="mg-view-toggle">
+              ${(["Timeline", "Month"] as const).map(
+                (v) => html`
+                  <button
+                    class="mg-view-toggle__btn ${this._view === v
+                      ? "active"
+                      : ""}"
+                    @click=${() => this._handleViewSwitch(v)}
+                  >
+                    ${v}
+                  </button>
+                `,
+              )}
+            </div>
+            <button class="mg-icon-btn" aria-label="Search">
+              ${SearchIcon()}
+            </button>
+            <button
+              class="mg-icon-btn mg-icon-btn--bell"
+              aria-label="Notifications"
+            >
+              ${BellIcon()}
+              <span class="mg-bell-dot"></span>
+            </button>
+          </div>
+        </header>
+
+        <!-- ── Calendar panel ── -->
+        <div class="mg-panel">
+          <!-- Weekday labels row -->
+          <div class="mg-day-header">
+            ${WEEK_DAYS.map(
+              (d) => html`<div class="mg-day-header__cell">${d}</div>`,
+            )}
+          </div>
+
+          <!-- 6 × 7 grid -->
+          <div
+            class="mg-grid"
+            style="grid-template-rows: repeat(${rowCount}, 1fr)"
+          >
+            ${grid.map(
+              (week) => html`
+                <div class="mg-week-row">
+                  ${week.map((day) => this._renderDay(day))}
+                </div>
+              `,
+            )}
+          </div>
+        </div>
+
+        <!-- ── AI bar ── -->
+        <div class="mg-ai-wrap">
+          <div class="mg-ai-card">
+            ${SparkleIcon()}
+            <input
+              class="mg-ai-card__input"
+              type="text"
+              .value=${this._aiPrompt}
+              @input=${(e: Event) =>
+                (this._aiPrompt = (e.target as HTMLInputElement).value)}
+              placeholder="Try 'Schedule a design sync with Alex tomorrow at 10am in Room A'"
+            />
+            <button class="mg-ai-card__btn">Schedule</button>
+          </div>
+        </div>
+
+        <!-- ── FAB ── -->
+        <button
+          class="mg-fab"
+          @click=${this._handleAddEvent}
+          aria-label="Add event"
+        >
+          ${PlusIcon()}
+        </button>
+      </div>
+    `;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "janus-month-grid": JanusMonthGrid;
+  }
+}
