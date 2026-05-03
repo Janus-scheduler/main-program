@@ -278,22 +278,39 @@ type OpenPicker = "startDate" | "startTime" | "endDate" | "endTime" | null;
 export class JanusScheduler extends LitElement {
   static styles = schedulerStyles;
 
-  @state() title = "Strategy Workshop";
-  @state() startDate = "2026-04-30";
-  @state() startTime = "14:00";
-  @state() endDate = "2026-04-30";
-  @state() endTime = "15:00";
-  @state() participants = ["John Doe", "Sarah Chen"];
+  // ── External inputs (@property) — can be set by React/Angular/Solid wrappers
+  // These pre-fill the form when editing an existing event.
+  // Leave unset (empty string / empty array) for a blank "create" form.
+  @property({ type: String }) title = "";
+  @property({ type: String }) startDate = "";
+  @property({ type: String }) startTime = "";
+  @property({ type: String }) endDate = "";
+  @property({ type: String }) endTime = "";
+  @property({ type: Array }) participants: string[] = [];
+  @property({ type: String }) description = "";
+  @property({ type: String }) activeColor = "orange";
+  @property({ type: String }) error: string | null = null;
+
+  // Safe accessor — guards against React passing undefined for array props
+  private get _participants(): string[] {
+    return Array.isArray(this.participants) ? this.participants : [];
+  }
+
+  // ── Internal UI state (@state) — never set from outside
   @state() participantInput = "";
-  @state() description =
-    "Discussing the Q4 roadmap and resource allocation for upcoming projects.";
-  @state() activeColor = "orange";
   @state() sidebarOpen = false;
   @state() openPicker: OpenPicker = null;
-  @state() startCal: CalState = { viewYear: 2026, viewMonth: 3 };
-  @state() endCal: CalState = { viewYear: 2026, viewMonth: 3 };
 
-  @property({ type: String }) error: string | null = null;
+  // Calendar view: sync to the selected date when a property is set,
+  // otherwise default to current month
+  @state() startCal: CalState = {
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(),
+  };
+  @state() endCal: CalState = {
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(),
+  };
 
   // ─── Computed ──────────────────────────────────────────────────────────────
 
@@ -307,6 +324,19 @@ export class JanusScheduler extends LitElement {
   }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
+
+  // When startDate/endDate properties are set from outside (edit mode),
+  // sync the calendar view to show the correct month
+  updated(changed: Map<string, unknown>) {
+    if (changed.has("startDate") && this.startDate) {
+      const [y, m] = this.startDate.split("-").map(Number);
+      this.startCal = { viewYear: y, viewMonth: m - 1 };
+    }
+    if (changed.has("endDate") && this.endDate) {
+      const [y, m] = this.endDate.split("-").map(Number);
+      this.endCal = { viewYear: y, viewMonth: m - 1 };
+    }
+  }
 
   connectedCallback() {
     super.connectedCallback();
@@ -344,7 +374,7 @@ export class JanusScheduler extends LitElement {
           startTime: this.startTime,
           endDate: this.endDate,
           endTime: this.endTime,
-          participants: this.participants,
+          participants: this._participants,
           description: this.description,
           activeColor: this.activeColor,
         },
@@ -365,21 +395,21 @@ export class JanusScheduler extends LitElement {
   // ─── Participants ──────────────────────────────────────────────────────────
 
   private _removeParticipant(name: string) {
-    this.participants = this.participants.filter((p) => p !== name);
+    this.participants = this._participants.filter((p) => p !== name);
   }
 
   private _handleParticipantKey(e: KeyboardEvent) {
     if ((e.key === "Enter" || e.key === ",") && this.participantInput.trim()) {
       e.preventDefault();
-      this.participants = [...this.participants, this.participantInput.trim()];
+      this.participants = [...this._participants, this.participantInput.trim()];
       this.participantInput = "";
     }
     if (
       e.key === "Backspace" &&
       !this.participantInput &&
-      this.participants.length
+      this._participants.length
     ) {
-      this.participants = this.participants.slice(0, -1);
+      this.participants = this._participants.slice(0, -1);
     }
   }
 
@@ -625,14 +655,14 @@ export class JanusScheduler extends LitElement {
                 <div>
                   <div class="meta-label">Participants</div>
                   <div class="meta-value">
-                    ${this.participants.length}
-                    ${this.participants.length === 1 ? "person" : "people"}
+                    ${this._participants.length}
+                    ${this._participants.length === 1 ? "person" : "people"}
                   </div>
                   <div class="avatar-stack">
-                    ${this.participants.slice(0, 4).map((n) => avatarHtml(n))}
-                    ${this.participants.length > 4
+                    ${this._participants.slice(0, 4).map((n) => avatarHtml(n))}
+                    ${this._participants.length > 4
                       ? html`<span class="avatar avatar-more"
-                          >+${this.participants.length - 4}</span
+                          >+${this._participants.length - 4}</span
                         >`
                       : nothing}
                   </div>
@@ -723,7 +753,7 @@ export class JanusScheduler extends LitElement {
                 <div class="msummary-item">
                   <span class="meta-label">Participants</span>
                   <span class="meta-value"
-                    >${this.participants.length} people</span
+                    >${this._participants.length} people</span
                   >
                 </div>
                 <div class="msummary-item">
@@ -864,7 +894,7 @@ export class JanusScheduler extends LitElement {
                         ?.getElementById("participant-input")
                         ?.focus()}
                   >
-                    ${this.participants.map(
+                    ${this._participants.map(
                       (name) =>
                         html` <span class="chip">
                           ${avatarHtml(name)} ${name}

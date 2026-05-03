@@ -6,9 +6,6 @@ import {
   JanusMonthGrid as JanusMonthGridWC,
 } from "@janus-scheduler/ui";
 
-// The Lit @customElement decorator auto-registers the web components
-// when the module is imported, so no manual customElements.define() needed.
-
 export const Scheduler = createComponent({
   tagName: "janus-scheduler",
   elementClass: JanusSchedulerWC,
@@ -26,10 +23,11 @@ export const Timeline = createComponent({
   react: React,
   events: {
     onEventClick: "event-click",
-    onAddEvent: "add-event",
+    onViewChange: "view-change",
     onEventMove: "event-move",
     onEventResize: "event-resize",
     onEventCreate: "event-create",
+    onAddEvent: "add-event",
   },
 });
 
