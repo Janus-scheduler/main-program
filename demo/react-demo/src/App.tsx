@@ -23,6 +23,8 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>("Month");
   const [showScheduler, setShowScheduler] = useState(false);
   const [hookError, setHookError] = useState<HookError | null>(null);
+  // null = creating a new event; string = editing the event with this ID
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   // Auto-dismiss the error toast after 6 seconds
   const handleHookError = useCallback((err: HookError) => {
@@ -42,10 +44,17 @@ function App() {
           currentView={currentView}
           showScheduler={showScheduler}
           schedulerError={null}
+          selectedEventId={selectedEventId}
           manager={manager}
           onViewChange={setCurrentView}
-          onOpenScheduler={() => setShowScheduler(true)}
-          onCloseScheduler={() => setShowScheduler(false)}
+          onOpenScheduler={(eventId) => {
+            setSelectedEventId(eventId ?? null);
+            setShowScheduler(true);
+          }}
+          onCloseScheduler={() => {
+            setShowScheduler(false);
+            setSelectedEventId(null);
+          }}
         />
 
         {hookError && (

@@ -34,15 +34,16 @@ export interface SchedulerHooks {
 
   // ── Error handler ──────────────────────────────────────────────────────────
   /**
-   * Called whenever any async hook rejects (e.g. a fetch() fails).
-   * The store change that triggered the hook has already been rolled back
-   * by the time this fires, so the UI has reverted to the previous state.
+   * Called whenever any hook fails — either throws synchronously or returns a
+   * rejected Promise (e.g. a failed fetch()). The store change that triggered
+   * the hook has already been rolled back by the time this fires, so the UI
+   * has reverted to the previous state.
    *
    * Use this hook to show an error notification to your user, e.g.:
    *   onError: ({ operation, error }) => toast.error(`${operation} failed: ${error.message}`)
    *
    * @param ctx.operation  - Name of the method that failed, e.g. "addEvent"
-   * @param ctx.error      - The raw rejection value from your hook
+   * @param ctx.error      - The raw thrown/rejected value from your hook
    * @param ctx.reverted   - Always true — the store was rolled back automatically
    */
   onError?: (ctx: {
@@ -93,20 +94,33 @@ export class SchedulerManager {
   // ── Private helper ─────────────────────────────────────────────────────────
 
   /**
-   * Fires an optional async hook and, if it rejects, runs the rollback
-   * function then calls onError.
+   * Invokes an optional lifecycle hook inside a try/catch and, if it fails
+   * (synchronous throw OR async rejection), runs the rollback then calls onError.
    *
-   * @param operation - Method name shown in the error context
-   * @param hook      - The promise returned by the hook (may be undefined)
-   * @param rollback  - Undoes the optimistic store write
+   * The hook is passed as a **thunk** (`() => hook?.()`) so that invocation
+   * happens inside the try block. Without this, a synchronous throw would
+   * escape at the call site before _fireHook was entered, bypassing rollback.
+   *
+   * @param operation   - Method name shown in the error context, e.g. "addEvent"
+   * @param invokeHook  - Zero-arg function that calls the hook and returns its result
+   * @param rollback    - Undoes the optimistic store write
    */
   private _fireHook(
     operation: string,
-    hook: void | Promise<void>,
+    invokeHook: () => void | Promise<void>,
     rollback: () => void,
   ): void {
-    if (!hook) return; // hook was synchronous (returned void) — nothing to catch
-    hook.catch((error: unknown) => {
+    let result: void | Promise<void>;
+    try {
+      result = invokeHook();
+    } catch (error: unknown) {
+      // Synchronous throw — treat identically to an async rejection.
+      rollback();
+      this._hooks.onError?.({ operation, error, reverted: true });
+      return;
+    }
+    // Async rejection path.
+    result?.catch((error: unknown) => {
       rollback();
       this._hooks.onError?.({ operation, error, reverted: true });
     });
@@ -124,8 +138,10 @@ export class SchedulerManager {
   addEvent(data: EventData): Event {
     const event = schedulerStore.getState().addEvent(data);
 
-    this._fireHook("addEvent", this._hooks.onEventAdd?.(event), () =>
-      schedulerStore.getState().deleteEvent(event.id),
+    this._fireHook(
+      "addEvent",
+      () => this._hooks.onEventAdd?.(event),
+      () => schedulerStore.getState().deleteEvent(event.id),
     );
 
     return event;
@@ -157,22 +173,32 @@ export class SchedulerManager {
    * @returns The updated Event instance (already visible in the UI)
    */
   updateEvent(id: string, updates: Partial<EventData>): Event {
-    // Snapshot the previous values before the optimistic write
-    const previous = schedulerStore.getState().events[id];
+    // Shallow-clone the primitive fields BEFORE the store writes.
+    // Without the spread, `snapshot` would be a reference to the same
+    // object that updateEvent() mutates in-place — meaning the rollback
+    // would read already-updated values and restore nothing.
+    const existing = schedulerStore.getState().events[id];
+    const snapshot = existing ? { ...existing } : null;
+
     const event = schedulerStore.getState().updateEvent(id, updates);
 
-    this._fireHook("updateEvent", this._hooks.onEventUpdate?.(event), () => {
-      if (previous) {
-        // Restore previous field values
-        schedulerStore.getState().updateEvent(id, {
-          title: previous.title,
-          startTime: previous.startTime,
-          endTime: previous.endTime,
-          status: previous.status,
-          description: previous.description,
-        });
-      }
-    });
+    this._fireHook(
+      "updateEvent",
+      () => this._hooks.onEventUpdate?.(event),
+      () => {
+        if (snapshot) {
+          // All fields are primitive strings — snapshot holds the original values.
+          schedulerStore.getState().updateEvent(id, {
+            title: snapshot.title,
+            startTime: snapshot.startTime,
+            endTime: snapshot.endTime,
+            status: snapshot.status,
+            description: snapshot.description,
+            resourceId: snapshot.resourceId,
+          });
+        }
+      },
+    );
 
     return event;
   }
@@ -190,9 +216,13 @@ export class SchedulerManager {
     const deleted = schedulerStore.getState().deleteEvent(id);
 
     if (deleted) {
-      this._fireHook("deleteEvent", this._hooks.onEventDelete?.(id), () => {
-        if (snapshot) schedulerStore.getState().addEvent(snapshot);
-      });
+      this._fireHook(
+        "deleteEvent",
+        () => this._hooks.onEventDelete?.(id),
+        () => {
+          if (snapshot) schedulerStore.getState().addEvent(snapshot);
+        },
+      );
     }
 
     return deleted;
@@ -232,8 +262,10 @@ export class SchedulerManager {
   addResource(data: ResourceData): Resource {
     const resource = schedulerStore.getState().addResource(data);
 
-    this._fireHook("addResource", this._hooks.onResourceAdd?.(resource), () =>
-      schedulerStore.getState().deleteResource(resource.id),
+    this._fireHook(
+      "addResource",
+      () => this._hooks.onResourceAdd?.(resource),
+      () => schedulerStore.getState().deleteResource(resource.id),
     );
 
     return resource;
@@ -265,18 +297,23 @@ export class SchedulerManager {
    * @returns The updated Resource instance (already visible in the UI)
    */
   updateResource(id: string, updates: Partial<ResourceData>): Resource {
-    const previous = schedulerStore.getState().resources[id];
+    // Shallow-clone before the store write — same reason as updateEvent.
+    // Without the spread, `snapshot` is a reference that the store may
+    // mutate in-place, causing the rollback to restore the new values.
+    const existing = schedulerStore.getState().resources[id];
+    const snapshot = existing ? { ...existing } : null;
+
     const resource = schedulerStore.getState().updateResource(id, updates);
 
     this._fireHook(
       "updateResource",
-      this._hooks.onResourceUpdate?.(resource),
+      () => this._hooks.onResourceUpdate?.(resource),
       () => {
-        if (previous) {
+        if (snapshot) {
           schedulerStore.getState().updateResource(id, {
-            name: previous.name,
-            type: previous.type,
-            email: previous.email,
+            name: snapshot.name,
+            type: snapshot.type,
+            email: snapshot.email,
           });
         }
       },
@@ -300,7 +337,7 @@ export class SchedulerManager {
     if (deleted) {
       this._fireHook(
         "deleteResource",
-        this._hooks.onResourceDelete?.(id),
+        () => this._hooks.onResourceDelete?.(id),
         () => {
           if (snapshot) schedulerStore.getState().addResource(snapshot);
         },
@@ -324,7 +361,7 @@ export class SchedulerManager {
 
     this._fireHook(
       "addAssignment",
-      this._hooks.onAssignmentAdd?.(assignment),
+      () => this._hooks.onAssignmentAdd?.(assignment),
       () => schedulerStore.getState().deleteAssignment(assignment.id),
     );
 
@@ -367,7 +404,7 @@ export class SchedulerManager {
     if (deleted) {
       this._fireHook(
         "deleteAssignment",
-        this._hooks.onAssignmentDelete?.(id),
+        () => this._hooks.onAssignmentDelete?.(id),
         () => {
           if (snapshot) schedulerStore.getState().addAssignment(snapshot);
         },

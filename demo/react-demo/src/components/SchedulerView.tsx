@@ -1,34 +1,10 @@
 import { useCallback } from "react";
 import { Timeline, MonthGrid, Scheduler } from "@janus-scheduler/react";
-
-// ─── Why we import these types ────────────────────────────────────────────────
-//
-// The <Timeline> and <MonthGrid> components are Lit Web Components wrapped
-// with @lit/react's createComponent(). When the user interacts with them
-// (drags an event, resizes, draws a new one), the Web Component fires a
-// native browser CustomEvent on the DOM.
-//
-// React's synthetic event system does NOT understand CustomEvents — it only
-// knows about standard DOM events (click, input, etc.). So @lit/react passes
-// the raw Event object to your callback prop.
-//
-// Without these types, TypeScript only knows the callback receives `Event`,
-// and accessing `.detail` would be an error. By casting to
-// `CustomEvent<EventMoveDetail>`, we tell TypeScript exactly what shape
-// `.detail` has — giving us autocomplete and compile-time safety.
-//
-// EventMoveDetail   → { event, oldResourceId, newResourceId, newStartTime, newEndTime }
-// EventResizeDetail → { event, resourceId, newStartTime, newEndTime }
-// EventCreateDetail → { resourceId, startTime, endTime, date }
-//
-// These types originate in @janus-scheduler/ui (timeline-types.ts) and are
-// re-exported from @janus-scheduler/react as a convenience so the host app
-// has a single import point.
-// ─────────────────────────────────────────────────────────────────────────────
 import type {
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
+  TimelineEvent,
 } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
 
@@ -41,10 +17,20 @@ interface SchedulerViewProps {
   showScheduler: boolean;
   /** Inline error passed into the Scheduler modal (synchronous store errors) */
   schedulerError: string | null;
+  /**
+   * ID of the event being edited, or null when creating a new one.
+   * Forwarded to <Scheduler eventId> so the web component can include it
+   * in its onSave / onDelete payloads.
+   */
+  selectedEventId: string | null;
   /** The SchedulerManager instance — used to mutate store state */
   manager: SchedulerManager;
+  /**
+   * @param eventId - string when opening in edit mode (event was clicked),
+   *                  undefined/null when opening in create mode (FAB was clicked).
+   */
   onViewChange: (view: ViewType) => void;
-  onOpenScheduler: () => void;
+  onOpenScheduler: (eventId?: string) => void;
   onCloseScheduler: () => void;
 }
 
@@ -54,9 +40,7 @@ interface SchedulerViewProps {
  * Mounts the correct Janus component based on `currentView` and wires all
  * event callbacks to `manager` mutations.
  *
- * This component is the bridge between the Web Component event system and
- * the SchedulerManager API:
- *
+ * Event flow for a drag-and-drop move:
  *   User drags event
  *     → <janus-timeline> fires CustomEvent("event-move", { detail: EventMoveDetail })
  *     → @lit/react calls onEventMove(e: Event)
@@ -64,25 +48,36 @@ interface SchedulerViewProps {
  *     → we call manager.updateEvent() which writes to Zustand
  *     → Zustand notifies <janus-timeline> subscription
  *     → UI re-renders with the new position
+ *
+ * Event flow for delete:
+ *   User clicks Delete in the Scheduler modal
+ *     → <janus-scheduler> fires CustomEvent("delete", { detail: { id, title } })
+ *     → handleDelete reads detail.id (the eventId passed via the eventId prop)
+ *     → manager.deleteEvent(id) removes it from the store
  */
 export function SchedulerView({
   currentView,
   showScheduler,
   schedulerError,
+  selectedEventId,
   manager,
   onViewChange,
   onOpenScheduler,
   onCloseScheduler,
 }: SchedulerViewProps) {
-  // ── Shared: open the modal ─────────────────────────────────────────────
+  // ── Open modal for NEW event (FAB / + button) ───────────────────────────
   const handleAddEvent = useCallback(() => {
-    onOpenScheduler();
+    onOpenScheduler(); // no eventId → create mode
   }, [onOpenScheduler]);
 
+  // ── Open modal for EXISTING event (click on an event chip) ─────────────
+  // The TimelineEvent detail contains the event id — extract it and pass it
+  // to onOpenScheduler so App can track which event is being edited and
+  // forward it to <Scheduler eventId={...}>.
   const handleEventClick = useCallback(
-    (_e: Event) => {
-      console.log(_e);
-      onOpenScheduler();
+    (e: Event) => {
+      const ev = (e as CustomEvent<TimelineEvent>).detail;
+      onOpenScheduler(ev?.id); // string → edit mode
     },
     [onOpenScheduler],
   );
@@ -97,36 +92,52 @@ export function SchedulerView({
   );
 
   // ── Scheduler modal: save ──────────────────────────────────────────────
-  // Reads the modal's form payload and calls manager.addEvent().
-  // The onEventAdd hook (configured in useSchedulerManager) fires
-  // asynchronously after this returns.
+  // detail.id distinguishes create (null) from edit (string).
   const handleSave = useCallback(
     (e: Event) => {
       const data = (e as CustomEvent).detail;
       const today = new Date().toISOString().split("T")[0];
       try {
-        manager.addEvent({
-          id: `evt_${Date.now()}`,
-          title: data.title,
-          startTime: `${data.date || today}T${data.startTime}:00Z`,
-          endTime: `${data.date || today}T${data.endTime}:00Z`,
-          resourceId: data.participants?.[0] || "r1",
-          description: data.description,
-          status: "confirmed",
-        });
+        if (data.id) {
+          // ── Edit mode: update the existing event ──────────────────────
+          manager.updateEvent(data.id, {
+            title: data.title,
+            startTime: `${data.date || today}T${data.startTime}:00Z`,
+            endTime: `${data.date || today}T${data.endTime}:00Z`,
+            resourceId: data.participants?.[0] || "r1",
+            description: data.description,
+            status: "confirmed",
+          });
+        } else {
+          // ── Create mode: add a new event ──────────────────────────────
+          manager.addEvent({
+            id: `evt_${Date.now()}`,
+            title: data.title,
+            startTime: `${data.date || today}T${data.startTime}:00Z`,
+            endTime: `${data.date || today}T${data.endTime}:00Z`,
+            resourceId: data.participants?.[0] || "r1",
+            description: data.description,
+            status: "confirmed",
+          });
+        }
         onCloseScheduler();
       } catch (err: unknown) {
-        // Synchronous store validation errors surface here (e.g. startTime > endTime).
-        // Async hook failures go through onError in useSchedulerManager instead.
+        // Synchronous store errors (e.g. invalid time range) surface here.
+        // Async hook failures go through onError in useSchedulerManager.
         console.error("Store rejected the event:", err);
       }
     },
     [manager, onCloseScheduler],
   );
 
+  // ── Scheduler modal: delete ────────────────────────────────────────────
+  // detail.id is the eventId that was passed to <Scheduler eventId={...}>.
+  // Before this fix, detail only contained { title }, making id always
+  // undefined and the delete a no-op.
   const handleDelete = useCallback(
     (e: Event) => {
-      const { id } = (e as CustomEvent).detail;
+      const { id } = (e as CustomEvent<{ id: string | null; title: string }>)
+        .detail;
       if (id) manager.deleteEvent(id);
       onCloseScheduler();
     },
@@ -134,14 +145,6 @@ export function SchedulerView({
   );
 
   // ── Timeline: drag-and-drop ────────────────────────────────────────────
-  //
-  // All three callbacks below follow the same pattern:
-  //   1. Cast `e` (raw DOM Event) → CustomEvent<SpecificDetailType>
-  //   2. Destructure .detail to get typed fields
-  //   3. Convert "HH:MM" time strings → full ISO 8601 timestamps
-  //      (the Web Component works with display times; the store needs ISO)
-  //   4. Call manager.updateEvent() / manager.addEvent()
-
   const handleEventMove = useCallback(
     (e: Event) => {
       const { event, newResourceId, newStartTime, newEndTime } = (
@@ -211,6 +214,10 @@ export function SchedulerView({
 
       {showScheduler && (
         <Scheduler
+          // eventId tells the web component which event is being edited.
+          // null/undefined → create mode. string → edit mode.
+          // The component includes this in its onSave and onDelete payloads.
+          eventId={selectedEventId}
           error={schedulerError}
           onSave={handleSave}
           onDelete={handleDelete}

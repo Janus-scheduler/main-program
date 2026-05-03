@@ -30,6 +30,8 @@ export type {
 
 // Scheduler modal save-data shape (matches what the <janus-scheduler> "save" event emits)
 export interface SchedulerSaveData {
+  /** Present when editing an existing event; null/undefined when creating a new one. */
+  id: string | null;
   title: string;
   date: string;
   startTime: string; // "HH:MM"
@@ -59,10 +61,15 @@ export interface SchedulerSaveData {
 /**
  * <Scheduler> — Modal form for creating or editing a single event.
  *
+ * Props:
+ *  - eventId  — string | null. Pass the event's ID when opening in edit mode;
+ *               omit or pass null for create mode.
+ *
  * Events:
- *  - onSave   → CustomEvent<SchedulerSaveData>   — user submitted the form
- *  - onDelete → CustomEvent<{ id: string }>      — user clicked Delete
- *  - onClose  → CustomEvent<void>                — user dismissed the modal
+ *  - onSave   → CustomEvent<SchedulerSaveData>             — user submitted the form
+ *                 detail.id is null (create) or the event ID (edit)
+ *  - onDelete → CustomEvent<{ id: string | null; title: string }> — user clicked Delete
+ *  - onClose  → CustomEvent<void>                          — user dismissed the modal
  */
 export const Scheduler = createComponent({
   tagName: "janus-scheduler",
