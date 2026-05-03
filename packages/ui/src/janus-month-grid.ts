@@ -1,5 +1,5 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, state, property } from "lit/decorators.js";
 import { monthGridStyles } from "./month-grid-styles";
 import { MonthEvent } from "./month-grid-types";
 
@@ -26,7 +26,8 @@ export class JanusMonthGrid extends LitElement {
   static readonly styles = monthGridStyles;
 
   // ── Internal state ────────────────────────────────────────────────────
-  @state() private events: MonthEvent[] = [];
+  /** Events to display — can be set externally (e.g. from Angular wrapper) or populated via store subscription */
+  @property({ type: Array }) events: MonthEvent[] = [];
   private _unsubStore?: () => void;
 
   connectedCallback() {

@@ -201,6 +201,7 @@ export function SchedulerView({
           onEventMove={handleEventMove}
           onEventResize={handleEventResize}
           onEventCreate={handleEventCreate}
+          onViewChange={handleViewChange}
         />
       )}
 

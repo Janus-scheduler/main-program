@@ -74,6 +74,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Emitted when a new event is created by dragging on empty space */
   readonly eventCreate = output<EventCreateDetail>();
 
+  /** Emitted when the view is changed (Timeline vs Month) */
+  readonly viewChange = output<{ view: "Timeline" | "Month" }>();
+
   private _unsubStore?: () => void;
 
   private _eventClickHandler = (e: Event) => {
@@ -96,6 +99,10 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.eventCreate.emit((e as CustomEvent).detail);
   };
+  private _viewChangeHandler = (e: Event) => {
+    e.stopPropagation();
+    this.viewChange.emit((e as CustomEvent).detail);
+  };
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
@@ -104,6 +111,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("event-move", this._eventMoveHandler);
     el.addEventListener("event-resize", this._eventResizeHandler);
     el.addEventListener("event-create", this._eventCreateHandler);
+    el.addEventListener("view-change", this._viewChangeHandler);
 
     // If an explicit resources input is provided, use it directly.
     // Otherwise, subscribe to the Zustand store so the web component
@@ -126,6 +134,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("event-move", this._eventMoveHandler);
     el?.removeEventListener("event-resize", this._eventResizeHandler);
     el?.removeEventListener("event-create", this._eventCreateHandler);
+    el?.removeEventListener("view-change", this._viewChangeHandler);
     this._unsubStore?.();
   }
 

@@ -53,15 +53,27 @@
   </aside>
 
   <main class="app-main">
-    <janus-timeline-ng
-      (eventClick)="handleEventClick($event)"
-      (addEvent)="handleAddEvent()"
-      (eventMove)="handleEventMove($event)"
-      (eventResize)="handleEventResize($event)"
-      (eventCreate)="handleEventCreate($event)"
-    />
+    @if (currentView() === 'Timeline') {
+      <janus-timeline-ng
+        (eventClick)="handleEventClick($event)"
+        (addEvent)="handleAddEvent()"
+        (eventMove)="handleEventMove($event)"
+        (eventResize)="handleEventResize($event)"
+        (eventCreate)="handleEventCreate($event)"
+        (viewChange)="handleViewChange($event)"
+      />
+    }
 
-    @if (showScheduler) {
+    @if (currentView() === 'Month') {
+      <janus-month-grid-ng
+        (eventClick)="handleEventClick($event)"
+        (dayClick)="handleDayClick($event)"
+        (addEvent)="handleAddEvent()"
+        (viewChange)="handleViewChange($event)"
+      />
+    }
+
+    @if (showScheduler()) {
       <janus-scheduler-ng
         [error]="schedulerError()"
         (save)="handleSave($event)"

@@ -199,6 +199,17 @@ export class JanusTimeline extends LitElement {
     );
   }
 
+  private _handleViewSwitch(v: "Timeline" | "Month") {
+    this.view = v;
+    this.dispatchEvent(
+      new CustomEvent("view-change", {
+        detail: { view: v },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   // ── Drag-and-drop handlers ────────────────────────────────────────
 
   private _onEventPointerDown(
@@ -372,7 +383,7 @@ export class JanusTimeline extends LitElement {
                     class="tl-view-toggle__btn ${this.view === v
                       ? "active"
                       : ""}"
-                    @click=${() => (this.view = v)}
+                    @click=${() => this._handleViewSwitch(v)}
                   >
                     ${v}
                   </button>

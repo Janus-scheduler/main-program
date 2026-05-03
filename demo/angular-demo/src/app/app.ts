@@ -1,5 +1,9 @@
 import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
-import { SchedulerComponent, TimelineComponent } from '@janus-scheduler/angular';
+import {
+  SchedulerComponent,
+  TimelineComponent,
+  MonthGridComponent,
+} from '@janus-scheduler/angular';
 import type {
   TimelineEvent,
   SchedulerSaveData,
@@ -12,14 +16,15 @@ import { SchedulerManager } from '@janus-scheduler/core';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [SchedulerComponent, TimelineComponent],
+  imports: [SchedulerComponent, TimelineComponent, MonthGridComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './app.html',
   styleUrl: './app.css',
   encapsulation: ViewEncapsulation.None,
 })
 export class App {
-  showScheduler = false;
+  currentView = signal<'Timeline' | 'Month'>('Month');
+  showScheduler = signal(false);
   schedulerError = signal<string | null>(null);
   private manager = new SchedulerManager({
     onError: ({ operation, error }) => {
@@ -70,13 +75,13 @@ export class App {
 
   handleAddEvent(): void {
     this.schedulerError.set(null);
-    this.showScheduler = true;
+    this.showScheduler.set(true);
   }
 
   handleEventClick(event: TimelineEvent): void {
     console.log('Clicked event:', event);
     this.schedulerError.set(null);
-    this.showScheduler = true;
+    this.showScheduler.set(true);
   }
 
   handleSave(data: SchedulerSaveData): void {
@@ -99,7 +104,7 @@ export class App {
         this.manager.addEvent(eventData);
       }
 
-      this.showScheduler = false;
+      this.showScheduler.set(false);
       this.schedulerError.set(null);
     } catch (err: unknown) {
       // Errors are also handled by the manager's onError hook
@@ -110,11 +115,11 @@ export class App {
     if (data.id) {
       this.manager.deleteEvent(data.id);
     }
-    this.showScheduler = false;
+    this.showScheduler.set(false);
   }
 
   closeScheduler(): void {
-    this.showScheduler = false;
+    this.showScheduler.set(false);
   }
 
   handleEventMove(data: EventMoveDetail): void {
@@ -144,5 +149,15 @@ export class App {
       resourceId: data.resourceId,
       status: 'confirmed',
     });
+  }
+
+  handleViewChange(data: { view: 'Timeline' | 'Month' }): void {
+    console.log('🔄 View changing to:', data.view);
+    this.currentView.set(data.view);
+  }
+
+  handleDayClick(data: { date: string }): void {
+    console.log('📅 Day clicked:', data.date);
+    this.handleAddEvent();
   }
 }
