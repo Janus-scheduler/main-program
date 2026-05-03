@@ -1,4 +1,4 @@
-import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
 import { SchedulerComponent, TimelineComponent } from '@janus-scheduler/angular';
 import type {
   TimelineEvent,
@@ -8,8 +8,6 @@ import type {
   EventCreateDetail,
 } from '@janus-scheduler/angular';
 import { SchedulerManager } from '@janus-scheduler/core';
-import { SAMPLE } from '@janus-scheduler/ui';
-import type { TimelineResource } from '@janus-scheduler/ui';
 
 @Component({
   selector: 'app-root',
@@ -22,18 +20,62 @@ import type { TimelineResource } from '@janus-scheduler/ui';
 })
 export class App {
   showScheduler = false;
-  schedulerError: string | null = null;
-  resources: TimelineResource[] = JSON.parse(JSON.stringify(SAMPLE));
-  private manager = new SchedulerManager();
+  schedulerError = signal<string | null>(null);
+  private manager = new SchedulerManager({
+    onError: ({ operation, error }) => {
+      console.error(`❌ Manager error [${operation}]:`, error);
+      this.schedulerError.set((error as Error).message || 'An unexpected error occurred');
+    },
+  });
+
+  constructor() {
+    this.seedInitialData();
+  }
+
+  private seedInitialData() {
+    // Only seed if the store is empty to avoid duplicates on re-renders
+    if (this.manager.getResourceCount() > 0) return;
+
+    console.log('🌱 Seeding initial data to core manager...');
+
+    // Same resources as React demo
+    this.manager.addResource({ id: 'r1', name: 'Dr. Sarah Chen', type: 'person' });
+    this.manager.addResource({ id: 'r2', name: 'Dr. Michael Ross', type: 'person' });
+    this.manager.addResource({ id: 'r3', name: 'Operating Room 1', type: 'room' });
+    this.manager.addResource({ id: 'r4', name: 'MRI Scanner A', type: 'equipment' });
+
+    // Same events as React demo
+    const today = new Date().toISOString().split('T')[0];
+
+    this.manager.addEvent({
+      id: 'e1',
+      title: 'Appendectomy',
+      startTime: `${today}T09:00:00Z`,
+      endTime: `${today}T11:30:00Z`,
+      resourceId: 'r1',
+      status: 'confirmed',
+    });
+
+    this.manager.addEvent({
+      id: 'e2',
+      title: 'Pre-op Assessment',
+      startTime: `${today}T13:00:00Z`,
+      endTime: `${today}T14:00:00Z`,
+      resourceId: 'r2',
+      status: 'confirmed',
+    });
+
+    console.log('✅ Seeding complete');
+  }
 
   handleAddEvent(): void {
-    this.schedulerError = null;
+    this.schedulerError.set(null);
     this.showScheduler = true;
   }
 
   handleEventClick(event: TimelineEvent): void {
     console.log('Clicked event:', event);
-    this.schedulerError = null;
+    this.schedulerError.set(null);
     this.showScheduler = true;
   }
 
@@ -41,9 +83,8 @@ export class App {
     console.log('Saving event with data:', data);
 
     try {
-      // Data Processing: Transform UI data into core EventData format
       const eventData = {
-        id: `evt_${Date.now()}`,
+        id: data.id || `evt_${Date.now()}`,
         title: data.title,
         startTime: `${data.date}T${data.startTime}:00Z`,
         endTime: `${data.date}T${data.endTime}:00Z`,
@@ -52,22 +93,23 @@ export class App {
         status: 'confirmed' as const,
       };
 
-      // Core Processing: Use the SchedulerManager to add the event
-      this.manager.addEvent(eventData);
+      if (data.id) {
+        this.manager.updateEvent(data.id, eventData);
+      } else {
+        this.manager.addEvent(eventData);
+      }
 
-      console.log('✅ Event successfully added to core manager');
       this.showScheduler = false;
-      this.schedulerError = null;
+      this.schedulerError.set(null);
     } catch (err: unknown) {
-      const error = err as Error;
-      console.error('❌ Failed to save event:', error);
-      this.schedulerError = error.message || 'An unexpected error occurred';
+      // Errors are also handled by the manager's onError hook
     }
   }
 
-  handleDelete(data: { title: string }): void {
-    console.log('Delete requested for:', data.title);
-    // Logic for deletion if we had an ID
+  handleDelete(data: { id?: string | null; title?: string }): void {
+    if (data.id) {
+      this.manager.deleteEvent(data.id);
+    }
     this.showScheduler = false;
   }
 
@@ -76,85 +118,31 @@ export class App {
   }
 
   handleEventMove(data: EventMoveDetail): void {
-    const { event, oldResourceId, newResourceId, newStartTime, newEndTime } = data;
-    console.log('📦 Event moved:', data);
-
-    const next = [...this.resources];
-
-    // Remove from old resource
-    const oldResIndex = next.findIndex((r) => r.id === oldResourceId);
-    if (oldResIndex === -1) return;
-
-    const oldRes = { ...next[oldResIndex], events: [...next[oldResIndex].events] };
-    const eventIndex = oldRes.events.findIndex((ev) => ev.id === event.id);
-
-    if (eventIndex === -1) return;
-
-    const movedEvent = { ...oldRes.events[eventIndex] };
-    oldRes.events.splice(eventIndex, 1);
-    next[oldResIndex] = oldRes;
-
-    // Update event times
-    movedEvent.startTime = newStartTime;
-    movedEvent.endTime = newEndTime;
-
-    // Add to new resource
-    const newResIndex = next.findIndex((r) => r.id === newResourceId);
-    if (newResIndex !== -1) {
-      const newRes = { ...next[newResIndex] };
-      newRes.events = [...newRes.events, movedEvent];
-      next[newResIndex] = newRes;
-    }
-
-    this.resources = next;
+    console.log('📦 Moving event:', data);
+    this.manager.updateEvent(data.event.id, {
+      resourceId: data.newResourceId,
+      startTime: data.newStartTime,
+      endTime: data.newEndTime,
+    });
   }
 
   handleEventResize(data: EventResizeDetail): void {
-    const { event, resourceId, newStartTime, newEndTime } = data;
-    console.log('↔️ Event resized:', data);
-
-    const next = [...this.resources];
-    const resIndex = next.findIndex((r) => r.id === resourceId);
-    if (resIndex === -1) return;
-
-    const res = { ...next[resIndex] };
-    const eventIndex = res.events.findIndex((ev) => ev.id === event.id);
-
-    if (eventIndex !== -1) {
-      res.events = [...res.events];
-      res.events[eventIndex] = {
-        ...res.events[eventIndex],
-        startTime: newStartTime,
-        endTime: newEndTime,
-      };
-      next[resIndex] = res;
-    }
-
-    this.resources = next;
+    console.log('↔️ Resizing event:', data);
+    this.manager.updateEvent(data.event.id, {
+      startTime: data.newStartTime,
+      endTime: data.newEndTime,
+    });
   }
 
   handleEventCreate(data: EventCreateDetail): void {
-    const { resourceId, startTime, endTime, date } = data;
-    console.log('✨ New event created:', data);
-
-    const next = [...this.resources];
-    const resIndex = next.findIndex((r) => r.id === resourceId);
-    if (resIndex === -1) return;
-
-    const res = { ...next[resIndex] };
-
-    const newEvent = {
+    console.log('✨ Creating new event:', data);
+    this.manager.addEvent({
       id: `evt_${Date.now()}`,
       title: 'New Event',
-      startTime,
-      endTime,
-      color: 'blue' as const,
-      date,
-    };
-
-    res.events = [...res.events, newEvent];
-    next[resIndex] = res;
-
-    this.resources = next;
+      startTime: data.startTime,
+      endTime: data.endTime,
+      resourceId: data.resourceId,
+      status: 'confirmed',
+    });
   }
 }

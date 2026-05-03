@@ -13,6 +13,7 @@ export type {
 } from "@janus-scheduler/ui";
 
 export interface SchedulerSaveData {
+  id?: string | null;
   title: string;
   date: string;
   startTime: string;

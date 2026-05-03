@@ -21,6 +21,7 @@ import type {
   EventResizeDetail,
   EventCreateDetail,
 } from "@janus-scheduler/ui";
+import { schedulerStore } from "@janus-scheduler/core";
 
 /**
  * TimelineComponent
@@ -73,6 +74,8 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Emitted when a new event is created by dragging on empty space */
   readonly eventCreate = output<EventCreateDetail>();
 
+  private _unsubStore?: () => void;
+
   private _eventClickHandler = (e: Event) => {
     e.stopPropagation();
     this.eventClick.emit((e as CustomEvent).detail);
@@ -101,7 +104,15 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("event-move", this._eventMoveHandler);
     el.addEventListener("event-resize", this._eventResizeHandler);
     el.addEventListener("event-create", this._eventCreateHandler);
-    this._syncResources();
+
+    // If an explicit resources input is provided, use it directly.
+    // Otherwise, subscribe to the Zustand store so the web component
+    // stays in sync when data is seeded/mutated by the SchedulerManager.
+    if (this.resources() !== undefined) {
+      this._syncResources();
+    } else {
+      this._subscribeToStore();
+    }
   }
 
   ngOnChanges(): void {
@@ -115,6 +126,98 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("event-move", this._eventMoveHandler);
     el?.removeEventListener("event-resize", this._eventResizeHandler);
     el?.removeEventListener("event-create", this._eventCreateHandler);
+    this._unsubStore?.();
+  }
+
+  private _subscribeToStore(): void {
+    // Immediately sync with the current store state
+    this._pushStoreToElement(schedulerStore.getState());
+
+    // Subscribe to future changes
+    this._unsubStore = schedulerStore.subscribe((state) => {
+      this._pushStoreToElement(state);
+    });
+  }
+
+  private _pushStoreToElement(
+    state: ReturnType<typeof schedulerStore.getState>,
+  ): void {
+    const el = this._elRef()?.nativeElement as
+      | (HTMLElement & { resources: TimelineResource[] })
+      | undefined;
+    if (!el) return;
+
+    const resources = Object.values(state.resources) as any[];
+    const events = Object.values(state.events) as any[];
+
+    if (resources.length === 0) return;
+
+    const typeOrder: Record<string, number> = {
+      person: 1,
+      room: 2,
+      equipment: 3,
+    };
+    const sorted = [...resources].sort(
+      (a, b) =>
+        (typeOrder[a.type || "person"] || 99) -
+        (typeOrder[b.type || "person"] || 99),
+    );
+
+    let currentGroupType = "";
+    const mapped: TimelineResource[] = sorted.map((res) => {
+      const resEvents = events
+        .filter((e: any) => e.resourceId === res.id)
+        .map((e: any) => {
+          const startD = new Date(e.startTime);
+          const endD = new Date(e.endTime);
+          const pad = (n: number) => n.toString().padStart(2, "0");
+          return {
+            id: e.id,
+            title: e.title,
+            startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
+            endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+            color: "blue" as const,
+            date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
+          };
+        });
+
+      let avatarType: "initials" | "icon" = "initials";
+      let avatarIcon: "room" | "equipment" | undefined = undefined;
+      let groupLabel: string | undefined = undefined;
+      const type = res.type || "person";
+
+      if (type !== currentGroupType) {
+        currentGroupType = type;
+        if (type === "person") groupLabel = "STAFF";
+        else if (type === "room") groupLabel = "ROOMS";
+        else if (type === "equipment") groupLabel = "EQUIPMENT";
+      }
+
+      if (type === "room") {
+        avatarType = "icon";
+        avatarIcon = "room";
+      } else if (type === "equipment") {
+        avatarType = "icon";
+        avatarIcon = "equipment";
+      }
+
+      return {
+        id: res.id,
+        name: res.name,
+        subtitle:
+          type === "person"
+            ? "Staff"
+            : type === "room"
+              ? "Facility"
+              : "Equipment",
+        avatarType,
+        avatarIcon,
+        groupLabel,
+        events: resEvents,
+      };
+    });
+
+    el.resources = mapped;
   }
 
   private _syncResources(): void {
