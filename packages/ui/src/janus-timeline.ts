@@ -100,7 +100,7 @@ export class JanusTimeline extends LitElement {
             startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
             endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
             color: "blue",
-            date: startD.toISOString().split("T")[0],
+            date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
           } as TimelineEvent;
         });
 

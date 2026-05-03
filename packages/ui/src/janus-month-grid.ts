@@ -1,5 +1,5 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import { monthGridStyles } from "./month-grid-styles";
 import { MonthEvent } from "./month-grid-types";
 
@@ -48,11 +48,14 @@ export class JanusMonthGrid extends LitElement {
       const startD = new Date(e.startTime);
       const endD = new Date(e.endTime);
       const pad = (n: number) => n.toString().padStart(2, "0");
+      // Use LOCAL date so event.date matches the calendar cell dateStr,
+      // which is also derived from local date components (see month-grid-utils toDateStr).
+      const localDate = `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`;
       return {
         id: e.id,
         title: e.title,
-        color: "blue", // Use default color or grab from resource if desired
-        date: startD.toISOString().split("T")[0],
+        color: "blue",
+        date: localDate,
         startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
         endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
       };

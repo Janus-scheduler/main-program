@@ -187,6 +187,12 @@ export class JanusScheduler extends LitElement {
   @state() activeColor = "orange";
   @state() sidebarOpen = false;
   @property({ type: String }) error: string | null = null;
+  /**
+   * The ID of the event being edited.
+   * - `null` / omitted → creation mode (onSave should call addEvent)
+   * - a string         → edit mode     (onSave should call updateEvent, onDelete should call deleteEvent)
+   */
+  @property({ type: String }) eventId: string | null = null;
 
   private _onClose() {
     this.dispatchEvent(
@@ -200,6 +206,8 @@ export class JanusScheduler extends LitElement {
         bubbles: true,
         composed: true,
         detail: {
+          // id is included so the host can tell create (null) from edit (string)
+          id: this.eventId,
           title: this.title,
           date: this.date,
           startTime: this.startTime,
@@ -217,7 +225,9 @@ export class JanusScheduler extends LitElement {
       new CustomEvent("delete", {
         bubbles: true,
         composed: true,
-        detail: { title: this.title },
+        // id is what the host needs to call manager.deleteEvent(id).
+        // title is included for display purposes (e.g. confirmation messages).
+        detail: { id: this.eventId, title: this.title },
       }),
     );
   }
