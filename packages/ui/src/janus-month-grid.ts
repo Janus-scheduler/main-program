@@ -1,5 +1,5 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import { monthGridStyles } from "./month-grid-styles";
 import { MonthEvent } from "./month-grid-types";
 
@@ -26,7 +26,7 @@ export class JanusMonthGrid extends LitElement {
   static readonly styles = monthGridStyles;
 
   // ── Internal state ────────────────────────────────────────────────────
-  @state() private events: MonthEvent[] = [];
+  @property({ type: Array }) events: MonthEvent[] = [];
   private _unsubStore?: () => void;
 
   connectedCallback() {
@@ -44,7 +44,7 @@ export class JanusMonthGrid extends LitElement {
 
   private _syncFromStore(state: any) {
     const coreEvents = Object.values(state.events) as any[];
-    this.events = coreEvents.map((e) => {
+    const newEvents = coreEvents.map((e) => {
       const startD = new Date(e.startTime);
       const endD = new Date(e.endTime);
       const pad = (n: number) => n.toString().padStart(2, "0");
@@ -60,6 +60,10 @@ export class JanusMonthGrid extends LitElement {
         endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
       };
     });
+
+    if (newEvents.length > 0) {
+      this.events = newEvents as MonthEvent[];
+    }
   }
 
   // ── Internal state ────────────────────────────────────────────────────

@@ -1,5 +1,9 @@
 import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA, signal } from '@angular/core';
-import { SchedulerComponent, TimelineComponent } from '@janus-scheduler/angular';
+import {
+  SchedulerComponent,
+  TimelineComponent,
+  MonthGridComponent,
+} from '@janus-scheduler/angular';
 import type {
   TimelineEvent,
   SchedulerSaveData,
@@ -12,13 +16,14 @@ import { SchedulerManager } from '@janus-scheduler/core';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [SchedulerComponent, TimelineComponent],
+  imports: [SchedulerComponent, TimelineComponent, MonthGridComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './app.html',
   styleUrl: './app.css',
   encapsulation: ViewEncapsulation.None,
 })
 export class App {
+  currentView: 'Timeline' | 'Month' = 'Month';
   showScheduler = false;
   schedulerError = signal<string | null>(null);
   private manager = new SchedulerManager({
@@ -117,30 +122,37 @@ export class App {
     this.showScheduler = false;
   }
 
+  handleViewChange(data: { view: 'Timeline' | 'Month' }): void {
+    this.currentView = data.view;
+  }
+
   handleEventMove(data: EventMoveDetail): void {
     console.log('📦 Moving event:', data);
+    const today = data.event.date || new Date().toISOString().split('T')[0];
     this.manager.updateEvent(data.event.id, {
       resourceId: data.newResourceId,
-      startTime: data.newStartTime,
-      endTime: data.newEndTime,
+      startTime: `${today}T${data.newStartTime}:00Z`,
+      endTime: `${today}T${data.newEndTime}:00Z`,
     });
   }
 
   handleEventResize(data: EventResizeDetail): void {
     console.log('↔️ Resizing event:', data);
+    const today = data.event.date || new Date().toISOString().split('T')[0];
     this.manager.updateEvent(data.event.id, {
-      startTime: data.newStartTime,
-      endTime: data.newEndTime,
+      startTime: `${today}T${data.newStartTime}:00Z`,
+      endTime: `${today}T${data.newEndTime}:00Z`,
     });
   }
 
   handleEventCreate(data: EventCreateDetail): void {
     console.log('✨ Creating new event:', data);
+    const today = data.date || new Date().toISOString().split('T')[0];
     this.manager.addEvent({
       id: `evt_${Date.now()}`,
       title: 'New Event',
-      startTime: data.startTime,
-      endTime: data.endTime,
+      startTime: `${today}T${data.startTime}:00Z`,
+      endTime: `${today}T${data.endTime}:00Z`,
       resourceId: data.resourceId,
       status: 'confirmed',
     });
