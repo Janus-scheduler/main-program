@@ -55,6 +55,7 @@
   <main class="app-main">
     @if (currentView === 'Timeline') {
       <janus-timeline-ng
+        [allowCreate]="allowCreate()"
         (eventClick)="handleEventClick($event)"
         (addEvent)="handleAddEvent()"
         (eventMove)="handleEventMove($event)"

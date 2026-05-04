@@ -13,6 +13,7 @@ import {
   BellIcon,
   SparkleIcon,
   PlusIcon,
+  PencilRulerIcon,
 } from "./timeline-icons";
 import {
   HOUR_START,
@@ -37,6 +38,8 @@ export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
 
   @property({ type: Array }) resources: TimelineResource[] = [];
+  /** When true, dragging on empty row space creates a new event. Default: false */
+  @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
 
   @state() view: "Timeline" | "Month" = "Timeline";
   @state() currentDate = new Date();
@@ -65,11 +68,14 @@ export class JanusTimeline extends LitElement {
     if (this._unsubStore) this._unsubStore();
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _syncFromStore(state: any) {
     const newResources: TimelineResource[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const coreEvents = Object.values(state.events) as any[];
 
     // First, convert object values to arrays and sort them by type so groups cluster correctly
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const coreResources = Object.values(state.resources) as any[];
 
     // Define ordering for types
@@ -210,6 +216,17 @@ export class JanusTimeline extends LitElement {
     );
   }
 
+  private _toggleCreate() {
+    this.allowCreate = !this.allowCreate;
+    this.dispatchEvent(
+      new CustomEvent("allow-create-change", {
+        detail: { allowCreate: this.allowCreate },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   // ── Drag-and-drop handlers ────────────────────────────────────────
 
   private _onEventPointerDown(
@@ -236,6 +253,7 @@ export class JanusTimeline extends LitElement {
 
   private _onRowPointerDown(e: PointerEvent, resourceId: string) {
     if (e.button !== 0) return;
+    if (!this.allowCreate) return; // creation disabled
     this._drag.startCreate(e, resourceId);
     if (this._drag.mode === "creating") {
       this._addDragUpListener();
@@ -390,6 +408,18 @@ export class JanusTimeline extends LitElement {
                 `,
               )}
             </div>
+            <button
+              class="tl-icon-btn tl-draw-toggle ${this.allowCreate
+                ? "tl-draw-toggle--active"
+                : ""}"
+              aria-label="Toggle draw-to-create"
+              data-tooltip="${this.allowCreate
+                ? "Draw Event ON — click to disable"
+                : "Draw Event OFF — drag on empty space to create an event"}"
+              @click=${this._toggleCreate}
+            >
+              ${PencilRulerIcon()}
+            </button>
             <button class="tl-icon-btn" aria-label="Search">
               ${SearchIcon()}
             </button>

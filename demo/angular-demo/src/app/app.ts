@@ -25,6 +25,7 @@ import { SchedulerManager } from '@janus-scheduler/core';
 export class App {
   currentView: 'Timeline' | 'Month' = 'Month';
   showScheduler = false;
+  allowCreate = signal(false);
   schedulerError = signal<string | null>(null);
   private manager = new SchedulerManager({
     onError: ({ operation, error }) => {
@@ -106,7 +107,7 @@ export class App {
 
       this.showScheduler = false;
       this.schedulerError.set(null);
-    } catch (err: unknown) {
+    } catch (_) {
       // Errors are also handled by the manager's onError hook
     }
   }
@@ -124,6 +125,10 @@ export class App {
 
   handleViewChange(data: { view: 'Timeline' | 'Month' }): void {
     this.currentView = data.view;
+  }
+
+  toggleCreate(): void {
+    this.allowCreate.set(!this.allowCreate());
   }
 
   handleEventMove(data: EventMoveDetail): void {

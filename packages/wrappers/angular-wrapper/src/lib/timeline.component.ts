@@ -13,6 +13,7 @@ import {
 // Side-effect import: ensures the <janus-timeline> custom element is registered
 import { JanusTimeline } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _ = JanusTimeline;
 import type {
   TimelineResource,
@@ -58,6 +59,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   /** Timeline resource data to display — leave unset to use built-in sample data */
   readonly resources = input<TimelineResource[] | undefined>(undefined);
+
+  /** When true, dragging on empty row space creates a new event */
+  readonly allowCreate = input<boolean>(false);
 
   /** Emitted when an event is clicked */
   readonly eventClick = output<TimelineEvent>();
@@ -113,6 +117,8 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("event-create", this._eventCreateHandler);
     el.addEventListener("view-change", this._viewChangeHandler);
 
+    this._applyAllowCreate();
+
     // If an explicit resources input is provided, use it directly.
     // Otherwise, subscribe to the Zustand store so the web component
     // stays in sync when data is seeded/mutated by the SchedulerManager.
@@ -125,6 +131,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   ngOnChanges(): void {
     this._syncResources();
+    this._applyAllowCreate();
   }
 
   ngOnDestroy(): void {
@@ -156,7 +163,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
       | undefined;
     if (!el) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resources = Object.values(state.resources) as any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events = Object.values(state.events) as any[];
 
     if (resources.length === 0) return;
@@ -175,7 +184,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     let currentGroupType = "";
     const mapped: TimelineResource[] = sorted.map((res) => {
       const resEvents = events
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((e: any) => e.resourceId === res.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((e: any) => {
           const startD = new Date(e.startTime);
           const endD = new Date(e.endTime);
@@ -231,12 +242,21 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private _syncResources(): void {
     const data = this.resources();
-    if (!data) return; // let the web component use its built-in SAMPLE data
+    if (!data) return;
     const el = this._elRef()?.nativeElement as
       | (HTMLElement & { resources: TimelineResource[] })
       | undefined;
     if (el) {
       el.resources = data;
+    }
+  }
+
+  private _applyAllowCreate(): void {
+    const el = this._elRef()?.nativeElement as
+      | (HTMLElement & { allowCreate: boolean })
+      | undefined;
+    if (el) {
+      el.allowCreate = this.allowCreate();
     }
   }
 }

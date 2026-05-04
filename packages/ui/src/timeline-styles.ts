@@ -226,6 +226,71 @@ export const timelineStyles = css`
     border: 1.5px solid var(--white);
   }
 
+  .tl-draw-toggle {
+    position: relative;
+  }
+
+  .tl-draw-toggle--active {
+    background: var(--orange);
+    color: #fff;
+  }
+
+  .tl-draw-toggle--active:hover {
+    background: #ea6c0a;
+    color: #fff;
+  }
+
+  /* Custom tooltip using data-tooltip attribute (title doesn't work in Shadow DOM) */
+  .tl-draw-toggle::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    transform: translateY(-4px);
+    background: #18181b;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: normal;
+    max-width: 220px;
+    width: max-content;
+    padding: 8px 12px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+    z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    font-family: "DM Sans", sans-serif;
+    text-align: left;
+  }
+
+  /* Tooltip caret — points UP, aligned to right side */
+  .tl-draw-toggle::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 2px);
+    right: 10px;
+    transform: translateY(-4px);
+    border: 5px solid transparent;
+    border-bottom-color: #18181b;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+    z-index: 9999;
+  }
+
+  .tl-draw-toggle:hover::before,
+  .tl-draw-toggle:hover::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   /* ══════════════════════════════════════════════════════════════════════════════
      TIMELINE CONTENT
   ══════════════════════════════════════════════════════════════════════════════ */
