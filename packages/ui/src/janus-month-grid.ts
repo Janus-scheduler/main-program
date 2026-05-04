@@ -32,6 +32,7 @@ export class JanusMonthGrid extends LitElement {
   @state() private _month = new Date().getMonth(); // 0-based
   @state() private _view: "Timeline" | "Month" = "Month";
   @state() private _aiPrompt = "";
+  @state() private _selectedDay: CalendarDay | null = null;
 
   // ── Navigation ────────────────────────────────────────────────────────
   private _prevMonth() {
@@ -58,6 +59,13 @@ export class JanusMonthGrid extends LitElement {
     this._month = now.getMonth();
   }
 
+  override firstUpdated() {
+    // Default selected day to today on initial load
+    const grid = buildCalendarGrid(this._year, this._month, this.events);
+    const todayCell = grid.flat().find((d) => d.isToday) ?? grid[0][0];
+    this._selectedDay = todayCell;
+  }
+
   // ── Event dispatchers ─────────────────────────────────────────────────
   private _handleEventClick(ev: MonthEvent) {
     this.dispatchEvent(
@@ -70,6 +78,7 @@ export class JanusMonthGrid extends LitElement {
   }
 
   private _handleDayClick(day: CalendarDay) {
+    this._selectedDay = day;
     this.dispatchEvent(
       new CustomEvent("day-click", {
         detail: { date: day.dateStr },
@@ -120,7 +129,6 @@ export class JanusMonthGrid extends LitElement {
   private _renderDay(day: CalendarDay) {
     const MAX_VISIBLE = 3; // how many chips to show before "+N more"
     const visible = day.events.slice(0, MAX_VISIBLE);
-    const overflow = day.events.length - MAX_VISIBLE;
 
     const classes = [
       "mg-day-cell",
@@ -141,10 +149,53 @@ export class JanusMonthGrid extends LitElement {
             : html`<span class="mg-day-cell__num">${day.dayNum}</span>`}
         </div>
 
-        ${visible.map((ev) => this._renderEventChip(ev))}
-        ${overflow > 0
-          ? html`<span class="mg-event mg-event--more">+${overflow} more</span>`
-          : nothing}
+        <div class="mg-day-cell__dots">
+          ${visible.map((ev) => this._renderEventChip(ev))}
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderDayPanel() {
+    if (!this._selectedDay) return nothing;
+
+    const day = this._selectedDay;
+
+    const title = day.date
+      .toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+      })
+      .toUpperCase(); // e.g. "MAY 15"
+
+    return html`
+      <div class="mg-day-panel">
+        <div class="mg-day-panel__header">
+          <span class="mg-day-panel__title">${title} EVENTS</span>
+          ${day.isToday
+            ? html`<span class="mg-day-panel__today-badge">TODAY</span>`
+            : nothing}
+        </div>
+
+        ${day.events.length === 0
+          ? html`<p class="mg-day-panel__empty">No events</p>`
+          : day.events.map(
+              (ev) => html`
+                <div class="mg-day-panel__event">
+                  <div
+                    class="mg-day-panel__color-bar mg-day-panel__color-bar--${ev.color}"
+                  ></div>
+                  <div class="mg-day-panel__event-info">
+                    <span class="mg-day-panel__event-title">${ev.title}</span>
+                    ${ev.startTime && ev.endTime
+                      ? html`<span class="mg-day-panel__event-time">
+                          ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}
+                        </span>`
+                      : nothing}
+                  </div>
+                </div>
+              `,
+            )}
       </div>
     `;
   }
@@ -228,6 +279,9 @@ export class JanusMonthGrid extends LitElement {
             )}
           </div>
         </div>
+
+        <!-- ── Selected day panel (mobile) ── -->
+        ${this._renderDayPanel()}
 
         <!-- ── AI bar ── -->
         <div class="mg-ai-wrap">
