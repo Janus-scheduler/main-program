@@ -407,6 +407,7 @@ export const timelineStyles = css`
   }
 
   .tl-event-row {
+    touch-action: none; 
     height: var(--row-h);
     position: relative;
     border-bottom: 1px solid var(--border);
@@ -447,6 +448,7 @@ export const timelineStyles = css`
      EVENT BLOCKS
   ══════════════════════════════════════════════════════════════════════════════ */
   .tl-event {
+    touch-action: none; 
     position: absolute;
     top: 8px;
     bottom: 8px;
@@ -528,6 +530,7 @@ export const timelineStyles = css`
 
   /* Resize handles — thin strips on left/right edges */
   .tl-event-resize-handle {
+    touch-action: none;
     position: absolute;
     top: 0;
     bottom: 0;
@@ -628,10 +631,12 @@ export const timelineStyles = css`
 
   /* Empty-space creation cursor */
   .tl-event-row {
+    touch-action: none; 
     cursor: crosshair;
   }
 
   .tl-event {
+    touch-action: none; 
     cursor: grab;
   }
 
