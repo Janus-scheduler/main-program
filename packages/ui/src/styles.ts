@@ -14,7 +14,7 @@ export const schedulerStyles = css`
   :host {
     --orange: #f97316;
     --orange-light: #fff7ed;
-    --orange-glow: meta-labelrgba(249, 115, 22, 0.15);
+    --orange-glow: rgba(249, 115, 22, 0.15);
 
     --border: #e4e4e7;
     --text-primary: #18181b;
