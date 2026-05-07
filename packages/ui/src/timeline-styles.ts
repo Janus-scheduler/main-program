@@ -226,6 +226,24 @@ export const timelineStyles = css`
     border: 1.5px solid var(--white);
   }
 
+  /* Zoom badge */
+  .tl-zoom-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: var(--orange-lt);
+    color: var(--orange);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: "DM Mono", monospace;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    user-select: none;
+    transition: opacity 0.2s;
+  }
+
   .tl-draw-toggle {
     position: relative;
   }

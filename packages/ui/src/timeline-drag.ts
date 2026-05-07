@@ -1,6 +1,6 @@
 import { TimelineEvent } from "./timeline-types";
 import {
-  HOUR_WIDTH,
+  DEFAULT_HOUR_WIDTH,
   HOUR_START,
   ROW_HEIGHT,
   DRAG_THRESHOLD,
@@ -68,6 +68,7 @@ export class TimelineDragController {
   private _resourceLayout: ResourceLayout[] = [];
   private _scrollContainer: HTMLElement | null = null;
   private _requestUpdate: () => void;
+  private _hourWidth: number = DEFAULT_HOUR_WIDTH;
 
   // Bound handler for cleanup
   private _boundMove: (e: PointerEvent) => void;
@@ -81,9 +82,11 @@ export class TimelineDragController {
   updateLayout(
     scrollContainer: HTMLElement | null,
     resourceLayout: ResourceLayout[],
+    hourWidth: number = DEFAULT_HOUR_WIDTH,
   ) {
     this._scrollContainer = scrollContainer;
     this._resourceLayout = resourceLayout;
+    this._hourWidth = hourWidth;
   }
 
   /** True if an event is the one currently being dragged */
@@ -101,10 +104,9 @@ export class TimelineDragController {
     this._originResourceId = resourceId;
     this._targetResourceId = resourceId;
 
-    const evLeft =
-      ((toMin(ev.startTime) - HOUR_START * 60) / 60) * HOUR_WIDTH + 2;
-    const evWidth =
-      ((toMin(ev.endTime) - toMin(ev.startTime)) / 60) * HOUR_WIDTH - 6;
+    const hw = this._hourWidth;
+    const evLeft = ((toMin(ev.startTime) - HOUR_START * 60) / 60) * hw + 2;
+    const evWidth = ((toMin(ev.endTime) - toMin(ev.startTime)) / 60) * hw - 6;
 
     this._originalLeft = evLeft;
     this._originalWidth = evWidth;
@@ -127,10 +129,9 @@ export class TimelineDragController {
     this._originResourceId = resourceId;
     this._targetResourceId = resourceId;
 
-    const evLeft =
-      ((toMin(ev.startTime) - HOUR_START * 60) / 60) * HOUR_WIDTH + 2;
-    const evWidth =
-      ((toMin(ev.endTime) - toMin(ev.startTime)) / 60) * HOUR_WIDTH - 6;
+    const hw = this._hourWidth;
+    const evLeft = ((toMin(ev.startTime) - HOUR_START * 60) / 60) * hw + 2;
+    const evWidth = ((toMin(ev.endTime) - toMin(ev.startTime)) / 60) * hw - 6;
 
     this._originalLeft = evLeft;
     this._originalWidth = evWidth;
@@ -236,12 +237,13 @@ export class TimelineDragController {
   // ── Ghost computation ───────────────────────────────────────────────
 
   private _computeMoveGhost(dx: number, e: PointerEvent) {
+    const hw = this._hourWidth;
     const newLeft = this._originalLeft + dx;
     const ev = this._event!;
     const duration = toMin(ev.endTime) - toMin(ev.startTime);
 
     // Snap the start time
-    const rawStartMin = pxToMinutes(newLeft - 2);
+    const rawStartMin = pxToMinutes(newLeft - 2, hw);
     const snappedStart = snapMinutes(rawStartMin);
     const snappedEnd = snappedStart + duration;
 
@@ -251,9 +253,9 @@ export class TimelineDragController {
     this._targetResourceId = targetRow.id;
 
     this.ghost = {
-      left: (snappedStart / 60) * HOUR_WIDTH + 2,
+      left: (snappedStart / 60) * hw + 2,
       top: targetRow.yOffset + 8,
-      width: (duration / 60) * HOUR_WIDTH - 6,
+      width: (duration / 60) * hw - 6,
       color: ev.color,
       timeLabel: `${fmt12(minutesToTimeStr(snappedStart))} – ${fmt12(minutesToTimeStr(snappedEnd))}`,
       title: ev.title,
@@ -261,17 +263,18 @@ export class TimelineDragController {
   }
 
   private _computeResizeStartGhost(dx: number) {
+    const hw = this._hourWidth;
     const ev = this._event!;
     const newLeft = this._originalLeft + dx;
     const rightEdge = this._originalLeft + this._originalWidth;
 
-    const rawStartMin = pxToMinutes(newLeft - 2);
+    const rawStartMin = pxToMinutes(newLeft - 2, hw);
     const snappedStart = snapMinutes(rawStartMin);
     const endMin = toMin(ev.endTime);
 
     // Don't allow start to go past end (min 15 min event)
     const clampedStart = Math.min(snappedStart, endMin - 15);
-    const snappedLeft = (clampedStart / 60) * HOUR_WIDTH + 2;
+    const snappedLeft = (clampedStart / 60) * hw + 2;
     const newWidth = rightEdge - snappedLeft;
 
     const rowEntry = this._resourceLayout.find(
@@ -289,11 +292,12 @@ export class TimelineDragController {
   }
 
   private _computeResizeEndGhost(dx: number) {
+    const hw = this._hourWidth;
     const ev = this._event!;
     const newWidth = this._originalWidth + dx;
 
     const startMin = toMin(ev.startTime);
-    const rawEndMin = startMin + pxToMinutes(newWidth + 6);
+    const rawEndMin = startMin + pxToMinutes(newWidth + 6, hw);
     const snappedEnd = snapMinutes(rawEndMin);
 
     // Don't allow end to go before start (min 15 min event)
@@ -306,7 +310,7 @@ export class TimelineDragController {
     this.ghost = {
       left: this._originalLeft,
       top: (rowEntry?.yOffset ?? 0) + 8,
-      width: ((clampedEnd - startMin) / 60) * HOUR_WIDTH - 6,
+      width: ((clampedEnd - startMin) / 60) * hw - 6,
       color: ev.color,
       timeLabel: `${fmt12(ev.startTime)} – ${fmt12(minutesToTimeStr(clampedEnd))}`,
       title: ev.title,
@@ -315,6 +319,7 @@ export class TimelineDragController {
 
   private _computeCreateGhost(e: PointerEvent) {
     if (!this._scrollContainer) return;
+    const hw = this._hourWidth;
 
     const rect = this._scrollContainer.getBoundingClientRect();
     const currentX = e.clientX - rect.left + this._scrollContainer.scrollLeft;
@@ -322,8 +327,8 @@ export class TimelineDragController {
     const startPx = Math.min(this._originalLeft, currentX);
     const endPx = Math.max(this._originalLeft, currentX);
 
-    const rawStartMin = pxToMinutes(startPx);
-    const rawEndMin = pxToMinutes(endPx);
+    const rawStartMin = pxToMinutes(startPx, hw);
+    const rawEndMin = pxToMinutes(endPx, hw);
     const snappedStart = snapMinutes(rawStartMin);
     const snappedEnd = Math.max(snapMinutes(rawEndMin), snappedStart + 15);
 
@@ -332,9 +337,9 @@ export class TimelineDragController {
     );
 
     this.ghost = {
-      left: (snappedStart / 60) * HOUR_WIDTH,
+      left: (snappedStart / 60) * hw,
       top: (rowEntry?.yOffset ?? 0) + 8,
-      width: ((snappedEnd - snappedStart) / 60) * HOUR_WIDTH,
+      width: ((snappedEnd - snappedStart) / 60) * hw,
       color: "blue",
       timeLabel: `${fmt12(minutesToTimeStr(snappedStart))} – ${fmt12(minutesToTimeStr(snappedEnd))}`,
       title: "New Event",
@@ -345,11 +350,12 @@ export class TimelineDragController {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _computeResult(): { type: string; detail: any } | null {
+    const hw = this._hourWidth;
     switch (this.mode) {
       case "moving": {
         const ev = this._event!;
         const duration = toMin(ev.endTime) - toMin(ev.startTime);
-        const rawStartMin = pxToMinutes(this.ghost.left - 2);
+        const rawStartMin = pxToMinutes(this.ghost.left - 2, hw);
         const snappedStart = snapMinutes(rawStartMin);
         return {
           type: "event-move",
@@ -367,11 +373,13 @@ export class TimelineDragController {
         const ev = this._event!;
         const startMin =
           this.mode === "resize-start"
-            ? snapMinutes(pxToMinutes(this.ghost.left - 2))
+            ? snapMinutes(pxToMinutes(this.ghost.left - 2, hw))
             : toMin(ev.startTime);
         const endMin =
           this.mode === "resize-end"
-            ? snapMinutes(pxToMinutes(this.ghost.left + this.ghost.width + 4))
+            ? snapMinutes(
+                pxToMinutes(this.ghost.left + this.ghost.width + 4, hw),
+              )
             : toMin(ev.endTime);
         return {
           type: "event-resize",
@@ -384,8 +392,8 @@ export class TimelineDragController {
         };
       }
       case "creating": {
-        const rawStartMin = pxToMinutes(this.ghost.left);
-        const rawEndMin = pxToMinutes(this.ghost.left + this.ghost.width);
+        const rawStartMin = pxToMinutes(this.ghost.left, hw);
+        const rawEndMin = pxToMinutes(this.ghost.left + this.ghost.width, hw);
         const snappedStart = snapMinutes(rawStartMin);
         const snappedEnd = Math.max(snapMinutes(rawEndMin), snappedStart + 15);
         return {

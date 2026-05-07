@@ -2,7 +2,12 @@ import { TimelineEvent } from "./timeline-types";
 
 // ── Constants  ─────────────────────────────────────────────────────────
 export const HOUR_START = 0;
-export const HOUR_WIDTH = 80;
+export const DEFAULT_HOUR_WIDTH = 80;
+export const MIN_HOUR_WIDTH = 40;
+export const MAX_HOUR_WIDTH = 300;
+export const ZOOM_FACTOR = 0.08; // 8% per scroll tick
+/** @deprecated Use DEFAULT_HOUR_WIDTH and pass hourWidth dynamically */
+export const HOUR_WIDTH = DEFAULT_HOUR_WIDTH;
 export const VISIBLE_HOURS = Array.from({ length: 24 }, (_, i) => i);
 export const AVATAR_PALETTE = [
   "#f97316",
@@ -39,10 +44,13 @@ export function avatarColor(id: string): string {
   return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
 }
 
-export function eventStyle(ev: TimelineEvent): string {
-  const left = ((toMin(ev.startTime) - HOUR_START * 60) / 60) * HOUR_WIDTH + 2;
+export function eventStyle(
+  ev: TimelineEvent,
+  hourWidth: number = DEFAULT_HOUR_WIDTH,
+): string {
+  const left = ((toMin(ev.startTime) - HOUR_START * 60) / 60) * hourWidth + 2;
   const width =
-    ((toMin(ev.endTime) - toMin(ev.startTime)) / 60) * HOUR_WIDTH - 6;
+    ((toMin(ev.endTime) - toMin(ev.startTime)) / 60) * hourWidth - 6;
   return `left: ${left}px; width: ${width}px;`;
 }
 
@@ -57,11 +65,11 @@ export function toDateStr(d: Date): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export function nowLeft(): number {
+export function nowLeft(hourWidth: number = DEFAULT_HOUR_WIDTH): number {
   const now = new Date();
   return (
     ((now.getHours() * 60 + now.getMinutes() - HOUR_START * 60) / 60) *
-    HOUR_WIDTH
+    hourWidth
   );
 }
 
@@ -86,12 +94,18 @@ export const SNAP_MINUTES = 15;
 export const DRAG_THRESHOLD = 5;
 
 // ── Drag-and-drop helpers ─────────────────────────────────────────────
-export function pxToMinutes(px: number): number {
-  return (px / HOUR_WIDTH) * 60;
+export function pxToMinutes(
+  px: number,
+  hourWidth: number = DEFAULT_HOUR_WIDTH,
+): number {
+  return (px / hourWidth) * 60;
 }
 
-export function minutesToPx(min: number): number {
-  return (min / 60) * HOUR_WIDTH;
+export function minutesToPx(
+  min: number,
+  hourWidth: number = DEFAULT_HOUR_WIDTH,
+): number {
+  return (min / 60) * hourWidth;
 }
 
 export function snapMinutes(min: number, snap: number = SNAP_MINUTES): number {

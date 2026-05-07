@@ -17,7 +17,10 @@ import {
 } from "./timeline-icons";
 import {
   HOUR_START,
-  HOUR_WIDTH,
+  DEFAULT_HOUR_WIDTH,
+  MIN_HOUR_WIDTH,
+  MAX_HOUR_WIDTH,
+  ZOOM_FACTOR,
   VISIBLE_HOURS,
   ROW_HEIGHT,
   GROUP_LABEL_HEIGHT,
@@ -45,6 +48,7 @@ export class JanusTimeline extends LitElement {
   @state() currentDate = new Date();
   @state() aiPrompt = "";
   @state() private _dragVersion = 0; // bumped to trigger re-render during drag
+  @state() private _hourWidth = DEFAULT_HOUR_WIDTH; // dynamic zoom width
 
   @query(".tl-res-col") resColRef!: HTMLElement;
   @query(".tl-time-scroll") gridScrollRef!: HTMLElement;
@@ -156,7 +160,7 @@ export class JanusTimeline extends LitElement {
   firstUpdated() {
     // On mount: scroll horizontally so 8:00 AM is the first visible hour
     if (this.gridScrollRef) {
-      this.gridScrollRef.scrollLeft = 8 * HOUR_WIDTH;
+      this.gridScrollRef.scrollLeft = 8 * this._hourWidth;
     }
   }
 
@@ -221,6 +225,51 @@ export class JanusTimeline extends LitElement {
     this.dispatchEvent(
       new CustomEvent("allow-create-change", {
         detail: { allowCreate: this.allowCreate },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  // ── Zoom handler (Ctrl/Cmd + Scroll) ──────────────────────────────
+
+  private _handleWheel(e: WheelEvent) {
+    // Only zoom when Ctrl or Meta (Cmd on Mac) is held
+    if (!e.ctrlKey && !e.metaKey) return;
+
+    e.preventDefault();
+
+    const container = this.gridScrollRef;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+
+    // Where is the cursor relative to the visible container?
+    const pointerX = e.clientX - rect.left;
+
+    // What time (in minutes) is currently under the pointer?
+    const scrollLeft = container.scrollLeft;
+    const timeUnderCursorMin = ((scrollLeft + pointerX) / this._hourWidth) * 60;
+
+    // Compute new hour width
+    const oldWidth = this._hourWidth;
+    const direction = e.deltaY < 0 ? 1 : -1; // scroll up = zoom in
+    const newWidth = Math.min(
+      MAX_HOUR_WIDTH,
+      Math.max(MIN_HOUR_WIDTH, oldWidth * (1 + direction * ZOOM_FACTOR)),
+    );
+
+    // Update the state (triggers re-render)
+    this._hourWidth = newWidth;
+
+    // Adjust scrollLeft so the time under the cursor stays pinned
+    const newPxForTime = (timeUnderCursorMin / 60) * newWidth;
+    container.scrollLeft = newPxForTime - pointerX;
+
+    // Dispatch a zoom-change event for any external listeners
+    this.dispatchEvent(
+      new CustomEvent("zoom-change", {
+        detail: { hourWidth: newWidth },
         bubbles: true,
         composed: true,
       }),
@@ -334,7 +383,13 @@ export class JanusTimeline extends LitElement {
     `;
   }
 
+  /** Compute a zoom percentage for the indicator display */
+  private _zoomPercent(): number {
+    return Math.round((this._hourWidth / DEFAULT_HOUR_WIDTH) * 100);
+  }
+
   render() {
+    const hw = this._hourWidth;
     const activeDateStr = toDateStr(this.currentDate);
 
     // Filter resources conditionally by activeDate
@@ -358,12 +413,12 @@ export class JanusTimeline extends LitElement {
       }
     }
 
-    // Update drag controller with current layout
+    // Update drag controller with current layout and zoom level
     const resourceLayout = this._computeResourceLayout(groups);
-    this._drag.updateLayout(this.gridScrollRef, resourceLayout);
+    this._drag.updateLayout(this.gridScrollRef, resourceLayout, hw);
 
-    const totalW = VISIBLE_HOURS.length * HOUR_WIDTH;
-    const nl = nowLeft();
+    const totalW = VISIBLE_HOURS.length * hw;
+    const nl = nowLeft(hw);
 
     return html`
       <div class="tl-component-shell">
@@ -394,6 +449,9 @@ export class JanusTimeline extends LitElement {
             >
           </nav>
           <div class="tl-topbar__right">
+            ${this._zoomPercent() !== 100
+              ? html`<span class="tl-zoom-badge">${this._zoomPercent()}%</span>`
+              : nothing}
             <div class="tl-view-toggle">
               ${(["Timeline", "Month"] as const).map(
                 (v) => html`
@@ -465,12 +523,16 @@ export class JanusTimeline extends LitElement {
               )}
             </div>
 
-            <div class="tl-time-scroll" @scroll=${this._onGridScroll}>
+            <div
+              class="tl-time-scroll"
+              @scroll=${this._onGridScroll}
+              @wheel=${this._handleWheel}
+            >
               <div class="tl-time-inner" style="width: ${totalW}px">
                 <div class="tl-hour-header">
                   ${VISIBLE_HOURS.map(
                     (h) => html`
-                      <div class="tl-hour-cell" style="width: ${HOUR_WIDTH}px">
+                      <div class="tl-hour-cell" style="width: ${hw}px">
                         ${h.toString().padStart(2, "0")}:00
                       </div>
                     `,
@@ -502,8 +564,7 @@ export class JanusTimeline extends LitElement {
                               (h) =>
                                 html`<div
                                   class="tl-vline"
-                                  style="left: ${(h - HOUR_START) *
-                                  HOUR_WIDTH}px"
+                                  style="left: ${(h - HOUR_START) * hw}px"
                                 ></div>`,
                             )}
                             ${r.events.map(
@@ -514,7 +575,7 @@ export class JanusTimeline extends LitElement {
                                   )
                                     ? "tl-event--dragging"
                                     : ""}"
-                                  style=${eventStyle(ev)}
+                                  style=${eventStyle(ev, hw)}
                                   @pointerdown=${(e: PointerEvent) =>
                                     this._onEventPointerDown(e, ev, r.id)}
                                   @click=${(e: Event) =>
