@@ -326,6 +326,12 @@ export const monthGridStyles = css`
     line-height: 1;
   }
 
+  /* Selected day — orange outline */
+  .mg-day-cell--selected {
+    outline: 2px solid var(--orange);
+    outline-offset: -2px;
+  }
+
   /* Orange circle badge for today */
   .mg-today-badge {
     display: inline-flex;

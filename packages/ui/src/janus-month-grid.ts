@@ -32,7 +32,7 @@ export class JanusMonthGrid extends LitElement {
   @state() private _month = new Date().getMonth(); // 0-based
   @state() private _view: "Timeline" | "Month" = "Month";
   @state() private _aiPrompt = "";
-  @state() private _selectedDay: CalendarDay | null = null;
+  @state() private _selectedDateStr: string | null = null;
 
   // ── Navigation ────────────────────────────────────────────────────────
   private _prevMonth() {
@@ -42,6 +42,11 @@ export class JanusMonthGrid extends LitElement {
     } else {
       this._month -= 1;
     }
+
+    // Select first day of new month
+    this._selectedDateStr = new Date(this._year, this._month, 1)
+      .toISOString()
+      .split("T")[0];
   }
 
   private _nextMonth() {
@@ -51,6 +56,11 @@ export class JanusMonthGrid extends LitElement {
     } else {
       this._month += 1;
     }
+
+    // Select first day of new month
+    this._selectedDateStr = new Date(this._year, this._month, 1)
+      .toISOString()
+      .split("T")[0];
   }
 
   private _goToToday() {
@@ -60,10 +70,13 @@ export class JanusMonthGrid extends LitElement {
   }
 
   override firstUpdated() {
-    // Default selected day to today on initial load
     const grid = buildCalendarGrid(this._year, this._month, this.events);
     const todayCell = grid.flat().find((d) => d.isToday) ?? grid[0][0];
-    this._selectedDay = todayCell;
+    this._selectedDateStr = todayCell.dateStr;
+
+    requestAnimationFrame(() => {
+      this.requestUpdate();
+    });
   }
 
   // ── Event dispatchers ─────────────────────────────────────────────────
@@ -78,7 +91,7 @@ export class JanusMonthGrid extends LitElement {
   }
 
   private _handleDayClick(day: CalendarDay) {
-    this._selectedDay = day;
+    this._selectedDateStr = day.dateStr;
     this.dispatchEvent(
       new CustomEvent("day-click", {
         detail: { date: day.dateStr },
@@ -134,6 +147,7 @@ export class JanusMonthGrid extends LitElement {
       "mg-day-cell",
       day.isCurrentMonth ? "" : "mg-day-cell--other",
       day.isToday ? "mg-day-cell--today" : "",
+      day.dateStr === this._selectedDateStr ? "mg-day-cell--selected" : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -156,10 +170,8 @@ export class JanusMonthGrid extends LitElement {
     `;
   }
 
-  private _renderDayPanel() {
-    if (!this._selectedDay) return nothing;
-
-    const day = this._selectedDay;
+  private _renderDayPanel(day: CalendarDay | null) {
+    if (!day) return nothing;
 
     const title = day.date
       .toLocaleDateString("en-US", {
@@ -205,6 +217,8 @@ export class JanusMonthGrid extends LitElement {
     const grid = buildCalendarGrid(this._year, this._month, this.events);
     const monthLabel = formatMonthYear(this._year, this._month);
     const rowCount = grid.length;
+    const selectedDay =
+      grid.flat().find((d) => d.dateStr === this._selectedDateStr) ?? null;
 
     return html`
       <div class="mg-shell">
@@ -281,7 +295,7 @@ export class JanusMonthGrid extends LitElement {
         </div>
 
         <!-- ── Selected day panel (mobile) ── -->
-        ${this._renderDayPanel()}
+        ${this._renderDayPanel(selectedDay)}
 
         <!-- ── AI bar ── -->
         <div class="mg-ai-wrap">
