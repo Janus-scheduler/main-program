@@ -25,7 +25,13 @@ export interface CalendarDay {
 
 /** "YYYY-MM-DD" from a Date */
 export function toDateStr(d: Date): string {
-  return d.toISOString().split("T")[0];
+  // Use LOCAL date components — not toISOString() — so calendar cell dates
+  // match the user's local calendar. toISOString() on a local-midnight Date
+  // converts to UTC and shifts the date back for UTC+ timezones.
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function todayStr(): string {

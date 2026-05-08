@@ -5,14 +5,32 @@ on:
       - main
   pull_request:
     types: [opened, synchronize, reopened]
+
 jobs:
   sonarqube:
     name: SonarQube
-    runs-on: windows-latest
+    runs-on: ubuntu-latest # linux is faster and cheaper than windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          fetch-depth: 0 # full history required for SonarCloud blame/new-code detection
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Install all workspace dependencies (core, ui, wrappers, demos)
+      - name: Install dependencies
+        run: npm ci
+
+      # Run Jest with --coverage to produce packages/core/coverage/lcov.info
+      # This is the file sonar.javascript.lcov.reportPaths points to.
+      - name: Run tests with coverage
+        run: npm test --workspace=packages/core
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
