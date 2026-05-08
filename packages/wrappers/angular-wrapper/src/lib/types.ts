@@ -1,7 +1,7 @@
 /**
  * Angular Wrapper Types
  *
- * Re-exports the framework-agnostic types from @janus-scheduler/ui
+ * Re-exports the framework-agnostic types from @janus-scheduler/core
  * so consumers can import everything from @janus-scheduler/angular.
  */
 export type {
@@ -10,15 +10,6 @@ export type {
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
-} from "@janus-scheduler/ui";
-
-export interface SchedulerSaveData {
-  title: string;
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
-  participants: string[];
-  description: string;
-  activeColor: string;
-}
+  SchedulerSaveData,
+  SchedulerDeleteData,
+} from "@janus-scheduler/core";

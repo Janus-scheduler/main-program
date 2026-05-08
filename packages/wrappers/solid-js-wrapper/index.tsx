@@ -4,7 +4,15 @@ import {
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
 } from "@janus-scheduler/ui";
-import type { TimelineEvent, TimelineResource } from "@janus-scheduler/ui";
+import type {
+  TimelineEvent,
+  TimelineResource,
+  EventMoveDetail,
+  EventResizeDetail,
+  EventCreateDetail,
+  SchedulerSaveData,
+  SchedulerDeleteData,
+} from "@janus-scheduler/core";
 
 declare module "solid-js" {
   namespace JSX {
@@ -41,8 +49,8 @@ export interface SchedulerProps {
   activeColor?: string;
   error?: string | null;
   onClose?: (e: Event) => void;
-  onSave?: (e: CustomEvent) => void;
-  onDelete?: (e: CustomEvent) => void;
+  onSave?: (e: CustomEvent<SchedulerSaveData>) => void;
+  onDelete?: (e: CustomEvent<SchedulerDeleteData>) => void;
 }
 
 export const Scheduler: Component<SchedulerProps> = (props) => {
@@ -65,14 +73,15 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
 
   onMount(() => {
     if (!ref) return;
+    const el = ref as unknown as HTMLElement;
     const attach = (
       eventName: string,
       handler?: ((e: Event) => void) | ((e: CustomEvent) => void),
     ) => {
-      if (handler) {
+      if (handler && el) {
         const h = handler as (e: Event) => void;
-        ref!.addEventListener(eventName, h);
-        onCleanup(() => ref!.removeEventListener(eventName, h));
+        el.addEventListener(eventName, h);
+        onCleanup(() => el.removeEventListener(eventName, h));
       }
     };
     attach("close", props.onClose);
@@ -94,9 +103,9 @@ export interface TimelineProps {
   aiPrompt?: string;
   onEventClick?: (e: CustomEvent<TimelineEvent>) => void;
   onAddEvent?: (e: Event) => void;
-  onEventMove?: (e: CustomEvent) => void;
-  onEventResize?: (e: CustomEvent) => void;
-  onEventCreate?: (e: CustomEvent) => void;
+  onEventMove?: (e: CustomEvent<EventMoveDetail>) => void;
+  onEventResize?: (e: CustomEvent<EventResizeDetail>) => void;
+  onEventCreate?: (e: CustomEvent<EventCreateDetail>) => void;
 }
 
 export const Timeline: Component<TimelineProps> = (props) => {
@@ -114,17 +123,20 @@ export const Timeline: Component<TimelineProps> = (props) => {
 
   onMount(() => {
     if (!ref) return;
+    const el = ref as unknown as HTMLElement;
     const attach = (
       eventName: string,
       handler?:
         | ((e: Event) => void)
-        | ((e: CustomEvent) => void)
-        | ((e: CustomEvent<TimelineEvent>) => void),
+        | ((e: CustomEvent<TimelineEvent>) => void)
+        | ((e: CustomEvent<EventMoveDetail>) => void)
+        | ((e: CustomEvent<EventResizeDetail>) => void)
+        | ((e: CustomEvent<EventCreateDetail>) => void),
     ) => {
-      if (handler) {
+      if (handler && el) {
         const h = handler as (e: Event) => void;
-        ref!.addEventListener(eventName, h);
-        onCleanup(() => ref!.removeEventListener(eventName, h));
+        el.addEventListener(eventName, h);
+        onCleanup(() => el.removeEventListener(eventName, h));
       }
     };
     attach("event-click", props.onEventClick);
@@ -142,10 +154,10 @@ export const Timeline: Component<TimelineProps> = (props) => {
 // ----------------------------------------------------------------------
 
 export interface MonthGridProps {
-  onEventClick?: (e: CustomEvent<unknown>) => void;
-  onDayClick?: (e: CustomEvent) => void;
+  onEventClick?: (e: CustomEvent<TimelineEvent>) => void;
+  onDayClick?: (e: CustomEvent<{ date: string }>) => void;
   onAddEvent?: (e: Event) => void;
-  onViewChange?: (e: CustomEvent) => void;
+  onViewChange?: (e: CustomEvent<{ view: "Timeline" | "Month" }>) => void;
 }
 
 export const MonthGrid: Component<MonthGridProps> = (props) => {
@@ -153,17 +165,19 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
 
   onMount(() => {
     if (!ref) return;
+    const el = ref as unknown as HTMLElement;
     const attach = (
       eventName: string,
       handler?:
         | ((e: Event) => void)
-        | ((e: CustomEvent) => void)
-        | ((e: CustomEvent<unknown>) => void),
+        | ((e: CustomEvent<TimelineEvent>) => void)
+        | ((e: CustomEvent<{ date: string }>) => void)
+        | ((e: CustomEvent<{ view: "Timeline" | "Month" }>) => void),
     ) => {
-      if (handler) {
+      if (handler && el) {
         const h = handler as (e: Event) => void;
-        ref!.addEventListener(eventName, h);
-        onCleanup(() => ref!.removeEventListener(eventName, h));
+        el.addEventListener(eventName, h);
+        onCleanup(() => el.removeEventListener(eventName, h));
       }
     };
     attach("event-click", props.onEventClick);
