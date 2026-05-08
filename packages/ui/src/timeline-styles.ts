@@ -265,7 +265,7 @@ export const timelineStyles = css`
     height: var(--hour-hdr-h);
     display: flex;
     align-items: center;
-    padding: 0 20px;
+    padding: 0 4px;
     font-size: 11px;
     font-weight: 600;
     color: var(--text-3);
@@ -282,7 +282,7 @@ export const timelineStyles = css`
     height: var(--grp-label-h);
     display: flex;
     align-items: center;
-    padding: 0 20px;
+    padding: 0 4px;
     font-size: 10.5px;
     font-weight: 600;
     color: var(--text-3);
@@ -407,6 +407,7 @@ export const timelineStyles = css`
   }
 
   .tl-event-row {
+    touch-action: none; 
     height: var(--row-h);
     position: relative;
     border-bottom: 1px solid var(--border);
@@ -447,6 +448,7 @@ export const timelineStyles = css`
      EVENT BLOCKS
   ══════════════════════════════════════════════════════════════════════════════ */
   .tl-event {
+    touch-action: none; 
     position: absolute;
     top: 8px;
     bottom: 8px;
@@ -528,6 +530,7 @@ export const timelineStyles = css`
 
   /* Resize handles — thin strips on left/right edges */
   .tl-event-resize-handle {
+    touch-action: none;
     position: absolute;
     top: 0;
     bottom: 0;
@@ -628,10 +631,12 @@ export const timelineStyles = css`
 
   /* Empty-space creation cursor */
   .tl-event-row {
+    touch-action: none; 
     cursor: crosshair;
   }
 
   .tl-event {
+    touch-action: none; 
     cursor: grab;
   }
 
@@ -805,9 +810,6 @@ export const timelineStyles = css`
   }
 
   @media (max-width: 640px) {
-    :host {
-      --res-col-w: 120px;
-    }
     .tl-res-sub {
       display: none;
     }
@@ -825,15 +827,101 @@ export const timelineStyles = css`
       padding: 0 10px;
       gap: 6px;
     }
+    /* Hide name and subtitle, show only avatar */
+    .tl-res-info {
+      display: none;
+    }
+
+    /* Shrink resource column to just fit the avatar */
+    :host {
+      --res-col-w: 60px;
+    }
+
+    /* Center avatar in the narrower column */
+    .tl-res-row {
+      padding: 0 8px;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .tl-res-col__header {
+      font-size: 0;
+      padding: 0;
+    }
+    /* Smaller AI bar */
+    .tl-ai-wrap {
+      height: auto;
+      min-height: auto;
+      padding: 8px 12px;
+    }
+
+    .tl-ai-card {
+      padding: 4px 10px;
+      border-radius: 10px;
+    }
+
+    .tl-ai-card__input {
+      font-size: 12px;
+    }
+
+    .tl-ai-card__input::placeholder {
+      font-size: 11px;
+    }
+
+    .tl-ai-card__btn {
+      padding: 5px 12px;
+      font-size: 12px;
+      border-radius: 7px;
+    }
+
+    /* Smaller FAB */
+    .tl-fab {
+      width: 42px;
+      height: 42px;
+      bottom: calc(var(--aicard-area-h) + 12px);
+      right: 16px;
+    }
+
+    .tl-fab svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    :host {
+      --aicard-area-h: 48px;
+    }
   }
 
   @media (max-width: 480px) {
-    .tl-view-toggle {
-      display: none;
+    .tl-view-toggle__btn {
+      padding: 3px 8px;
+      font-size: 11px;
     }
+
     .tl-icon-btn {
       width: 28px;
       height: 28px;
     }
-  }
+
+    .tl-icon-btn svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    .tl-nav {
+      gap: 2px;
+    }
+
+    .tl-nav__arrow {
+      width: 24px;
+      height: 24px;
+    }
+
+    .tl-nav__date--short {
+      margin-left: 4px;
+    }
+
+    .tl-topbar {
+      padding: 0 6px;
+    }
 `;
