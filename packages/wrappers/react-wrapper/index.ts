@@ -33,8 +33,9 @@ export interface SchedulerSaveData {
   /** Present when editing an existing event; null/undefined when creating a new one. */
   id: string | null;
   title: string;
-  date: string;
+  startDate: string;
   startTime: string; // "HH:MM"
+  endDate: string;
   endTime: string; // "HH:MM"
   participants: string[];
   description: string;
@@ -101,7 +102,6 @@ export const Timeline = createComponent({
   react: React,
   events: {
     onEventClick: "event-click",
-    onViewChange: "view-change",
     onEventMove: "event-move",
     onEventResize: "event-resize",
     onEventCreate: "event-create",
