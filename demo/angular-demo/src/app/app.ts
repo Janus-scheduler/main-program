@@ -9,6 +9,7 @@ import type {
   EventCreateDetail,
 } from '@janus-scheduler/angular';
 import { SchedulerManager } from '@janus-scheduler/core';
+import type { TimelineResource } from '@janus-scheduler/ui';
 
 @Component({
   selector: 'app-root',
@@ -22,7 +23,7 @@ import { SchedulerManager } from '@janus-scheduler/core';
 export class App {
   showScheduler = false;
   schedulerError: string | null = null;
-  resources: TimelineResource[] | undefined = undefined;
+  resources: TimelineResource[] = [];
   private manager = new SchedulerManager();
 
   handleAddEvent(): void {
@@ -44,8 +45,8 @@ export class App {
       const eventData = {
         id: `evt_${Date.now()}`,
         title: data.title,
-        startTime: `${data.date}T${data.startTime}:00Z`,
-        endTime: `${data.date}T${data.endTime}:00Z`,
+        startTime: `${data.startDate}T${data.startTime}:00Z`,
+        endTime: `${data.endDate}T${data.endTime}:00Z`,
         resourceId: data.participants[0] || 'unassigned',
         description: data.description,
         status: 'confirmed' as const,
