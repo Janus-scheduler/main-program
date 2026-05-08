@@ -15,8 +15,9 @@ export type {
 export interface SchedulerSaveData {
   id?: string | null;
   title: string;
-  date: string;
+  startDate: string;
   startTime: string;
+  endDate: string;
   endTime: string;
   participants: string[];
   description: string;
