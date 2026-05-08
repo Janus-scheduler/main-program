@@ -89,10 +89,10 @@ export const Timeline = createComponent({
   react: React,
   events: {
     onEventClick: "event-click",
-    onAddEvent: "add-event",
     onEventMove: "event-move",
     onEventResize: "event-resize",
     onEventCreate: "event-create",
+    onAddEvent: "add-event",
   },
 });
 

@@ -52,9 +52,10 @@ export interface SchedulerSaveData {
   /** Present when editing an existing event; null/undefined when creating a new one. */
   id: string | null;
   title: string;
-  date: string;
+  startDate: string;
   startTime: string; // "HH:MM"
-  endTime: string; // "HH:MM"
+  endDate: string;
+  endTime: string;
   participants: string[];
   description: string;
   activeColor: string;
