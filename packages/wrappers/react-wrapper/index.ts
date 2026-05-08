@@ -26,20 +26,8 @@ export type {
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
-} from "@janus-scheduler/ui";
-
-// Scheduler modal save-data shape (matches what the <janus-scheduler> "save" event emits)
-export interface SchedulerSaveData {
-  /** Present when editing an existing event; null/undefined when creating a new one. */
-  id: string | null;
-  title: string;
-  date: string;
-  startTime: string; // "HH:MM"
-  endTime: string; // "HH:MM"
-  participants: string[];
-  description: string;
-  activeColor: string;
-}
+  SchedulerSaveData,
+} from "@janus-scheduler/core";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Web Component → React bindings
@@ -101,10 +89,10 @@ export const Timeline = createComponent({
   react: React,
   events: {
     onEventClick: "event-click",
-    onAddEvent: "add-event",
     onEventMove: "event-move",
     onEventResize: "event-resize",
     onEventCreate: "event-create",
+    onAddEvent: "add-event",
   },
 });
 

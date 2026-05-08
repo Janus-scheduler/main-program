@@ -102,8 +102,8 @@ export function SchedulerView({
           // ── Edit mode: update the existing event ──────────────────────
           manager.updateEvent(data.id, {
             title: data.title,
-            startTime: `${data.date || today}T${data.startTime}:00Z`,
-            endTime: `${data.date || today}T${data.endTime}:00Z`,
+            startTime: `${data.startDate || today}T${data.startTime}:00`,
+            endTime: `${data.endDate || today}T${data.endTime}:00`,
             resourceId: data.participants?.[0] || "r1",
             description: data.description,
             status: "confirmed",
@@ -113,8 +113,8 @@ export function SchedulerView({
           manager.addEvent({
             id: `evt_${Date.now()}`,
             title: data.title,
-            startTime: `${data.date || today}T${data.startTime}:00Z`,
-            endTime: `${data.date || today}T${data.endTime}:00Z`,
+            startTime: `${data.startDate || today}T${data.startTime}:00`,
+            endTime: `${data.endDate || today}T${data.endTime}:00`,
             resourceId: data.participants?.[0] || "r1",
             description: data.description,
             status: "confirmed",
@@ -192,6 +192,19 @@ export function SchedulerView({
     [manager],
   );
 
+  // ── Helper to split ISO ────────────────────────────────────────────────
+  const splitISO = (iso: string) => {
+    if (!iso) return { date: "", time: "" };
+    const clean = iso.replace("Z", "");
+    const [datePart, timePart = ""] = clean.split("T");
+    const time = timePart.slice(0, 5); // "HH:mm"
+    return { date: datePart, time };
+  };
+
+  const storeEvent = selectedEventId ? manager.getEvent(selectedEventId) : null;
+  const startParts = storeEvent ? splitISO(storeEvent.startTime) : null;
+  const endParts = storeEvent ? splitISO(storeEvent.endTime) : null;
+
   return (
     <>
       {currentView === "Timeline" && (
@@ -219,6 +232,15 @@ export function SchedulerView({
           // The component includes this in its onSave and onDelete payloads.
           eventId={selectedEventId}
           error={schedulerError}
+          title={storeEvent?.title}
+          startDate={startParts?.date}
+          startTime={startParts?.time}
+          endDate={endParts?.date}
+          endTime={endParts?.time}
+          participants={
+            storeEvent?.resourceId ? [storeEvent.resourceId] : undefined
+          }
+          description={storeEvent?.description}
           onSave={handleSave}
           onDelete={handleDelete}
           onClose={onCloseScheduler}
