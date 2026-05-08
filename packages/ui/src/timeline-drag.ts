@@ -1,15 +1,23 @@
+/**
+ * timeline-drag.ts
+ *
+ * Drag controller for the multi-scale timeline.
+ * Uses absolute timestamps (ms) for all positioning.
+ */
+
 import { TimelineEvent } from "./timeline-types";
 import {
-  DEFAULT_HOUR_WIDTH,
-  HOUR_START,
   ROW_HEIGHT,
   DRAG_THRESHOLD,
-  toMin,
-  pxToMinutes,
-  snapMinutes,
-  minutesToTimeStr,
   fmt12,
+  msToTimeStr,
 } from "./timeline-utils";
+import {
+  timestampToPx,
+  pxToTimestamp,
+  snapTimestamp,
+  getActiveZoomLevel,
+} from "./timeline-zoom";
 
 export type DragMode =
   | "idle"
@@ -37,8 +45,7 @@ export interface DragGhost {
  * TimelineDragController
  *
  * Manages all drag interactions on the timeline grid using native
- * pointer events. Tracks a simple state machine (idle → dragging → idle)
- * and computes ghost positions with 15-minute snapping.
+ * pointer events. Uses absolute ms timestamps for all positioning.
  *
  * The controller does NOT mutate data — it returns event detail objects
  * that the host component dispatches as CustomEvents.
@@ -63,12 +70,14 @@ export class TimelineDragController {
   private _targetResourceId = "";
   private _startClientX = 0;
   private _startClientY = 0;
-  private _originalLeft = 0;
-  private _originalWidth = 0;
+  private _originalStartMs = 0;
+  private _originalEndMs = 0;
+  private _createAnchorMs = 0; // for create-by-drag: the anchor timestamp
   private _resourceLayout: ResourceLayout[] = [];
   private _scrollContainer: HTMLElement | null = null;
   private _requestUpdate: () => void;
-  private _hourWidth: number = DEFAULT_HOUR_WIDTH;
+  private _pxPerMs = 0;
+  private _viewStartMs = 0;
 
   // Bound handler for cleanup
   private _boundMove: (e: PointerEvent) => void;
@@ -78,15 +87,17 @@ export class TimelineDragController {
     this._boundMove = this._onPointerMove.bind(this);
   }
 
-  /** Must be called each render with current layout info */
+  /** Must be called each render with current layout & zoom info */
   updateLayout(
     scrollContainer: HTMLElement | null,
     resourceLayout: ResourceLayout[],
-    hourWidth: number = DEFAULT_HOUR_WIDTH,
+    pxPerMs: number,
+    viewStartMs: number,
   ) {
     this._scrollContainer = scrollContainer;
     this._resourceLayout = resourceLayout;
-    this._hourWidth = hourWidth;
+    this._pxPerMs = pxPerMs;
+    this._viewStartMs = viewStartMs;
   }
 
   /** True if an event is the one currently being dragged */
@@ -103,13 +114,8 @@ export class TimelineDragController {
     this._event = ev;
     this._originResourceId = resourceId;
     this._targetResourceId = resourceId;
-
-    const hw = this._hourWidth;
-    const evLeft = ((toMin(ev.startTime) - HOUR_START * 60) / 60) * hw + 2;
-    const evWidth = ((toMin(ev.endTime) - toMin(ev.startTime)) / 60) * hw - 6;
-
-    this._originalLeft = evLeft;
-    this._originalWidth = evWidth;
+    this._originalStartMs = ev.startMs;
+    this._originalEndMs = ev.endMs;
     this._startClientX = e.clientX;
     this._startClientY = e.clientY;
 
@@ -128,13 +134,8 @@ export class TimelineDragController {
     this._event = ev;
     this._originResourceId = resourceId;
     this._targetResourceId = resourceId;
-
-    const hw = this._hourWidth;
-    const evLeft = ((toMin(ev.startTime) - HOUR_START * 60) / 60) * hw + 2;
-    const evWidth = ((toMin(ev.endTime) - toMin(ev.startTime)) / 60) * hw - 6;
-
-    this._originalLeft = evLeft;
-    this._originalWidth = evWidth;
+    this._originalStartMs = ev.startMs;
+    this._originalEndMs = ev.endMs;
     this._startClientX = e.clientX;
     this._startClientY = e.clientY;
 
@@ -154,13 +155,16 @@ export class TimelineDragController {
     this._startClientX = e.clientX;
     this._startClientY = e.clientY;
 
-    // Compute the starting X in the time grid
+    // Compute the timestamp at click position
     if (this._scrollContainer) {
       const rect = this._scrollContainer.getBoundingClientRect();
-      this._originalLeft =
-        e.clientX - rect.left + this._scrollContainer.scrollLeft;
+      const clickPx = e.clientX - rect.left + this._scrollContainer.scrollLeft;
+      this._createAnchorMs = pxToTimestamp(
+        clickPx,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
     }
-    this._originalWidth = 0;
 
     this._addMoveListener();
   }
@@ -207,7 +211,6 @@ export class TimelineDragController {
 
   /**
    * Complete the drag and return the event detail to dispatch.
-   * Called by the host in the pointerup handler.
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   completeAndGetResult(): { type: string; detail: any } | null {
@@ -236,112 +239,132 @@ export class TimelineDragController {
 
   // ── Ghost computation ───────────────────────────────────────────────
 
+  private _getSnapMs(): number {
+    const level = getActiveZoomLevel(this._pxPerMs);
+    return level.snapMs;
+  }
+
   private _computeMoveGhost(dx: number, e: PointerEvent) {
-    const hw = this._hourWidth;
-    const newLeft = this._originalLeft + dx;
-    const ev = this._event!;
-    const duration = toMin(ev.endTime) - toMin(ev.startTime);
+    const snapMs = this._getSnapMs();
+    const durationMs = this._originalEndMs - this._originalStartMs;
 
-    // Snap the start time
-    const rawStartMin = pxToMinutes(newLeft - 2, hw);
-    const snappedStart = snapMinutes(rawStartMin);
-    const snappedEnd = snappedStart + duration;
+    // How many ms did the pointer move?
+    const deltaMs = dx / this._pxPerMs;
+    const newStartMs = snapTimestamp(this._originalStartMs + deltaMs, snapMs);
+    const newEndMs = newStartMs + durationMs;
 
-    // Find target resource using the pointer's actual Y position
-    // relative to the scroll container's content area
+    // Find target resource
     const targetRow = this._findRowFromPointerY(e.clientY);
     this._targetResourceId = targetRow.id;
 
+    const startLabel = msToTimeStr(newStartMs);
+    const endLabel = msToTimeStr(newEndMs);
+
     this.ghost = {
-      left: (snappedStart / 60) * hw + 2,
+      left: timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
       top: targetRow.yOffset + 8,
-      width: (duration / 60) * hw - 6,
-      color: ev.color,
-      timeLabel: `${fmt12(minutesToTimeStr(snappedStart))} – ${fmt12(minutesToTimeStr(snappedEnd))}`,
-      title: ev.title,
+      width:
+        timestampToPx(newEndMs, this._viewStartMs, this._pxPerMs) -
+        timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
+      color: this._event!.color,
+      timeLabel: `${fmt12(startLabel)} – ${fmt12(endLabel)}`,
+      title: this._event!.title,
     };
   }
 
   private _computeResizeStartGhost(dx: number) {
-    const hw = this._hourWidth;
-    const ev = this._event!;
-    const newLeft = this._originalLeft + dx;
-    const rightEdge = this._originalLeft + this._originalWidth;
+    const snapMs = this._getSnapMs();
+    const deltaMs = dx / this._pxPerMs;
+    const endMs = this._originalEndMs;
+    const minDuration = snapMs; // minimum 1 snap unit
 
-    const rawStartMin = pxToMinutes(newLeft - 2, hw);
-    const snappedStart = snapMinutes(rawStartMin);
-    const endMin = toMin(ev.endTime);
-
-    // Don't allow start to go past end (min 15 min event)
-    const clampedStart = Math.min(snappedStart, endMin - 15);
-    const snappedLeft = (clampedStart / 60) * hw + 2;
-    const newWidth = rightEdge - snappedLeft;
+    let newStartMs = snapTimestamp(this._originalStartMs + deltaMs, snapMs);
+    // Don't allow start past end
+    if (newStartMs > endMs - minDuration) {
+      newStartMs = endMs - minDuration;
+    }
 
     const rowEntry = this._resourceLayout.find(
       (r) => r.id === this._originResourceId,
     );
 
+    const startLabel = msToTimeStr(newStartMs);
+
     this.ghost = {
-      left: snappedLeft,
+      left: timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
       top: (rowEntry?.yOffset ?? 0) + 8,
-      width: Math.max(newWidth, 20),
-      color: ev.color,
-      timeLabel: `${fmt12(minutesToTimeStr(clampedStart))} – ${fmt12(ev.endTime)}`,
-      title: ev.title,
+      width:
+        timestampToPx(endMs, this._viewStartMs, this._pxPerMs) -
+        timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
+      color: this._event!.color,
+      timeLabel: `${fmt12(startLabel)} – ${fmt12(this._event!.endTime)}`,
+      title: this._event!.title,
     };
   }
 
   private _computeResizeEndGhost(dx: number) {
-    const hw = this._hourWidth;
-    const ev = this._event!;
-    const newWidth = this._originalWidth + dx;
+    const snapMs = this._getSnapMs();
+    const deltaMs = dx / this._pxPerMs;
+    const startMs = this._originalStartMs;
+    const minDuration = snapMs;
 
-    const startMin = toMin(ev.startTime);
-    const rawEndMin = startMin + pxToMinutes(newWidth + 6, hw);
-    const snappedEnd = snapMinutes(rawEndMin);
-
-    // Don't allow end to go before start (min 15 min event)
-    const clampedEnd = Math.max(snappedEnd, startMin + 15);
+    let newEndMs = snapTimestamp(this._originalEndMs + deltaMs, snapMs);
+    if (newEndMs < startMs + minDuration) {
+      newEndMs = startMs + minDuration;
+    }
 
     const rowEntry = this._resourceLayout.find(
       (r) => r.id === this._originResourceId,
     );
 
+    const endLabel = msToTimeStr(newEndMs);
+
     this.ghost = {
-      left: this._originalLeft,
+      left: timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
       top: (rowEntry?.yOffset ?? 0) + 8,
-      width: ((clampedEnd - startMin) / 60) * hw - 6,
-      color: ev.color,
-      timeLabel: `${fmt12(ev.startTime)} – ${fmt12(minutesToTimeStr(clampedEnd))}`,
-      title: ev.title,
+      width:
+        timestampToPx(newEndMs, this._viewStartMs, this._pxPerMs) -
+        timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
+      color: this._event!.color,
+      timeLabel: `${fmt12(this._event!.startTime)} – ${fmt12(endLabel)}`,
+      title: this._event!.title,
     };
   }
 
   private _computeCreateGhost(e: PointerEvent) {
     if (!this._scrollContainer) return;
-    const hw = this._hourWidth;
+    const snapMs = this._getSnapMs();
 
     const rect = this._scrollContainer.getBoundingClientRect();
-    const currentX = e.clientX - rect.left + this._scrollContainer.scrollLeft;
+    const currentPx = e.clientX - rect.left + this._scrollContainer.scrollLeft;
+    const currentMs = pxToTimestamp(
+      currentPx,
+      this._viewStartMs,
+      this._pxPerMs,
+    );
 
-    const startPx = Math.min(this._originalLeft, currentX);
-    const endPx = Math.max(this._originalLeft, currentX);
+    const snappedAnchor = snapTimestamp(this._createAnchorMs, snapMs);
+    const snappedCurrent = snapTimestamp(currentMs, snapMs);
 
-    const rawStartMin = pxToMinutes(startPx, hw);
-    const rawEndMin = pxToMinutes(endPx, hw);
-    const snappedStart = snapMinutes(rawStartMin);
-    const snappedEnd = Math.max(snapMinutes(rawEndMin), snappedStart + 15);
+    const startMs = Math.min(snappedAnchor, snappedCurrent);
+    let endMs = Math.max(snappedAnchor, snappedCurrent);
+    if (endMs <= startMs) endMs = startMs + snapMs;
 
     const rowEntry = this._resourceLayout.find(
       (r) => r.id === this._originResourceId,
     );
 
+    const startLabel = msToTimeStr(startMs);
+    const endLabel = msToTimeStr(endMs);
+
     this.ghost = {
-      left: (snappedStart / 60) * hw,
+      left: timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
       top: (rowEntry?.yOffset ?? 0) + 8,
-      width: ((snappedEnd - snappedStart) / 60) * hw,
+      width:
+        timestampToPx(endMs, this._viewStartMs, this._pxPerMs) -
+        timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
       color: "blue",
-      timeLabel: `${fmt12(minutesToTimeStr(snappedStart))} – ${fmt12(minutesToTimeStr(snappedEnd))}`,
+      timeLabel: `${fmt12(startLabel)} – ${fmt12(endLabel)}`,
       title: "New Event",
     };
   }
@@ -350,59 +373,90 @@ export class TimelineDragController {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _computeResult(): { type: string; detail: any } | null {
-    const hw = this._hourWidth;
+    const snapMs = this._getSnapMs();
+
     switch (this.mode) {
       case "moving": {
         const ev = this._event!;
-        const duration = toMin(ev.endTime) - toMin(ev.startTime);
-        const rawStartMin = pxToMinutes(this.ghost.left - 2, hw);
-        const snappedStart = snapMinutes(rawStartMin);
+        const durationMs = this._originalEndMs - this._originalStartMs;
+        const ghostStartMs = pxToTimestamp(
+          this.ghost.left,
+          this._viewStartMs,
+          this._pxPerMs,
+        );
+        const snappedStart = snapTimestamp(ghostStartMs, snapMs);
+        const snappedEnd = snappedStart + durationMs;
+
         return {
           type: "event-move",
           detail: {
             event: ev,
             oldResourceId: this._originResourceId,
             newResourceId: this._targetResourceId,
-            newStartTime: minutesToTimeStr(snappedStart),
-            newEndTime: minutesToTimeStr(snappedStart + duration),
+            newStartTime: new Date(snappedStart).toISOString(),
+            newEndTime: new Date(snappedEnd).toISOString(),
           },
         };
       }
-      case "resize-start":
-      case "resize-end": {
+      case "resize-start": {
         const ev = this._event!;
-        const startMin =
-          this.mode === "resize-start"
-            ? snapMinutes(pxToMinutes(this.ghost.left - 2, hw))
-            : toMin(ev.startTime);
-        const endMin =
-          this.mode === "resize-end"
-            ? snapMinutes(
-                pxToMinutes(this.ghost.left + this.ghost.width + 4, hw),
-              )
-            : toMin(ev.endTime);
+        const ghostStartMs = pxToTimestamp(
+          this.ghost.left,
+          this._viewStartMs,
+          this._pxPerMs,
+        );
+        const snappedStart = snapTimestamp(ghostStartMs, snapMs);
         return {
           type: "event-resize",
           detail: {
             event: ev,
             resourceId: this._originResourceId,
-            newStartTime: minutesToTimeStr(startMin),
-            newEndTime: minutesToTimeStr(endMin),
+            newStartTime: new Date(snappedStart).toISOString(),
+            newEndTime: new Date(this._originalEndMs).toISOString(),
+          },
+        };
+      }
+      case "resize-end": {
+        const ev = this._event!;
+        const ghostEndPx = this.ghost.left + this.ghost.width;
+        const ghostEndMs = pxToTimestamp(
+          ghostEndPx,
+          this._viewStartMs,
+          this._pxPerMs,
+        );
+        const snappedEnd = snapTimestamp(ghostEndMs, snapMs);
+        return {
+          type: "event-resize",
+          detail: {
+            event: ev,
+            resourceId: this._originResourceId,
+            newStartTime: new Date(this._originalStartMs).toISOString(),
+            newEndTime: new Date(snappedEnd).toISOString(),
           },
         };
       }
       case "creating": {
-        const rawStartMin = pxToMinutes(this.ghost.left, hw);
-        const rawEndMin = pxToMinutes(this.ghost.left + this.ghost.width, hw);
-        const snappedStart = snapMinutes(rawStartMin);
-        const snappedEnd = Math.max(snapMinutes(rawEndMin), snappedStart + 15);
+        const ghostStartMs = pxToTimestamp(
+          this.ghost.left,
+          this._viewStartMs,
+          this._pxPerMs,
+        );
+        const ghostEndMs = pxToTimestamp(
+          this.ghost.left + this.ghost.width,
+          this._viewStartMs,
+          this._pxPerMs,
+        );
+        const snappedStart = snapTimestamp(ghostStartMs, snapMs);
+        let snappedEnd = snapTimestamp(ghostEndMs, snapMs);
+        if (snappedEnd <= snappedStart) snappedEnd = snappedStart + snapMs;
+
         return {
           type: "event-create",
           detail: {
             resourceId: this._originResourceId,
-            startTime: minutesToTimeStr(snappedStart),
-            endTime: minutesToTimeStr(snappedEnd),
-            date: "",
+            startTime: new Date(snappedStart).toISOString(),
+            endTime: new Date(snappedEnd).toISOString(),
+            date: new Date(snappedStart).toISOString().split("T")[0],
           },
         };
       }
@@ -413,11 +467,6 @@ export class TimelineDragController {
 
   // ── Helpers ─────────────────────────────────────────────────────────
 
-  /**
-   * Find the resource row under the pointer using actual clientY.
-   * Converts clientY to content-area Y by accounting for the scroll
-   * container's position and scroll offset.
-   */
   private _findRowFromPointerY(clientY: number): ResourceLayout {
     if (!this._scrollContainer || this._resourceLayout.length === 0) {
       return this._resourceLayout[0] ?? { id: "", yOffset: 0, index: 0 };
@@ -426,7 +475,6 @@ export class TimelineDragController {
     const rect = this._scrollContainer.getBoundingClientRect();
     const contentY = clientY - rect.top + this._scrollContainer.scrollTop;
 
-    // Find the row whose Y range contains contentY
     let closest = this._resourceLayout[0];
     let minDist = Infinity;
     for (const row of this._resourceLayout) {

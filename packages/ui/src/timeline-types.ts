@@ -1,8 +1,12 @@
 export interface TimelineEvent {
   id: string;
   title: string;
-  startTime: string; // "HH:MM" 24h
-  endTime: string; // "HH:MM" 24h
+  startTime: string; // "HH:MM" 24h — kept for display labels
+  endTime: string; // "HH:MM" 24h — kept for display labels
+  /** Unix timestamp in ms — used for absolute positioning */
+  startMs: number;
+  /** Unix timestamp in ms — used for absolute positioning */
+  endMs: number;
   color: "orange" | "blue" | "yellow" | "purple" | "green";
   date?: string;
 }

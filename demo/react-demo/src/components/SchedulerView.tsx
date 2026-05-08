@@ -150,11 +150,10 @@ export function SchedulerView({
       const { event, newResourceId, newStartTime, newEndTime } = (
         e as CustomEvent<EventMoveDetail>
       ).detail;
-      const today = event.date || new Date().toISOString().split("T")[0];
       manager.updateEvent(event.id, {
         resourceId: newResourceId,
-        startTime: `${today}T${newStartTime}:00Z`,
-        endTime: `${today}T${newEndTime}:00Z`,
+        startTime: newStartTime,
+        endTime: newEndTime,
       });
     },
     [manager],
@@ -165,10 +164,9 @@ export function SchedulerView({
       const { event, newStartTime, newEndTime } = (
         e as CustomEvent<EventResizeDetail>
       ).detail;
-      const today = event.date || new Date().toISOString().split("T")[0];
       manager.updateEvent(event.id, {
-        startTime: `${today}T${newStartTime}:00Z`,
-        endTime: `${today}T${newEndTime}:00Z`,
+        startTime: newStartTime,
+        endTime: newEndTime,
       });
     },
     [manager],
@@ -176,15 +174,14 @@ export function SchedulerView({
 
   const handleEventCreate = useCallback(
     (e: Event) => {
-      const { resourceId, startTime, endTime, date } = (
+      const { resourceId, startTime, endTime } = (
         e as CustomEvent<EventCreateDetail>
       ).detail;
-      const today = date || new Date().toISOString().split("T")[0];
       manager.addEvent({
         id: `evt_${Date.now()}`,
         title: "New Event",
-        startTime: `${today}T${startTime}:00Z`,
-        endTime: `${today}T${endTime}:00Z`,
+        startTime,
+        endTime,
         resourceId,
         status: "confirmed",
       });
