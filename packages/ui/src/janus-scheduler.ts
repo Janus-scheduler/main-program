@@ -1,5 +1,9 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, state, property } from "lit/decorators.js";
+import type {
+  SchedulerSaveData,
+  SchedulerDeleteData,
+} from "@janus-scheduler/core";
 import { schedulerStyles } from "./styles";
 
 const COLORS = ["orange", "blue", "green", "yellow", "purple"];
@@ -215,7 +219,7 @@ export class JanusScheduler extends LitElement {
           participants: this.participants,
           description: this.description,
           activeColor: this.activeColor,
-        },
+        } as SchedulerSaveData,
       }),
     );
   }
@@ -227,7 +231,7 @@ export class JanusScheduler extends LitElement {
         composed: true,
         // id is what the host needs to call manager.deleteEvent(id).
         // title is included for display purposes (e.g. confirmation messages).
-        detail: { id: this.eventId, title: this.title },
+        detail: { id: this.eventId, title: this.title } as SchedulerDeleteData,
       }),
     );
   }
