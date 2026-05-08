@@ -14,7 +14,7 @@ import {
 import { JanusScheduler } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
 const _ = JanusScheduler;
-import { SchedulerSaveData } from "./types";
+import { SchedulerSaveData, SchedulerDeleteData } from "./types";
 
 /**
  * SchedulerComponent
@@ -56,7 +56,7 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly save = output<SchedulerSaveData>();
 
   /** Emitted when the user deletes an event */
-  readonly delete = output<{ title: string }>();
+  readonly delete = output<SchedulerDeleteData>();
 
   private _closeHandler = (e: Event) => {
     e.stopPropagation();

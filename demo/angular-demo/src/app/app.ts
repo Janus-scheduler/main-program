@@ -2,14 +2,13 @@ import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA } from '@angular/c
 import { SchedulerComponent, TimelineComponent } from '@janus-scheduler/angular';
 import type {
   TimelineEvent,
+  TimelineResource,
   SchedulerSaveData,
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
 } from '@janus-scheduler/angular';
 import { SchedulerManager } from '@janus-scheduler/core';
-import { SAMPLE } from '@janus-scheduler/ui';
-import type { TimelineResource } from '@janus-scheduler/ui';
 
 @Component({
   selector: 'app-root',
@@ -23,7 +22,7 @@ import type { TimelineResource } from '@janus-scheduler/ui';
 export class App {
   showScheduler = false;
   schedulerError: string | null = null;
-  resources: TimelineResource[] = JSON.parse(JSON.stringify(SAMPLE));
+  resources: TimelineResource[] | undefined = undefined;
   private manager = new SchedulerManager();
 
   handleAddEvent(): void {
@@ -65,9 +64,11 @@ export class App {
     }
   }
 
-  handleDelete(data: { title: string }): void {
+  handleDelete(data: { id: string | null; title: string }): void {
     console.log('Delete requested for:', data.title);
-    // Logic for deletion if we had an ID
+    if (data.id) {
+      this.manager.deleteEvent(data.id);
+    }
     this.showScheduler = false;
   }
 
@@ -76,85 +77,40 @@ export class App {
   }
 
   handleEventMove(data: EventMoveDetail): void {
-    const { event, oldResourceId, newResourceId, newStartTime, newEndTime } = data;
+    const { event, newResourceId, newStartTime, newEndTime } = data;
     console.log('📦 Event moved:', data);
+    const today = event.date || new Date().toISOString().split('T')[0];
 
-    const next = [...this.resources];
-
-    // Remove from old resource
-    const oldResIndex = next.findIndex((r) => r.id === oldResourceId);
-    if (oldResIndex === -1) return;
-
-    const oldRes = { ...next[oldResIndex], events: [...next[oldResIndex].events] };
-    const eventIndex = oldRes.events.findIndex((ev) => ev.id === event.id);
-
-    if (eventIndex === -1) return;
-
-    const movedEvent = { ...oldRes.events[eventIndex] };
-    oldRes.events.splice(eventIndex, 1);
-    next[oldResIndex] = oldRes;
-
-    // Update event times
-    movedEvent.startTime = newStartTime;
-    movedEvent.endTime = newEndTime;
-
-    // Add to new resource
-    const newResIndex = next.findIndex((r) => r.id === newResourceId);
-    if (newResIndex !== -1) {
-      const newRes = { ...next[newResIndex] };
-      newRes.events = [...newRes.events, movedEvent];
-      next[newResIndex] = newRes;
-    }
-
-    this.resources = next;
+    this.manager.updateEvent(event.id, {
+      resourceId: newResourceId,
+      startTime: `${today}T${newStartTime}:00Z`,
+      endTime: `${today}T${newEndTime}:00Z`,
+    });
   }
 
   handleEventResize(data: EventResizeDetail): void {
-    const { event, resourceId, newStartTime, newEndTime } = data;
+    const { event, newStartTime, newEndTime } = data;
     console.log('↔️ Event resized:', data);
+    const today = event.date || new Date().toISOString().split('T')[0];
 
-    const next = [...this.resources];
-    const resIndex = next.findIndex((r) => r.id === resourceId);
-    if (resIndex === -1) return;
-
-    const res = { ...next[resIndex] };
-    const eventIndex = res.events.findIndex((ev) => ev.id === event.id);
-
-    if (eventIndex !== -1) {
-      res.events = [...res.events];
-      res.events[eventIndex] = {
-        ...res.events[eventIndex],
-        startTime: newStartTime,
-        endTime: newEndTime,
-      };
-      next[resIndex] = res;
-    }
-
-    this.resources = next;
+    this.manager.updateEvent(event.id, {
+      startTime: `${today}T${newStartTime}:00Z`,
+      endTime: `${today}T${newEndTime}:00Z`,
+    });
   }
 
   handleEventCreate(data: EventCreateDetail): void {
     const { resourceId, startTime, endTime, date } = data;
     console.log('✨ New event created:', data);
+    const today = date || new Date().toISOString().split('T')[0];
 
-    const next = [...this.resources];
-    const resIndex = next.findIndex((r) => r.id === resourceId);
-    if (resIndex === -1) return;
-
-    const res = { ...next[resIndex] };
-
-    const newEvent = {
+    this.manager.addEvent({
       id: `evt_${Date.now()}`,
       title: 'New Event',
-      startTime,
-      endTime,
-      color: 'blue' as const,
-      date,
-    };
-
-    res.events = [...res.events, newEvent];
-    next[resIndex] = res;
-
-    this.resources = next;
+      startTime: `${today}T${startTime}:00Z`,
+      endTime: `${today}T${endTime}:00Z`,
+      resourceId,
+      status: 'confirmed',
+    });
   }
 }
