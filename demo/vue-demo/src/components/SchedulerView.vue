@@ -29,6 +29,13 @@
     v-if="showScheduler"
     :event-id="selectedEventId"
     :error="schedulerError"
+    :title="storeEvent?.title"
+    :start-date="startParts.date"
+    :start-time="startParts.time"
+    :end-date="endParts.date"
+    :end-time="endParts.time"
+    :participants="storeEvent?.resourceId ? [storeEvent.resourceId] : undefined"
+    :description="storeEvent?.description"
     @save="handleSave"
     @delete="handleDelete"
     @close="$emit('close-scheduler')"
@@ -36,6 +43,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { SchedulerManager } from "@janus-scheduler/core";
 import type {
   EventMoveDetail,
@@ -63,6 +71,21 @@ const emit = defineEmits<{
   "close-scheduler": [];
 }>();
 
+const storeEvent = computed(() =>
+  props.selectedEventId ? props.manager.getEvent(props.selectedEventId) : null
+);
+
+const splitISO = (iso: string | undefined) => {
+  if (!iso) return { date: undefined, time: undefined };
+  const clean = iso.replace("Z", "");
+  const [datePart, timePart = ""] = clean.split("T");
+  const time = timePart.slice(0, 5); // "HH:mm"
+  return { date: datePart, time };
+};
+
+const startParts = computed(() => splitISO(storeEvent.value?.startTime));
+const endParts = computed(() => splitISO(storeEvent.value?.endTime));
+
 // ── Open modal for NEW event (FAB / + button) ────────────────────────────
 function handleAddEvent() {
   emit("open-scheduler"); // no eventId → create mode
@@ -89,8 +112,8 @@ function handleSave(e: Event) {
     if (data.id) {
       props.manager.updateEvent(data.id, {
         title: data.title,
-        startTime: `${data.date || today}T${data.startTime}:00Z`,
-        endTime: `${data.date || today}T${data.endTime}:00Z`,
+        startTime: `${data.startDate || today}T${data.startTime}:00Z`,
+        endTime: `${data.endDate || today}T${data.endTime}:00Z`,
         resourceId: data.participants?.[0] || "r1",
         description: data.description,
         status: "confirmed",
@@ -99,8 +122,8 @@ function handleSave(e: Event) {
       props.manager.addEvent({
         id: `evt_${Date.now()}`,
         title: data.title,
-        startTime: `${data.date || today}T${data.startTime}:00Z`,
-        endTime: `${data.date || today}T${data.endTime}:00Z`,
+        startTime: `${data.startDate || today}T${data.startTime}:00Z`,
+        endTime: `${data.endDate || today}T${data.endTime}:00Z`,
         resourceId: data.participants?.[0] || "r1",
         description: data.description,
         status: "confirmed",
