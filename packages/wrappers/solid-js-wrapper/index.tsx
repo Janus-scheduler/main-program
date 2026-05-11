@@ -72,7 +72,7 @@ export interface SchedulerProps {
 }
 
 export const Scheduler: Component<SchedulerProps> = (props) => {
-  let ref: HTMLElement | undefined;
+  let ref!: HTMLElement;
 
   createEffect(() => {
     if (ref) {
@@ -130,14 +130,15 @@ export interface TimelineProps {
   currentDate?: Date;
   aiPrompt?: string;
   onEventClick?: (e: CustomEvent<TimelineEvent>) => void;
-  onAddEvent?: (e: CustomEvent<void>) => void;
-  onEventMove?: (e: CustomEvent<EventMoveDetail>) => void;
-  onEventResize?: (e: CustomEvent<EventResizeDetail>) => void;
-  onEventCreate?: (e: CustomEvent<EventCreateDetail>) => void;
+  onAddEvent?: (e: Event) => void;
+  onEventMove?: (e: CustomEvent) => void;
+  onEventResize?: (e: CustomEvent) => void;
+  onEventCreate?: (e: CustomEvent) => void;
+  onViewChange?: (e: CustomEvent) => void;
 }
 
 export const Timeline: Component<TimelineProps> = (props) => {
-  let ref: HTMLElement | undefined;
+  let ref!: HTMLElement;
 
   createEffect(() => {
     if (ref) {
@@ -191,7 +192,7 @@ export interface MonthGridProps {
 }
 
 export const MonthGrid: Component<MonthGridProps> = (props) => {
-  let ref: HTMLElement | undefined;
+  let ref!: HTMLElement;
 
   onMount(() => {
     const attach = (eventName: string, handler?: (e: Event) => void) => {

@@ -10,6 +10,7 @@
   "scripts": {
     "dev:core": "npm run dev -w @janus-scheduler/core",
     "dev:react-demo": "npm run dev -w react-demo",
+    "dev:vue-demo": "npm run dev -w vue-demo",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test -w @janus-scheduler/core",
     "clean": "rm -rf packages/*/dist demo/dist",

@@ -177,11 +177,10 @@ function App() {
     const { event, newResourceId, newStartTime, newEndTime } = e.detail;
     console.log("📦 Event moved:", e.detail);
 
-    const today = event.date || new Date().toISOString().split("T")[0];
     manager.updateEvent(event.id, {
       resourceId: newResourceId,
-      startTime: `${today}T${newStartTime}:00Z`,
-      endTime: `${today}T${newEndTime}:00Z`,
+      startTime: newStartTime,
+      endTime: newEndTime,
     });
   };
 
@@ -189,23 +188,21 @@ function App() {
     const { event, newStartTime, newEndTime } = e.detail;
     console.log("↔️ Event resized:", e.detail);
 
-    const today = event.date || new Date().toISOString().split("T")[0];
     manager.updateEvent(event.id, {
-      startTime: `${today}T${newStartTime}:00Z`,
-      endTime: `${today}T${newEndTime}:00Z`,
+      startTime: newStartTime,
+      endTime: newEndTime,
     });
   };
 
   const handleEventCreate = (e: any) => {
-    const { resourceId, startTime, endTime, date } = e.detail;
+    const { resourceId, startTime, endTime } = e.detail;
     console.log("✨ New event created:", e.detail);
 
-    const today = date || new Date().toISOString().split("T")[0];
     manager.addEvent({
       id: `evt_${Date.now()}`,
       title: "New Event",
-      startTime: `${today}T${startTime}:00Z`,
-      endTime: `${today}T${endTime}:00Z`,
+      startTime,
+      endTime,
       resourceId,
       status: "confirmed",
     });

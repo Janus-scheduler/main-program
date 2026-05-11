@@ -37,6 +37,7 @@ export const timelineStyles = css`
     --row-h: 72px;
     --grp-label-h: 32px;
     --hour-hdr-h: 40px;
+    --super-hdr-h: 24px;
 
     display: flex;
     flex-direction: column;
@@ -226,6 +227,89 @@ export const timelineStyles = css`
     border: 1.5px solid var(--white);
   }
 
+  /* Zoom badge */
+  .tl-zoom-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: var(--orange-lt);
+    color: var(--orange);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: "DM Mono", monospace;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    user-select: none;
+    transition: opacity 0.2s;
+  }
+
+  .tl-draw-toggle {
+    position: relative;
+  }
+
+  .tl-draw-toggle--active {
+    background: var(--orange);
+    color: #fff;
+  }
+
+  .tl-draw-toggle--active:hover {
+    background: #ea6c0a;
+    color: #fff;
+  }
+
+  /* Custom tooltip using data-tooltip attribute (title doesn't work in Shadow DOM) */
+  .tl-draw-toggle::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    transform: translateY(-4px);
+    background: #18181b;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: normal;
+    max-width: 220px;
+    width: max-content;
+    padding: 8px 12px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+    z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    font-family: "DM Sans", sans-serif;
+    text-align: left;
+  }
+
+  /* Tooltip caret — points UP, aligned to right side */
+  .tl-draw-toggle::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 2px);
+    right: 10px;
+    transform: translateY(-4px);
+    border: 5px solid transparent;
+    border-bottom-color: #18181b;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+    z-index: 9999;
+  }
+
+  .tl-draw-toggle:hover::before,
+  .tl-draw-toggle:hover::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
   /* ══════════════════════════════════════════════════════════════════════════════
      TIMELINE CONTENT
   ══════════════════════════════════════════════════════════════════════════════ */
@@ -262,7 +346,7 @@ export const timelineStyles = css`
   }
 
   .tl-res-col__header {
-    height: var(--hour-hdr-h);
+    height: calc(var(--hour-hdr-h) + var(--super-hdr-h));
     display: flex;
     align-items: center;
     padding: 0 4px;
@@ -366,6 +450,25 @@ export const timelineStyles = css`
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    will-change: scroll-position;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: auto;
+  }
+
+  /* Smooth scrollbar */
+  .tl-time-scroll::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .tl-time-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .tl-time-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+  }
+  .tl-time-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
   }
 
   .tl-time-inner {
@@ -374,29 +477,68 @@ export const timelineStyles = css`
     min-height: 100%;
     display: flex;
     flex-direction: column;
+    contain: layout style;
   }
 
-  /* Hour header */
-  .tl-hour-header {
-    display: flex;
-    height: var(--hour-hdr-h);
-    border-bottom: 1px solid var(--border);
+  /* Super header (parent-level labels: day name, month, year) */
+  .tl-super-header {
+    height: var(--super-hdr-h);
     position: sticky;
     top: 0;
     background: var(--white);
+    z-index: 11;
+    border-bottom: 1px solid var(--border);
+    display: block;
+    overflow: hidden;
+  }
+
+  .tl-super-cell {
+    position: absolute;
+    top: 0;
+    height: var(--super-hdr-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-2);
+    letter-spacing: 0.3px;
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 8px;
+  }
+
+  /* Hour header (column labels) */
+  .tl-hour-header {
+    height: var(--hour-hdr-h);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: var(--super-hdr-h);
+    background: var(--white);
     z-index: 10;
+    display: block;
+    overflow: hidden;
   }
 
   .tl-hour-cell {
-    flex-shrink: 0;
+    position: absolute;
+    top: 0;
+    height: var(--hour-hdr-h);
     display: flex;
     align-items: center;
     padding-left: 12px;
+    padding-right: 4px;
     font-family: "DM Mono", monospace;
     font-size: 12px;
     font-weight: 500;
     color: var(--text-3);
     border-right: 1px solid var(--border);
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tl-group-spacer {
@@ -425,7 +567,7 @@ export const timelineStyles = css`
 
   .tl-now-line {
     position: absolute;
-    top: var(--hour-hdr-h);
+    top: calc(var(--hour-hdr-h) + var(--super-hdr-h));
     bottom: 0;
     width: 2px;
     background: var(--orange);

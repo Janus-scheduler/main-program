@@ -13,6 +13,7 @@ import {
 // Side-effect import: ensures the <janus-timeline> custom element is registered
 import { JanusTimeline } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _ = JanusTimeline;
 import type {
   TimelineResource,
@@ -21,6 +22,7 @@ import type {
   EventResizeDetail,
   EventCreateDetail,
 } from "./types";
+import { schedulerStore } from "@janus-scheduler/core";
 
 /**
  * TimelineComponent
@@ -58,6 +60,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Timeline resource data to display — leave unset to use built-in sample data */
   readonly resources = input<TimelineResource[] | undefined>(undefined);
 
+  /** When true, dragging on empty row space creates a new event */
+  readonly allowCreate = input<boolean>(false);
+
   /** Emitted when an event is clicked */
   readonly eventClick = output<TimelineEvent>();
 
@@ -72,6 +77,11 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   /** Emitted when a new event is created by dragging on empty space */
   readonly eventCreate = output<EventCreateDetail>();
+
+  /** Emitted when the user toggles the view */
+  readonly viewChange = output<{ view: "Timeline" | "Month" }>();
+
+  private _unsubStore?: () => void;
 
   private _eventClickHandler = (e: Event) => {
     e.stopPropagation();
@@ -93,6 +103,10 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.eventCreate.emit((e as CustomEvent).detail);
   };
+  private _viewChangeHandler = (e: Event) => {
+    e.stopPropagation();
+    this.viewChange.emit((e as CustomEvent).detail);
+  };
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
@@ -101,11 +115,23 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("event-move", this._eventMoveHandler);
     el.addEventListener("event-resize", this._eventResizeHandler);
     el.addEventListener("event-create", this._eventCreateHandler);
-    this._syncResources();
+    el.addEventListener("view-change", this._viewChangeHandler);
+
+    this._applyAllowCreate();
+
+    // If an explicit resources input is provided, use it directly.
+    // Otherwise, subscribe to the Zustand store so the web component
+    // stays in sync when data is seeded/mutated by the SchedulerManager.
+    if (this.resources() !== undefined) {
+      this._syncResources();
+    } else {
+      this._subscribeToStore();
+    }
   }
 
   ngOnChanges(): void {
     this._syncResources();
+    this._applyAllowCreate();
   }
 
   ngOnDestroy(): void {
@@ -115,16 +141,124 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("event-move", this._eventMoveHandler);
     el?.removeEventListener("event-resize", this._eventResizeHandler);
     el?.removeEventListener("event-create", this._eventCreateHandler);
+    el?.removeEventListener("view-change", this._viewChangeHandler);
+    this._unsubStore?.();
+  }
+
+  private _subscribeToStore(): void {
+    // Immediately sync with the current store state
+    this._pushStoreToElement(schedulerStore.getState());
+
+    // Subscribe to future changes
+    this._unsubStore = schedulerStore.subscribe((state) => {
+      this._pushStoreToElement(state);
+    });
+  }
+
+  private _pushStoreToElement(
+    state: ReturnType<typeof schedulerStore.getState>,
+  ): void {
+    const el = this._elRef()?.nativeElement as
+      | (HTMLElement & { resources: TimelineResource[] })
+      | undefined;
+    if (!el) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resources = Object.values(state.resources) as any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const events = Object.values(state.events) as any[];
+
+    if (resources.length === 0) return;
+
+    const typeOrder: Record<string, number> = {
+      person: 1,
+      room: 2,
+      equipment: 3,
+    };
+    const sorted = [...resources].sort(
+      (a, b) =>
+        (typeOrder[a.type || "person"] || 99) -
+        (typeOrder[b.type || "person"] || 99),
+    );
+
+    let currentGroupType = "";
+    const mapped: TimelineResource[] = sorted.map((res) => {
+      const resEvents = events
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((e: any) => e.resourceId === res.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((e: any) => {
+          const startD = new Date(e.startTime);
+          const endD = new Date(e.endTime);
+          const pad = (n: number) => n.toString().padStart(2, "0");
+          return {
+            id: e.id,
+            title: e.title,
+            startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
+            endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+            startMs: startD.getTime(),
+            endMs: endD.getTime(),
+            color: "blue" as const,
+            date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
+          };
+        });
+
+      let avatarType: "initials" | "icon" = "initials";
+      let avatarIcon: "room" | "equipment" | undefined = undefined;
+      let groupLabel: string | undefined = undefined;
+      const type = res.type || "person";
+
+      if (type !== currentGroupType) {
+        currentGroupType = type;
+        if (type === "person") groupLabel = "STAFF";
+        else if (type === "room") groupLabel = "ROOMS";
+        else if (type === "equipment") groupLabel = "EQUIPMENT";
+      }
+
+      if (type === "room") {
+        avatarType = "icon";
+        avatarIcon = "room";
+      } else if (type === "equipment") {
+        avatarType = "icon";
+        avatarIcon = "equipment";
+      }
+
+      return {
+        id: res.id,
+        name: res.name,
+        subtitle:
+          type === "person"
+            ? "Staff"
+            : type === "room"
+              ? "Facility"
+              : "Equipment",
+        avatarType,
+        avatarIcon,
+        groupLabel,
+        events: resEvents,
+      };
+    });
+
+    el.resources = mapped;
   }
 
   private _syncResources(): void {
     const data = this.resources();
-    if (!data) return; // let the web component use its built-in SAMPLE data
+    if (!data) return;
     const el = this._elRef()?.nativeElement as
       | (HTMLElement & { resources: TimelineResource[] })
       | undefined;
     if (el) {
       el.resources = data;
+    }
+  }
+
+  private _applyAllowCreate(): void {
+    const el = this._elRef()?.nativeElement as
+      | (HTMLElement & { allowCreate: boolean })
+      | undefined;
+    if (el) {
+      el.allowCreate = this.allowCreate();
     }
   }
 }

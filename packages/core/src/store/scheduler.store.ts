@@ -49,6 +49,7 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     if (updates.title) event.title = updates.title;
     if (updates.startTime) event.startTime = updates.startTime;
     if (updates.endTime) event.endTime = updates.endTime;
+    if (updates.resourceId) event.resourceId = updates.resourceId;
     if (updates.status) event.status = updates.status;
     if (updates.description !== undefined)
       event.description = updates.description;
