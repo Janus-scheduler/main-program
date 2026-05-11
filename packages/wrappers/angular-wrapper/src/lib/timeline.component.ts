@@ -196,6 +196,8 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
             title: e.title,
             startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
             endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+            startMs: startD.getTime(),
+            endMs: endD.getTime(),
             color: "blue" as const,
             date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
           };

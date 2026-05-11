@@ -92,8 +92,8 @@ export class App {
       const eventData = {
         id: data.id || `evt_${Date.now()}`,
         title: data.title,
-        startTime: `${data.date}T${data.startTime}:00Z`,
-        endTime: `${data.date}T${data.endTime}:00Z`,
+        startTime: `${data.startDate}T${data.startTime}:00Z`,
+        endTime: `${data.startDate}T${data.endTime}:00Z`,
         resourceId: data.participants[0] || 'unassigned',
         description: data.description,
         status: 'confirmed' as const,
