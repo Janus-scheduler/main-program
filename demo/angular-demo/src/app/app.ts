@@ -6,6 +6,7 @@ import {
 } from '@janus-scheduler/angular';
 import type {
   TimelineEvent,
+  TimelineResource,
   SchedulerSaveData,
   EventMoveDetail,
   EventResizeDetail,

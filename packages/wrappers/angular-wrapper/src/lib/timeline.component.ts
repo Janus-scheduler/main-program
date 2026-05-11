@@ -21,7 +21,7 @@ import type {
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
-} from "@janus-scheduler/ui";
+} from "./types";
 import { schedulerStore } from "@janus-scheduler/core";
 
 /**
