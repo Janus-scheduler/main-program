@@ -1,16 +1,15 @@
 import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import { SchedulerComponent, TimelineComponent } from '@janus-scheduler/angular';
-import type {
-  TimelineEvent,
-  TimelineResource,
-  SchedulerSaveData,
-  EventMoveDetail,
-  EventResizeDetail,
-  EventCreateDetail,
+import {
+  SchedulerComponent,
+  TimelineComponent,
+  type TimelineEvent,
+  type TimelineResource,
+  type SchedulerSaveData,
+  type EventMoveDetail,
+  type EventResizeDetail,
+  type EventCreateDetail,
 } from '@janus-scheduler/angular';
 import { SchedulerManager } from '@janus-scheduler/core';
-import type { TimelineResource } from '@janus-scheduler/ui';
-
 @Component({
   selector: 'app-root',
   standalone: true,

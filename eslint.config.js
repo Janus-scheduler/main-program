@@ -48,6 +48,7 @@ export default [
     rules: {
       // Disable base rule — @typescript-eslint/no-unused-vars handles this for TS
       "no-unused-vars": "off",
+      "no-duplicate-imports": "error",
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": [
         "warn",
