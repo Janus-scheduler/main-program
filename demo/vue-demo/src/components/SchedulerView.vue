@@ -50,12 +50,13 @@ import type {
   EventResizeDetail,
   EventCreateDetail,
   TimelineEvent,
-} from "@janus-scheduler/ui";
+  ViewType,
+} from "@janus-scheduler/core";
 
 // Side-effect import: registers the custom elements
 import "@janus-scheduler/ui";
 
-export type ViewType = "Timeline" | "Month";
+export type { ViewType };
 
 const props = defineProps<{
   currentView: ViewType;

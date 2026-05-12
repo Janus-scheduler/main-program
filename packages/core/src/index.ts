@@ -7,3 +7,13 @@ export type {
   SchedulerActions,
   SchedulerStore,
 } from "./store/scheduler.store";
+
+// ── Domain model classes (Option B: exported so hook consumers get rich objects) ──
+export { Event } from "./models/events/event";
+export { Resource } from "./models/resources/resources";
+export { Assignment } from "./models/assignments/assignments";
+
+// ── Input data shapes (used in SchedulerManager public method signatures) ──
+export type { EventData } from "./types/event.types";
+export type { ResourceData } from "./models/resources/resources";
+export type { AssignmentData } from "./models/assignments/assignments";

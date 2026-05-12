@@ -10,8 +10,12 @@ import {
   viewChild,
   ChangeDetectionStrategy,
 } from "@angular/core";
-import { type TimelineEvent } from "@janus-scheduler/ui";
-import { schedulerStore } from "@janus-scheduler/core";
+// Side-effect import: ensures the <janus-month-grid> custom element is registered
+import { JanusMonthGrid } from "@janus-scheduler/ui";
+// Ensure the class is not dropped
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _mg = JanusMonthGrid;
+import { schedulerStore, type TimelineEvent } from "@janus-scheduler/core";
 
 @Component({
   selector: "janus-month-grid-ng",

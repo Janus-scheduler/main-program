@@ -1,6 +1,11 @@
 import { createSignal, createMemo, Show } from "solid-js";
 import "./App.css";
-import { Timeline, Scheduler, MonthGrid } from "@janus-scheduler/solid";
+import {
+  Timeline,
+  Scheduler,
+  MonthGrid,
+  type ViewType,
+} from "@janus-scheduler/solid";
 import { SchedulerManager } from "@janus-scheduler/core";
 
 const GridIcon = () => (
@@ -72,9 +77,7 @@ const SettingsIcon = () => (
 function App() {
   const [showScheduler, setShowScheduler] = createSignal(false);
   const [schedulerError, setSchedulerError] = createSignal<string | null>(null);
-  const [currentView, setCurrentView] = createSignal<"Timeline" | "Month">(
-    "Month",
-  );
+  const [currentView, setCurrentView] = createSignal<ViewType>("Month");
   const [selectedEventId, setSelectedEventId] = createSignal<string | null>(
     null,
   );

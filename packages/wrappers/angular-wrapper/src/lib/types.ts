@@ -12,4 +12,11 @@ export type {
   EventCreateDetail,
   SchedulerSaveData,
   SchedulerDeleteData,
+  EventColor,
+  ViewType,
+  EventData,
+  ResourceData,
+  AssignmentData,
 } from "@janus-scheduler/core";
+
+export { Event, Resource, Assignment } from "@janus-scheduler/core";

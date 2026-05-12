@@ -5,10 +5,9 @@ import type {
   EventResizeDetail,
   EventCreateDetail,
   TimelineEvent,
+  ViewType,
 } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
-
-export type ViewType = "Timeline" | "Month";
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */

@@ -14,6 +14,7 @@ import {
   type EventMoveDetail,
   type EventResizeDetail,
   type EventCreateDetail,
+  type ViewType,
 } from '@janus-scheduler/angular';
 import { SchedulerManager } from '@janus-scheduler/core';
 
@@ -27,7 +28,7 @@ import { SchedulerManager } from '@janus-scheduler/core';
   encapsulation: ViewEncapsulation.None,
 })
 export class App {
-  currentView: 'Timeline' | 'Month' = 'Month';
+  currentView: ViewType = 'Month';
   showScheduler = false;
   selectedEventId = signal<string | null>(null);
 

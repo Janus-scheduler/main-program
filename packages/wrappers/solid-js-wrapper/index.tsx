@@ -12,6 +12,11 @@ import type {
   EventCreateDetail,
   SchedulerSaveData,
   SchedulerDeleteData,
+  EventColor,
+  ViewType,
+  EventData,
+  ResourceData,
+  AssignmentData,
 } from "@janus-scheduler/core";
 
 export { SchedulerManager } from "@janus-scheduler/core";
@@ -25,7 +30,14 @@ export type {
   EventCreateDetail,
   SchedulerSaveData,
   SchedulerDeleteData,
+  EventColor,
+  ViewType,
+  EventData,
+  ResourceData,
+  AssignmentData,
 };
+
+export { Event, Resource, Assignment } from "@janus-scheduler/core";
 
 declare module "solid-js" {
   namespace JSX {

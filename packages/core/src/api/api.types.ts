@@ -1,3 +1,14 @@
+/**
+ * Color options for scheduler events.
+ * Used in both TimelineEvent and MonthEvent.
+ */
+export type EventColor = "orange" | "blue" | "yellow" | "purple" | "green";
+
+/**
+ * The two supported calendar views.
+ */
+export type ViewType = "Timeline" | "Month";
+
 export interface TimelineEvent {
   id: string;
   title: string;
@@ -8,7 +19,7 @@ export interface TimelineEvent {
   startMs: number;
   /** Unix timestamp in ms — used for absolute positioning */
   endMs: number;
-  color: "orange" | "blue" | "yellow" | "purple" | "green";
+  color: EventColor;
   date?: string;
 }
 
@@ -47,7 +58,7 @@ export interface EventCreateDetail {
 export interface MonthEvent {
   id: string;
   title: string;
-  color: "orange" | "blue" | "yellow" | "purple" | "green";
+  color: EventColor;
   date: string; // "YYYY-MM-DD"
   startTime?: string; // "HH:MM" 24h — optional
   endTime?: string;
@@ -75,7 +86,7 @@ export interface JanusEventMap {
   "event-click": TimelineEvent;
   "add-event": void;
   "day-click": { date: string };
-  "view-change": { view: "Timeline" | "Month" };
+  "view-change": { view: ViewType };
   "allow-create-change": { allowCreate: boolean };
   "event-move": EventMoveDetail;
   "event-resize": EventResizeDetail;

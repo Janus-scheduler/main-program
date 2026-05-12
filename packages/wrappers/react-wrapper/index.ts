@@ -16,9 +16,6 @@ export type { SchedulerHooks } from "@janus-scheduler/core";
 // ─────────────────────────────────────────────────────────────────────────────
 // Re-export UI event-detail types so the host app can type its callbacks
 // without importing from @janus-scheduler/ui directly.
-//
-// Usage:
-//   const handleMove = (e: CustomEvent<EventMoveDetail>) => { ... }
 // ─────────────────────────────────────────────────────────────────────────────
 export type {
   TimelineEvent,
@@ -27,7 +24,14 @@ export type {
   EventResizeDetail,
   EventCreateDetail,
   SchedulerSaveData,
+  EventColor,
+  ViewType,
+  EventData,
+  ResourceData,
+  AssignmentData,
 } from "@janus-scheduler/core";
+
+export { Event, Resource, Assignment } from "@janus-scheduler/core";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Web Component → React bindings
