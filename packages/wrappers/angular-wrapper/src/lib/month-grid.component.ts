@@ -10,10 +10,7 @@ import {
   viewChild,
   ChangeDetectionStrategy,
 } from "@angular/core";
-import { JanusMonthGrid } from "@janus-scheduler/ui";
-const _ = JanusMonthGrid;
-
-import type { TimelineEvent } from "@janus-scheduler/ui";
+import { type TimelineEvent } from "@janus-scheduler/ui";
 import { schedulerStore } from "@janus-scheduler/core";
 
 @Component({

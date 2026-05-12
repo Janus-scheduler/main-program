@@ -75,7 +75,9 @@ function App() {
   const [currentView, setCurrentView] = createSignal<"Timeline" | "Month">(
     "Month",
   );
-  const [selectedEventId, setSelectedEventId] = createSignal<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = createSignal<string | null>(
+    null,
+  );
 
   // Initialize the core manager once and populate initial data
   const manager = new SchedulerManager();
@@ -287,7 +289,9 @@ function App() {
             startTime={startParts().time}
             endDate={endParts().date}
             endTime={endParts().time}
-            participants={storeEvent()?.resourceId ? [storeEvent()?.resourceId!] : undefined}
+            participants={
+              storeEvent()?.resourceId ? [storeEvent()?.resourceId!] : undefined
+            }
             description={storeEvent()?.description}
             error={schedulerError()}
             onSave={handleSave}

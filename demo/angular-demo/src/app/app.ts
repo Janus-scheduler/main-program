@@ -1,15 +1,19 @@
-import { Component, ViewEncapsulation, CUSTOM_ELEMENTS_SCHEMA, signal, computed } from '@angular/core';
+import {
+  Component,
+  ViewEncapsulation,
+  CUSTOM_ELEMENTS_SCHEMA,
+  signal,
+  computed,
+} from '@angular/core';
 import {
   SchedulerComponent,
   TimelineComponent,
   MonthGridComponent,
-} from '@janus-scheduler/angular';
-import type {
-  TimelineEvent,
-  SchedulerSaveData,
-  EventMoveDetail,
-  EventResizeDetail,
-  EventCreateDetail,
+  type TimelineEvent,
+  type SchedulerSaveData,
+  type EventMoveDetail,
+  type EventResizeDetail,
+  type EventCreateDetail,
 } from '@janus-scheduler/angular';
 import { SchedulerManager } from '@janus-scheduler/core';
 
@@ -133,7 +137,7 @@ export class App {
       this.showScheduler = false;
       this.selectedEventId.set(null);
       this.schedulerError.set(null);
-    } catch (_) {
+    } catch {
       // Errors are also handled by the manager's onError hook
     }
   }

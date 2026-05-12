@@ -109,7 +109,8 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
       if (this.startTime() !== undefined) el.startTime = this.startTime();
       if (this.endDate() !== undefined) el.endDate = this.endDate();
       if (this.endTime() !== undefined) el.endTime = this.endTime();
-      if (this.participants() !== undefined) el.participants = this.participants();
+      if (this.participants() !== undefined)
+        el.participants = this.participants();
       if (this.description() !== undefined) el.description = this.description();
       if (this.activeColor() !== undefined) el.activeColor = this.activeColor();
     }

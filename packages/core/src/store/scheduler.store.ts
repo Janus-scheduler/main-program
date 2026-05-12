@@ -1,10 +1,11 @@
 import { createStore } from "zustand/vanilla";
 import { Event } from "../models/events/event";
-import { Resource } from "../models/resources/resources";
-import { Assignment } from "../models/assignments/assignments";
+import { Resource, type ResourceData } from "../models/resources/resources";
+import {
+  Assignment,
+  type AssignmentData,
+} from "../models/assignments/assignments";
 import type { EventData } from "../types/event.types";
-import type { ResourceData } from "../models/resources/resources";
-import type { AssignmentData } from "../models/assignments/assignments";
 
 export interface SchedulerState {
   events: Record<string, Event>;
