@@ -5,3 +5,5 @@ coverage
 fix.cjs
 eslint-errors.*
 lint_output.txt
+*.timestamp-*
+*.log
