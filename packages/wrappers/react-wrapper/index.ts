@@ -93,6 +93,7 @@ export const Timeline = createComponent({
     onEventResize: "event-resize",
     onEventCreate: "event-create",
     onAddEvent: "add-event",
+    onViewChange: "view-change",
   },
 });
 

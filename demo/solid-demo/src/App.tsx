@@ -75,6 +75,7 @@ function App() {
   const [currentView, setCurrentView] = createSignal<"Timeline" | "Month">(
     "Month",
   );
+  const [selectedEventId, setSelectedEventId] = createSignal<string | null>(null);
 
   // Initialize the core manager once and populate initial data
   const manager = new SchedulerManager();
@@ -127,12 +128,14 @@ function App() {
   };
 
   const handleAddEvent = () => {
+    setSelectedEventId(null);
     setSchedulerError(null);
     setShowScheduler(true);
   };
 
   const handleEventClick = (e: any) => {
     console.log("Clicked event:", e);
+    setSelectedEventId(e.detail?.id || e.id);
     setSchedulerError(null);
     setShowScheduler(true);
   };
@@ -157,6 +160,7 @@ function App() {
 
       console.log("✅ Event successfully added to core manager");
       setShowScheduler(false);
+      setSelectedEventId(null);
       setSchedulerError(null);
     } catch (err: unknown) {
       const error = err as Error;
@@ -171,17 +175,17 @@ function App() {
       manager.deleteEvent(e.detail.id);
     }
     setShowScheduler(false);
+    setSelectedEventId(null);
   };
 
   const handleEventMove = (e: any) => {
     const { event, newResourceId, newStartTime, newEndTime } = e.detail;
     console.log("📦 Event moved:", e.detail);
 
-    const today = event.date || new Date().toISOString().split("T")[0];
     manager.updateEvent(event.id, {
       resourceId: newResourceId,
-      startTime: `${today}T${newStartTime}:00Z`,
-      endTime: `${today}T${newEndTime}:00Z`,
+      startTime: newStartTime,
+      endTime: newEndTime,
     });
   };
 
@@ -189,27 +193,41 @@ function App() {
     const { event, newStartTime, newEndTime } = e.detail;
     console.log("↔️ Event resized:", e.detail);
 
-    const today = event.date || new Date().toISOString().split("T")[0];
     manager.updateEvent(event.id, {
-      startTime: `${today}T${newStartTime}:00Z`,
-      endTime: `${today}T${newEndTime}:00Z`,
+      startTime: newStartTime,
+      endTime: newEndTime,
     });
   };
 
   const handleEventCreate = (e: any) => {
-    const { resourceId, startTime, endTime, date } = e.detail;
+    const { resourceId, startTime, endTime } = e.detail;
     console.log("✨ New event created:", e.detail);
 
-    const today = date || new Date().toISOString().split("T")[0];
     manager.addEvent({
       id: `evt_${Date.now()}`,
       title: "New Event",
-      startTime: `${today}T${startTime}:00Z`,
-      endTime: `${today}T${endTime}:00Z`,
+      startTime,
+      endTime,
       resourceId,
       status: "confirmed",
     });
   };
+
+  const storeEvent = createMemo(() => {
+    const id = selectedEventId();
+    return id ? manager.getEvent(id) : null;
+  });
+
+  const splitISO = (iso: string | undefined) => {
+    if (!iso) return { date: undefined, time: undefined };
+    const clean = iso.replace("Z", "");
+    const [datePart, timePart = ""] = clean.split("T");
+    const time = timePart.slice(0, 5); // "HH:mm"
+    return { date: datePart, time };
+  };
+
+  const startParts = createMemo(() => splitISO(storeEvent()?.startTime));
+  const endParts = createMemo(() => splitISO(storeEvent()?.endTime));
 
   return (
     <div class="app-shell">
@@ -263,10 +281,21 @@ function App() {
 
         <Show when={showScheduler()}>
           <Scheduler
+            eventId={selectedEventId()}
+            title={storeEvent()?.title}
+            startDate={startParts().date}
+            startTime={startParts().time}
+            endDate={endParts().date}
+            endTime={endParts().time}
+            participants={storeEvent()?.resourceId ? [storeEvent()?.resourceId!] : undefined}
+            description={storeEvent()?.description}
             error={schedulerError()}
             onSave={handleSave}
             onDelete={handleDelete}
-            onClose={() => setShowScheduler(false)}
+            onClose={() => {
+              setShowScheduler(false);
+              setSelectedEventId(null);
+            }}
           />
         </Show>
       </main>

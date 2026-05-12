@@ -12,6 +12,7 @@
     "dev:react-demo": "npm run dev -w react-demo",
     "dev:angular-demo": "npm run dev -w angular-demo",
     "dev:solid-demo": "npm run dev -w solid-demo",
+    "dev:vue-demo": "npm run dev -w vue-demo",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test -w @janus-scheduler/core",
     "clean": "rm -rf packages/*/dist demo/dist",
@@ -37,7 +38,8 @@
     "prettier": "^3.8.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vscode-uri": "^3.1.0"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

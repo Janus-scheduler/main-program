@@ -48,6 +48,15 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   /** Error message to display in the scheduler */
   readonly error = input<string | null>(null);
+  readonly eventId = input<string | null>(null);
+  readonly title = input<string | undefined>(undefined);
+  readonly startDate = input<string | undefined>(undefined);
+  readonly startTime = input<string | undefined>(undefined);
+  readonly endDate = input<string | undefined>(undefined);
+  readonly endTime = input<string | undefined>(undefined);
+  readonly participants = input<string[] | undefined>(undefined);
+  readonly description = input<string | undefined>(undefined);
+  readonly activeColor = input<string | undefined>(undefined);
 
   /** Emitted when the user closes the scheduler modal */
   readonly close = output<void>();
@@ -76,11 +85,11 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("close", this._closeHandler);
     el.addEventListener("save", this._saveHandler);
     el.addEventListener("delete", this._deleteHandler);
-    this._syncError();
+    this._syncProps();
   }
 
   ngOnChanges(): void {
-    this._syncError();
+    this._syncProps();
   }
 
   ngOnDestroy(): void {
@@ -90,12 +99,19 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("delete", this._deleteHandler);
   }
 
-  private _syncError(): void {
-    const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { error: string | null })
-      | undefined;
+  private _syncProps(): void {
+    const el = this._elRef()?.nativeElement as any;
     if (el) {
-      el.error = this.error();
+      if (this.error() !== undefined) el.error = this.error();
+      if (this.eventId() !== undefined) el.eventId = this.eventId();
+      if (this.title() !== undefined) el.title = this.title();
+      if (this.startDate() !== undefined) el.startDate = this.startDate();
+      if (this.startTime() !== undefined) el.startTime = this.startTime();
+      if (this.endDate() !== undefined) el.endDate = this.endDate();
+      if (this.endTime() !== undefined) el.endTime = this.endTime();
+      if (this.participants() !== undefined) el.participants = this.participants();
+      if (this.description() !== undefined) el.description = this.description();
+      if (this.activeColor() !== undefined) el.activeColor = this.activeColor();
     }
   }
 }

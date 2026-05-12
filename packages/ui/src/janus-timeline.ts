@@ -13,23 +13,31 @@ import {
   BellIcon,
   SparkleIcon,
   PlusIcon,
+  PencilRulerIcon,
 } from "./timeline-icons";
 import {
-  HOUR_START,
-  HOUR_WIDTH,
-  VISIBLE_HOURS,
   ROW_HEIGHT,
   GROUP_LABEL_HEIGHT,
   HOUR_HEADER_HEIGHT,
+  SUPER_HEADER_HEIGHT,
   fmt12,
   getInitials,
   avatarColor,
-  eventStyle,
-  toDateStr,
-  nowLeft,
-  formatDateFull,
-  formatDateShort,
 } from "./timeline-utils";
+import {
+  DEFAULT_PX_PER_MS,
+  MIN_PX_PER_MS,
+  MAX_PX_PER_MS,
+  ZOOM_SCALE_FACTOR,
+  CONTENT_HALF_WIDTH,
+  getActiveZoomLevel,
+  generateColumns,
+  generateSuperLabels,
+  timestampToPx,
+  pxToTimestamp,
+  formatNavDate,
+  getNavStepMs,
+} from "./timeline-zoom";
 import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
 @customElement("janus-timeline")
@@ -37,11 +45,21 @@ export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
 
   @property({ type: Array }) resources: TimelineResource[] = [];
+  /** When true, dragging on empty row space creates a new event. Default: false */
+  @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
 
   @state() view: "Timeline" | "Month" = "Timeline";
-  @state() currentDate = new Date();
   @state() aiPrompt = "";
   @state() private _dragVersion = 0; // bumped to trigger re-render during drag
+
+  /** Zoom: pixels per millisecond (the single universal scale) */
+  @state() private _pxPerMs = DEFAULT_PX_PER_MS;
+
+  /**
+   * The absolute timestamp (ms) at the LEFT EDGE of the rendered content.
+   * The content always spans from _viewStartMs to _viewStartMs + totalWidth/pxPerMs.
+   */
+  private _viewStartMs = 0;
 
   @query(".tl-res-col") resColRef!: HTMLElement;
   @query(".tl-time-scroll") gridScrollRef!: HTMLElement;
@@ -51,6 +69,8 @@ export class JanusTimeline extends LitElement {
   });
   private _wasDragging = false;
   private _unsubStore?: () => void;
+  /** Suppress scroll handler during programmatic scroll adjustments */
+  private _suppressScroll = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -65,11 +85,13 @@ export class JanusTimeline extends LitElement {
     if (this._unsubStore) this._unsubStore();
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _syncFromStore(state: any) {
     const newResources: TimelineResource[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const coreEvents = Object.values(state.events) as any[];
 
-    // First, convert object values to arrays and sort them by type so groups cluster correctly
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const coreResources = Object.values(state.resources) as any[];
 
     // Define ordering for types
@@ -84,7 +106,6 @@ export class JanusTimeline extends LitElement {
         (typeOrder[b.type || "person"] || 99),
     );
 
-    // Keep track of which group we are currently in so we only set groupLabel on the first item of that group
     let currentGroupType = "";
 
     for (const res of coreResources) {
@@ -97,8 +118,11 @@ export class JanusTimeline extends LitElement {
           return {
             id: e.id,
             title: e.title,
-            startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
-            endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+            // Use LOCAL time for display labels (matches column header format)
+            startTime: `${pad(startD.getHours())}:${pad(startD.getMinutes())}`,
+            endTime: `${pad(endD.getHours())}:${pad(endD.getMinutes())}`,
+            startMs: startD.getTime(),
+            endMs: endD.getTime(),
             color: "blue",
             date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
           } as TimelineEvent;
@@ -141,43 +165,100 @@ export class JanusTimeline extends LitElement {
       });
     }
 
-    // Only overwrite if store has data, otherwise we might wipe initial props
     if (newResources.length > 0) {
       this.resources = newResources;
     }
   }
 
   firstUpdated() {
-    // On mount: scroll horizontally so 8:00 AM is the first visible hour
-    if (this.gridScrollRef) {
-      this.gridScrollRef.scrollLeft = 8 * HOUR_WIDTH;
-    }
+    // Center on today at current time
+    const now = new Date();
+    this._initializeView(now.getTime());
   }
 
+  /**
+   * Initialize (or re-center) the timeline around a timestamp.
+   * Sets _viewStartMs so that `centerMs` is at the middle of the container.
+   */
+  private _initializeView(centerMs: number) {
+    // Content spans CONTENT_HALF_WIDTH * 2 pixels = 20000px total
+    this._viewStartMs = centerMs - CONTENT_HALF_WIDTH / this._pxPerMs;
+    this.requestUpdate();
+
+    requestAnimationFrame(() => {
+      if (!this.gridScrollRef) return;
+      // Scroll to center of the content
+      const containerWidth = this.gridScrollRef.clientWidth;
+      this._suppressScroll = true;
+      this.gridScrollRef.scrollLeft = CONTENT_HALF_WIDTH - containerWidth / 2;
+      this._suppressScroll = false;
+    });
+  }
+
+  /** Total content width in px — always fixed at 2 * CONTENT_HALF_WIDTH */
+  private get _totalWidth(): number {
+    return CONTENT_HALF_WIDTH * 2;
+  }
+
+  private _getViewEndMs(): number {
+    return this._viewStartMs + this._totalWidth / this._pxPerMs;
+  }
+
+  /** Get the timestamp at the center of the currently visible area */
+  private _getVisibleCenterMs(): number {
+    if (!this.gridScrollRef)
+      return this._viewStartMs + CONTENT_HALF_WIDTH / this._pxPerMs;
+    const containerWidth = this.gridScrollRef.clientWidth;
+    const scrollCenter = this.gridScrollRef.scrollLeft + containerWidth / 2;
+    return this._viewStartMs + scrollCenter / this._pxPerMs;
+  }
+
+  // ── Scroll handling ─────────────────────────────────────────────────
+
   private _onGridScroll() {
+    // Sync vertical scroll between resource column and time grid
     if (this.resColRef && this.gridScrollRef) {
       this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
     }
+
+    // Skip re-centering during programmatic scroll adjustments
+    if (this._suppressScroll) return;
+
+    // Infinite scroll: when user nears the edges, re-center the content
+    if (this.gridScrollRef) {
+      const sl = this.gridScrollRef.scrollLeft;
+      const containerWidth = this.gridScrollRef.clientWidth;
+      const maxScroll = this._totalWidth - containerWidth;
+
+      // If within 15% of either edge, re-center
+      const edgeThreshold = maxScroll * 0.15;
+      if (sl < edgeThreshold || sl > maxScroll - edgeThreshold) {
+        const currentCenterMs = this._getVisibleCenterMs();
+        this._initializeView(currentCenterMs);
+      }
+    }
   }
 
-  private _goToPrevDay() {
-    const d = new Date(this.currentDate);
-    d.setDate(d.getDate() - 1);
-    this.currentDate = d;
+  // ── Navigation ────────────────────────────────────────────────────
+
+  private _goToPrev() {
+    const level = getActiveZoomLevel(this._pxPerMs);
+    const currentCenter = this._getVisibleCenterMs();
+    this._initializeView(currentCenter - getNavStepMs(level));
   }
 
-  private _goToNextDay() {
-    const d = new Date(this.currentDate);
-    d.setDate(d.getDate() + 1);
-    this.currentDate = d;
+  private _goToNext() {
+    const level = getActiveZoomLevel(this._pxPerMs);
+    const currentCenter = this._getVisibleCenterMs();
+    this._initializeView(currentCenter + getNavStepMs(level));
   }
 
   private _goToToday() {
-    this.currentDate = new Date();
+    this._pxPerMs = DEFAULT_PX_PER_MS; // reset zoom to default
+    this._initializeView(Date.now());
   }
 
   private _handleEventClick(e: Event, ev: TimelineEvent) {
-    // Don't fire click if we just finished a drag
     if (this._wasDragging) {
       this._wasDragging = false;
       e.preventDefault();
@@ -199,6 +280,85 @@ export class JanusTimeline extends LitElement {
     );
   }
 
+  private _handleViewSwitch(v: "Timeline" | "Month") {
+    this.view = v;
+    this.dispatchEvent(
+      new CustomEvent("view-change", {
+        detail: { view: v },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _toggleCreate() {
+    this.allowCreate = !this.allowCreate;
+    this.dispatchEvent(
+      new CustomEvent("allow-create-change", {
+        detail: { allowCreate: this.allowCreate },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  // ── Zoom handler (Ctrl/Cmd + Scroll) ──────────────────────────────
+
+  private _handleWheel(e: WheelEvent) {
+    // Only zoom when Ctrl or Meta (Cmd on Mac) is held
+    if (!e.ctrlKey && !e.metaKey) return;
+
+    e.preventDefault();
+
+    const container = this.gridScrollRef;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const pointerX = e.clientX - rect.left;
+
+    // 1. What timestamp is currently under the pointer?
+    const pointerPx = container.scrollLeft + pointerX;
+    const timeUnderCursorMs = this._viewStartMs + pointerPx / this._pxPerMs;
+
+    // 2. Compute new pxPerMs (smooth clamping)
+    const direction = e.deltaY < 0 ? 1 : -1; // scroll up = zoom in
+    const newPxPerMs = Math.min(
+      MAX_PX_PER_MS,
+      Math.max(
+        MIN_PX_PER_MS,
+        this._pxPerMs * (1 + direction * ZOOM_SCALE_FACTOR),
+      ),
+    );
+
+    // 3. Adjust viewStartMs so the time under cursor stays at the same pixel
+    //    timeUnderCursorMs = newViewStartMs + pointerPx / newPxPerMs
+    //    But pointerPx changes because scrollLeft stays the same, so:
+    //    We want: after zoom, the cursor still points to timeUnderCursorMs
+    //    newViewStartMs = timeUnderCursorMs - pointerPx_new / newPxPerMs
+    //    We need to find what pointerPx_new should be. For cursor anchoring:
+    //    newViewStartMs = timeUnderCursorMs - (scrollLeft + pointerX) / newPxPerMs
+    //    But we can simplify: keep scrollLeft + pointerX pointing to the same time
+    const newViewStartMs = timeUnderCursorMs - pointerPx / newPxPerMs;
+
+    // 4. Apply
+    this._pxPerMs = newPxPerMs;
+    this._viewStartMs = newViewStartMs;
+
+    // No need to adjust scrollLeft — the content re-renders around the new viewStartMs
+    // and the scroll position naturally keeps the cursor pointing to the same time
+
+    this.dispatchEvent(
+      new CustomEvent("zoom-change", {
+        detail: {
+          pxPerMs: newPxPerMs,
+          level: getActiveZoomLevel(newPxPerMs).unit,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   // ── Drag-and-drop handlers ────────────────────────────────────────
 
   private _onEventPointerDown(
@@ -206,7 +366,6 @@ export class JanusTimeline extends LitElement {
     ev: TimelineEvent,
     resourceId: string,
   ) {
-    // Only left mouse button
     if (e.button !== 0) return;
     this._drag.startMove(e, ev, resourceId);
     this._addDragUpListener();
@@ -225,6 +384,7 @@ export class JanusTimeline extends LitElement {
 
   private _onRowPointerDown(e: PointerEvent, resourceId: string) {
     if (e.button !== 0) return;
+    if (!this.allowCreate) return;
     this._drag.startCreate(e, resourceId);
     if (this._drag.mode === "creating") {
       this._addDragUpListener();
@@ -237,10 +397,6 @@ export class JanusTimeline extends LitElement {
       const result = this._drag.completeAndGetResult();
       if (result) {
         this._wasDragging = true;
-        // Set the current date on create events
-        if (result.type === "event-create") {
-          result.detail.date = toDateStr(this.currentDate);
-        }
         this.dispatchEvent(
           new CustomEvent(result.type, {
             detail: result.detail,
@@ -259,7 +415,7 @@ export class JanusTimeline extends LitElement {
     groups: { label: string; items: TimelineResource[] }[],
   ): ResourceLayout[] {
     const layout: ResourceLayout[] = [];
-    let y = HOUR_HEADER_HEIGHT;
+    let y = HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT;
     let idx = 0;
     for (const g of groups) {
       if (g.label) y += GROUP_LABEL_HEIGHT;
@@ -291,7 +447,6 @@ export class JanusTimeline extends LitElement {
 
   private _renderDragGhost() {
     if (!this._drag.active) return nothing;
-    // Reference _dragVersion to ensure Lit tracks this dependency
     void this._dragVersion;
     const g = this._drag.ghost;
     return html`
@@ -305,19 +460,40 @@ export class JanusTimeline extends LitElement {
     `;
   }
 
-  render() {
-    const activeDateStr = toDateStr(this.currentDate);
+  /** Compute zoom percentage for display */
+  private _zoomPercent(): number {
+    return Math.round((this._pxPerMs / DEFAULT_PX_PER_MS) * 100);
+  }
 
-    // Filter resources conditionally by activeDate
-    const filteredResources = this.resources.map((r) => ({
-      ...r,
-      events: r.events.filter((ev) => !ev.date || ev.date === activeDateStr),
-    }));
+  render() {
+    const pxPerMs = this._pxPerMs;
+    const viewStartMs = this._viewStartMs;
+    const viewEndMs = this._getViewEndMs();
+    const level = getActiveZoomLevel(pxPerMs);
+
+    // Generate columns and super-labels
+    const columns = generateColumns(viewStartMs, viewEndMs, pxPerMs, level);
+    const superLabels = generateSuperLabels(
+      viewStartMs,
+      viewEndMs,
+      pxPerMs,
+      level,
+    );
+
+    // Total width of the rendered content (fixed)
+    const totalW = this._totalWidth;
+
+    // Current-time indicator
+    const nowMs = Date.now();
+    const nowPx = timestampToPx(nowMs, viewStartMs, pxPerMs);
+
+    // Collect all events from all resources
+    const allResources = this.resources;
 
     // Grouping
     const groups: { label: string; items: TimelineResource[] }[] = [];
     let cur: (typeof groups)[0] | null = null;
-    for (const r of filteredResources) {
+    for (const r of allResources) {
       if (r.groupLabel) {
         cur = { label: r.groupLabel, items: [r] };
         groups.push(cur);
@@ -329,12 +505,42 @@ export class JanusTimeline extends LitElement {
       }
     }
 
-    // Update drag controller with current layout
-    const resourceLayout = this._computeResourceLayout(groups);
-    this._drag.updateLayout(this.gridScrollRef, resourceLayout);
+    // Filter events to those visible in the current viewport (with margin)
+    const visibleResources = allResources.map((r) => ({
+      ...r,
+      events: r.events.filter(
+        (ev) => ev.endMs > viewStartMs && ev.startMs < viewEndMs,
+      ),
+    }));
 
-    const totalW = VISIBLE_HOURS.length * HOUR_WIDTH;
-    const nl = nowLeft();
+    // Re-group with visible events
+    const visGroups: { label: string; items: TimelineResource[] }[] = [];
+    let visCur: (typeof visGroups)[0] | null = null;
+    for (const r of visibleResources) {
+      const orig = allResources.find((o) => o.id === r.id);
+      if (orig?.groupLabel) {
+        visCur = { label: orig.groupLabel, items: [r] };
+        visGroups.push(visCur);
+      } else if (visCur) {
+        visCur.items.push(r);
+      } else {
+        visCur = { label: "", items: [r] };
+        visGroups.push(visCur);
+      }
+    }
+
+    // Update drag controller
+    const resourceLayout = this._computeResourceLayout(groups);
+    this._drag.updateLayout(
+      this.gridScrollRef,
+      resourceLayout,
+      pxPerMs,
+      viewStartMs,
+    );
+
+    // Nav label
+    const visibleCenter = this._getVisibleCenterMs();
+    const navLabel = formatNavDate(visibleCenter, level);
 
     return html`
       <div class="tl-component-shell">
@@ -343,7 +549,7 @@ export class JanusTimeline extends LitElement {
             <button
               class="tl-nav__arrow"
               aria-label="Previous"
-              @click=${this._goToPrevDay}
+              @click=${this._goToPrev}
             >
               ${ChevronLeft()}
             </button>
@@ -353,18 +559,19 @@ export class JanusTimeline extends LitElement {
             <button
               class="tl-nav__arrow"
               aria-label="Next"
-              @click=${this._goToNextDay}
+              @click=${this._goToNext}
             >
               ${ChevronRight()}
             </button>
-            <span class="tl-nav__date"
-              >${formatDateFull(this.currentDate)}</span
-            >
-            <span class="tl-nav__date--short"
-              >${formatDateShort(this.currentDate)}</span
-            >
+            <span class="tl-nav__date">${navLabel}</span>
+            <span class="tl-nav__date--short">${navLabel}</span>
           </nav>
           <div class="tl-topbar__right">
+            ${this._zoomPercent() !== 100
+              ? html`<span class="tl-zoom-badge"
+                  >${this._zoomPercent()}% · ${level.unit}</span
+                >`
+              : nothing}
             <div class="tl-view-toggle">
               ${(["Timeline", "Month"] as const).map(
                 (v) => html`
@@ -372,13 +579,25 @@ export class JanusTimeline extends LitElement {
                     class="tl-view-toggle__btn ${this.view === v
                       ? "active"
                       : ""}"
-                    @click=${() => (this.view = v)}
+                    @click=${() => this._handleViewSwitch(v)}
                   >
                     ${v}
                   </button>
                 `,
               )}
             </div>
+            <button
+              class="tl-icon-btn tl-draw-toggle ${this.allowCreate
+                ? "tl-draw-toggle--active"
+                : ""}"
+              aria-label="Toggle draw-to-create"
+              data-tooltip="${this.allowCreate
+                ? "Draw Event ON — click to disable"
+                : "Draw Event OFF — drag on empty space to create an event"}"
+              @click=${this._toggleCreate}
+            >
+              ${PencilRulerIcon()}
+            </button>
             <button class="tl-icon-btn" aria-label="Search">
               ${SearchIcon()}
             </button>
@@ -394,14 +613,13 @@ export class JanusTimeline extends LitElement {
 
         <div class="tl-panel">
           <div class="tl-grid-wrap">
-            <div
-              class="tl-res-col"
-              @scroll=${
-                (e: Event) =>
-                  e.preventDefault() /* Native lock, handled by ref */
-              }
-            >
-              <div class="tl-res-col__header">RESOURCE</div>
+            <div class="tl-res-col" @scroll=${(e: Event) => e.preventDefault()}>
+              <div
+                class="tl-res-col__header"
+                style="height: ${HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT}px"
+              >
+                RESOURCE
+              </div>
               ${groups.map(
                 (g) => html`
                   <div>
@@ -424,26 +642,55 @@ export class JanusTimeline extends LitElement {
               )}
             </div>
 
-            <div class="tl-time-scroll" @scroll=${this._onGridScroll}>
+            <div
+              class="tl-time-scroll"
+              @scroll=${this._onGridScroll}
+              @wheel=${this._handleWheel}
+            >
               <div class="tl-time-inner" style="width: ${totalW}px">
+                <!-- Super header row -->
+                ${superLabels.length > 0
+                  ? html`
+                      <div class="tl-super-header">
+                        ${superLabels.map(
+                          (sl) => html`
+                            <div
+                              class="tl-super-cell"
+                              style="left: ${sl.px}px; width: ${sl.width}px;"
+                            >
+                              ${sl.label}
+                            </div>
+                          `,
+                        )}
+                      </div>
+                    `
+                  : html`<div class="tl-super-header"></div>`}
+
+                <!-- Column headers -->
                 <div class="tl-hour-header">
-                  ${VISIBLE_HOURS.map(
-                    (h) => html`
-                      <div class="tl-hour-cell" style="width: ${HOUR_WIDTH}px">
-                        ${h.toString().padStart(2, "0")}:00
+                  ${columns.map(
+                    (col) => html`
+                      <div
+                        class="tl-hour-cell"
+                        style="left: ${col.px}px; width: ${col.width}px;"
+                      >
+                        ${col.label}
                       </div>
                     `,
                   )}
                 </div>
 
-                ${nl > 0 && nl < totalW
+                <!-- Now line -->
+                ${nowPx > 0 && nowPx < totalW
                   ? html`
-                      <div class="tl-now-line" style="left: ${nl}px">
+                      <div class="tl-now-line" style="left: ${nowPx}px">
                         <span class="tl-now-dot"></span>
                       </div>
                     `
                   : nothing}
-                ${groups.map(
+
+                <!-- Resource rows with events -->
+                ${visGroups.map(
                   (g) => html`
                     <div>
                       ${g.label
@@ -457,23 +704,35 @@ export class JanusTimeline extends LitElement {
                             @pointerdown=${(e: PointerEvent) =>
                               this._onRowPointerDown(e, r.id)}
                           >
-                            ${VISIBLE_HOURS.map(
-                              (h) =>
+                            <!-- Column grid lines -->
+                            ${columns.map(
+                              (col) =>
                                 html`<div
                                   class="tl-vline"
-                                  style="left: ${(h - HOUR_START) *
-                                  HOUR_WIDTH}px"
+                                  style="left: ${col.px}px"
                                 ></div>`,
                             )}
-                            ${r.events.map(
-                              (ev) => html`
+                            <!-- Events -->
+                            ${r.events.map((ev) => {
+                              const evLeft = timestampToPx(
+                                ev.startMs,
+                                viewStartMs,
+                                pxPerMs,
+                              );
+                              const evWidth =
+                                timestampToPx(ev.endMs, viewStartMs, pxPerMs) -
+                                evLeft;
+                              // Don't render events that are too small to see
+                              if (evWidth < 2) return nothing;
+                              return html`
                                 <div
                                   class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
                                     ev,
                                   )
                                     ? "tl-event--dragging"
                                     : ""}"
-                                  style=${eventStyle(ev)}
+                                  style="left: ${evLeft +
+                                  2}px; width: ${Math.max(evWidth - 6, 4)}px;"
                                   @pointerdown=${(e: PointerEvent) =>
                                     this._onEventPointerDown(e, ev, r.id)}
                                   @click=${(e: Event) =>
@@ -492,10 +751,12 @@ export class JanusTimeline extends LitElement {
                                   <span class="tl-event__title"
                                     >${ev.title}</span
                                   >
-                                  <span class="tl-event__time"
-                                    >${fmt12(ev.startTime)} –
-                                    ${fmt12(ev.endTime)}</span
-                                  >
+                                  ${evWidth > 80
+                                    ? html`<span class="tl-event__time"
+                                        >${fmt12(ev.startTime)} –
+                                        ${fmt12(ev.endTime)}</span
+                                      >`
+                                    : nothing}
                                   <div
                                     class="tl-event-resize-handle tl-event-resize-handle--end"
                                     @pointerdown=${(e: PointerEvent) =>
@@ -507,8 +768,8 @@ export class JanusTimeline extends LitElement {
                                       )}
                                   ></div>
                                 </div>
-                              `,
-                            )}
+                              `;
+                            })}
                           </div>
                         `,
                       )}

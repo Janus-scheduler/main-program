@@ -11,7 +11,7 @@ export default defineConfig({
       formats: ["es", "umd"],
     },
     rollupOptions: {
-      external: [/^lit/],
+      external: [/^lit/, "@janus-scheduler/core"],
       output: {
         globals: {
           lit: "lit",

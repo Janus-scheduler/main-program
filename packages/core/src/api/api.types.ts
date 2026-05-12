@@ -1,8 +1,13 @@
 export interface TimelineEvent {
   id: string;
   title: string;
+  resourceId?: string; // Helpful for mapping back to resource
   startTime: string; // "HH:MM" 24h
   endTime: string; // "HH:MM" 24h
+  /** Unix timestamp in ms — used for absolute positioning */
+  startMs: number;
+  /** Unix timestamp in ms — used for absolute positioning */
+  endMs: number;
   color: "orange" | "blue" | "yellow" | "purple" | "green";
   date?: string;
 }
@@ -71,6 +76,7 @@ export interface JanusEventMap {
   "add-event": void;
   "day-click": { date: string };
   "view-change": { view: "Timeline" | "Month" };
+  "allow-create-change": { allowCreate: boolean };
   "event-move": EventMoveDetail;
   "event-resize": EventResizeDetail;
   "event-create": EventCreateDetail;

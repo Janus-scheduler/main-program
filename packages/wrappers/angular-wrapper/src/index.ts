@@ -15,6 +15,7 @@
 // Components
 export { SchedulerComponent } from "./lib/scheduler.component";
 export { TimelineComponent } from "./lib/timeline.component";
+export { MonthGridComponent } from "./lib/month-grid.component";
 
 // Types — re-exported so consumers don't need to import from @janus-scheduler/ui
 export type {

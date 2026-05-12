@@ -57,6 +57,7 @@ if (!customElements.get("janus-month-grid")) {
  *  - onClose  → CustomEvent<void>                 — user dismissed the modal
  */
 export interface SchedulerProps {
+  eventId?: string | null;
   title?: string;
   startDate?: string;
   endDate?: string;
@@ -72,11 +73,12 @@ export interface SchedulerProps {
 }
 
 export const Scheduler: Component<SchedulerProps> = (props) => {
-  let ref: HTMLElement | undefined;
+  let ref!: HTMLElement;
 
   createEffect(() => {
     if (ref) {
       const el = ref as unknown as Record<string, unknown>;
+      if (props.eventId !== undefined) el.eventId = props.eventId;
       if (props.title !== undefined) el.title = props.title;
       if (props.startDate !== undefined) el.startDate = props.startDate;
       if (props.endDate !== undefined) el.endDate = props.endDate;
@@ -130,14 +132,15 @@ export interface TimelineProps {
   currentDate?: Date;
   aiPrompt?: string;
   onEventClick?: (e: CustomEvent<TimelineEvent>) => void;
-  onAddEvent?: (e: CustomEvent<void>) => void;
-  onEventMove?: (e: CustomEvent<EventMoveDetail>) => void;
-  onEventResize?: (e: CustomEvent<EventResizeDetail>) => void;
-  onEventCreate?: (e: CustomEvent<EventCreateDetail>) => void;
+  onAddEvent?: (e: Event) => void;
+  onEventMove?: (e: CustomEvent) => void;
+  onEventResize?: (e: CustomEvent) => void;
+  onEventCreate?: (e: CustomEvent) => void;
+  onViewChange?: (e: CustomEvent) => void;
 }
 
 export const Timeline: Component<TimelineProps> = (props) => {
-  let ref: HTMLElement | undefined;
+  let ref!: HTMLElement;
 
   createEffect(() => {
     if (ref) {
@@ -191,7 +194,7 @@ export interface MonthGridProps {
 }
 
 export const MonthGrid: Component<MonthGridProps> = (props) => {
-  let ref: HTMLElement | undefined;
+  let ref!: HTMLElement;
 
   onMount(() => {
     const attach = (eventName: string, handler?: (e: Event) => void) => {
