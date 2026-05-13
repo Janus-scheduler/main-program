@@ -1,6 +1,9 @@
 import { useMemo } from "react";
-import { SchedulerManager } from "@janus-scheduler/react";
-import { getBrowserTimezone, zonedInputToISO } from "@janus-scheduler/core";
+import {
+  SchedulerManager,
+  getBrowserTimezone,
+  zonedInputToISO,
+} from "@janus-scheduler/react";
 
 export interface HookError {
   operation: string;

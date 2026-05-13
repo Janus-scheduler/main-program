@@ -18,6 +18,16 @@ export { SchedulerComponent } from "./lib/scheduler.component";
 export { TimelineComponent } from "./lib/timeline.component";
 export { MonthGridComponent } from "./lib/month-grid.component";
 
+// Core Utilities — Facade Pattern
+export {
+  SchedulerManager,
+  getBrowserTimezone,
+  isoToZonedDisplay,
+  zonedInputToISO,
+  schedulerStore,
+} from "@janus-scheduler/core";
+export type { SchedulerHooks } from "@janus-scheduler/core";
+
 // Types — re-exported so consumers don't need to import from @janus-scheduler/core directly
 export type {
   TimelineEvent,

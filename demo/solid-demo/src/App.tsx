@@ -5,14 +5,12 @@ import {
   Scheduler,
   MonthGrid,
   type ViewType,
-} from "@janus-scheduler/solid";
-import {
   SchedulerManager,
   getBrowserTimezone,
   zonedInputToISO,
   isoToZonedDisplay,
   schedulerStore,
-} from "@janus-scheduler/core";
+} from "@janus-scheduler/solid";
 
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
@@ -134,105 +132,6 @@ function App() {
     });
   }
 
-  const handleViewChange = (e: any) => {
-    const view = e.detail.view;
-    setCurrentView(view);
-  };
-
-  const handleAddEvent = () => {
-    setSelectedEventId(null);
-    setSchedulerError(null);
-    setShowScheduler(true);
-  };
-
-  const handleEventClick = (e: any) => {
-    console.log("Clicked event:", e);
-    setSelectedEventId(e.detail?.id || e.id);
-    setSchedulerError(null);
-    setShowScheduler(true);
-  };
-
-  const handleSave = (e: any) => {
-    const data = e.detail;
-    console.log("Saving event with data:", data);
-
-    try {
-      const today = new Date().toISOString().split("T")[0];
-      const eventData = {
-        id: `evt_${Date.now()}`,
-        title: data.title,
-        startTime: zonedInputToISO(
-          data.date || today,
-          data.startTime,
-          data.timezone,
-        ),
-        endTime: zonedInputToISO(
-          data.date || today,
-          data.endTime,
-          data.timezone,
-        ),
-        resourceId: data.participants?.[0] || "r1",
-        description: data.description,
-        status: "confirmed" as const,
-      };
-
-      manager.addEvent(eventData);
-
-      console.log("✅ Event successfully added to core manager");
-      setShowScheduler(false);
-      setSelectedEventId(null);
-      setSchedulerError(null);
-    } catch (err: unknown) {
-      const error = err as Error;
-      console.error("❌ Failed to save event:", error);
-      setSchedulerError(error.message || "An unexpected error occurred");
-    }
-  };
-
-  const handleDelete = (e: any) => {
-    console.log("Delete requested for:", e.detail.title);
-    if (e.detail.id) {
-      manager.deleteEvent(e.detail.id);
-    }
-    setShowScheduler(false);
-    setSelectedEventId(null);
-  };
-
-  const handleEventMove = (e: any) => {
-    const { event, newResourceId, newStartTime, newEndTime } = e.detail;
-    console.log("📦 Event moved:", e.detail);
-
-    manager.updateEvent(event.id, {
-      resourceId: newResourceId,
-      startTime: newStartTime,
-      endTime: newEndTime,
-    });
-  };
-
-  const handleEventResize = (e: any) => {
-    const { event, newStartTime, newEndTime } = e.detail;
-    console.log("↔️ Event resized:", e.detail);
-
-    manager.updateEvent(event.id, {
-      startTime: newStartTime,
-      endTime: newEndTime,
-    });
-  };
-
-  const handleEventCreate = (e: any) => {
-    const { resourceId, startTime, endTime } = e.detail;
-    console.log("✨ New event created:", e.detail);
-
-    manager.addEvent({
-      id: `evt_${Date.now()}`,
-      title: "New Event",
-      startTime,
-      endTime,
-      resourceId,
-      status: "confirmed",
-    });
-  };
-
   const storeEvent = createMemo(() => {
     const id = selectedEventId();
     return id ? manager.getEvent(id) : null;
@@ -286,18 +185,60 @@ function App() {
       <main class="app-main">
         <Show when={currentView() === "Timeline"}>
           <Timeline
-            onAddEvent={handleAddEvent}
-            onEventClick={handleEventClick}
-            onEventMove={handleEventMove}
-            onEventResize={handleEventResize}
-            onEventCreate={handleEventCreate}
+            onAddEvent={() => {
+              setSelectedEventId(null);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onEventClick={(detail) => {
+              setSelectedEventId(detail.id);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onEventMove={({
+              event,
+              newResourceId,
+              newStartTime,
+              newEndTime,
+            }) => {
+              manager.updateEvent(event.id, {
+                resourceId: newResourceId,
+                startTime: newStartTime,
+                endTime: newEndTime,
+              });
+            }}
+            onEventResize={({ event, newStartTime, newEndTime }) => {
+              manager.updateEvent(event.id, {
+                startTime: newStartTime,
+                endTime: newEndTime,
+              });
+            }}
+            onEventCreate={({ resourceId, startTime, endTime }) => {
+              manager.addEvent({
+                id: `evt_${Date.now()}`,
+                title: "New Event",
+                startTime,
+                endTime,
+                resourceId,
+                status: "confirmed",
+              });
+            }}
+            onViewChange={(detail) => setCurrentView(detail.view)}
           />
         </Show>
         <Show when={currentView() === "Month"}>
           <MonthGrid
-            onAddEvent={handleAddEvent}
-            onEventClick={handleEventClick}
-            onViewChange={handleViewChange}
+            onAddEvent={() => {
+              setSelectedEventId(null);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onEventClick={(detail) => {
+              setSelectedEventId(detail.id);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onViewChange={(detail) => setCurrentView(detail.view)}
           />
         </Show>
 
@@ -310,12 +251,51 @@ function App() {
             endDate={endParts().date}
             endTime={endParts().time}
             participants={
-              storeEvent()?.resourceId ? [storeEvent()?.resourceId!] : undefined
+              storeEvent()?.resourceId ? [storeEvent()!.resourceId] : undefined
             }
             description={storeEvent()?.description}
             error={schedulerError()}
-            onSave={handleSave}
-            onDelete={handleDelete}
+            onSave={(data) => {
+              try {
+                const today = new Date().toISOString().split("T")[0];
+                const eventData = {
+                  id: selectedEventId() || `evt_${Date.now()}`,
+                  title: data.title,
+                  startTime: zonedInputToISO(
+                    data.startDate || today,
+                    data.startTime,
+                    data.timezone,
+                  ),
+                  endTime: zonedInputToISO(
+                    data.endDate || today,
+                    data.endTime,
+                    data.timezone,
+                  ),
+                  resourceId: data.participants?.[0] || "r1",
+                  description: data.description,
+                  status: "confirmed" as const,
+                };
+
+                if (selectedEventId()) {
+                  manager.updateEvent(selectedEventId()!, eventData);
+                } else {
+                  manager.addEvent(eventData);
+                }
+                setShowScheduler(false);
+                setSelectedEventId(null);
+                setSchedulerError(null);
+              } catch (err: unknown) {
+                const error = err as Error;
+                setSchedulerError(
+                  error.message || "An unexpected error occurred",
+                );
+              }
+            }}
+            onDelete={(data) => {
+              if (data.id) manager.deleteEvent(data.id);
+              setShowScheduler(false);
+              setSelectedEventId(null);
+            }}
             onClose={() => {
               setShowScheduler(false);
               setSelectedEventId(null);

@@ -15,13 +15,12 @@ import {
   type EventResizeDetail,
   type EventCreateDetail,
   type ViewType,
-} from '@janus-scheduler/angular';
-import {
   SchedulerManager,
   getBrowserTimezone,
   zonedInputToISO,
   isoToZonedDisplay,
-} from '@janus-scheduler/core';
+  schedulerStore,
+} from '@janus-scheduler/angular';
 
 @Component({
   selector: 'app-root',
@@ -45,7 +44,7 @@ export class App {
   // Convert a UTC ISO string → local { date, time } using the store's selected timezone.
   private splitISO(iso: string | undefined) {
     if (!iso) return { date: undefined, time: undefined };
-    const { date, time } = isoToZonedDisplay(iso, getBrowserTimezone());
+    const { date, time } = isoToZonedDisplay(iso, schedulerStore.getState().timezone);
     return { date, time };
   }
 

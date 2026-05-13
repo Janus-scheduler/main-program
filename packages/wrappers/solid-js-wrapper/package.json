@@ -1,6 +1,6 @@
 {
   "name": "@janus-scheduler/solid",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "./dist/janus-scheduler-solid.cjs.js",
   "module": "./dist/janus-scheduler-solid.es.js",
@@ -12,12 +12,17 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vite build"
   },
-  "dependencies": {
-    "@janus-scheduler/ui": "^1.0.0",
+  "peerDependencies": {
     "solid-js": "^1.8.0"
+  },
+  "dependencies": {
+    "@janus-scheduler/ui": "^1.0.0"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

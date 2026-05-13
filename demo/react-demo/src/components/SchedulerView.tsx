@@ -1,18 +1,11 @@
-import { useCallback } from "react";
 import { Timeline, MonthGrid, Scheduler } from "@janus-scheduler/react";
-import type {
-  EventMoveDetail,
-  EventResizeDetail,
-  EventCreateDetail,
-  TimelineEvent,
-  ViewType,
-} from "@janus-scheduler/react";
+import type { ViewType } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
 import {
   isoToZonedDisplay,
   zonedInputToISO,
   schedulerStore,
-} from "@janus-scheduler/core";
+} from "@janus-scheduler/react";
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
@@ -69,144 +62,6 @@ export function SchedulerView({
   onOpenScheduler,
   onCloseScheduler,
 }: SchedulerViewProps) {
-  // ── Open modal for NEW event (FAB / + button) ───────────────────────────
-  const handleAddEvent = useCallback(() => {
-    onOpenScheduler(); // no eventId → create mode
-  }, [onOpenScheduler]);
-
-  // ── Open modal for EXISTING event (click on an event chip) ─────────────
-  // The TimelineEvent detail contains the event id — extract it and pass it
-  // to onOpenScheduler so App can track which event is being edited and
-  // forward it to <Scheduler eventId={...}>.
-  const handleEventClick = useCallback(
-    (e: Event) => {
-      const ev = (e as CustomEvent<TimelineEvent>).detail;
-      onOpenScheduler(ev?.id); // string → edit mode
-    },
-    [onOpenScheduler],
-  );
-
-  // ── MonthGrid: view switch ─────────────────────────────────────────────
-  const handleViewChange = useCallback(
-    (e: Event) => {
-      const view = (e as CustomEvent<{ view: ViewType }>).detail.view;
-      onViewChange(view);
-    },
-    [onViewChange],
-  );
-
-  // ── Scheduler modal: save ──────────────────────────────────────────────
-  // detail.id distinguishes create (null) from edit (string).
-  const handleSave = useCallback(
-    (e: Event) => {
-      const data = (e as CustomEvent).detail;
-      const today = new Date().toISOString().split("T")[0];
-      try {
-        if (data.id) {
-          manager.updateEvent(data.id, {
-            title: data.title,
-            startTime: zonedInputToISO(
-              data.startDate || today,
-              data.startTime,
-              data.timezone,
-            ),
-            endTime: zonedInputToISO(
-              data.endDate || today,
-              data.endTime,
-              data.timezone,
-            ),
-            resourceId: data.participants?.[0] || "r1",
-            description: data.description,
-            status: "confirmed",
-          });
-        } else {
-          manager.addEvent({
-            id: `evt_${Date.now()}`,
-            title: data.title,
-            startTime: zonedInputToISO(
-              data.startDate || today,
-              data.startTime,
-              data.timezone,
-            ),
-            endTime: zonedInputToISO(
-              data.endDate || today,
-              data.endTime,
-              data.timezone,
-            ),
-            resourceId: data.participants?.[0] || "r1",
-            description: data.description,
-            status: "confirmed",
-          });
-        }
-        onCloseScheduler();
-      } catch (err: unknown) {
-        // Synchronous store errors (e.g. invalid time range) surface here.
-        // Async hook failures go through onError in useSchedulerManager.
-        console.error("Store rejected the event:", err);
-      }
-    },
-    [manager, onCloseScheduler],
-  );
-
-  // ── Scheduler modal: delete ────────────────────────────────────────────
-  // detail.id is the eventId that was passed to <Scheduler eventId={...}>.
-  // Before this fix, detail only contained { title }, making id always
-  // undefined and the delete a no-op.
-  const handleDelete = useCallback(
-    (e: Event) => {
-      const { id } = (e as CustomEvent<{ id: string | null; title: string }>)
-        .detail;
-      if (id) manager.deleteEvent(id);
-      onCloseScheduler();
-    },
-    [manager, onCloseScheduler],
-  );
-
-  // ── Timeline: drag-and-drop ────────────────────────────────────────────
-  const handleEventMove = useCallback(
-    (e: Event) => {
-      const { event, newResourceId, newStartTime, newEndTime } = (
-        e as CustomEvent<EventMoveDetail>
-      ).detail;
-      manager.updateEvent(event.id, {
-        resourceId: newResourceId,
-        startTime: newStartTime,
-        endTime: newEndTime,
-      });
-    },
-    [manager],
-  );
-
-  const handleEventResize = useCallback(
-    (e: Event) => {
-      const { event, newStartTime, newEndTime } = (
-        e as CustomEvent<EventResizeDetail>
-      ).detail;
-      manager.updateEvent(event.id, {
-        startTime: newStartTime,
-        endTime: newEndTime,
-      });
-    },
-    [manager],
-  );
-
-  const handleEventCreate = useCallback(
-    (e: Event) => {
-      const { resourceId, startTime, endTime } = (
-        e as CustomEvent<EventCreateDetail>
-      ).detail;
-      manager.addEvent({
-        id: `evt_${Date.now()}`,
-        title: "New Event",
-        startTime,
-        endTime,
-        resourceId,
-        status: "confirmed",
-      });
-    },
-    [manager],
-  );
-
   // ── Helper to split ISO ────────────────────────────────────────────────
   // Convert a UTC ISO string → local { date, time } for display in the modal.
   // Uses the store's selected timezone for consistent display.
@@ -223,20 +78,40 @@ export function SchedulerView({
     <>
       {currentView === "Timeline" && (
         <Timeline
-          onAddEvent={handleAddEvent}
-          onEventClick={handleEventClick}
-          onEventMove={handleEventMove}
-          onEventResize={handleEventResize}
-          onEventCreate={handleEventCreate}
-          onViewChange={handleViewChange}
+          onAddEvent={() => onOpenScheduler()}
+          onEventClick={(ev) => onOpenScheduler(ev?.id)}
+          onEventMove={({ event, newResourceId, newStartTime, newEndTime }) => {
+            manager.updateEvent(event.id, {
+              resourceId: newResourceId,
+              startTime: newStartTime,
+              endTime: newEndTime,
+            });
+          }}
+          onEventResize={({ event, newStartTime, newEndTime }) => {
+            manager.updateEvent(event.id, {
+              startTime: newStartTime,
+              endTime: newEndTime,
+            });
+          }}
+          onEventCreate={({ resourceId, startTime, endTime }) => {
+            manager.addEvent({
+              id: `evt_${Date.now()}`,
+              title: "New Event",
+              startTime,
+              endTime,
+              resourceId,
+              status: "confirmed",
+            });
+          }}
+          onViewChange={(detail) => onViewChange(detail.view)}
         />
       )}
 
       {currentView === "Month" && (
         <MonthGrid
-          onAddEvent={handleAddEvent}
-          onEventClick={handleEventClick}
-          onViewChange={handleViewChange}
+          onAddEvent={() => onOpenScheduler()}
+          onEventClick={(ev) => onOpenScheduler(ev?.id)}
+          onViewChange={(detail) => onViewChange(detail.view)}
         />
       )}
 
@@ -256,8 +131,54 @@ export function SchedulerView({
             storeEvent?.resourceId ? [storeEvent.resourceId] : undefined
           }
           description={storeEvent?.description}
-          onSave={handleSave}
-          onDelete={handleDelete}
+          onSave={(data) => {
+            const today = new Date().toISOString().split("T")[0];
+            try {
+              if (data.id) {
+                manager.updateEvent(data.id, {
+                  title: data.title,
+                  startTime: zonedInputToISO(
+                    data.startDate || today,
+                    data.startTime,
+                    data.timezone,
+                  ),
+                  endTime: zonedInputToISO(
+                    data.endDate || today,
+                    data.endTime,
+                    data.timezone,
+                  ),
+                  resourceId: data.participants?.[0] || "r1",
+                  description: data.description,
+                  status: "confirmed",
+                });
+              } else {
+                manager.addEvent({
+                  id: `evt_${Date.now()}`,
+                  title: data.title,
+                  startTime: zonedInputToISO(
+                    data.startDate || today,
+                    data.startTime,
+                    data.timezone,
+                  ),
+                  endTime: zonedInputToISO(
+                    data.endDate || today,
+                    data.endTime,
+                    data.timezone,
+                  ),
+                  resourceId: data.participants?.[0] || "r1",
+                  description: data.description,
+                  status: "confirmed",
+                });
+              }
+              onCloseScheduler();
+            } catch (err: unknown) {
+              console.error("Store rejected the event:", err);
+            }
+          }}
+          onDelete={({ id }) => {
+            if (id) manager.deleteEvent(id);
+            onCloseScheduler();
+          }}
           onClose={onCloseScheduler}
         />
       )}
