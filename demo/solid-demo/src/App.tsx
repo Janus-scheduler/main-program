@@ -6,7 +6,13 @@ import {
   MonthGrid,
   type ViewType,
 } from "@janus-scheduler/solid";
-import { SchedulerManager } from "@janus-scheduler/core";
+import {
+  SchedulerManager,
+  getBrowserTimezone,
+  zonedInputToISO,
+  isoToZonedDisplay,
+  schedulerStore,
+} from "@janus-scheduler/core";
 
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
@@ -109,19 +115,20 @@ function App() {
 
     // Add a couple of initial events for today
     const today = new Date().toISOString().split("T")[0];
+    const tz = getBrowserTimezone();
     manager.addEvent({
       id: "e1",
       title: "Appendectomy",
-      startTime: `${today}T09:00:00Z`,
-      endTime: `${today}T11:30:00Z`,
+      startTime: zonedInputToISO(today, "09:00", tz),
+      endTime: zonedInputToISO(today, "11:30", tz),
       resourceId: "r1",
       status: "confirmed",
     });
     manager.addEvent({
       id: "e2",
       title: "Pre-op Assessment",
-      startTime: `${today}T13:00:00Z`,
-      endTime: `${today}T14:00:00Z`,
+      startTime: zonedInputToISO(today, "13:00", tz),
+      endTime: zonedInputToISO(today, "14:00", tz),
       resourceId: "r2",
       status: "confirmed",
     });
@@ -154,8 +161,16 @@ function App() {
       const eventData = {
         id: `evt_${Date.now()}`,
         title: data.title,
-        startTime: `${data.date || today}T${data.startTime}:00Z`,
-        endTime: `${data.date || today}T${data.endTime}:00Z`,
+        startTime: zonedInputToISO(
+          data.date || today,
+          data.startTime,
+          data.timezone,
+        ),
+        endTime: zonedInputToISO(
+          data.date || today,
+          data.endTime,
+          data.timezone,
+        ),
         resourceId: data.participants?.[0] || "r1",
         description: data.description,
         status: "confirmed" as const,
@@ -223,12 +238,14 @@ function App() {
     return id ? manager.getEvent(id) : null;
   });
 
+  // Convert a UTC ISO string → local { date, time } using the store's selected timezone.
   const splitISO = (iso: string | undefined) => {
     if (!iso) return { date: undefined, time: undefined };
-    const clean = iso.replace("Z", "");
-    const [datePart, timePart = ""] = clean.split("T");
-    const time = timePart.slice(0, 5); // "HH:mm"
-    return { date: datePart, time };
+    const { date, time } = isoToZonedDisplay(
+      iso,
+      schedulerStore.getState().timezone,
+    );
+    return { date, time };
   };
 
   const startParts = createMemo(() => splitISO(storeEvent()?.startTime));

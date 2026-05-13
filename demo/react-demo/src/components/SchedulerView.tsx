@@ -8,6 +8,11 @@ import type {
   ViewType,
 } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
+import {
+  isoToZonedDisplay,
+  zonedInputToISO,
+  schedulerStore,
+} from "@janus-scheduler/core";
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
@@ -98,22 +103,36 @@ export function SchedulerView({
       const today = new Date().toISOString().split("T")[0];
       try {
         if (data.id) {
-          // ── Edit mode: update the existing event ──────────────────────
           manager.updateEvent(data.id, {
             title: data.title,
-            startTime: `${data.startDate || today}T${data.startTime}:00`,
-            endTime: `${data.endDate || today}T${data.endTime}:00`,
+            startTime: zonedInputToISO(
+              data.startDate || today,
+              data.startTime,
+              data.timezone,
+            ),
+            endTime: zonedInputToISO(
+              data.endDate || today,
+              data.endTime,
+              data.timezone,
+            ),
             resourceId: data.participants?.[0] || "r1",
             description: data.description,
             status: "confirmed",
           });
         } else {
-          // ── Create mode: add a new event ──────────────────────────────
           manager.addEvent({
             id: `evt_${Date.now()}`,
             title: data.title,
-            startTime: `${data.startDate || today}T${data.startTime}:00`,
-            endTime: `${data.endDate || today}T${data.endTime}:00`,
+            startTime: zonedInputToISO(
+              data.startDate || today,
+              data.startTime,
+              data.timezone,
+            ),
+            endTime: zonedInputToISO(
+              data.endDate || today,
+              data.endTime,
+              data.timezone,
+            ),
             resourceId: data.participants?.[0] || "r1",
             description: data.description,
             status: "confirmed",
@@ -189,12 +208,11 @@ export function SchedulerView({
   );
 
   // ── Helper to split ISO ────────────────────────────────────────────────
+  // Convert a UTC ISO string → local { date, time } for display in the modal.
+  // Uses the store's selected timezone for consistent display.
   const splitISO = (iso: string) => {
     if (!iso) return { date: "", time: "" };
-    const clean = iso.replace("Z", "");
-    const [datePart, timePart = ""] = clean.split("T");
-    const time = timePart.slice(0, 5); // "HH:mm"
-    return { date: datePart, time };
+    return isoToZonedDisplay(iso, schedulerStore.getState().timezone);
   };
 
   const storeEvent = selectedEventId ? manager.getEvent(selectedEventId) : null;

@@ -1448,4 +1448,106 @@ export const schedulerStyles = css`
       font-size: 16px; /* prevents iOS auto-zoom on focus */
     }
   }
+
+  /* ── Timezone row ─────────────────────────────────────────────────────────── */
+
+  .dt-tz-row {
+    margin-top: 10px;
+  }
+
+  .dt-cell--tz {
+    position: relative;
+  }
+
+  /* ── Timezone picker dropdown ─────────────────────────────────────────────── */
+
+  .tz-picker-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 220;
+    width: 300px;
+    background: #ffffff;
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.14),
+      0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    animation: picker-in 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .tz-search-wrap {
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tz-search-input {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--input-bg);
+    border: 1.5px solid var(--input-border);
+    border-radius: 8px;
+    font-family: "Roboto", sans-serif;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .tz-search-input:focus {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-glow);
+  }
+
+  .tz-list {
+    list-style: none;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 6px 0;
+    scrollbar-width: thin;
+    scrollbar-color: #e4e4e7 transparent;
+  }
+
+  .tz-list::-webkit-scrollbar {
+    width: 4px;
+  }
+  .tz-list::-webkit-scrollbar-thumb {
+    background: #e4e4e7;
+    border-radius: 4px;
+  }
+
+  .tz-item {
+    padding: 8px 14px;
+    font-size: 12.5px;
+    font-family: "Roboto", sans-serif;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background 0.1s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tz-item:hover {
+    background: var(--orange-light);
+    color: var(--orange);
+  }
+
+  .tz-item--active {
+    background: var(--orange);
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  .tz-item--active:hover {
+    background: var(--orange);
+    color: #ffffff;
+  }
+
+  .tz-item--empty {
+    color: var(--text-muted);
+    font-style: italic;
+    cursor: default;
+  }
 `;

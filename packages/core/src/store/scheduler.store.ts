@@ -6,11 +6,14 @@ import {
   type AssignmentData,
 } from "../models/assignments/assignments";
 import type { EventData } from "../types/event.types";
+import { getBrowserTimezone } from "../utils/time";
 
 export interface SchedulerState {
   events: Record<string, Event>;
   resources: Record<string, Resource>;
   assignments: Record<string, Assignment>;
+  /** IANA timezone string used for all display conversions. Defaults to the browser's local timezone. */
+  timezone: string;
 }
 
 export interface SchedulerActions {
@@ -23,6 +26,8 @@ export interface SchedulerActions {
   addAssignment: (data: AssignmentData) => Assignment;
   deleteAssignment: (id: string) => boolean;
   clearAll: () => void;
+  /** Change the display timezone for all scheduler components. */
+  setTimezone: (timezone: string) => void;
 }
 
 export type SchedulerStore = SchedulerState & SchedulerActions;
@@ -31,6 +36,7 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
   events: {},
   resources: {},
   assignments: {},
+  timezone: getBrowserTimezone(),
 
   addEvent: (data) => {
     const event = new Event(data);
@@ -162,5 +168,9 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
       resources: {},
       assignments: {},
     });
+  },
+
+  setTimezone: (timezone) => {
+    set({ timezone });
   },
 }));

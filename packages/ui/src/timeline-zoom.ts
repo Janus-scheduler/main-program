@@ -8,6 +8,8 @@
  * Zero DOM / Lit dependency — fully testable in isolation.
  */
 
+import { toFakeLocalDate } from "@janus-scheduler/core";
+
 // ── Types ────────────────────────────────────────────────────────────────
 
 export type ZoomUnit =
@@ -332,32 +334,22 @@ export function generateColumns(
   viewEndMs: number,
   pxPerMs: number,
   level: ZoomLevel,
+  timezone?: string,
 ): ColumnTick[] {
   const columns: ColumnTick[] = [];
-
-  // Find the first column boundary at or before viewStartMs
   let cursor = floorToUnit(viewStartMs, level.unit);
-
   let safety = 0;
   while (cursor < viewEndMs && safety < 300) {
     const nextCursor = advanceByUnit(cursor, level.unit);
     const px = (cursor - viewStartMs) * pxPerMs;
     const width = (nextCursor - cursor) * pxPerMs;
-
-    // Only add columns that have a visible width
     if (width > 0.5) {
-      columns.push({
-        startMs: cursor,
-        label: level.labelFormat(new Date(cursor)),
-        px,
-        width,
-      });
+      const d = timezone ? toFakeLocalDate(cursor, timezone) : new Date(cursor);
+      columns.push({ startMs: cursor, label: level.labelFormat(d), px, width });
     }
-
     cursor = nextCursor;
     safety++;
   }
-
   return columns;
 }
 
@@ -370,39 +362,28 @@ export function generateSuperLabels(
   viewEndMs: number,
   pxPerMs: number,
   level: ZoomLevel,
+  timezone?: string,
 ): SuperLabel[] {
   if (!level.superLabelFormat) return [];
-
-  // Determine the parent unit for the super-label
   const parentUnit = getSuperUnit(level.unit);
   if (!parentUnit) return [];
 
   const labels: SuperLabel[] = [];
   let cursor = floorToUnit(viewStartMs, parentUnit);
-
   let safety = 0;
   while (cursor < viewEndMs && safety < 100) {
     const nextCursor = advanceByUnit(cursor, parentUnit);
-
-    // Clip to viewport
     const clippedStart = Math.max(cursor, viewStartMs);
     const clippedEnd = Math.min(nextCursor, viewEndMs);
-
     const px = (clippedStart - viewStartMs) * pxPerMs;
     const width = (clippedEnd - clippedStart) * pxPerMs;
-
     if (width > 1) {
-      labels.push({
-        label: level.superLabelFormat(new Date(cursor)),
-        px,
-        width,
-      });
+      const d = timezone ? toFakeLocalDate(cursor, timezone) : new Date(cursor);
+      labels.push({ label: level.superLabelFormat(d), px, width });
     }
-
     cursor = nextCursor;
     safety++;
   }
-
   return labels;
 }
 
@@ -452,8 +433,12 @@ export function getNavStepMs(level: ZoomLevel): number {
 /**
  * Format a date for the nav bar based on the current zoom level.
  */
-export function formatNavDate(centerMs: number, level: ZoomLevel): string {
-  const d = new Date(centerMs);
+export function formatNavDate(
+  centerMs: number,
+  level: ZoomLevel,
+  timezone?: string,
+): string {
+  const d = timezone ? toFakeLocalDate(centerMs, timezone) : new Date(centerMs);
   switch (level.unit) {
     case "5min":
     case "15min":
@@ -468,10 +453,7 @@ export function formatNavDate(centerMs: number, level: ZoomLevel): string {
       });
     case "1day":
     case "1week":
-      return d.toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric",
-      });
+      return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
     case "1month":
       return `${d.getFullYear()}`;
     case "1year":

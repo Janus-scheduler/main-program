@@ -1,8 +1,11 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, state, property } from "lit/decorators.js";
-import type {
-  SchedulerSaveData,
-  SchedulerDeleteData,
+import {
+  type SchedulerSaveData,
+  type SchedulerDeleteData,
+  schedulerStore,
+  getAllTimezones,
+  formatTimezoneLabel,
 } from "@janus-scheduler/core";
 import { schedulerStyles } from "./styles";
 
@@ -101,6 +104,24 @@ const XIcon = () =>
   >
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>`;
+
+const GlobeIcon = () =>
+  html`<svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path
+      d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+    />
   </svg>`;
 
 const UsersIcon = () =>
@@ -274,7 +295,13 @@ function isoFromParts(y: number, m: number, d: number): string {
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
-type OpenPicker = "startDate" | "startTime" | "endDate" | "endTime" | null;
+type OpenPicker =
+  | "startDate"
+  | "startTime"
+  | "endDate"
+  | "endTime"
+  | "timezone"
+  | null;
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -310,6 +337,8 @@ export class JanusScheduler extends LitElement {
   @state() participantInput = "";
   @state() sidebarOpen = false;
   @state() openPicker: OpenPicker = null;
+  @state() private _tzSearch = "";
+  @state() private _selectedTz: string = schedulerStore.getState().timezone;
 
   // Calendar view: sync to the selected date when a property is set,
   // otherwise default to current month
@@ -374,12 +403,13 @@ export class JanusScheduler extends LitElement {
 
   private _onSave() {
     if (this._invalid) return;
+    // Persist the chosen timezone to the store so all components stay in sync
+    schedulerStore.getState().setTimezone(this._selectedTz);
     this.dispatchEvent(
       new CustomEvent("save", {
         bubbles: true,
         composed: true,
         detail: {
-          // id is included so the host can tell create (null) from edit (string)
           id: this.eventId,
           title: this.title,
           startDate: this.startDate,
@@ -389,6 +419,7 @@ export class JanusScheduler extends LitElement {
           participants: this._participants,
           description: this.description,
           activeColor: this.activeColor,
+          timezone: this._selectedTz,
         } as SchedulerSaveData,
       }),
     );
@@ -598,6 +629,60 @@ export class JanusScheduler extends LitElement {
         <span class="time-trigger-value">${value || "—"}</span>
         <span class="time-trigger-chevron">${ChevronDownIcon()}</span>
       </button>
+    `;
+  }
+
+  // ─── Timezone picker dropdown ──────────────────────────────────────────────
+
+  private _timezonePicker() {
+    const allZones = getAllTimezones();
+    const q = this._tzSearch.toLowerCase();
+    const filtered = q
+      ? allZones.filter(
+          (tz) =>
+            tz.toLowerCase().includes(q) ||
+            formatTimezoneLabel(tz).toLowerCase().includes(q),
+        )
+      : allZones;
+    const visible = filtered.slice(0, 80); // cap for performance
+
+    return html`
+      <div
+        class="tz-picker-dropdown"
+        @click=${(e: Event) => e.stopPropagation()}
+      >
+        <div class="tz-search-wrap">
+          <input
+            class="tz-search-input"
+            type="text"
+            placeholder="Search timezone…"
+            .value=${this._tzSearch}
+            @input=${(e: Event) =>
+              (this._tzSearch = (e.target as HTMLInputElement).value)}
+          />
+        </div>
+        <ul class="tz-list">
+          ${visible.map(
+            (tz) => html`
+              <li
+                class="tz-item ${this._selectedTz === tz
+                  ? "tz-item--active"
+                  : ""}"
+                @click=${() => {
+                  this._selectedTz = tz;
+                  this._tzSearch = "";
+                  this.openPicker = null;
+                }}
+              >
+                ${formatTimezoneLabel(tz)}
+              </li>
+            `,
+          )}
+          ${visible.length === 0
+            ? html`<li class="tz-item tz-item--empty">No results</li>`
+            : nothing}
+        </ul>
+      </div>
     `;
   }
 
@@ -894,6 +979,24 @@ export class JanusScheduler extends LitElement {
                       >
                     </div>`
                   : nothing}
+
+                <!-- Timezone selector -->
+                <div class="dt-tz-row">
+                  <div class="dt-row-label">Timezone</div>
+                  <div class="dt-cell dt-cell--tz">
+                    ${this._triggerBtn(
+                      GlobeIcon(),
+                      this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
+                        this._selectedTz,
+                      this.openPicker === "timezone",
+                      false,
+                      "timezone",
+                    )}
+                    ${this.openPicker === "timezone"
+                      ? this._timezonePicker()
+                      : nothing}
+                  </div>
+                </div>
               </div>
 
               <!-- People -->

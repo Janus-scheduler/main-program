@@ -52,6 +52,11 @@ import type {
   TimelineEvent,
   ViewType,
 } from "@janus-scheduler/core";
+import {
+  isoToZonedDisplay,
+  zonedInputToISO,
+  schedulerStore,
+} from "@janus-scheduler/core";
 
 // Side-effect import: registers the custom elements
 import "@janus-scheduler/ui";
@@ -76,12 +81,11 @@ const storeEvent = computed(() =>
   props.selectedEventId ? props.manager.getEvent(props.selectedEventId) : null
 );
 
+// Convert a UTC ISO string → local { date, time } using the store's selected timezone.
 const splitISO = (iso: string | undefined) => {
   if (!iso) return { date: undefined, time: undefined };
-  const clean = iso.replace("Z", "");
-  const [datePart, timePart = ""] = clean.split("T");
-  const time = timePart.slice(0, 5); // "HH:mm"
-  return { date: datePart, time };
+  const { date, time } = isoToZonedDisplay(iso, schedulerStore.getState().timezone);
+  return { date, time };
 };
 
 const startParts = computed(() => splitISO(storeEvent.value?.startTime));
@@ -113,8 +117,8 @@ function handleSave(e: Event) {
     if (data.id) {
       props.manager.updateEvent(data.id, {
         title: data.title,
-        startTime: `${data.startDate || today}T${data.startTime}:00Z`,
-        endTime: `${data.endDate || today}T${data.endTime}:00Z`,
+        startTime: zonedInputToISO(data.startDate || today, data.startTime, data.timezone),
+        endTime: zonedInputToISO(data.endDate || today, data.endTime, data.timezone),
         resourceId: data.participants?.[0] || "r1",
         description: data.description,
         status: "confirmed",
@@ -123,8 +127,8 @@ function handleSave(e: Event) {
       props.manager.addEvent({
         id: `evt_${Date.now()}`,
         title: data.title,
-        startTime: `${data.startDate || today}T${data.startTime}:00Z`,
-        endTime: `${data.endDate || today}T${data.endTime}:00Z`,
+        startTime: zonedInputToISO(data.startDate || today, data.startTime, data.timezone),
+        endTime: zonedInputToISO(data.endDate || today, data.endTime, data.timezone),
         resourceId: data.participants?.[0] || "r1",
         description: data.description,
         status: "confirmed",
