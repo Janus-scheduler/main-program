@@ -69,12 +69,14 @@ export interface SchedulerSaveData {
   id: string | null;
   title: string;
   startDate: string;
-  startTime: string; // "HH:MM"
+  startTime: string; // "HH:MM" in the selected timezone
   endDate: string;
-  endTime: string;
+  endTime: string; // "HH:MM" in the selected timezone
   participants: string[];
   description: string;
   activeColor: string;
+  /** IANA timezone the user was viewing when they entered the times. */
+  timezone: string;
 }
 
 export interface SchedulerDeleteData {

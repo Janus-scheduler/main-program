@@ -290,7 +290,9 @@ export class Event {
 
 ---
 
-## Importing Types — The Right Source
+## Importing Types & Utilities — The Facade Pattern
+
+Janus Scheduler uses the **Facade Pattern**. This means that developers consuming the library should **never** need to import from `@janus-scheduler/core`. Instead, each framework wrapper (e.g., `@janus-scheduler/react`) re-exports all necessary types and utilities.
 
 | In this file...                            | Import types from...                                               |
 | ------------------------------------------ | ------------------------------------------------------------------ |
@@ -305,6 +307,7 @@ export class Event {
 | `demo/vue-demo/**`                         | `@janus-scheduler/core` (Vue has no dedicated wrapper package yet) |
 
 > [!IMPORTANT]
+> **Always import types and core utilities from your framework wrapper** (e.g. `import { TimelineEvent, zonedInputToISO } from "@janus-scheduler/react"`).
 > **Never import from `@janus-scheduler/ui` for types** outside of the `ui` package and the wrapper packages' component implementations. The `@janus-scheduler/ui` package is for web component **class imports** (to trigger `customElements.define()`), not for shared type definitions.
 
 ---

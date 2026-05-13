@@ -1,4 +1,8 @@
-import { SchedulerManager } from "@janus-scheduler/core";
+import {
+  SchedulerManager,
+  getBrowserTimezone,
+  zonedInputToISO,
+} from "@janus-scheduler/core";
 
 export interface HookError {
   operation: string;
@@ -54,12 +58,13 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     });
 
     const today = new Date().toISOString().split("T")[0];
+    const tz = getBrowserTimezone();
 
     manager.addEvent({
       id: "e1",
       title: "Appendectomy",
-      startTime: `${today}T09:00:00Z`,
-      endTime: `${today}T11:30:00Z`,
+      startTime: zonedInputToISO(today, "09:00", tz),
+      endTime: zonedInputToISO(today, "11:30", tz),
       resourceId: "r1",
       status: "confirmed",
     });
@@ -67,8 +72,8 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     manager.addEvent({
       id: "e2",
       title: "Pre-op Assessment",
-      startTime: `${today}T13:00:00Z`,
-      endTime: `${today}T14:00:00Z`,
+      startTime: zonedInputToISO(today, "13:00", tz),
+      endTime: zonedInputToISO(today, "14:00", tz),
       resourceId: "r2",
       status: "confirmed",
     });

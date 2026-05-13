@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import { SchedulerManager } from "@janus-scheduler/react";
+import {
+  SchedulerManager,
+  getBrowserTimezone,
+  zonedInputToISO,
+} from "@janus-scheduler/react";
 
 export interface HookError {
   operation: string;
@@ -66,19 +70,20 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       mgr.addResource({ id: "r4", name: "MRI Scanner A", type: "equipment" });
 
       const today = new Date().toISOString().split("T")[0];
+      const tz = getBrowserTimezone();
       mgr.addEvent({
         id: "e1",
         title: "Appendectomy",
-        startTime: `${today}T09:00:00Z`,
-        endTime: `${today}T11:30:00Z`,
+        startTime: zonedInputToISO(today, "09:00", tz),
+        endTime: zonedInputToISO(today, "11:30", tz),
         resourceId: "r1",
         status: "confirmed",
       });
       mgr.addEvent({
         id: "e2",
         title: "Pre-op Assessment",
-        startTime: `${today}T13:00:00Z`,
-        endTime: `${today}T14:00:00Z`,
+        startTime: zonedInputToISO(today, "13:00", tz),
+        endTime: zonedInputToISO(today, "14:00", tz),
         resourceId: "r2",
         status: "confirmed",
       });

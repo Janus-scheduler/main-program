@@ -15,7 +15,11 @@ import { JanusMonthGrid } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _mg = JanusMonthGrid;
-import { schedulerStore, type TimelineEvent } from "@janus-scheduler/core";
+import {
+  schedulerStore,
+  isoToZonedDisplay,
+  type TimelineEvent,
+} from "@janus-scheduler/core";
 
 @Component({
   selector: "janus-month-grid-ng",
@@ -106,18 +110,22 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     const coreEvents = Object.values(state.events) as any[];
     if (coreEvents.length === 0) return;
 
+    const tz = state.timezone;
     const mapped = coreEvents.map((e) => {
       const startD = new Date(e.startTime);
       const endD = new Date(e.endTime);
-      const pad = (n: number) => n.toString().padStart(2, "0");
-      const localDate = `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`;
+      const { date: localDate, time: startTime } = isoToZonedDisplay(
+        e.startTime,
+        tz,
+      );
+      const { time: endTime } = isoToZonedDisplay(e.endTime, tz);
       return {
         id: e.id,
         title: e.title,
         color: "blue",
         date: localDate,
-        startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
-        endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+        startTime,
+        endTime,
       };
     });
 

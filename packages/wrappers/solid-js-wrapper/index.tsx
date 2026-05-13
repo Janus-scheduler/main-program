@@ -19,7 +19,13 @@ import type {
   AssignmentData,
 } from "@janus-scheduler/core";
 
-export { SchedulerManager } from "@janus-scheduler/core";
+export {
+  SchedulerManager,
+  getBrowserTimezone,
+  isoToZonedDisplay,
+  zonedInputToISO,
+  schedulerStore,
+} from "@janus-scheduler/core";
 export type { SchedulerHooks } from "@janus-scheduler/core";
 
 export type {
@@ -79,9 +85,9 @@ export interface SchedulerProps {
   description?: string;
   activeColor?: string;
   error?: string | null;
-  onClose?: (e: CustomEvent<void>) => void;
-  onSave?: (e: CustomEvent<SchedulerSaveData>) => void;
-  onDelete?: (e: CustomEvent<SchedulerDeleteData>) => void;
+  onClose?: () => void;
+  onSave?: (detail: SchedulerSaveData) => void;
+  onDelete?: (detail: SchedulerDeleteData) => void;
 }
 
 export const Scheduler: Component<SchedulerProps> = (props) => {
@@ -105,15 +111,16 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
   });
 
   onMount(() => {
-    const attach = (eventName: string, handler?: (e: Event) => void) => {
+    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
       if (handler) {
-        ref?.addEventListener(eventName, handler);
-        onCleanup(() => ref?.removeEventListener(eventName, handler));
+        const listener = (e: Event) => handler((e as CustomEvent).detail);
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
       }
     };
-    attach("close", props.onClose as (e: Event) => void);
-    attach("save", props.onSave as (e: Event) => void);
-    attach("delete", props.onDelete as (e: Event) => void);
+    attach("close", props.onClose);
+    attach("save", props.onSave);
+    attach("delete", props.onDelete);
   });
 
   return (
@@ -143,12 +150,12 @@ export interface TimelineProps {
   view?: "Timeline" | "Month";
   currentDate?: Date;
   aiPrompt?: string;
-  onEventClick?: (e: CustomEvent<TimelineEvent>) => void;
-  onAddEvent?: (e: Event) => void;
-  onEventMove?: (e: CustomEvent) => void;
-  onEventResize?: (e: CustomEvent) => void;
-  onEventCreate?: (e: CustomEvent) => void;
-  onViewChange?: (e: CustomEvent) => void;
+  onEventClick?: (detail: TimelineEvent) => void;
+  onAddEvent?: () => void;
+  onEventMove?: (detail: EventMoveDetail) => void;
+  onEventResize?: (detail: EventResizeDetail) => void;
+  onEventCreate?: (detail: EventCreateDetail) => void;
+  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
 }
 
 export const Timeline: Component<TimelineProps> = (props) => {
@@ -165,17 +172,19 @@ export const Timeline: Component<TimelineProps> = (props) => {
   });
 
   onMount(() => {
-    const attach = (eventName: string, handler?: (e: Event) => void) => {
+    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
       if (handler) {
-        ref?.addEventListener(eventName, handler);
-        onCleanup(() => ref?.removeEventListener(eventName, handler));
+        const listener = (e: Event) => handler((e as CustomEvent).detail);
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
       }
     };
-    attach("event-click", props.onEventClick as (e: Event) => void);
-    attach("add-event", props.onAddEvent as (e: Event) => void);
-    attach("event-move", props.onEventMove as (e: Event) => void);
-    attach("event-resize", props.onEventResize as (e: Event) => void);
-    attach("event-create", props.onEventCreate as (e: Event) => void);
+    attach("event-click", props.onEventClick);
+    attach("add-event", props.onAddEvent);
+    attach("event-move", props.onEventMove);
+    attach("event-resize", props.onEventResize);
+    attach("event-create", props.onEventCreate);
+    attach("view-change", props.onViewChange);
   });
 
   return (
@@ -199,26 +208,27 @@ export const Timeline: Component<TimelineProps> = (props) => {
  * The component reads directly from the Zustand store.
  */
 export interface MonthGridProps {
-  onEventClick?: (e: CustomEvent<TimelineEvent>) => void;
-  onDayClick?: (e: CustomEvent<{ date: string }>) => void;
-  onAddEvent?: (e: CustomEvent<void>) => void;
-  onViewChange?: (e: CustomEvent<{ view: "Timeline" | "Month" }>) => void;
+  onEventClick?: (detail: TimelineEvent) => void;
+  onDayClick?: (detail: { date: string }) => void;
+  onAddEvent?: () => void;
+  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
 }
 
 export const MonthGrid: Component<MonthGridProps> = (props) => {
   let ref!: HTMLElement;
 
   onMount(() => {
-    const attach = (eventName: string, handler?: (e: Event) => void) => {
+    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
       if (handler) {
-        ref?.addEventListener(eventName, handler);
-        onCleanup(() => ref?.removeEventListener(eventName, handler));
+        const listener = (e: Event) => handler((e as CustomEvent).detail);
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
       }
     };
-    attach("event-click", props.onEventClick as (e: Event) => void);
-    attach("day-click", props.onDayClick as (e: Event) => void);
-    attach("add-event", props.onAddEvent as (e: Event) => void);
-    attach("view-change", props.onViewChange as (e: Event) => void);
+    attach("event-click", props.onEventClick);
+    attach("day-click", props.onDayClick);
+    attach("add-event", props.onAddEvent);
+    attach("view-change", props.onViewChange);
   });
 
   return (

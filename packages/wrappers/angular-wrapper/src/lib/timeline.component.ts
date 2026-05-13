@@ -22,7 +22,7 @@ import type {
   EventResizeDetail,
   EventCreateDetail,
 } from "./types";
-import { schedulerStore } from "@janus-scheduler/core";
+import { schedulerStore, isoToZonedDisplay } from "@janus-scheduler/core";
 
 /**
  * TimelineComponent
@@ -190,16 +190,18 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
         .map((e: any) => {
           const startD = new Date(e.startTime);
           const endD = new Date(e.endTime);
-          const pad = (n: number) => n.toString().padStart(2, "0");
+          const tz = state.timezone;
+          const { time: startTime } = isoToZonedDisplay(e.startTime, tz);
+          const { time: endTime, date } = isoToZonedDisplay(e.endTime, tz);
           return {
             id: e.id,
             title: e.title,
-            startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
-            endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+            startTime,
+            endTime,
             startMs: startD.getTime(),
             endMs: endD.getTime(),
             color: "blue" as const,
-            date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
+            date,
           };
         });
 

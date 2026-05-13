@@ -1,6 +1,6 @@
 {
   "name": "@janus-scheduler/react",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "./dist/janus-scheduler-react.cjs.js",
   "module": "./dist/janus-scheduler-react.es.js",
@@ -12,14 +12,19 @@
       "types": "./dist/index.d.ts"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "vite build"
   },
-  "dependencies": {
-    "@janus-scheduler/ui": "^1.0.0",
-    "@lit/react": "^1.0.4",
+  "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "dependencies": {
+    "@janus-scheduler/ui": "^1.0.0",
+    "@lit/react": "^1.0.4"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

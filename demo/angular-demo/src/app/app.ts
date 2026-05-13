@@ -15,8 +15,12 @@ import {
   type EventResizeDetail,
   type EventCreateDetail,
   type ViewType,
+  SchedulerManager,
+  getBrowserTimezone,
+  zonedInputToISO,
+  isoToZonedDisplay,
+  schedulerStore,
 } from '@janus-scheduler/angular';
-import { SchedulerManager } from '@janus-scheduler/core';
 
 @Component({
   selector: 'app-root',
@@ -37,12 +41,11 @@ export class App {
     return id ? this.manager.getEvent(id) : null;
   });
 
+  // Convert a UTC ISO string → local { date, time } using the store's selected timezone.
   private splitISO(iso: string | undefined) {
     if (!iso) return { date: undefined, time: undefined };
-    const clean = iso.replace('Z', '');
-    const [datePart, timePart = ''] = clean.split('T');
-    const time = timePart.slice(0, 5); // "HH:mm"
-    return { date: datePart, time };
+    const { date, time } = isoToZonedDisplay(iso, schedulerStore.getState().timezone);
+    return { date, time };
   }
 
   startParts = computed(() => this.splitISO(this.storeEvent()?.startTime));
@@ -80,12 +83,13 @@ export class App {
 
     // Same events as React demo
     const today = new Date().toISOString().split('T')[0];
+    const tz = getBrowserTimezone();
 
     this.manager.addEvent({
       id: 'e1',
       title: 'Appendectomy',
-      startTime: `${today}T09:00:00Z`,
-      endTime: `${today}T11:30:00Z`,
+      startTime: zonedInputToISO(today, '09:00', tz),
+      endTime: zonedInputToISO(today, '11:30', tz),
       resourceId: 'r1',
       status: 'confirmed',
     });
@@ -93,8 +97,8 @@ export class App {
     this.manager.addEvent({
       id: 'e2',
       title: 'Pre-op Assessment',
-      startTime: `${today}T13:00:00Z`,
-      endTime: `${today}T14:00:00Z`,
+      startTime: zonedInputToISO(today, '13:00', tz),
+      endTime: zonedInputToISO(today, '14:00', tz),
       resourceId: 'r2',
       status: 'confirmed',
     });
@@ -122,8 +126,8 @@ export class App {
       const eventData = {
         id: data.id || `evt_${Date.now()}`,
         title: data.title,
-        startTime: `${data.startDate}T${data.startTime}:00Z`,
-        endTime: `${data.startDate}T${data.endTime}:00Z`,
+        startTime: zonedInputToISO(data.startDate, data.startTime, data.timezone),
+        endTime: zonedInputToISO(data.endDate, data.endTime, data.timezone),
         resourceId: data.participants[0] || 'unassigned',
         description: data.description,
         status: 'confirmed' as const,

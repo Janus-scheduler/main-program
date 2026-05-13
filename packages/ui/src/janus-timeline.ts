@@ -1,7 +1,11 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
-import { schedulerStore } from "@janus-scheduler/core";
+import {
+  schedulerStore,
+  isoToZonedDisplay,
+  toFakeLocalDate,
+} from "@janus-scheduler/core";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
 import {
@@ -87,14 +91,15 @@ export class JanusTimeline extends LitElement {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _syncFromStore(state: any) {
+    const tz =
+      (state.timezone as string) ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newResources: TimelineResource[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const coreEvents = Object.values(state.events) as any[];
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const coreResources = Object.values(state.resources) as any[];
 
-    // Define ordering for types
     const typeOrder: Record<string, number> = {
       person: 1,
       room: 2,
@@ -114,17 +119,17 @@ export class JanusTimeline extends LitElement {
         .map((e) => {
           const startD = new Date(e.startTime);
           const endD = new Date(e.endTime);
-          const pad = (n: number) => n.toString().padStart(2, "0");
+          const { time: startTime } = isoToZonedDisplay(e.startTime, tz);
+          const { time: endTime, date } = isoToZonedDisplay(e.endTime, tz);
           return {
             id: e.id,
             title: e.title,
-            // Use LOCAL time for display labels (matches column header format)
-            startTime: `${pad(startD.getHours())}:${pad(startD.getMinutes())}`,
-            endTime: `${pad(endD.getHours())}:${pad(endD.getMinutes())}`,
+            startTime,
+            endTime,
             startMs: startD.getTime(),
             endMs: endD.getTime(),
             color: "blue",
-            date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
+            date,
           } as TimelineEvent;
         });
 
@@ -471,13 +476,16 @@ export class JanusTimeline extends LitElement {
     const viewEndMs = this._getViewEndMs();
     const level = getActiveZoomLevel(pxPerMs);
 
-    // Generate columns and super-labels
-    const columns = generateColumns(viewStartMs, viewEndMs, pxPerMs, level);
+    const tz = schedulerStore.getState().timezone;
+
+    // Generate columns and super-labels (timezone-aware)
+    const columns = generateColumns(viewStartMs, viewEndMs, pxPerMs, level, tz);
     const superLabels = generateSuperLabels(
       viewStartMs,
       viewEndMs,
       pxPerMs,
       level,
+      tz,
     );
 
     // Total width of the rendered content (fixed)
@@ -538,9 +546,9 @@ export class JanusTimeline extends LitElement {
       viewStartMs,
     );
 
-    // Nav label
+    // Nav label (timezone-aware)
     const visibleCenter = this._getVisibleCenterMs();
-    const navLabel = formatNavDate(visibleCenter, level);
+    const navLabel = formatNavDate(visibleCenter, level, tz);
 
     return html`
       <div class="tl-component-shell">

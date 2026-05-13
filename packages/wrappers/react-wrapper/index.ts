@@ -10,26 +10,50 @@ import {
 // Re-export core API so React consumers can import everything from one package:
 //   import { Timeline, SchedulerManager, SchedulerHooks } from '@janus-scheduler/react'
 // ─────────────────────────────────────────────────────────────────────────────
-export { SchedulerManager } from "@janus-scheduler/core";
-export type { SchedulerHooks } from "@janus-scheduler/core";
+export {
+  SchedulerManager,
+  getBrowserTimezone,
+  isoToZonedDisplay,
+  zonedInputToISO,
+  schedulerStore,
+} from "@janus-scheduler/core";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Re-export UI event-detail types so the host app can type its callbacks
-// without importing from @janus-scheduler/ui directly.
-// ─────────────────────────────────────────────────────────────────────────────
-export type {
+import type {
+  SchedulerHooks,
   TimelineEvent,
   TimelineResource,
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
   SchedulerSaveData,
+  SchedulerDeleteData,
   EventColor,
   ViewType,
   EventData,
   ResourceData,
   AssignmentData,
 } from "@janus-scheduler/core";
+
+export type {
+  SchedulerHooks,
+  TimelineEvent,
+  TimelineResource,
+  EventMoveDetail,
+  EventResizeDetail,
+  EventCreateDetail,
+  SchedulerSaveData,
+  SchedulerDeleteData,
+  EventColor,
+  ViewType,
+  EventData,
+  ResourceData,
+  AssignmentData,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Re-export UI event-detail types so the host app can type its callbacks
+// without importing from @janus-scheduler/ui directly.
+// ─────────────────────────────────────────────────────────────────────────────
 
 export { Event, Resource, Assignment } from "@janus-scheduler/core";
 
@@ -39,31 +63,13 @@ export { Event, Resource, Assignment } from "@janus-scheduler/core";
 // The Lit @customElement decorator auto-registers the web components when the
 // module is imported — no manual customElements.define() is needed.
 //
-// Each `events` map converts a Web Component CustomEvent name to its
-// React prop name. The host receives a native CustomEvent; use `.detail`
-// to access the typed payload.
-//
-// Example:
-//   <Timeline
-//     onEventMove={(e: CustomEvent<EventMoveDetail>) => manager.updateEvent(...)}
-//     onEventCreate={(e: CustomEvent<EventCreateDetail>) => manager.addEvent(...)}
-//   />
+// We internally use `@lit/react` to map the custom elements to React, and then
+// we wrap those in functional components to "unwrap" the CustomEvent objects.
+// This allows the React consumer to receive the pure data payload rather than
+// having to access `e.detail`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * <Scheduler> — Modal form for creating or editing a single event.
- *
- * Props:
- *  - eventId  — string | null. Pass the event's ID when opening in edit mode;
- *               omit or pass null for create mode.
- *
- * Events:
- *  - onSave   → CustomEvent<SchedulerSaveData>             — user submitted the form
- *                 detail.id is null (create) or the event ID (edit)
- *  - onDelete → CustomEvent<{ id: string | null; title: string }> — user clicked Delete
- *  - onClose  → CustomEvent<void>                          — user dismissed the modal
- */
-export const Scheduler = createComponent({
+const _Scheduler = createComponent({
   tagName: "janus-scheduler",
   elementClass: JanusSchedulerWC,
   react: React,
@@ -74,20 +80,40 @@ export const Scheduler = createComponent({
   },
 });
 
-/**
- * <Timeline> — Horizontal resource/time-axis view with drag-and-drop.
- *
- * Events:
- *  - onEventClick   → CustomEvent<TimelineEvent>       — user clicked an event chip
- *  - onAddEvent     → CustomEvent<void>                — user clicked the + FAB
- *  - onEventMove    → CustomEvent<EventMoveDetail>     — drag completed (move)
- *  - onEventResize  → CustomEvent<EventResizeDetail>   — drag completed (resize)
- *  - onEventCreate  → CustomEvent<EventCreateDetail>   — drag completed (new event)
- *
- * The component reads directly from the Zustand store, so you only need
- * to call manager.addEvent() / manager.updateEvent() — the UI updates automatically.
- */
-export const Timeline = createComponent({
+export interface SchedulerProps extends React.HTMLAttributes<HTMLElement> {
+  eventId?: string | null;
+  title?: string;
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  participants?: string[];
+  description?: string;
+  activeColor?: string;
+  error?: string | null;
+  onClose?: () => void;
+  onSave?: (detail: SchedulerSaveData) => void;
+  onDelete?: (detail: { id: string | null; title: string }) => void;
+}
+
+export function Scheduler(props: SchedulerProps): React.JSX.Element {
+  return React.createElement(_Scheduler, {
+    ...props,
+    onClose: props.onClose ? () => props.onClose!() : undefined,
+    onSave: props.onSave
+      ? (e: Event) =>
+          props.onSave!((e as CustomEvent<SchedulerSaveData>).detail)
+      : undefined,
+    onDelete: props.onDelete
+      ? (e: Event) =>
+          props.onDelete!(
+            (e as CustomEvent<{ id: string | null; title: string }>).detail,
+          )
+      : undefined,
+  });
+}
+
+const _Timeline = createComponent({
   tagName: "janus-timeline",
   elementClass: JanusTimelineWC,
   react: React,
@@ -101,18 +127,49 @@ export const Timeline = createComponent({
   },
 });
 
-/**
- * <MonthGrid> — Monthly calendar view showing event chips per day.
- *
- * Events:
- *  - onEventClick → CustomEvent<TimelineEvent>        — user clicked an event chip
- *  - onDayClick   → CustomEvent<{ date: string }>     — user clicked an empty day cell
- *  - onAddEvent   → CustomEvent<void>                 — user clicked the + FAB
- *  - onViewChange → CustomEvent<{ view: "Timeline" | "Month" }> — user switched views
- *
- * The component reads directly from the Zustand store.
- */
-export const MonthGrid = createComponent({
+export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
+  resources?: TimelineResource[];
+  view?: "Timeline" | "Month";
+  currentDate?: Date;
+  aiPrompt?: string;
+  onEventClick?: (detail: TimelineEvent) => void;
+  onEventMove?: (detail: EventMoveDetail) => void;
+  onEventResize?: (detail: EventResizeDetail) => void;
+  onEventCreate?: (detail: EventCreateDetail) => void;
+  onAddEvent?: () => void;
+  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+}
+
+export function Timeline(props: TimelineProps): React.JSX.Element {
+  return React.createElement(_Timeline, {
+    ...props,
+    onEventClick: props.onEventClick
+      ? (e: Event) =>
+          props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+      : undefined,
+    onEventMove: props.onEventMove
+      ? (e: Event) =>
+          props.onEventMove!((e as CustomEvent<EventMoveDetail>).detail)
+      : undefined,
+    onEventResize: props.onEventResize
+      ? (e: Event) =>
+          props.onEventResize!((e as CustomEvent<EventResizeDetail>).detail)
+      : undefined,
+    onEventCreate: props.onEventCreate
+      ? (e: Event) =>
+          props.onEventCreate!((e as CustomEvent<EventCreateDetail>).detail)
+      : undefined,
+    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+    onViewChange: props.onViewChange
+      ? (e: Event) =>
+          props.onViewChange!(
+            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+          )
+      : undefined,
+  });
+}
+
+const _MonthGrid = createComponent({
   tagName: "janus-month-grid",
   elementClass: JanusMonthGridWC,
   react: React,
@@ -123,3 +180,31 @@ export const MonthGrid = createComponent({
     onViewChange: "view-change",
   },
 });
+
+export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
+  onEventClick?: (detail: TimelineEvent) => void;
+  onDayClick?: (detail: { date: string }) => void;
+  onAddEvent?: () => void;
+  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+}
+
+export function MonthGrid(props: MonthGridProps): React.JSX.Element {
+  return React.createElement(_MonthGrid, {
+    ...props,
+    onEventClick: props.onEventClick
+      ? (e: Event) =>
+          props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+      : undefined,
+    onDayClick: props.onDayClick
+      ? (e: Event) =>
+          props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
+      : undefined,
+    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+    onViewChange: props.onViewChange
+      ? (e: Event) =>
+          props.onViewChange!(
+            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+          )
+      : undefined,
+  });
+}
