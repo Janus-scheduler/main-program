@@ -29,6 +29,7 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.2.3",
     "jest": "^30.2.0",
@@ -37,6 +38,7 @@
     "vite-plugin-dts": "^4.5.4"
   },
   "dependencies": {
+    "crypto-js": "^4.2.0",
     "zustand": "^5.0.12"
   }
 }

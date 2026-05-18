@@ -28,3 +28,6 @@ export {
   formatTimezoneLabel,
   getAllTimezones,
 } from "./utils/time";
+
+// ── Security ──
+export { SecureApiClient, secureApiClient } from "./security/SecureApiClient";

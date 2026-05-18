@@ -3,7 +3,8 @@ import {
   SchedulerManager,
   getBrowserTimezone,
   zonedInputToISO,
-} from "@janus-scheduler/react";
+  secureApiClient,
+} from "@janus-scheduler/core";
 
 export interface HookError {
   operation: string;
@@ -20,7 +21,10 @@ export interface HookError {
  * @param onError - called when any async hook rejects after a store rollback
  * @returns the configured SchedulerManager instance (stable across renders)
  */
-export function useSchedulerManager(onError: (err: HookError) => void) {
+export function useSchedulerManager(
+  onError: (err: HookError) => void,
+  isSecure: boolean = false,
+) {
   const manager = useMemo(() => {
     const mgr = new SchedulerManager({
       // ── onEventAdd ────────────────────────────────────────────────────
@@ -30,23 +34,49 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       // Replace with a real fetch() in production:
       //   await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) })
       onEventAdd: async (_event) => {
-        await new Promise((r) => setTimeout(r, 400)); // simulate network latency
-        console.log(_event);
-        return; // ← success path
-        // throw new Error("HTTP 500 (simulated)"); // ← uncomment to test rollback
+        if (isSecure) {
+          await secureApiClient.secureFetch(
+            "http://localhost:3001/api/secure/events",
+            "POST",
+            _event,
+          );
+        } else {
+          await fetch("http://localhost:3001/api/insecure/events", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(_event),
+          });
+        }
       },
 
-      // onEventUpdate: async (event) => {
-      //   const res = await fetch(`/api/events/${event.id}`, {
-      //     method: 'PATCH',
-      //     body: JSON.stringify(event),
-      //   });
-      //   if (!res.ok) throw new Error(`Server error ${res.status}`);
-      // },
+      onEventUpdate: async (event) => {
+        if (isSecure) {
+          await secureApiClient.secureFetch(
+            `http://localhost:3001/api/secure/events/${event.id}`,
+            "PUT",
+            event,
+          );
+        } else {
+          await fetch(`http://localhost:3001/api/insecure/events/${event.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(event),
+          });
+        }
+      },
 
-      // onEventDelete: async (id) => {
-      //   await fetch(`/api/events/${id}`, { method: 'DELETE' });
-      // },
+      onEventDelete: async (id) => {
+        if (isSecure) {
+          await secureApiClient.secureFetch(
+            `http://localhost:3001/api/secure/events/${id}`,
+            "DELETE",
+          );
+        } else {
+          await fetch(`http://localhost:3001/api/insecure/events/${id}`, {
+            method: "DELETE",
+          });
+        }
+      },
 
       // ── onError ───────────────────────────────────────────────────────
       // The store has already been rolled back before this fires.
@@ -91,7 +121,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
 
     return mgr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // manager is intentionally created once
+  }, [isSecure]); // manager is recreated when isSecure toggles so hooks use updated state
 
   return manager;
 }
