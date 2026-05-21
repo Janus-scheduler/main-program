@@ -21,6 +21,7 @@
     "merge-descriptors": "^1.0.3",
     "mime-db": "^1.52.0",
     "mime-types": "^2.1.35",
+    "mongoose": "^9.6.2",
     "negotiator": "^0.6.3",
     "path-to-regexp": "^0.1.13",
     "raw-body": "^2.5.3",

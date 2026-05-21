@@ -2,6 +2,12 @@ import express from "express";
 import cors from "cors";
 import jwt from "jsonwebtoken";
 import CryptoJS from "crypto-js";
+import dotenv from "dotenv";
+import mongoose from "mongoose";
+import Event from "./models/Event.js";
+import Resource from "./models/Resource.js";
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -9,13 +15,21 @@ app.use(express.json()); // Allow JSON body parsing
 
 const PORT = 3001;
 
-// Define static secrets for demo purposes
-// In a real app, these should be loaded from .env
-const JWT_SECRET = "janus-super-secret-jwt-key";
-const AES_SECRET = "janus-super-secret-aes-key";
+// Load secrets from .env
+const JWT_SECRET = process.env.JWT_SECRET || "fallback-jwt-secret";
+const AES_SECRET = process.env.AES_SECRET || "fallback-aes-secret";
+const MONGO_URI = process.env.MONGO_URI;
 
-// Mock DB
-let eventsDB = [];
+if (!MONGO_URI) {
+  console.error("FATAL: MONGO_URI is missing from .env");
+  process.exit(1);
+}
+
+// Connect to MongoDB
+mongoose
+  .connect(MONGO_URI)
+  .then(() => console.log("✅ Successfully connected to MongoDB"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 // ---------------------------------------------------------
 // 1. Authentication (Login) Endpoint
@@ -99,27 +113,59 @@ const requireSecurePayload = (req, res, next) => {
 };
 
 // ---------------------------------------------------------
-// 4. Endpoints
+// 4. Endpoints (MongoDB)
 // ---------------------------------------------------------
 
-// --- INSECURE ENDPOINT (For Demonstration Comparison) ---
-app.post("/api/insecure/events", (req, res) => {
-  console.log("\n[INSECURE] Received plain text event:", req.body);
-  eventsDB.push(req.body);
-  res.json({ success: true, event: req.body });
+// --- SEEDING LOGIC ---
+async function seedDatabaseIfEmpty() {
+  const count = await Resource.countDocuments();
+  if (count === 0) {
+    console.log("🌱 Database is empty. Seeding initial data...");
+
+    await Resource.create([
+      { id: "r1", name: "Dr. Sarah Chen", type: "person" },
+      { id: "r2", name: "Dr. Michael Ross", type: "person" },
+      { id: "r3", name: "Operating Room 1", type: "room" },
+      { id: "r4", name: "MRI Scanner A", type: "equipment" },
+    ]);
+
+    const today = new Date().toISOString().split("T")[0];
+    await Event.create([
+      {
+        id: "e1",
+        title: "Appendectomy",
+        startTime: `${today}T09:00:00.000Z`,
+        endTime: `${today}T11:30:00.000Z`,
+        resourceId: "r1",
+        status: "confirmed",
+      },
+      {
+        id: "e2",
+        title: "Pre-op Assessment",
+        startTime: `${today}T13:00:00.000Z`,
+        endTime: `${today}T14:00:00.000Z`,
+        resourceId: "r2",
+        status: "confirmed",
+      },
+    ]);
+    console.log("✅ Seeding complete.");
+  }
+}
+
+// --- GET DATA ENDPOINT ---
+app.get("/api/insecure/data", async (req, res) => {
+  await seedDatabaseIfEmpty();
+  const events = await Event.find({}, "-_id -__v");
+  const resources = await Resource.find({}, "-_id -__v");
+  res.json({ events, resources });
 });
 
-// --- SECURE ENDPOINT ---
-app.post("/api/secure/events", verifyJWT, requireSecurePayload, (req, res) => {
-  console.log(
-    `\n[SECURE] Received encrypted request from user: ${req.user.username}`,
-  );
-  console.log(`[SECURE] Successfully decrypted payload:`, req.body);
+app.get("/api/secure/data", verifyJWT, async (req, res) => {
+  await seedDatabaseIfEmpty();
+  const events = await Event.find({}, "-_id -__v");
+  const resources = await Resource.find({}, "-_id -__v");
 
-  eventsDB.push(req.body);
-
-  // We should also encrypt the response
-  const responseData = { success: true, event: req.body };
+  const responseData = { events, resources };
   const jsonString = JSON.stringify(responseData);
   const responseCipherText = CryptoJS.AES.encrypt(
     jsonString,
@@ -129,14 +175,56 @@ app.post("/api/secure/events", verifyJWT, requireSecurePayload, (req, res) => {
   res.json({ cipherText: responseCipherText });
 });
 
+// --- INSECURE ENDPOINT (For Demonstration Comparison) ---
+app.post("/api/insecure/events", async (req, res) => {
+  try {
+    console.log("\n[INSECURE] Received plain text event:", req.body);
+    await Event.create(req.body);
+    res.json({ success: true, event: req.body });
+  } catch (err) {
+    console.error("[INSECURE] Error creating event:", err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// --- SECURE ENDPOINT ---
+app.post(
+  "/api/secure/events",
+  verifyJWT,
+  requireSecurePayload,
+  async (req, res) => {
+    try {
+      console.log(
+        `\n[SECURE] Received encrypted POST request from user: ${req.user.username}`,
+      );
+      console.log(`[SECURE] Successfully decrypted payload:`, req.body);
+
+      await Event.create(req.body);
+
+      const responseData = { success: true, event: req.body };
+      const jsonString = JSON.stringify(responseData);
+      const responseCipherText = CryptoJS.AES.encrypt(
+        jsonString,
+        AES_SECRET,
+      ).toString();
+
+      res.json({ cipherText: responseCipherText });
+    } catch (err) {
+      console.error("[SECURE] Error creating event:", err.message);
+      res.status(400).json({ error: err.message });
+    }
+  },
+);
+
 // --- PUT ENDPOINTS ---
-app.put("/api/insecure/events/:id", (req, res) => {
+app.put("/api/insecure/events/:id", async (req, res) => {
   console.log(
     `\n[INSECURE] Received plain text event update for ID: ${req.params.id}`,
     req.body,
   );
-  const index = eventsDB.findIndex((e) => e.id === req.params.id);
-  if (index !== -1) eventsDB[index] = { ...eventsDB[index], ...req.body };
+  await Event.findOneAndUpdate({ id: req.params.id }, req.body, {
+    upsert: true,
+  });
   res.json({ success: true, event: req.body });
 });
 
@@ -144,14 +232,15 @@ app.put(
   "/api/secure/events/:id",
   verifyJWT,
   requireSecurePayload,
-  (req, res) => {
+  async (req, res) => {
     console.log(
       `\n[SECURE] Received encrypted update request for ID: ${req.params.id} from user: ${req.user.username}`,
     );
     console.log(`[SECURE] Successfully decrypted update payload:`, req.body);
 
-    const index = eventsDB.findIndex((e) => e.id === req.params.id);
-    if (index !== -1) eventsDB[index] = { ...eventsDB[index], ...req.body };
+    await Event.findOneAndUpdate({ id: req.params.id }, req.body, {
+      upsert: true,
+    });
 
     const responseData = { success: true, event: req.body };
     const jsonString = JSON.stringify(responseData);
@@ -165,9 +254,9 @@ app.put(
 );
 
 // --- DELETE ENDPOINTS ---
-app.delete("/api/insecure/events/:id", (req, res) => {
+app.delete("/api/insecure/events/:id", async (req, res) => {
   console.log(`\n[INSECURE] Received delete request for ID: ${req.params.id}`);
-  eventsDB = eventsDB.filter((e) => e.id !== req.params.id);
+  await Event.findOneAndDelete({ id: req.params.id });
   res.json({ success: true });
 });
 
@@ -175,11 +264,11 @@ app.delete(
   "/api/secure/events/:id",
   verifyJWT,
   requireSecurePayload,
-  (req, res) => {
+  async (req, res) => {
     console.log(
       `\n[SECURE] Received secure delete request for ID: ${req.params.id} from user: ${req.user.username}`,
     );
-    eventsDB = eventsDB.filter((e) => e.id !== req.params.id);
+    await Event.findOneAndDelete({ id: req.params.id });
 
     const responseData = { success: true };
     const jsonString = JSON.stringify(responseData);
@@ -188,6 +277,71 @@ app.delete(
       AES_SECRET,
     ).toString();
 
+    res.json({ cipherText: responseCipherText });
+  },
+);
+
+// --- RESOURCE ENDPOINTS ---
+app.post("/api/insecure/resources", async (req, res) => {
+  await Resource.create(req.body);
+  res.json({ success: true, resource: req.body });
+});
+
+app.post(
+  "/api/secure/resources",
+  verifyJWT,
+  requireSecurePayload,
+  async (req, res) => {
+    await Resource.create(req.body);
+    const responseData = { success: true, resource: req.body };
+    const responseCipherText = CryptoJS.AES.encrypt(
+      JSON.stringify(responseData),
+      AES_SECRET,
+    ).toString();
+    res.json({ cipherText: responseCipherText });
+  },
+);
+
+app.put("/api/insecure/resources/:id", async (req, res) => {
+  await Resource.findOneAndUpdate({ id: req.params.id }, req.body, {
+    upsert: true,
+  });
+  res.json({ success: true, resource: req.body });
+});
+
+app.put(
+  "/api/secure/resources/:id",
+  verifyJWT,
+  requireSecurePayload,
+  async (req, res) => {
+    await Resource.findOneAndUpdate({ id: req.params.id }, req.body, {
+      upsert: true,
+    });
+    const responseData = { success: true, resource: req.body };
+    const responseCipherText = CryptoJS.AES.encrypt(
+      JSON.stringify(responseData),
+      AES_SECRET,
+    ).toString();
+    res.json({ cipherText: responseCipherText });
+  },
+);
+
+app.delete("/api/insecure/resources/:id", async (req, res) => {
+  await Resource.findOneAndDelete({ id: req.params.id });
+  res.json({ success: true });
+});
+
+app.delete(
+  "/api/secure/resources/:id",
+  verifyJWT,
+  requireSecurePayload,
+  async (req, res) => {
+    await Resource.findOneAndDelete({ id: req.params.id });
+    const responseData = { success: true };
+    const responseCipherText = CryptoJS.AES.encrypt(
+      JSON.stringify(responseData),
+      AES_SECRET,
+    ).toString();
     res.json({ cipherText: responseCipherText });
   },
 );
