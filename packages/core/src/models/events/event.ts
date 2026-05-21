@@ -24,6 +24,7 @@ export class Event {
     if (!this.id || !this.title || !this.resourceId) return false;
     const start = new Date(this.startTime);
     const end = new Date(this.endTime);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
     if (start >= end) return false;
     return true;
   }

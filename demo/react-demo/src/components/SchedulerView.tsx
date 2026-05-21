@@ -136,39 +136,40 @@ export function SchedulerView({
             try {
               if (data.id) {
                 manager.updateEvent(data.id, {
-                  title: data.title,
+                  title: data.title || "Untitled Event",
                   startTime: zonedInputToISO(
                     data.startDate || today,
-                    data.startTime,
+                    data.startTime || "09:00",
                     data.timezone,
                   ),
                   endTime: zonedInputToISO(
                     data.endDate || today,
-                    data.endTime,
+                    data.endTime || "10:00",
                     data.timezone,
                   ),
                   resourceId: data.participants?.[0] || "r1",
-                  description: data.description,
+                  description: data.description || "",
                   status: "confirmed",
                 });
               } else {
-                manager.addEvent({
+                const newEventPayload = {
                   id: `evt_${Date.now()}`,
-                  title: data.title,
+                  title: data.title || "Untitled Event",
                   startTime: zonedInputToISO(
                     data.startDate || today,
-                    data.startTime,
+                    data.startTime || "09:00",
                     data.timezone,
                   ),
                   endTime: zonedInputToISO(
                     data.endDate || today,
-                    data.endTime,
+                    data.endTime || "10:00",
                     data.timezone,
                   ),
                   resourceId: data.participants?.[0] || "r1",
-                  description: data.description,
-                  status: "confirmed",
-                });
+                  description: data.description || "",
+                  status: "confirmed" as const,
+                };
+                manager.addEvent(newEventPayload);
               }
               onCloseScheduler();
             } catch (err: unknown) {

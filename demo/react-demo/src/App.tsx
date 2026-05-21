@@ -39,8 +39,12 @@ function App() {
   }, []);
 
   // SchedulerManager is stable (created once via useMemo inside the hook)
-  // We pass isSecure so the hook can use the correct fetch path
-  const manager = useSchedulerManager(handleHookError, isSecure);
+  // We pass isSecure and isAuthenticated so the hook can fetch the correct data
+  const manager = useSchedulerManager(
+    handleHookError,
+    isSecure,
+    isAuthenticated,
+  );
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -85,30 +89,60 @@ function App() {
         <div
           style={{
             position: "absolute",
-            top: 16,
-            right: 16,
+            top: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
             zIndex: 100,
             display: "flex",
-            gap: "10px",
+            gap: "12px",
             alignItems: "center",
-            background: "#f8f9fa",
-            padding: "8px 16px",
-            borderRadius: "8px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+            background: "rgba(255, 255, 255, 0.85)",
+            backdropFilter: "blur(12px)",
+            padding: "8px 20px",
+            borderRadius: "30px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            border: "1px solid rgba(255,255,255,0.4)",
+            transition: "all 0.3s ease",
           }}
         >
-          <span style={{ fontWeight: 600 }}>🛡️ Secure Sync:</span>
+          <span style={{ fontWeight: 600, fontSize: "14px", color: "#374151" }}>
+            🛡️ Secure Sync
+          </span>
           <button
             onClick={handleToggleSecurity}
             style={{
               background: isSecure ? "#10b981" : "#ef4444",
               color: "white",
               border: "none",
-              padding: "4px 12px",
-              borderRadius: "4px",
+              padding: "6px 16px",
+              borderRadius: "20px",
               cursor: "pointer",
               fontWeight: "bold",
+              fontSize: "13px",
+              letterSpacing: "0.5px",
+              boxShadow: isSecure
+                ? "0 4px 12px rgba(16, 185, 129, 0.3)"
+                : "0 4px 12px rgba(239, 68, 68, 0.3)",
+              transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = isSecure
+                ? "0 6px 16px rgba(16, 185, 129, 0.4)"
+                : "0 6px 16px rgba(239, 68, 68, 0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = isSecure
+                ? "0 4px 12px rgba(16, 185, 129, 0.3)"
+                : "0 4px 12px rgba(239, 68, 68, 0.3)";
+            }}
+            onMouseDown={(e) =>
+              (e.currentTarget.style.transform = "translateY(1px)")
+            }
+            onMouseUp={(e) =>
+              (e.currentTarget.style.transform = "translateY(-1px)")
+            }
           >
             {isSecure ? "ON" : "OFF"}
           </button>

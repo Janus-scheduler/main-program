@@ -1,9 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import {
   SchedulerManager,
-  getBrowserTimezone,
-  zonedInputToISO,
   secureApiClient,
+  schedulerStore,
 } from "@janus-scheduler/core";
 
 export interface HookError {
@@ -16,7 +15,7 @@ export interface HookError {
  *
  * Creates and seeds the SchedulerManager singleton for the demo app.
  * Also configures the lifecycle hooks that connect Janus mutations
- * to a backend (simulated here) and handle errors.
+ * to a backend and handle errors.
  *
  * @param onError - called when any async hook rejects after a store rollback
  * @returns the configured SchedulerManager instance (stable across renders)
@@ -24,15 +23,11 @@ export interface HookError {
 export function useSchedulerManager(
   onError: (err: HookError) => void,
   isSecure: boolean = false,
+  isAuthenticated: boolean = false,
 ) {
   const manager = useMemo(() => {
     const mgr = new SchedulerManager({
       // ── onEventAdd ────────────────────────────────────────────────────
-      // Fires AFTER the store is updated (optimistic). If this throws,
-      // SchedulerManager automatically rolls back the store and calls onError.
-      //
-      // Replace with a real fetch() in production:
-      //   await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) })
       onEventAdd: async (_event) => {
         if (isSecure) {
           await secureApiClient.secureFetch(
@@ -78,9 +73,57 @@ export function useSchedulerManager(
         }
       },
 
+      // ── onResourceAdd ─────────────────────────────────────────────────
+      onResourceAdd: async (_resource) => {
+        if (isSecure) {
+          await secureApiClient.secureFetch(
+            "http://localhost:3001/api/secure/resources",
+            "POST",
+            _resource,
+          );
+        } else {
+          await fetch("http://localhost:3001/api/insecure/resources", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(_resource),
+          });
+        }
+      },
+
+      onResourceUpdate: async (resource) => {
+        if (isSecure) {
+          await secureApiClient.secureFetch(
+            `http://localhost:3001/api/secure/resources/${resource.id}`,
+            "PUT",
+            resource,
+          );
+        } else {
+          await fetch(
+            `http://localhost:3001/api/insecure/resources/${resource.id}`,
+            {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(resource),
+            },
+          );
+        }
+      },
+
+      onResourceDelete: async (id) => {
+        if (isSecure) {
+          await secureApiClient.secureFetch(
+            `http://localhost:3001/api/secure/resources/${id}`,
+            "DELETE",
+          );
+        } else {
+          await fetch(`http://localhost:3001/api/insecure/resources/${id}`, {
+            method: "DELETE",
+          });
+        }
+      },
+
       // ── onError ───────────────────────────────────────────────────────
       // The store has already been rolled back before this fires.
-      // We only need to surface a message to the user.
       onError: ({ operation, error }) => {
         const message =
           error instanceof Error
@@ -90,38 +133,54 @@ export function useSchedulerManager(
       },
     });
 
-    // ── Seed initial demo data ─────────────────────────────────────────
-    // Zustand store is a module singleton — this block only runs once
-    // even across React hot-reloads.
-    if (mgr.getResourceCount() === 0) {
-      mgr.addResource({ id: "r1", name: "Dr. Sarah Chen", type: "person" });
-      mgr.addResource({ id: "r2", name: "Dr. Michael Ross", type: "person" });
-      mgr.addResource({ id: "r3", name: "Operating Room 1", type: "room" });
-      mgr.addResource({ id: "r4", name: "MRI Scanner A", type: "equipment" });
-
-      const today = new Date().toISOString().split("T")[0];
-      const tz = getBrowserTimezone();
-      mgr.addEvent({
-        id: "e1",
-        title: "Appendectomy",
-        startTime: zonedInputToISO(today, "09:00", tz),
-        endTime: zonedInputToISO(today, "11:30", tz),
-        resourceId: "r1",
-        status: "confirmed",
-      });
-      mgr.addEvent({
-        id: "e2",
-        title: "Pre-op Assessment",
-        startTime: zonedInputToISO(today, "13:00", tz),
-        endTime: zonedInputToISO(today, "14:00", tz),
-        resourceId: "r2",
-        status: "confirmed",
-      });
-    }
-
     return mgr;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSecure]); // manager is recreated when isSecure toggles so hooks use updated state
+
+  // ── Initial Data Fetching ─────────────────────────────────────────
+  useEffect(() => {
+    async function loadData() {
+      try {
+        //eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let data: any = null;
+        if (isSecure) {
+          // If we are in secure mode, we MUST be authenticated to fetch data
+          if (!isAuthenticated) return;
+
+          data = await secureApiClient.secureFetch(
+            "http://localhost:3001/api/secure/data",
+            "GET",
+          );
+        } else {
+          // Insecure mode
+          const res = await fetch("http://localhost:3001/api/insecure/data");
+          if (res.ok) {
+            data = await res.json();
+          }
+        }
+
+        if (data) {
+          schedulerStore.getState().clearAll();
+          if (data.resources) {
+            //eslint-disable-next-line @typescript-eslint/no-explicit-any
+            data.resources.forEach((r: any) =>
+              schedulerStore.getState().addResource(r),
+            );
+          }
+          if (data.events) {
+            //eslint-disable-next-line @typescript-eslint/no-explicit-any
+            data.events.forEach((e: any) =>
+              schedulerStore.getState().addEvent(e),
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load initial data", err);
+      }
+    }
+
+    loadData();
+  }, [manager, isSecure, isAuthenticated]);
 
   return manager;
 }
