@@ -23,5 +23,3 @@ export class Assignment {
     return !!(this.id && this.eventId && this.resourceId);
   }
 }
-
-// chathura test
