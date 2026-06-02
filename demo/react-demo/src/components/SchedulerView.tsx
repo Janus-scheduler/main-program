@@ -80,9 +80,20 @@ export function SchedulerView({
         <Timeline
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
-          onEventMove={({ event, newResourceId, newStartTime, newEndTime }) => {
+          onEventMove={({
+            event,
+            oldResourceId,
+            newResourceId,
+            newStartTime,
+            newEndTime,
+          }) => {
+            const currentEvent = manager.getEvent(event.id);
+            if (!currentEvent) return;
+            const updatedResourceIds = currentEvent.resourceIds.map((id) =>
+              id === oldResourceId ? newResourceId : id,
+            );
             manager.updateEvent(event.id, {
-              resourceId: newResourceId,
+              resourceIds: updatedResourceIds,
               startTime: newStartTime,
               endTime: newEndTime,
             });
@@ -99,7 +110,7 @@ export function SchedulerView({
               title: "New Event",
               startTime,
               endTime,
-              resourceId,
+              resourceIds: [resourceId],
               status: "confirmed",
             });
           }}
@@ -128,7 +139,7 @@ export function SchedulerView({
           endDate={endParts?.date}
           endTime={endParts?.time}
           participants={
-            storeEvent?.resourceId ? [storeEvent.resourceId] : undefined
+            storeEvent?.resourceIds ? storeEvent.resourceIds : undefined
           }
           description={storeEvent?.description}
           onSave={(data) => {
@@ -147,7 +158,7 @@ export function SchedulerView({
                     data.endTime,
                     data.timezone,
                   ),
-                  resourceId: data.participants?.[0] || "r1",
+                  resourceIds: data.participants || ["r1"],
                   description: data.description,
                   status: "confirmed",
                 });
@@ -165,10 +176,11 @@ export function SchedulerView({
                     data.endTime,
                     data.timezone,
                   ),
-                  resourceId: data.participants?.[0] || "r1",
+                  resourceIds: data.participants || ["r1"],
                   description: data.description,
                   status: "confirmed",
                 });
+                console.log("Event added:", data);
               }
               onCloseScheduler();
             } catch (err: unknown) {

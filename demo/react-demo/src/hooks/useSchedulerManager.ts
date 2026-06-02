@@ -68,6 +68,9 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       mgr.addResource({ id: "r2", name: "Dr. Michael Ross", type: "person" });
       mgr.addResource({ id: "r3", name: "Operating Room 1", type: "room" });
       mgr.addResource({ id: "r4", name: "MRI Scanner A", type: "equipment" });
+      mgr.addResource({ id: "r5", name: "MRI Scanner B", type: undefined });
+
+      console.log("Assignments", mgr.getAssignmentsByEvent("e1"));
 
       const today = new Date().toISOString().split("T")[0];
       const tz = getBrowserTimezone();
@@ -76,7 +79,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         title: "Appendectomy",
         startTime: zonedInputToISO(today, "09:00", tz),
         endTime: zonedInputToISO(today, "11:30", tz),
-        resourceId: "r1",
+        resourceIds: ["r1", "r3"],
         status: "confirmed",
       });
       mgr.addEvent({
@@ -84,7 +87,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         title: "Pre-op Assessment",
         startTime: zonedInputToISO(today, "13:00", tz),
         endTime: zonedInputToISO(today, "14:00", tz),
-        resourceId: "r2",
+        resourceIds: ["r2"],
         status: "confirmed",
       });
     }

@@ -1,11 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
-import {
-  schedulerStore,
-  isoToZonedDisplay,
-  toFakeLocalDate,
-} from "@janus-scheduler/core";
+import { schedulerStore, isoToZonedDisplay } from "@janus-scheduler/core";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
 import {
@@ -38,7 +34,6 @@ import {
   generateColumns,
   generateSuperLabels,
   timestampToPx,
-  pxToTimestamp,
   formatNavDate,
   getNavStepMs,
 } from "./timeline-zoom";
@@ -115,7 +110,11 @@ export class JanusTimeline extends LitElement {
 
     for (const res of coreResources) {
       const resEvents = coreEvents
-        .filter((e) => e.resourceId === res.id)
+        .filter(
+          (e) =>
+            (e.resourceIds && e.resourceIds.includes(res.id)) ||
+            e.resourceId === res.id,
+        )
         .map((e) => {
           const startD = new Date(e.startTime);
           const endD = new Date(e.endTime);
@@ -130,6 +129,7 @@ export class JanusTimeline extends LitElement {
             endMs: endD.getTime(),
             color: "blue",
             date,
+            resourceId: res.id,
           } as TimelineEvent;
         });
 

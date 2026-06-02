@@ -3,6 +3,7 @@ import { customElement, state, property } from "lit/decorators.js";
 import {
   type SchedulerSaveData,
   type SchedulerDeleteData,
+  type EventDraft,
   schedulerStore,
   getAllTimezones,
   formatTimezoneLabel,
@@ -334,7 +335,10 @@ export class JanusScheduler extends LitElement {
   }
 
   // ── Internal UI state (@state) — never set from outside
+  @state() private _isEditing = false;
   @state() participantInput = "";
+  @state() activeSuggestionIndex = -1;
+  @state() private _shakeInput = false;
   @state() sidebarOpen = false;
   @state() openPicker: OpenPicker = null;
   @state() private _tzSearch = "";
@@ -351,18 +355,71 @@ export class JanusScheduler extends LitElement {
     viewMonth: new Date().getMonth(),
   };
 
+  private _unsubStore?: () => void;
+
   // ─── Computed ──────────────────────────────────────────────────────────────
 
+  private _resolveResourceName(id: string): string {
+    const res = schedulerStore.getState().resources[id];
+    return res ? res.name : id;
+  }
+
+  private get _matchingSuggestions() {
+    const input = this.participantInput.trim().toLowerCase();
+    if (!input) return [];
+
+    const draft = schedulerStore.getState().eventDraft;
+    const existingParticipants = draft ? draft.participants : [];
+
+    const allResources = Object.values(schedulerStore.getState().resources);
+    return allResources.filter((res) => {
+      // Don't suggest already added participants
+      if (existingParticipants.includes(res.id)) return false;
+
+      return (
+        res.name.toLowerCase().includes(input) ||
+        res.id.toLowerCase().includes(input)
+      );
+    });
+  }
+
   private get _invalid() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return false;
     return isEndBeforeStart(
-      this.startDate,
-      this.startTime,
-      this.endDate,
-      this.endTime,
+      draft.startDate,
+      draft.startTime,
+      draft.endDate,
+      draft.endTime,
     );
   }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
+
+  willUpdate(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has("eventId")) {
+      this._isEditing = this.eventId === null;
+
+      const defaults = {
+        title: this.title,
+        startDate: this.startDate,
+        startTime: this.startTime,
+        endDate: this.endDate,
+        endTime: this.endTime,
+        participants: this._participants,
+        description: this.description,
+        activeColor: this.activeColor || "orange",
+        timezone: schedulerStore.getState().timezone,
+      };
+
+      schedulerStore.getState().startDraft(this.eventId, defaults);
+
+      const draft = schedulerStore.getState().eventDraft;
+      if (draft) {
+        this._selectedTz = draft.timezone || schedulerStore.getState().timezone;
+      }
+    }
+  }
 
   // When startDate/endDate properties are set from outside (edit mode),
   // sync the calendar view to show the correct month
@@ -381,44 +438,86 @@ export class JanusScheduler extends LitElement {
     super.connectedCallback();
     this._outsideClick = this._outsideClick.bind(this);
     document.addEventListener("click", this._outsideClick);
+
+    // Subscribe to store updates to keep the Lit UI reactive
+    this._unsubStore = schedulerStore.subscribe(() => {
+      const draft = schedulerStore.getState().eventDraft;
+      if (draft && draft.timezone) {
+        this._selectedTz = draft.timezone;
+      }
+      this.requestUpdate();
+    });
   }
+
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener("click", this._outsideClick);
+    this._unsubStore?.();
   }
+
   private _outsideClick() {
     if (this.openPicker) this.openPicker = null;
   }
+
   private _toggle(p: OpenPicker) {
     this.openPicker = this.openPicker === p ? null : p;
   }
 
-  // ─── Dispatchers ───────────────────────────────────────────────────────────
+  // ─── Dispatchers & Action Handlers ─────────────────────────────────────────
 
-  private _onClose() {
+  private _onClose(clearDraft = false) {
+    schedulerStore.getState().clearDraft(clearDraft);
     this.dispatchEvent(
       new CustomEvent("close", { bubbles: true, composed: true }),
     );
   }
 
+  private _handleCancel() {
+    if (this.eventId !== null) {
+      // Revert edit draft back to event defaults
+      const defaults = {
+        title: this.title,
+        startDate: this.startDate,
+        startTime: this.startTime,
+        endDate: this.endDate,
+        endTime: this.endTime,
+        participants: this._participants,
+        description: this.description,
+        activeColor: this.activeColor || "orange",
+        timezone: this._selectedTz,
+      };
+      schedulerStore.getState().startDraft(this.eventId, defaults);
+      this._isEditing = false;
+    } else {
+      // Close and discard draft completely
+      this._onClose(true);
+    }
+  }
+
   private _onSave() {
-    if (this._invalid) return;
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft || this._invalid) return;
+
     // Persist the chosen timezone to the store so all components stay in sync
     schedulerStore.getState().setTimezone(this._selectedTz);
+
+    // Clear draft
+    schedulerStore.getState().clearDraft(true);
+
     this.dispatchEvent(
       new CustomEvent("save", {
         bubbles: true,
         composed: true,
         detail: {
           id: this.eventId,
-          title: this.title,
-          startDate: this.startDate,
-          startTime: this.startTime,
-          endDate: this.endDate,
-          endTime: this.endTime,
-          participants: this._participants,
-          description: this.description,
-          activeColor: this.activeColor,
+          title: draft.title,
+          startDate: draft.startDate,
+          startTime: draft.startTime,
+          endDate: draft.endDate,
+          endTime: draft.endTime,
+          participants: draft.participants,
+          description: draft.description,
+          activeColor: draft.activeColor,
           timezone: this._selectedTz,
         } as SchedulerSaveData,
       }),
@@ -426,35 +525,108 @@ export class JanusScheduler extends LitElement {
   }
 
   private _onDelete() {
+    const draft = schedulerStore.getState().eventDraft;
+    const titleVal = draft ? draft.title : this.title;
+
+    // Clear draft
+    schedulerStore.getState().clearDraft(true);
+
     this.dispatchEvent(
       new CustomEvent("delete", {
         bubbles: true,
         composed: true,
         // id is what the host needs to call manager.deleteEvent(id).
         // title is included for display purposes (e.g. confirmation messages).
-        detail: { id: this.eventId, title: this.title } as SchedulerDeleteData,
+        detail: { id: this.eventId, title: titleVal } as SchedulerDeleteData,
       }),
     );
   }
 
   // ─── Participants ──────────────────────────────────────────────────────────
 
-  private _removeParticipant(name: string) {
-    this.participants = this._participants.filter((p) => p !== name);
+  private _removeParticipant(id: string) {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+    const participants = draft.participants.filter((p) => p !== id);
+    schedulerStore.getState().updateDraft({ participants });
+  }
+
+  private _selectSuggestion(id: string) {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+
+    if (!draft.participants.includes(id)) {
+      const participants = [...draft.participants, id];
+      schedulerStore.getState().updateDraft({ participants });
+    }
+    this.participantInput = "";
+    this.activeSuggestionIndex = -1;
   }
 
   private _handleParticipantKey(e: KeyboardEvent) {
-    if ((e.key === "Enter" || e.key === ",") && this.participantInput.trim()) {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+
+    const suggestions = this._matchingSuggestions;
+
+    if (e.key === "ArrowDown") {
       e.preventDefault();
-      this.participants = [...this._participants, this.participantInput.trim()];
+      if (suggestions.length > 0) {
+        this.activeSuggestionIndex =
+          (this.activeSuggestionIndex + 1) % suggestions.length;
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (suggestions.length > 0) {
+        this.activeSuggestionIndex =
+          (this.activeSuggestionIndex - 1 + suggestions.length) %
+          suggestions.length;
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
       this.participantInput = "";
-    }
-    if (
+      this.activeSuggestionIndex = -1;
+    } else if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      const val = this.participantInput.trim().toLowerCase();
+      if (!val) return;
+
+      // 1. If user highlighted a suggestion using Arrow keys, use it
+      if (
+        this.activeSuggestionIndex >= 0 &&
+        this.activeSuggestionIndex < suggestions.length
+      ) {
+        this._selectSuggestion(suggestions[this.activeSuggestionIndex].id);
+        return;
+      }
+
+      // 2. Otherwise, check for exact match in suggestions
+      const exactMatch = suggestions.find(
+        (s) => s.id.toLowerCase() === val || s.name.toLowerCase() === val,
+      );
+      if (exactMatch) {
+        this._selectSuggestion(exactMatch.id);
+        return;
+      }
+
+      // 3. Check if there's only one suggestion (fuzzy/partial match)
+      if (suggestions.length === 1) {
+        this._selectSuggestion(suggestions[0].id);
+        return;
+      }
+
+      // 4. Otherwise, trigger shake because it's not a valid resource
+      this._shakeInput = true;
+      setTimeout(() => {
+        this._shakeInput = false;
+      }, 500);
+    } else if (
       e.key === "Backspace" &&
       !this.participantInput &&
-      this._participants.length
+      draft.participants.length
     ) {
-      this.participants = this._participants.slice(0, -1);
+      const participants = draft.participants.slice(0, -1);
+      schedulerStore.getState().updateDraft({ participants });
     }
   }
 
@@ -468,8 +640,11 @@ export class JanusScheduler extends LitElement {
 
   private _setTime(which: "start" | "end", h: number, m: number) {
     const val = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-    if (which === "start") this.startTime = val;
-    else this.endTime = val;
+    if (which === "start") {
+      schedulerStore.getState().updateDraft({ startTime: val });
+    } else {
+      schedulerStore.getState().updateDraft({ endTime: val });
+    }
   }
 
   // ─── Calendar date selection ───────────────────────────────────────────────
@@ -481,16 +656,21 @@ export class JanusScheduler extends LitElement {
     d: number,
   ) {
     const iso = isoFromParts(y, mo, d);
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+
     if (which === "start") {
-      this.startDate = iso;
+      schedulerStore.getState().updateDraft({ startDate: iso });
       this.startCal = { viewYear: y, viewMonth: mo };
       // If end is now before start on the same day, nudge end date forward
-      if (isEndBeforeStart(iso, this.startTime, this.endDate, this.endTime)) {
-        this.endDate = iso;
+      if (
+        isEndBeforeStart(iso, draft.startTime, draft.endDate, draft.endTime)
+      ) {
+        schedulerStore.getState().updateDraft({ endDate: iso });
         this.endCal = { viewYear: y, viewMonth: mo };
       }
     } else {
-      this.endDate = iso;
+      schedulerStore.getState().updateDraft({ endDate: iso });
       this.endCal = { viewYear: y, viewMonth: mo };
     }
     this.openPicker = null;
@@ -705,384 +885,643 @@ export class JanusScheduler extends LitElement {
     else this.endCal = next;
   }
 
+  // ─── Render View Mode ──────────────────────────────────────────────────────
+
+  private _renderViewMode(draft: EventDraft) {
+    const multiDay = draft.startDate !== draft.endDate;
+    const displayDate = multiDay
+      ? `${formatDate(draft.startDate)} – ${formatDate(draft.endDate)}`
+      : formatDate(draft.startDate);
+    const displayTime = `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
+
+    const leadResourceId = draft.participants[0];
+    const leadResourceName = leadResourceId
+      ? this._resolveResourceName(leadResourceId)
+      : "";
+    const otherParticipants = draft.participants.slice(1);
+
+    const colorClass = `color-${draft.activeColor}`;
+
+    return html`
+      <div class="view-panel">
+        <!-- Header -->
+        <header class="view-header ${colorClass}">
+          <div class="view-header-left">
+            <div class="view-header-icon-box">${CalendarIcon()}</div>
+            <div class="view-header-titles">
+              <span class="view-header-tag">Janus Scheduler</span>
+              <h2 class="view-header-title">
+                ${draft.title || "Untitled Event"}
+              </h2>
+            </div>
+          </div>
+          <button
+            class="close-btn"
+            @click=${() => this._onClose(false)}
+            aria-label="Close"
+          >
+            ${XIcon()}
+          </button>
+        </header>
+
+        <!-- Body -->
+        <div class="view-body">
+          <!-- Date & Time -->
+          <div class="view-datetime-row">
+            <span class="view-datetime-icon">${ClockIcon()}</span>
+            <span class="view-datetime-text"
+              >${displayDate} • ${displayTime}</span
+            >
+          </div>
+
+          <!-- Lead Resource & Participants -->
+          <div class="view-section">
+            <div class="view-section-label">Lead Resource & Participants</div>
+            <div class="view-resource-card">
+              ${leadResourceId
+                ? html`
+                    <div class="view-lead-info">
+                      ${avatarHtml(leadResourceName)}
+                      <div class="view-lead-details">
+                        <div class="view-lead-name">${leadResourceName}</div>
+                        <div class="view-lead-role">Primary Resource</div>
+                      </div>
+                    </div>
+                  `
+                : html`
+                    <div class="view-lead-info">
+                      <span class="avatar avatar-more">?</span>
+                      <div class="view-lead-details">
+                        <div class="view-lead-name">No resource assigned</div>
+                        <div class="view-lead-role">
+                          Click Edit to add participants
+                        </div>
+                      </div>
+                    </div>
+                  `}
+              ${otherParticipants.length > 0
+                ? html`
+                    <div class="view-avatar-stack">
+                      ${otherParticipants
+                        .slice(0, 3)
+                        .map((p: string) =>
+                          avatarHtml(this._resolveResourceName(p)),
+                        )}
+                      ${otherParticipants.length > 3
+                        ? html`<span class="avatar avatar-more"
+                            >+${otherParticipants.length - 3}</span
+                          >`
+                        : nothing}
+                    </div>
+                  `
+                : nothing}
+            </div>
+          </div>
+
+          <!-- Description / Notes -->
+          <div class="view-section">
+            <div class="view-section-label">Agenda & Notes</div>
+            <div class="view-desc-card">
+              ${draft.description
+                ? html`<div class="view-desc-text">${draft.description}</div>`
+                : html`<div class="view-desc-text view-desc-text--empty">
+                    No description or agenda provided.
+                  </div>`}
+            </div>
+          </div>
+
+          <!-- Timezone & Event Color / Status -->
+          <div class="view-meta-grid">
+            <div class="view-meta-col">
+              <div class="view-section-label">Timezone</div>
+              <div class="view-meta-val-row">
+                <span class="view-meta-icon">${GlobeIcon()}</span>
+                <span class="view-meta-val">
+                  ${this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
+                  this._selectedTz}
+                </span>
+              </div>
+            </div>
+            <div class="view-meta-col">
+              <div class="view-section-label">Event Color</div>
+              <div class="view-meta-val-row">
+                <span class="view-color-dot swatch-${draft.activeColor}"></span>
+                <span class="view-meta-val capitalize"
+                  >${draft.activeColor}</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="view-footer">
+          <button class="btn-delete" @click=${this._onDelete}>
+            ${TrashIcon()} Delete
+          </button>
+          <div class="view-footer-right">
+            <button class="btn-cancel" @click=${() => this._onClose(false)}>
+              Close
+            </button>
+            <button
+              class="btn-edit-event ${colorClass}"
+              @click=${() => (this._isEditing = true)}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                style="margin-right: 4px; vertical-align: middle;"
+              >
+                <path d="M12 20h9" />
+                <path
+                  d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                />
+              </svg>
+              Edit Event
+            </button>
+          </div>
+        </footer>
+      </div>
+    `;
+  }
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   render() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return nothing;
+
     const invalid = this._invalid;
 
-    const multiDay = this.startDate !== this.endDate;
+    const multiDay = draft.startDate !== draft.endDate;
 
     const sidebarDate = multiDay
-      ? `${formatDateShort(this.startDate)} – ${formatDateShort(this.endDate)}`
-      : formatDate(this.startDate);
+      ? `${formatDateShort(draft.startDate)} – ${formatDateShort(draft.endDate)}`
+      : formatDate(draft.startDate);
 
     // When multi-day, attach the date to each time so the sidebar is unambiguous
     const sidebarTime = multiDay
-      ? `${formatDateShort(this.startDate)}, ${formatTime(this.startTime)} – ${formatDateShort(this.endDate)}, ${formatTime(this.endTime)}`
-      : `${formatTime(this.startTime)} – ${formatTime(this.endTime)}`;
+      ? `${formatDateShort(draft.startDate)}, ${formatTime(draft.startTime)} – ${formatDateShort(draft.endDate)}, ${formatTime(draft.endTime)}`
+      : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
 
     return html`
       <div
         class="overlay"
-        @click=${(e: Event) => e.target === e.currentTarget && this._onClose()}
+        @click=${(e: Event) =>
+          e.target === e.currentTarget && this._onClose(false)}
       >
-        <div class="modal" role="dialog" aria-modal="true">
-          <!-- ── Sidebar ─────────────────────────────────────────────────── -->
-          <aside class="sidebar ${this.sidebarOpen ? "sidebar--open" : ""}">
-            <div class="sidebar-accent color-${this.activeColor}"></div>
-            <div class="sidebar-top">
-              <div class="sidebar-event-badge">Event</div>
-              <h2 class="sidebar-title">${this.title || "Untitled Event"}</h2>
-            </div>
-            <div class="sidebar-meta">
-              <div class="meta-item">
-                <span class="meta-icon">${CalendarIcon()}</span>
-                <div>
-                  <div class="meta-label">Date</div>
-                  <div class="meta-value">${sidebarDate || "—"}</div>
-                </div>
-              </div>
-              <div class="meta-item">
-                <span class="meta-icon">${ClockIcon()}</span>
-                <div>
-                  <div class="meta-label">Time</div>
-                  <div class="meta-value">${sidebarTime}</div>
-                </div>
-              </div>
-              <div class="meta-item">
-                <span class="meta-icon">${UsersIcon()}</span>
-                <div>
-                  <div class="meta-label">Participants</div>
-                  <div class="meta-value">
-                    ${this._participants.length}
-                    ${this._participants.length === 1 ? "person" : "people"}
-                  </div>
-                  <div class="avatar-stack">
-                    ${this._participants.slice(0, 4).map((n) => avatarHtml(n))}
-                    ${this._participants.length > 4
-                      ? html`<span class="avatar avatar-more"
-                          >+${this._participants.length - 4}</span
-                        >`
-                      : nothing}
-                  </div>
-                </div>
-              </div>
-              <div class="meta-item">
-                <span class="meta-icon">${TagIcon()}</span>
-                <div class="color-meta-block">
-                  <div class="meta-label">Color</div>
-                  <div class="swatches">
-                    ${COLORS.map(
-                      (c) =>
-                        html`<button
-                          class="swatch swatch-${c} ${this.activeColor === c
-                            ? "active"
-                            : ""}"
-                          @click=${() => (this.activeColor = c)}
-                          aria-label="${c} color"
-                        ></button>`,
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div class="meta-item">
-                <span class="meta-icon">${BellIcon()}</span>
-                <div>
-                  <div class="meta-label">Reminder</div>
-                  <div class="meta-value">15 min before</div>
-                </div>
-              </div>
-            </div>
-            <div class="sidebar-footer">
-              <button class="btn-delete" @click=${this._onDelete}>
-                ${TrashIcon()} Delete Event
-              </button>
-            </div>
-          </aside>
-
-          <!-- ── Panel ───────────────────────────────────────────────────── -->
-          <div class="panel">
-            <div class="panel-header">
-              <div class="panel-header-left">
-                <button
-                  class="mobile-summary-btn"
-                  @click=${() => (this.sidebarOpen = !this.sidebarOpen)}
-                  aria-label="Toggle event summary"
+        <div
+          class="modal ${this._isEditing ? "" : "modal--view"}"
+          role="dialog"
+          aria-modal="true"
+        >
+          ${!this._isEditing
+            ? this._renderViewMode(draft)
+            : html`
+                <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+                <aside
+                  class="sidebar ${this.sidebarOpen ? "sidebar--open" : ""}"
                 >
-                  <div class="dot dot-${this.activeColor}"></div>
-                  <span class="mobile-summary-title"
-                    >${this.title || "Untitled"}</span
-                  >
-                  <span class="chevron ${this.sidebarOpen ? "chevron--up" : ""}"
-                    >${ChevronDownIcon()}</span
-                  >
-                </button>
-                <span class="panel-heading">Edit Event</span>
-              </div>
-              <button
-                class="close-btn"
-                @click=${this._onClose}
-                aria-label="Close"
-              >
-                ${XIcon()}
-              </button>
-            </div>
-
-            <!-- Mobile summary strip -->
-            <div
-              class="mobile-summary-panel ${this.sidebarOpen
-                ? "mobile-summary-panel--open"
-                : ""}"
-            >
-              <div class="mobile-summary-grid">
-                <div class="msummary-item">
-                  <span class="meta-label">Start</span>
-                  <span class="meta-value"
-                    >${formatDateShort(this.startDate)}
-                    ${formatTime(this.startTime)}</span
-                  >
-                </div>
-                <div class="msummary-item">
-                  <span class="meta-label">End</span>
-                  <span class="meta-value"
-                    >${formatDateShort(this.endDate)}
-                    ${formatTime(this.endTime)}</span
-                  >
-                </div>
-                <div class="msummary-item">
-                  <span class="meta-label">Participants</span>
-                  <span class="meta-value"
-                    >${this._participants.length} people</span
-                  >
-                </div>
-                <div class="msummary-item">
-                  <span class="meta-label">Color</span>
-                  <div class="swatches swatches--sm">
-                    ${COLORS.map(
-                      (c) =>
-                        html`<button
-                          class="swatch swatch-${c} ${this.activeColor === c
-                            ? "active"
-                            : ""}"
-                          @click=${() => (this.activeColor = c)}
-                        ></button>`,
-                    )}
+                  <div class="sidebar-accent color-${draft.activeColor}"></div>
+                  <div class="sidebar-top">
+                    <div class="sidebar-event-badge">Event</div>
+                    <h2 class="sidebar-title">
+                      ${draft.title || "Untitled Event"}
+                    </h2>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="panel-body">
-              ${this.error
-                ? html` <div class="error-alert">
-                    <span class="error-icon">!</span>
-                    <span class="error-message">${this.error}</span>
-                  </div>`
-                : nothing}
-
-              <!-- Basic Info -->
-              <div class="form-section">
-                <div class="section-label">Basic Info</div>
-                <div class="form-group">
-                  <label for="event-title">Event Title</label>
-                  <input
-                    id="event-title"
-                    type="text"
-                    .value=${this.title}
-                    @input=${(e: Event) =>
-                      (this.title = (e.target as HTMLInputElement).value)}
-                    placeholder="Add a title…"
-                  />
-                </div>
-              </div>
-
-              <!-- Date & Time -->
-              <div class="form-section">
-                <div class="section-label">Date &amp; Time</div>
-
-                <!-- START -->
-                <div class="dt-row-label">Start</div>
-                <div class="dt-row">
-                  <!-- Start date trigger + dropdown -->
-                  <div class="dt-cell dt-cell--date">
-                    ${this._triggerBtn(
-                      CalendarIcon(),
-                      formatDateShort(this.startDate),
-                      this.openPicker === "startDate",
-                      false,
-                      "startDate",
-                    )}
-                    ${this.openPicker === "startDate"
-                      ? this._calPicker(
-                          "start",
-                          this.startDate,
-                          this.startCal,
-                          (d) => this._navCal("start", d),
-                        )
-                      : nothing}
+                  <div class="sidebar-meta">
+                    <div class="meta-item">
+                      <span class="meta-icon">${CalendarIcon()}</span>
+                      <div>
+                        <div class="meta-label">Date</div>
+                        <div class="meta-value">${sidebarDate || "—"}</div>
+                      </div>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-icon">${ClockIcon()}</span>
+                      <div>
+                        <div class="meta-label">Time</div>
+                        <div class="meta-value">${sidebarTime}</div>
+                      </div>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-icon">${UsersIcon()}</span>
+                      <div>
+                        <div class="meta-label">Participants</div>
+                        <div class="meta-value">
+                          ${draft.participants.length}
+                          ${draft.participants.length === 1
+                            ? "person"
+                            : "people"}
+                        </div>
+                        <div class="avatar-stack">
+                          ${draft.participants
+                            .slice(0, 4)
+                            .map((n) =>
+                              avatarHtml(this._resolveResourceName(n)),
+                            )}
+                          ${draft.participants.length > 4
+                            ? html`<span class="avatar avatar-more"
+                                >+${draft.participants.length - 4}</span
+                              >`
+                            : nothing}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-icon">${TagIcon()}</span>
+                      <div class="color-meta-block">
+                        <div class="meta-label">Color</div>
+                        <div class="swatches">
+                          ${COLORS.map(
+                            (c) =>
+                              html`<button
+                                class="swatch swatch-${c} ${draft.activeColor ===
+                                c
+                                  ? "active"
+                                  : ""}"
+                                @click=${() =>
+                                  schedulerStore
+                                    .getState()
+                                    .updateDraft({ activeColor: c })}
+                                aria-label="${c} color"
+                              ></button>`,
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div class="meta-item">
+                      <span class="meta-icon">${BellIcon()}</span>
+                      <div>
+                        <div class="meta-label">Reminder</div>
+                        <div class="meta-value">15 min before</div>
+                      </div>
+                    </div>
                   </div>
-                  <!-- Start time trigger + dropdown -->
-                  <div class="dt-cell dt-cell--time">
-                    ${this._triggerBtn(
-                      ClockIcon(),
-                      formatTime(this.startTime),
-                      this.openPicker === "startTime",
-                      false,
-                      "startTime",
-                    )}
-                    ${this.openPicker === "startTime"
-                      ? this._timePicker("start", this.startTime)
-                      : nothing}
+                  <div class="sidebar-footer">
+                    <button class="btn-delete" @click=${this._onDelete}>
+                      ${TrashIcon()} Delete Event
+                    </button>
                   </div>
-                </div>
+                </aside>
 
-                <!-- END -->
-                <div class="dt-row-label dt-row-label--end">End</div>
-                <div class="dt-row">
-                  <!-- End date trigger + dropdown -->
-                  <div class="dt-cell dt-cell--date">
-                    ${this._triggerBtn(
-                      CalendarIcon(),
-                      formatDateShort(this.endDate),
-                      this.openPicker === "endDate",
-                      invalid,
-                      "endDate",
-                    )}
-                    ${this.openPicker === "endDate"
-                      ? this._calPicker("end", this.endDate, this.endCal, (d) =>
-                          this._navCal("end", d),
-                        )
-                      : nothing}
-                  </div>
-                  <!-- End time trigger + dropdown -->
-                  <div class="dt-cell dt-cell--time">
-                    ${this._triggerBtn(
-                      ClockIcon(),
-                      formatTime(this.endTime),
-                      this.openPicker === "endTime",
-                      invalid,
-                      "endTime",
-                    )}
-                    ${this.openPicker === "endTime"
-                      ? this._timePicker("end", this.endTime)
-                      : nothing}
-                  </div>
-                </div>
-
-                <!-- Validation warning -->
-                ${invalid
-                  ? html` <div class="dt-invalid-notice">
-                      <span>⚠</span>
-                      <span
-                        >End must be after start. Please adjust the date or
-                        time.</span
+                <!-- ── Panel ───────────────────────────────────────────────────── -->
+                <div class="panel">
+                  <div class="panel-header">
+                    <div class="panel-header-left">
+                      <button
+                        class="mobile-summary-btn"
+                        @click=${() => (this.sidebarOpen = !this.sidebarOpen)}
+                        aria-label="Toggle event summary"
                       >
-                    </div>`
-                  : nothing}
-
-                <!-- Timezone selector -->
-                <div class="dt-tz-row">
-                  <div class="dt-row-label">Timezone</div>
-                  <div class="dt-cell dt-cell--tz">
-                    ${this._triggerBtn(
-                      GlobeIcon(),
-                      this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
-                        this._selectedTz,
-                      this.openPicker === "timezone",
-                      false,
-                      "timezone",
-                    )}
-                    ${this.openPicker === "timezone"
-                      ? this._timezonePicker()
-                      : nothing}
+                        <div class="dot dot-${draft.activeColor}"></div>
+                        <span class="mobile-summary-title"
+                          >${draft.title || "Untitled"}</span
+                        >
+                        <span
+                          class="chevron ${this.sidebarOpen
+                            ? "chevron--up"
+                            : ""}"
+                          >${ChevronDownIcon()}</span
+                        >
+                      </button>
+                      <span class="panel-heading"
+                        >${this.eventId ? "Edit Event" : "Create Event"}</span
+                      >
+                    </div>
+                    <button
+                      class="close-btn"
+                      @click=${() => this._onClose(true)}
+                      aria-label="Close"
+                    >
+                      ${XIcon()}
+                    </button>
                   </div>
-                </div>
-              </div>
 
-              <!-- People -->
-              <div class="form-section">
-                <div class="section-label">People</div>
-                <div class="form-group">
-                  <label>Participants</label>
+                  <!-- Mobile summary strip -->
                   <div
-                    class="participants-box"
-                    @click=${() =>
-                      this.shadowRoot
-                        ?.getElementById("participant-input")
-                        ?.focus()}
+                    class="mobile-summary-panel ${this.sidebarOpen
+                      ? "mobile-summary-panel--open"
+                      : ""}"
                   >
-                    ${this._participants.map(
-                      (name) =>
-                        html` <span class="chip">
-                          ${avatarHtml(name)} ${name}
-                          <button
-                            class="chip-remove"
-                            @click=${(e: Event) => {
-                              e.stopPropagation();
-                              this._removeParticipant(name);
+                    <div class="mobile-summary-grid">
+                      <div class="msummary-item">
+                        <span class="meta-label">Start</span>
+                        <span class="meta-value"
+                          >${formatDateShort(draft.startDate)}
+                          ${formatTime(draft.startTime)}</span
+                        >
+                      </div>
+                      <div class="msummary-item">
+                        <span class="meta-label">End</span>
+                        <span class="meta-value"
+                          >${formatDateShort(draft.endDate)}
+                          ${formatTime(draft.endTime)}</span
+                        >
+                      </div>
+                      <div class="msummary-item">
+                        <span class="meta-label">Participants</span>
+                        <span class="meta-value"
+                          >${draft.participants.length} people</span
+                        >
+                      </div>
+                      <div class="msummary-item">
+                        <span class="meta-label">Color</span>
+                        <div class="swatches swatches--sm">
+                          ${COLORS.map(
+                            (c) =>
+                              html`<button
+                                class="swatch swatch-${c} ${draft.activeColor ===
+                                c
+                                  ? "active"
+                                  : ""}"
+                                @click=${() =>
+                                  schedulerStore
+                                    .getState()
+                                    .updateDraft({ activeColor: c })}
+                              ></button>`,
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="panel-body">
+                    ${this.error
+                      ? html` <div class="error-alert">
+                          <span class="error-icon">!</span>
+                          <span class="error-message">${this.error}</span>
+                        </div>`
+                      : nothing}
+
+                    <!-- Basic Info -->
+                    <div class="form-section">
+                      <div class="section-label">Basic Info</div>
+                      <div class="form-group">
+                        <label for="event-title">Event Title</label>
+                        <input
+                          id="event-title"
+                          type="text"
+                          .value=${draft.title}
+                          @input=${(e: Event) =>
+                            schedulerStore.getState().updateDraft({
+                              title: (e.target as HTMLInputElement).value,
+                            })}
+                          placeholder="Add a title…"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Date & Time -->
+                    <div class="form-section">
+                      <div class="section-label">Date &amp; Time</div>
+
+                      <!-- START -->
+                      <div class="dt-row-label">Start</div>
+                      <div class="dt-row">
+                        <!-- Start date trigger + dropdown -->
+                        <div class="dt-cell dt-cell--date">
+                          ${this._triggerBtn(
+                            CalendarIcon(),
+                            formatDateShort(draft.startDate),
+                            this.openPicker === "startDate",
+                            false,
+                            "startDate",
+                          )}
+                          ${this.openPicker === "startDate"
+                            ? this._calPicker(
+                                "start",
+                                draft.startDate,
+                                this.startCal,
+                                (d) => this._navCal("start", d),
+                              )
+                            : nothing}
+                        </div>
+                        <!-- Start time trigger + dropdown -->
+                        <div class="dt-cell dt-cell--time">
+                          ${this._triggerBtn(
+                            ClockIcon(),
+                            formatTime(draft.startTime),
+                            this.openPicker === "startTime",
+                            false,
+                            "startTime",
+                          )}
+                          ${this.openPicker === "startTime"
+                            ? this._timePicker("start", draft.startTime)
+                            : nothing}
+                        </div>
+                      </div>
+
+                      <!-- END -->
+                      <div class="dt-row-label dt-row-label--end">End</div>
+                      <div class="dt-row">
+                        <!-- End date trigger + dropdown -->
+                        <div class="dt-cell dt-cell--date">
+                          ${this._triggerBtn(
+                            CalendarIcon(),
+                            formatDateShort(draft.endDate),
+                            this.openPicker === "endDate",
+                            invalid,
+                            "endDate",
+                          )}
+                          ${this.openPicker === "endDate"
+                            ? this._calPicker(
+                                "end",
+                                draft.endDate,
+                                this.endCal,
+                                (d) => this._navCal("end", d),
+                              )
+                            : nothing}
+                        </div>
+                        <!-- End time trigger + dropdown -->
+                        <div class="dt-cell dt-cell--time">
+                          ${this._triggerBtn(
+                            ClockIcon(),
+                            formatTime(draft.endTime),
+                            this.openPicker === "endTime",
+                            invalid,
+                            "endTime",
+                          )}
+                          ${this.openPicker === "endTime"
+                            ? this._timePicker("end", draft.endTime)
+                            : nothing}
+                        </div>
+                      </div>
+
+                      <!-- Validation warning -->
+                      ${invalid
+                        ? html` <div class="dt-invalid-notice">
+                            <span>⚠</span>
+                            <span
+                              >End must be after start. Please adjust the date
+                              or time.</span
+                            >
+                          </div>`
+                        : nothing}
+
+                      <!-- Timezone selector -->
+                      <div class="dt-tz-row">
+                        <div class="dt-row-label">Timezone</div>
+                        <div class="dt-cell dt-cell--tz">
+                          ${this._triggerBtn(
+                            GlobeIcon(),
+                            this._selectedTz
+                              .split("/")
+                              .pop()
+                              ?.replace(/_/g, " ") ?? this._selectedTz,
+                            this.openPicker === "timezone",
+                            false,
+                            "timezone",
+                          )}
+                          ${this.openPicker === "timezone"
+                            ? this._timezonePicker()
+                            : nothing}
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- People -->
+                    <div class="form-section">
+                      <div class="section-label">People</div>
+                      <div class="form-group">
+                        <label>Participants</label>
+                        <div
+                          class="participants-box ${this._shakeInput
+                            ? "shake"
+                            : ""}"
+                          @click=${() =>
+                            this.shadowRoot
+                              ?.getElementById("participant-input")
+                              ?.focus()}
+                        >
+                          ${draft.participants.map((id) => {
+                            const name = this._resolveResourceName(id);
+                            return html` <span class="chip">
+                              ${avatarHtml(name)} ${name}
+                              <button
+                                class="chip-remove"
+                                @click=${(e: Event) => {
+                                  e.stopPropagation();
+                                  this._removeParticipant(id);
+                                }}
+                              >
+                                ${XIcon()}
+                              </button>
+                            </span>`;
+                          })}
+                          <input
+                            id="participant-input"
+                            class="participant-inline-input"
+                            type="text"
+                            placeholder="Add people…"
+                            .value=${this.participantInput}
+                            @input=${(e: Event) => {
+                              this.participantInput = (
+                                e.target as HTMLInputElement
+                              ).value;
+                              this.activeSuggestionIndex = -1;
                             }}
-                          >
-                            ${XIcon()}
-                          </button>
-                        </span>`,
-                    )}
-                    <input
-                      id="participant-input"
-                      class="participant-inline-input"
-                      type="text"
-                      placeholder="Add people…"
-                      .value=${this.participantInput}
-                      @input=${(e: Event) =>
-                        (this.participantInput = (
-                          e.target as HTMLInputElement
-                        ).value)}
-                      @keydown=${this._handleParticipantKey}
-                    />
-                    <span class="search-icon-wrap">${SearchIcon()}</span>
+                            @keydown=${this._handleParticipantKey}
+                          />
+                          <span class="search-icon-wrap">${SearchIcon()}</span>
+                        </div>
+
+                        <!-- Suggestions Dropdown -->
+                        ${this.participantInput.trim()
+                          ? html`
+                              <div class="suggestions-dropdown">
+                                ${this._matchingSuggestions.length > 0
+                                  ? html`
+                                      <ul>
+                                        ${this._matchingSuggestions.map(
+                                          (res, index) => html`
+                                            <li
+                                              class="suggestion-item ${index ===
+                                              this.activeSuggestionIndex
+                                                ? "active"
+                                                : ""}"
+                                              @mousedown=${(e: MouseEvent) => {
+                                                e.preventDefault();
+                                                this._selectSuggestion(res.id);
+                                              }}
+                                              @mouseenter=${() => {
+                                                this.activeSuggestionIndex =
+                                                  index;
+                                              }}
+                                            >
+                                              ${avatarHtml(res.name)}
+                                              <div class="suggestion-info">
+                                                <div class="suggestion-name">
+                                                  ${res.name}
+                                                </div>
+                                                <div class="suggestion-id">
+                                                  ${res.id}
+                                                </div>
+                                              </div>
+                                            </li>
+                                          `,
+                                        )}
+                                      </ul>
+                                    `
+                                  : html`
+                                      <div class="suggestions-empty">
+                                        No matching resources found
+                                      </div>
+                                    `}
+                              </div>
+                            `
+                          : nothing}
+                      </div>
+                    </div>
+
+                    <!-- Details -->
+                    <div class="form-section">
+                      <div class="section-label">Details</div>
+                      <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea
+                          id="description"
+                          rows="4"
+                          .value=${draft.description}
+                          @input=${(e: Event) =>
+                            schedulerStore.getState().updateDraft({
+                              description: (e.target as HTMLTextAreaElement)
+                                .value,
+                            })}
+                          placeholder="Add a description…"
+                        ></textarea>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="panel-footer">
+                    <button
+                      class="btn-delete btn-delete--footer"
+                      @click=${this._onDelete}
+                    >
+                      ${TrashIcon()} Delete
+                    </button>
+                    <div class="footer-right">
+                      <button class="btn-cancel" @click=${this._handleCancel}>
+                        Cancel
+                      </button>
+                      <button
+                        class="btn-save"
+                        ?disabled=${invalid}
+                        @click=${this._onSave}
+                      >
+                        Save Changes
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <!-- Details -->
-              <div class="form-section">
-                <div class="section-label">Details</div>
-                <div class="form-group">
-                  <label for="description">Description</label>
-                  <textarea
-                    id="description"
-                    rows="4"
-                    .value=${this.description}
-                    @input=${(e: Event) =>
-                      (this.description = (
-                        e.target as HTMLTextAreaElement
-                      ).value)}
-                    placeholder="Add a description…"
-                  ></textarea>
-                </div>
-              </div>
-            </div>
-
-            <div class="panel-footer">
-              <button
-                class="btn-delete btn-delete--footer"
-                @click=${this._onDelete}
-              >
-                ${TrashIcon()} Delete
-              </button>
-              <div class="footer-right">
-                <button class="btn-cancel" @click=${this._onClose}>
-                  Cancel
-                </button>
-                <button
-                  class="btn-save"
-                  ?disabled=${invalid}
-                  @click=${this._onSave}
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
+              `}
         </div>
       </div>
     `;

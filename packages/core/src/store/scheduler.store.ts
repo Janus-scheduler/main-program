@@ -8,12 +8,26 @@ import {
 import type { EventData } from "../types/event.types";
 import { getBrowserTimezone } from "../utils/time";
 
+export interface EventDraft {
+  id: string | null;
+  title: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  participants: string[];
+  description: string;
+  activeColor: string;
+  timezone: string;
+}
+
 export interface SchedulerState {
   events: Record<string, Event>;
   resources: Record<string, Resource>;
   assignments: Record<string, Assignment>;
   /** IANA timezone string used for all display conversions. Defaults to the browser's local timezone. */
   timezone: string;
+  eventDraft: EventDraft | null;
 }
 
 export interface SchedulerActions {
@@ -28,15 +42,53 @@ export interface SchedulerActions {
   clearAll: () => void;
   /** Change the display timezone for all scheduler components. */
   setTimezone: (timezone: string) => void;
+  startDraft: (id: string | null, defaults: Partial<EventDraft>) => void;
+  updateDraft: (updates: Partial<EventDraft>) => void;
+  clearDraft: (clearLocalStorage?: boolean) => void;
 }
 
 export type SchedulerStore = SchedulerState & SchedulerActions;
+
+const DRAFT_KEY = "janus-scheduler:new-event-draft";
+
+const isBrowser =
+  typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+
+const loadDraftFromLocalStorage = (): Partial<EventDraft> | null => {
+  if (!isBrowser) return null;
+  try {
+    const val = localStorage.getItem(DRAFT_KEY);
+    return val ? JSON.parse(val) : null;
+  } catch (e) {
+    console.error("Failed to load draft from local storage", e);
+    return null;
+  }
+};
+
+const saveDraftToLocalStorage = (draft: EventDraft) => {
+  if (!isBrowser) return;
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const clearDraftFromLocalStorage = () => {
+  if (!isBrowser) return;
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch (e) {
+    console.error(e);
+  }
+};
 
 export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
   events: {},
   resources: {},
   assignments: {},
   timezone: getBrowserTimezone(),
+  eventDraft: null,
 
   addEvent: (data) => {
     const event = new Event(data);
@@ -56,7 +108,13 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     if (updates.title) event.title = updates.title;
     if (updates.startTime) event.startTime = updates.startTime;
     if (updates.endTime) event.endTime = updates.endTime;
-    if (updates.resourceId) event.resourceId = updates.resourceId;
+    if (updates.resourceIds) {
+      event.resourceIds = updates.resourceIds;
+      event.resourceId = updates.resourceIds[0] || "";
+    } else if (updates.resourceId) {
+      event.resourceId = updates.resourceId;
+      event.resourceIds = [updates.resourceId];
+    }
     if (updates.status) event.status = updates.status;
     if (updates.description !== undefined)
       event.description = updates.description;
@@ -111,7 +169,8 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     const state = get();
     // Check if resource has events
     const hasEvents = Object.values(state.events).some(
-      (e) => e.resourceId === id,
+      (e) =>
+        (e.resourceIds && e.resourceIds.includes(id)) || e.resourceId === id,
     );
     if (hasEvents) {
       throw new Error(`Cannot delete resource ${id} - has assigned events`);
@@ -172,5 +231,53 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
 
   setTimezone: (timezone) => {
     set({ timezone });
+  },
+
+  startDraft: (id, defaults) => {
+    let initialDraft: EventDraft = {
+      id,
+      title: defaults.title ?? "",
+      startDate: defaults.startDate ?? "",
+      startTime: defaults.startTime ?? "",
+      endDate: defaults.endDate ?? "",
+      endTime: defaults.endTime ?? "",
+      participants: defaults.participants ?? [],
+      description: defaults.description ?? "",
+      activeColor: defaults.activeColor ?? "orange",
+      timezone: defaults.timezone ?? get().timezone,
+    };
+
+    if (id === null) {
+      const saved = loadDraftFromLocalStorage();
+      if (saved) {
+        initialDraft = {
+          ...initialDraft,
+          ...saved,
+          id: null,
+        };
+      }
+    }
+
+    set({ eventDraft: initialDraft });
+  },
+
+  updateDraft: (updates) => {
+    const { eventDraft } = get();
+    if (!eventDraft) return;
+
+    const updated = { ...eventDraft, ...updates };
+    set({ eventDraft: updated });
+
+    if (updated.id === null) {
+      saveDraftToLocalStorage(updated);
+    }
+  },
+
+  clearDraft: (clearLocalStorage = false) => {
+    const { eventDraft } = get();
+    if (eventDraft && eventDraft.id === null && clearLocalStorage) {
+      clearDraftFromLocalStorage();
+    }
+    set({ eventDraft: null });
   },
 }));

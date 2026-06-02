@@ -52,8 +52,7 @@ export class App {
   endParts = computed(() => this.splitISO(this.storeEvent()?.endTime));
 
   participants = computed(() => {
-    const resId = this.storeEvent()?.resourceId;
-    return resId ? [resId] : undefined;
+    return this.storeEvent()?.resourceIds;
   });
 
   allowCreate = signal(false);
@@ -90,7 +89,7 @@ export class App {
       title: 'Appendectomy',
       startTime: zonedInputToISO(today, '09:00', tz),
       endTime: zonedInputToISO(today, '11:30', tz),
-      resourceId: 'r1',
+      resourceIds: ['r1', 'r3'],
       status: 'confirmed',
     });
 
@@ -99,7 +98,7 @@ export class App {
       title: 'Pre-op Assessment',
       startTime: zonedInputToISO(today, '13:00', tz),
       endTime: zonedInputToISO(today, '14:00', tz),
-      resourceId: 'r2',
+      resourceIds: ['r2'],
       status: 'confirmed',
     });
 
@@ -128,7 +127,7 @@ export class App {
         title: data.title,
         startTime: zonedInputToISO(data.startDate, data.startTime, data.timezone),
         endTime: zonedInputToISO(data.endDate, data.endTime, data.timezone),
-        resourceId: data.participants[0] || 'unassigned',
+        resourceIds: data.participants || ['r1'],
         description: data.description,
         status: 'confirmed' as const,
       };
@@ -170,8 +169,13 @@ export class App {
 
   handleEventMove(data: EventMoveDetail): void {
     console.log('📦 Moving event:', data);
+    const currentEvent = this.manager.getEvent(data.event.id);
+    if (!currentEvent) return;
+    const updatedResourceIds = currentEvent.resourceIds.map((id) =>
+      id === data.oldResourceId ? data.newResourceId : id,
+    );
     this.manager.updateEvent(data.event.id, {
-      resourceId: data.newResourceId,
+      resourceIds: updatedResourceIds,
       startTime: data.newStartTime,
       endTime: data.newEndTime,
     });
@@ -192,7 +196,7 @@ export class App {
       title: 'New Event',
       startTime: data.startTime,
       endTime: data.endTime,
-      resourceId: data.resourceId,
+      resourceIds: [data.resourceId],
       status: 'confirmed',
     });
   }

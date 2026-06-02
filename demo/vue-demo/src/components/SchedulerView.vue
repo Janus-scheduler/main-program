@@ -34,7 +34,7 @@
     .startTime="startParts.time"
     .endDate="endParts.date"
     .endTime="endParts.time"
-    .participants="storeEvent?.resourceId ? [storeEvent.resourceId] : undefined"
+    .participants="storeEvent?.resourceIds ? storeEvent.resourceIds : undefined"
     .description="storeEvent?.description"
     @save="handleSave"
     @delete="handleDelete"
@@ -119,7 +119,7 @@ function handleSave(e: Event) {
         title: data.title,
         startTime: zonedInputToISO(data.startDate || today, data.startTime, data.timezone),
         endTime: zonedInputToISO(data.endDate || today, data.endTime, data.timezone),
-        resourceId: data.participants?.[0] || "r1",
+        resourceIds: data.participants || ["r1"],
         description: data.description,
         status: "confirmed",
       });
@@ -129,7 +129,7 @@ function handleSave(e: Event) {
         title: data.title,
         startTime: zonedInputToISO(data.startDate || today, data.startTime, data.timezone),
         endTime: zonedInputToISO(data.endDate || today, data.endTime, data.timezone),
-        resourceId: data.participants?.[0] || "r1",
+        resourceIds: data.participants || ["r1"],
         description: data.description,
         status: "confirmed",
       });
@@ -150,11 +150,16 @@ function handleDelete(e: Event) {
 
 // ── Timeline: drag-and-drop move ────────────────────────────────────────
 function handleEventMove(e: Event) {
-  const { event, newResourceId, newStartTime, newEndTime } = (
+  const { event, oldResourceId, newResourceId, newStartTime, newEndTime } = (
     e as CustomEvent<EventMoveDetail>
   ).detail;
+  const currentEvent = props.manager.getEvent(event.id);
+  if (!currentEvent) return;
+  const updatedResourceIds = currentEvent.resourceIds.map(
+    (id) => (id === oldResourceId ? newResourceId : id)
+  );
   props.manager.updateEvent(event.id, {
-    resourceId: newResourceId,
+    resourceIds: updatedResourceIds,
     startTime: newStartTime,
     endTime: newEndTime,
   });
@@ -181,7 +186,7 @@ function handleEventCreate(e: Event) {
     title: "New Event",
     startTime,
     endTime,
-    resourceId,
+    resourceIds: [resourceId],
     status: "confirmed",
   });
 }
