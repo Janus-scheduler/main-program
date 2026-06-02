@@ -184,8 +184,12 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     let currentGroupType = "";
     const mapped: TimelineResource[] = sorted.map((res) => {
       const resEvents = events
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((e: any) => e.resourceId === res.id)
+
+        .filter(
+          (e: any) =>
+            (e.resourceIds && e.resourceIds.includes(res.id)) ||
+            e.resourceId === res.id,
+        )
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((e: any) => {
           const startD = new Date(e.startTime);

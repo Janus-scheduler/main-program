@@ -178,7 +178,14 @@ export class SchedulerManager {
     // object that updateEvent() mutates in-place — meaning the rollback
     // would read already-updated values and restore nothing.
     const existing = schedulerStore.getState().events[id];
-    const snapshot = existing ? { ...existing } : null;
+    const snapshot = existing
+      ? {
+          ...existing,
+          resourceIds: existing.resourceIds
+            ? [...existing.resourceIds]
+            : undefined,
+        }
+      : null;
 
     const event = schedulerStore.getState().updateEvent(id, updates);
 
@@ -187,7 +194,7 @@ export class SchedulerManager {
       () => this._hooks.onEventUpdate?.(event),
       () => {
         if (snapshot) {
-          // All fields are primitive strings — snapshot holds the original values.
+          // Roll back original values including resourceIds
           schedulerStore.getState().updateEvent(id, {
             title: snapshot.title,
             startTime: snapshot.startTime,
@@ -195,6 +202,7 @@ export class SchedulerManager {
             status: snapshot.status,
             description: snapshot.description,
             resourceId: snapshot.resourceId,
+            resourceIds: snapshot.resourceIds,
           });
         }
       },
@@ -234,7 +242,11 @@ export class SchedulerManager {
    * @returns Filtered array of Event instances
    */
   getEventsByResource(resourceId: string): Event[] {
-    return this.getAllEvents().filter((e) => e.resourceId === resourceId);
+    return this.getAllEvents().filter(
+      (e) =>
+        (e.resourceIds && e.resourceIds.includes(resourceId)) ||
+        e.resourceId === resourceId,
+    );
   }
 
   /**

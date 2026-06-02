@@ -6,6 +6,7 @@ export type {
   SchedulerState,
   SchedulerActions,
   SchedulerStore,
+  EventDraft,
 } from "./store/scheduler.store";
 
 // ── Domain model classes (Option B: exported so hook consumers get rich objects) ──

@@ -63,7 +63,6 @@ export interface MonthEvent {
   startTime?: string; // "HH:MM" 24h — optional
   endTime?: string;
 }
-
 export interface SchedulerSaveData {
   /** Present when editing an existing event; null/undefined when creating a new one. */
   id: string | null;

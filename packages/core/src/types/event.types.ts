@@ -3,7 +3,8 @@ export interface EventData {
   title: string;
   startTime: string;
   endTime: string;
-  resourceId: string;
+  resourceId?: string;
+  resourceIds?: string[];
   status?: "draft" | "confirmed" | "cancelled";
   description?: string;
 }

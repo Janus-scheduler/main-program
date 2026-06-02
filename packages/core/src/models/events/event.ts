@@ -6,6 +6,7 @@ export class Event {
   startTime: string;
   endTime: string;
   resourceId: string;
+  resourceIds: string[];
   status: "draft" | "confirmed" | "cancelled";
   description: string;
 
@@ -14,14 +15,20 @@ export class Event {
     this.title = data.title;
     this.startTime = data.startTime;
     this.endTime = data.endTime;
-    this.resourceId = data.resourceId;
+    this.resourceIds =
+      data.resourceIds && data.resourceIds.length > 0
+        ? data.resourceIds
+        : data.resourceId
+          ? [data.resourceId]
+          : [];
+    this.resourceId = this.resourceIds[0] || data.resourceId || "";
     this.status = data.status || "draft";
     this.description = data.description || "";
   }
 
   // Check if event data is valid
   isValid(): boolean {
-    if (!this.id || !this.title || !this.resourceId) return false;
+    if (!this.id || !this.title || this.resourceIds.length === 0) return false;
     const start = new Date(this.startTime);
     const end = new Date(this.endTime);
     if (start >= end) return false;

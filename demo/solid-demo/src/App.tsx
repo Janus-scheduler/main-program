@@ -119,7 +119,7 @@ function App() {
       title: "Appendectomy",
       startTime: zonedInputToISO(today, "09:00", tz),
       endTime: zonedInputToISO(today, "11:30", tz),
-      resourceId: "r1",
+      resourceIds: ["r1", "r3"],
       status: "confirmed",
     });
     manager.addEvent({
@@ -127,7 +127,7 @@ function App() {
       title: "Pre-op Assessment",
       startTime: zonedInputToISO(today, "13:00", tz),
       endTime: zonedInputToISO(today, "14:00", tz),
-      resourceId: "r2",
+      resourceIds: ["r2"],
       status: "confirmed",
     });
   }
@@ -197,12 +197,18 @@ function App() {
             }}
             onEventMove={({
               event,
+              oldResourceId,
               newResourceId,
               newStartTime,
               newEndTime,
             }) => {
+              const currentEvent = manager.getEvent(event.id);
+              if (!currentEvent) return;
+              const updatedResourceIds = currentEvent.resourceIds.map((id) =>
+                id === oldResourceId ? newResourceId : id,
+              );
               manager.updateEvent(event.id, {
-                resourceId: newResourceId,
+                resourceIds: updatedResourceIds,
                 startTime: newStartTime,
                 endTime: newEndTime,
               });
@@ -219,7 +225,7 @@ function App() {
                 title: "New Event",
                 startTime,
                 endTime,
-                resourceId,
+                resourceIds: [resourceId],
                 status: "confirmed",
               });
             }}
@@ -251,7 +257,7 @@ function App() {
             endDate={endParts().date}
             endTime={endParts().time}
             participants={
-              storeEvent()?.resourceId ? [storeEvent()!.resourceId] : undefined
+              storeEvent()?.resourceIds ? storeEvent()!.resourceIds : undefined
             }
             description={storeEvent()?.description}
             error={schedulerError()}
@@ -271,7 +277,7 @@ function App() {
                     data.endTime,
                     data.timezone,
                   ),
-                  resourceId: data.participants?.[0] || "r1",
+                  resourceIds: data.participants || ["r1"],
                   description: data.description,
                   status: "confirmed" as const,
                 };
