@@ -2,7 +2,17 @@
  * Color options for scheduler events.
  * Used in both TimelineEvent and MonthEvent.
  */
-export type EventColor = "orange" | "blue" | "yellow" | "purple" | "green";
+export type EventColor =
+  | "orange"
+  | "blue"
+  | "yellow"
+  | "purple"
+  | "green"
+  | "red"
+  | "pink"
+  | "indigo"
+  | "cyan"
+  | "teal";
 
 /**
  * The two supported calendar views.

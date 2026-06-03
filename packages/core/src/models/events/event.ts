@@ -9,6 +9,7 @@ export class Event {
   resourceIds: string[];
   status: "draft" | "confirmed" | "cancelled";
   description: string;
+  color?: string;
 
   constructor(data: EventData) {
     this.id = data.id;
@@ -24,6 +25,7 @@ export class Event {
     this.resourceId = this.resourceIds[0] || data.resourceId || "";
     this.status = data.status || "draft";
     this.description = data.description || "";
+    this.color = data.color;
   }
 
   // Check if event data is valid

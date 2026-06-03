@@ -54,7 +54,7 @@ export class JanusMonthGrid extends LitElement {
       return {
         id: e.id,
         title: e.title,
-        color: "blue",
+        color: e.color || "blue",
         date: localDate,
         startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
         endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,

@@ -127,7 +127,7 @@ export class JanusTimeline extends LitElement {
             endTime,
             startMs: startD.getTime(),
             endMs: endD.getTime(),
-            color: "blue",
+            color: e.color || "blue",
             date,
             resourceId: res.id,
           } as TimelineEvent;

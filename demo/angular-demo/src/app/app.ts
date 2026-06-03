@@ -130,6 +130,7 @@ export class App {
         resourceIds: data.participants || ['r1'],
         description: data.description,
         status: 'confirmed' as const,
+        color: data.activeColor,
       };
 
       if (data.id) {

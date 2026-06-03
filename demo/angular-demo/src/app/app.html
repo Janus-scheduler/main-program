@@ -83,6 +83,7 @@
         [endTime]="endParts().time"
         [participants]="participants()"
         [description]="storeEvent()?.description"
+        [activeColor]="storeEvent()?.color"
         [error]="schedulerError()"
         (save)="handleSave($event)"
         (delete)="handleDelete($event)"

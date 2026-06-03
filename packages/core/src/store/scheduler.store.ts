@@ -118,6 +118,7 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     if (updates.status) event.status = updates.status;
     if (updates.description !== undefined)
       event.description = updates.description;
+    if (updates.color !== undefined) event.color = updates.color;
 
     // To ensure reactivity in zustand, we create a new object reference for the events record.
     set((state) => ({

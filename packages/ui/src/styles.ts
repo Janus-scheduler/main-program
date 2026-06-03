@@ -37,6 +37,11 @@ export const schedulerStyles = css`
     --c-green: #10b981;
     --c-yellow: #f59e0b;
     --c-purple: #8b5cf6;
+    --c-red: #ef4444;
+    --c-pink: #ec4899;
+    --c-indigo: #6366f1;
+    --c-cyan: #06b6d4;
+    --c-teal: #14b8a6;
 
     font-family: "Roboto", sans-serif;
     display: block;
@@ -126,6 +131,21 @@ export const schedulerStyles = css`
   }
   .sidebar-accent.color-purple {
     background: var(--c-purple);
+  }
+  .sidebar-accent.color-red {
+    background: var(--c-red);
+  }
+  .sidebar-accent.color-pink {
+    background: var(--c-pink);
+  }
+  .sidebar-accent.color-indigo {
+    background: var(--c-indigo);
+  }
+  .sidebar-accent.color-cyan {
+    background: var(--c-cyan);
+  }
+  .sidebar-accent.color-teal {
+    background: var(--c-teal);
   }
 
   .sidebar-top {
@@ -256,6 +276,26 @@ export const schedulerStyles = css`
   .swatch-purple {
     background: var(--c-purple);
     color: var(--c-purple);
+  }
+  .swatch-red {
+    background: var(--c-red);
+    color: var(--c-red);
+  }
+  .swatch-pink {
+    background: var(--c-pink);
+    color: var(--c-pink);
+  }
+  .swatch-indigo {
+    background: var(--c-indigo);
+    color: var(--c-indigo);
+  }
+  .swatch-cyan {
+    background: var(--c-cyan);
+    color: var(--c-cyan);
+  }
+  .swatch-teal {
+    background: var(--c-teal);
+    color: var(--c-teal);
   }
 
   /* Avatars */
@@ -409,6 +449,21 @@ export const schedulerStyles = css`
   }
   .dot-purple {
     background: var(--c-purple);
+  }
+  .dot-red {
+    background: var(--c-red);
+  }
+  .dot-pink {
+    background: var(--c-pink);
+  }
+  .dot-indigo {
+    background: var(--c-indigo);
+  }
+  .dot-cyan {
+    background: var(--c-cyan);
+  }
+  .dot-teal {
+    background: var(--c-teal);
   }
 
   .chevron {
@@ -1662,6 +1717,26 @@ export const schedulerStyles = css`
     background: linear-gradient(135deg, #faf5ff, #f3e8ff);
     border-bottom-color: #e9d5ff;
   }
+  .view-header.color-red {
+    background: linear-gradient(135deg, #fef2f2, #fee2e2);
+    border-bottom-color: #fca5a5;
+  }
+  .view-header.color-pink {
+    background: linear-gradient(135deg, #fdf2f8, #fce7f3);
+    border-bottom-color: #fbcfe8;
+  }
+  .view-header.color-indigo {
+    background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+    border-bottom-color: #c7d2fe;
+  }
+  .view-header.color-cyan {
+    background: linear-gradient(135deg, #ecfeff, #cffafe);
+    border-bottom-color: #a5f3fc;
+  }
+  .view-header.color-teal {
+    background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
+    border-bottom-color: #99f6e4;
+  }
 
   .view-header-left {
     display: flex;
@@ -1685,6 +1760,11 @@ export const schedulerStyles = css`
   .view-header.color-green .view-header-icon-box { color: var(--c-green); }
   .view-header.color-yellow .view-header-icon-box { color: var(--c-yellow); }
   .view-header.color-purple .view-header-icon-box { color: var(--c-purple); }
+  .view-header.color-red .view-header-icon-box { color: var(--c-red); }
+  .view-header.color-pink .view-header-icon-box { color: var(--c-pink); }
+  .view-header.color-indigo .view-header-icon-box { color: var(--c-indigo); }
+  .view-header.color-cyan .view-header-icon-box { color: var(--c-cyan); }
+  .view-header.color-teal .view-header-icon-box { color: var(--c-teal); }
 
   .view-header-titles {
     display: flex;
@@ -1884,6 +1964,7 @@ export const schedulerStyles = css`
     font-size: 13.5px;
     font-weight: 600;
     cursor: pointer;
+    background: var(--orange);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     transition: transform 0.15s, filter 0.15s;
   }
@@ -1900,4 +1981,9 @@ export const schedulerStyles = css`
   .btn-edit-event.color-green { background-color: var(--c-green); color: white; }
   .btn-edit-event.color-yellow { background-color: var(--c-yellow); color: var(--text-primary); }
   .btn-edit-event.color-purple { background-color: var(--c-purple); color: white; }
+  .btn-edit-event.color-red { background-color: var(--c-red); color: white; }
+  .btn-edit-event.color-pink { background-color: var(--c-pink); color: white; }
+  .btn-edit-event.color-indigo { background-color: var(--c-indigo); color: white; }
+  .btn-edit-event.color-cyan { background-color: var(--c-cyan); color: white; }
+  .btn-edit-event.color-teal { background-color: var(--c-teal); color: white; }
 `;

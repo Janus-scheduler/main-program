@@ -28,6 +28,21 @@ export const timelineStyles = css`
     --c-green-bg: #f0fdf4;
     --c-green-bd: #10b981;
     --c-green-tx: #047857;
+    --c-red-bg: #fef2f2;
+    --c-red-bd: #ef4444;
+    --c-red-tx: #991b1b;
+    --c-pink-bg: #fdf2f8;
+    --c-pink-bd: #ec4899;
+    --c-pink-tx: #9d174d;
+    --c-indigo-bg: #eef2ff;
+    --c-indigo-bd: #6366f1;
+    --c-indigo-tx: #3730a3;
+    --c-cyan-bg: #ecfeff;
+    --c-cyan-bd: #06b6d4;
+    --c-cyan-tx: #155e75;
+    --c-teal-bg: #f0fdfa;
+    --c-teal-bd: #14b8a6;
+    --c-teal-tx: #115e59;
 
     /* Layout sizes */
     --topbar-h: 56px;
@@ -666,6 +681,36 @@ export const timelineStyles = css`
     color: var(--c-green-tx);
   }
 
+  .tl-event--red {
+    background: var(--c-red-bg);
+    border-color: var(--c-red-bd);
+    color: var(--c-red-tx);
+  }
+
+  .tl-event--pink {
+    background: var(--c-pink-bg);
+    border-color: var(--c-pink-bd);
+    color: var(--c-pink-tx);
+  }
+
+  .tl-event--indigo {
+    background: var(--c-indigo-bg);
+    border-color: var(--c-indigo-bd);
+    color: var(--c-indigo-tx);
+  }
+
+  .tl-event--cyan {
+    background: var(--c-cyan-bg);
+    border-color: var(--c-cyan-bd);
+    color: var(--c-cyan-tx);
+  }
+
+  .tl-event--teal {
+    background: var(--c-teal-bg);
+    border-color: var(--c-teal-bd);
+    color: var(--c-teal-tx);
+  }
+
   /* ══════════════════════════════════════════════════════════════════════════════
      DRAG-AND-DROP
   ══════════════════════════════════════════════════════════════════════════════ */
@@ -769,6 +814,36 @@ export const timelineStyles = css`
     background: var(--c-green-bg);
     border-color: var(--c-green-bd);
     color: var(--c-green-tx);
+  }
+
+  .tl-drag-ghost--red {
+    background: var(--c-red-bg);
+    border-color: var(--c-red-bd);
+    color: var(--c-red-tx);
+  }
+
+  .tl-drag-ghost--pink {
+    background: var(--c-pink-bg);
+    border-color: var(--c-pink-bd);
+    color: var(--c-pink-tx);
+  }
+
+  .tl-drag-ghost--indigo {
+    background: var(--c-indigo-bg);
+    border-color: var(--c-indigo-bd);
+    color: var(--c-indigo-tx);
+  }
+
+  .tl-drag-ghost--cyan {
+    background: var(--c-cyan-bg);
+    border-color: var(--c-cyan-bd);
+    color: var(--c-cyan-tx);
+  }
+
+  .tl-drag-ghost--teal {
+    background: var(--c-teal-bg);
+    border-color: var(--c-teal-bd);
+    color: var(--c-teal-tx);
   }
 
   /* Empty-space creation cursor */

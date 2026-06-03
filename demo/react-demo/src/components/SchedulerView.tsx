@@ -142,6 +142,7 @@ export function SchedulerView({
             storeEvent?.resourceIds ? storeEvent.resourceIds : undefined
           }
           description={storeEvent?.description}
+          activeColor={storeEvent?.color}
           onSave={(data) => {
             const today = new Date().toISOString().split("T")[0];
             try {
@@ -161,6 +162,7 @@ export function SchedulerView({
                   resourceIds: data.participants || ["r1"],
                   description: data.description,
                   status: "confirmed",
+                  color: data.activeColor,
                 });
               } else {
                 manager.addEvent({
@@ -179,6 +181,7 @@ export function SchedulerView({
                   resourceIds: data.participants || ["r1"],
                   description: data.description,
                   status: "confirmed",
+                  color: data.activeColor,
                 });
                 console.log("Event added:", data);
               }

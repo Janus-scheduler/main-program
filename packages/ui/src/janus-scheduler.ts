@@ -10,7 +10,18 @@ import {
 } from "@janus-scheduler/core";
 import { schedulerStyles } from "./styles";
 
-const COLORS = ["orange", "blue", "green", "yellow", "purple"];
+const COLORS = [
+  "orange",
+  "blue",
+  "green",
+  "yellow",
+  "purple",
+  "red",
+  "pink",
+  "indigo",
+  "cyan",
+  "teal",
+];
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -384,6 +395,21 @@ export class JanusScheduler extends LitElement {
   }
 
   private get _invalid() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return false;
+    const timeInvalid = isEndBeforeStart(
+      draft.startDate,
+      draft.startTime,
+      draft.endDate,
+      draft.endTime,
+    );
+    const titleInvalid = !draft.title || !draft.title.trim();
+    const participantsInvalid =
+      !draft.participants || draft.participants.length === 0;
+    return timeInvalid || titleInvalid || participantsInvalid;
+  }
+
+  private get _timeInvalid() {
     const draft = schedulerStore.getState().eventDraft;
     if (!draft) return false;
     return isEndBeforeStart(
@@ -1024,7 +1050,7 @@ export class JanusScheduler extends LitElement {
               Close
             </button>
             <button
-              class="btn-edit-event ${colorClass}"
+              class="btn-edit-event"
               @click=${() => (this._isEditing = true)}
             >
               <svg
@@ -1058,6 +1084,7 @@ export class JanusScheduler extends LitElement {
     if (!draft) return nothing;
 
     const invalid = this._invalid;
+    const timeInvalid = this._timeInvalid;
 
     const multiDay = draft.startDate !== draft.endDate;
 
@@ -1275,6 +1302,15 @@ export class JanusScheduler extends LitElement {
                             })}
                           placeholder="Add a title…"
                         />
+                        ${!draft.title || !draft.title.trim()
+                          ? html`<div
+                              class="dt-invalid-notice"
+                              style="margin-top: 6px;"
+                            >
+                              <span>⚠</span>
+                              <span>Event Title is required.</span>
+                            </div>`
+                          : nothing}
                       </div>
                     </div>
 
@@ -1327,7 +1363,7 @@ export class JanusScheduler extends LitElement {
                             CalendarIcon(),
                             formatDateShort(draft.endDate),
                             this.openPicker === "endDate",
-                            invalid,
+                            timeInvalid,
                             "endDate",
                           )}
                           ${this.openPicker === "endDate"
@@ -1345,7 +1381,7 @@ export class JanusScheduler extends LitElement {
                             ClockIcon(),
                             formatTime(draft.endTime),
                             this.openPicker === "endTime",
-                            invalid,
+                            timeInvalid,
                             "endTime",
                           )}
                           ${this.openPicker === "endTime"
@@ -1355,7 +1391,7 @@ export class JanusScheduler extends LitElement {
                       </div>
 
                       <!-- Validation warning -->
-                      ${invalid
+                      ${timeInvalid
                         ? html` <div class="dt-invalid-notice">
                             <span>⚠</span>
                             <span
@@ -1476,6 +1512,15 @@ export class JanusScheduler extends LitElement {
                                     `}
                               </div>
                             `
+                          : nothing}
+                        ${!draft.participants || draft.participants.length === 0
+                          ? html`<div
+                              class="dt-invalid-notice"
+                              style="margin-top: 6px;"
+                            >
+                              <span>⚠</span>
+                              <span>At least one participant is required.</span>
+                            </div>`
                           : nothing}
                       </div>
                     </div>
