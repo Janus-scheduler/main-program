@@ -294,7 +294,10 @@ function parseRRule(rruleStr: string): { freq: string; until: string } {
     if (!key || !val) continue;
     if (key === "FREQ") {
       const lower = val.toLowerCase();
-      result.freq = lower.charAt(0).toUpperCase() + lower.slice(1);
+      const capitalized = lower.charAt(0).toUpperCase() + lower.slice(1);
+      if (["Daily", "Weekly", "Monthly", "Yearly"].includes(capitalized)) {
+        result.freq = capitalized;
+      }
     } else if (key === "UNTIL") {
       const match = val.match(/^(\d{4})(\d{2})(\d{2})/);
       if (match) {
@@ -1518,9 +1521,14 @@ export class JanusScheduler extends LitElement {
                       <!-- Switches Row -->
                       <div class="toggle-row">
                         <div class="toggle-control">
-                          <span class="toggle-label">All-day Event</span>
+                          <span class="toggle-label" id="all-day-label"
+                            >All-day Event</span
+                          >
                           <button
                             type="button"
+                            role="switch"
+                            aria-checked="${draft.allDay ? "true" : "false"}"
+                            aria-labelledby="all-day-label"
                             class="switch-btn ${draft.allDay
                               ? "switch-btn--active"
                               : ""}"
@@ -1530,9 +1538,16 @@ export class JanusScheduler extends LitElement {
                           </button>
                         </div>
                         <div class="toggle-control">
-                          <span class="toggle-label">Repeat Event</span>
+                          <span class="toggle-label" id="repeat-label"
+                            >Repeat Event</span
+                          >
                           <button
                             type="button"
+                            role="switch"
+                            aria-checked="${draft.recurrenceRule
+                              ? "true"
+                              : "false"}"
+                            aria-labelledby="repeat-label"
                             class="switch-btn ${draft.recurrenceRule
                               ? "switch-btn--active"
                               : ""}"

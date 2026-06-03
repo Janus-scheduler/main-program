@@ -49,7 +49,15 @@ export class JanusMonthGrid extends LitElement {
   private _syncFromStore(state: any) {
     const rawEvents = Object.values(state.events) as any[];
     const startRange = new Date(this._year, this._month - 1, 1).getTime();
-    const endRange = new Date(this._year, this._month + 2, 0).getTime();
+    const endRange = new Date(
+      this._year,
+      this._month + 2,
+      0,
+      23,
+      59,
+      59,
+      999,
+    ).getTime();
     const coreEvents = expandEvents(rawEvents, startRange, endRange);
 
     const newEvents: MonthEvent[] = [];
@@ -59,20 +67,29 @@ export class JanusMonthGrid extends LitElement {
       const startD = new Date(e.startTime);
       const endD = new Date(e.endTime);
 
+      // Clamp loop bounds to the visible month window [startRange, endRange]
+      const loopStartMs = Math.max(startD.getTime(), startRange);
+      const loopEndMs = Math.min(endD.getTime(), endRange);
+
+      if (loopStartMs > loopEndMs) continue;
+
+      const loopStartD = new Date(loopStartMs);
+      const loopEndD = new Date(loopEndMs);
+
       // Create a local midnight/noon safe cursor to iterate through all calendar dates.
       // Setting time to 12:00:00 avoids timezone/DST boundary jump errors.
       const current = new Date(
-        startD.getFullYear(),
-        startD.getMonth(),
-        startD.getDate(),
+        loopStartD.getFullYear(),
+        loopStartD.getMonth(),
+        loopStartD.getDate(),
         12,
         0,
         0,
       );
       const endLimit = new Date(
-        endD.getFullYear(),
-        endD.getMonth(),
-        endD.getDate(),
+        loopEndD.getFullYear(),
+        loopEndD.getMonth(),
+        loopEndD.getDate(),
         12,
         0,
         0,
