@@ -8,4 +8,6 @@ export interface EventData {
   status?: "draft" | "confirmed" | "cancelled";
   description?: string;
   color?: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 }

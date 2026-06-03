@@ -261,6 +261,8 @@ function App() {
             }
             description={storeEvent()?.description}
             activeColor={storeEvent()?.color}
+            allDay={storeEvent()?.allDay}
+            recurrenceRule={storeEvent()?.recurrenceRule}
             error={schedulerError()}
             onSave={(data) => {
               try {
@@ -282,6 +284,8 @@ function App() {
                   description: data.description,
                   status: "confirmed" as const,
                   color: data.activeColor,
+                  allDay: data.allDay,
+                  recurrenceRule: data.recurrenceRule,
                 };
 
                 if (selectedEventId()) {

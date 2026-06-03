@@ -136,6 +136,23 @@ const GlobeIcon = () =>
     />
   </svg>`;
 
+const RepeatIcon = () =>
+  html`<svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polyline points="17 1 21 5 17 9" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <polyline points="7 23 3 19 7 15" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </svg>`;
+
 const UsersIcon = () =>
   html`<svg
     width="15"
@@ -267,6 +284,37 @@ function isEndBeforeStart(
   return new Date(`${ed}T${et}`).getTime() <= new Date(`${sd}T${st}`).getTime();
 }
 
+function parseRRule(rruleStr: string): { freq: string; until: string } {
+  const result = { freq: "Weekly", until: "" };
+  if (!rruleStr) return result;
+
+  const parts = rruleStr.split(";");
+  for (const part of parts) {
+    const [key, val] = part.split("=");
+    if (!key || !val) continue;
+    if (key === "FREQ") {
+      const lower = val.toLowerCase();
+      result.freq = lower.charAt(0).toUpperCase() + lower.slice(1);
+    } else if (key === "UNTIL") {
+      const match = val.match(/^(\d{4})(\d{2})(\d{2})/);
+      if (match) {
+        result.until = `${match[1]}-${match[2]}-${match[3]}`;
+      }
+    }
+  }
+  return result;
+}
+
+function formatRecurrence(rruleStr: string): string {
+  if (!rruleStr) return "";
+  const { freq, until } = parseRRule(rruleStr);
+  let label = `Repeats ${freq.toLowerCase()}`;
+  if (until) {
+    label += ` until ${formatDate(until)}`;
+  }
+  return label;
+}
+
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -313,6 +361,7 @@ type OpenPicker =
   | "endDate"
   | "endTime"
   | "timezone"
+  | "recurrenceUntil"
   | null;
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -333,6 +382,8 @@ export class JanusScheduler extends LitElement {
   @property({ type: String }) description = "";
   @property({ type: String }) activeColor = "orange";
   @property({ type: String }) error: string | null = null;
+  @property({ type: Boolean }) allDay = false;
+  @property({ type: String }) recurrenceRule = "";
   /**
    * The ID of the event being edited.
    * - `null` / omitted → creation mode (onSave should call addEvent)
@@ -354,6 +405,13 @@ export class JanusScheduler extends LitElement {
   @state() openPicker: OpenPicker = null;
   @state() private _tzSearch = "";
   @state() private _selectedTz: string = schedulerStore.getState().timezone;
+  @state() private _recurrenceFreq: "Daily" | "Weekly" | "Monthly" | "Yearly" =
+    "Weekly";
+  @state() private _recurrenceUntilDate = "";
+  @state() recurrenceCal: CalState = {
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(),
+  };
 
   // Calendar view: sync to the selected date when a property is set,
   // otherwise default to current month
@@ -436,6 +494,8 @@ export class JanusScheduler extends LitElement {
         description: this.description,
         activeColor: this.activeColor || "orange",
         timezone: schedulerStore.getState().timezone,
+        allDay: this.allDay,
+        recurrenceRule: this.recurrenceRule,
       };
 
       schedulerStore.getState().startDraft(this.eventId, defaults);
@@ -443,6 +503,18 @@ export class JanusScheduler extends LitElement {
       const draft = schedulerStore.getState().eventDraft;
       if (draft) {
         this._selectedTz = draft.timezone || schedulerStore.getState().timezone;
+        if (draft.recurrenceRule) {
+          const parsed = parseRRule(draft.recurrenceRule);
+          this._recurrenceFreq = parsed.freq as any;
+          this._recurrenceUntilDate = parsed.until;
+          if (parsed.until) {
+            const [y, m] = parsed.until.split("-").map(Number);
+            this.recurrenceCal = { viewYear: y, viewMonth: m - 1 };
+          }
+        } else {
+          this._recurrenceFreq = "Weekly";
+          this._recurrenceUntilDate = "";
+        }
       }
     }
   }
@@ -545,6 +617,8 @@ export class JanusScheduler extends LitElement {
           description: draft.description,
           activeColor: draft.activeColor,
           timezone: this._selectedTz,
+          allDay: draft.allDay,
+          recurrenceRule: draft.recurrenceRule,
         } as SchedulerSaveData,
       }),
     );
@@ -676,7 +750,7 @@ export class JanusScheduler extends LitElement {
   // ─── Calendar date selection ───────────────────────────────────────────────
 
   private _selectDate(
-    which: "start" | "end",
+    which: "start" | "end" | "recurrenceUntil",
     y: number,
     mo: number,
     d: number,
@@ -695,17 +769,67 @@ export class JanusScheduler extends LitElement {
         schedulerStore.getState().updateDraft({ endDate: iso });
         this.endCal = { viewYear: y, viewMonth: mo };
       }
-    } else {
+    } else if (which === "end") {
       schedulerStore.getState().updateDraft({ endDate: iso });
       this.endCal = { viewYear: y, viewMonth: mo };
+    } else {
+      this._recurrenceUntilDate = iso;
+      this.recurrenceCal = { viewYear: y, viewMonth: mo };
+      this._updateRecurrenceRule();
     }
     this.openPicker = null;
+  }
+
+  private _toggleAllDay() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+    const newAllDay = !draft.allDay;
+    if (newAllDay) {
+      schedulerStore.getState().updateDraft({
+        allDay: true,
+        startTime: "00:00",
+        endTime: "23:59",
+      });
+    } else {
+      schedulerStore.getState().updateDraft({
+        allDay: false,
+      });
+    }
+  }
+
+  private _toggleRepeat() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+    if (draft.recurrenceRule) {
+      schedulerStore.getState().updateDraft({ recurrenceRule: "" });
+      this._recurrenceUntilDate = "";
+    } else {
+      this._recurrenceFreq = "Weekly";
+      this._recurrenceUntilDate = "";
+      this._updateRecurrenceRule();
+    }
+  }
+
+  private _setRepeatFreq(freq: "Daily" | "Weekly" | "Monthly" | "Yearly") {
+    this._recurrenceFreq = freq;
+    this._updateRecurrenceRule();
+  }
+
+  private _updateRecurrenceRule() {
+    const freqUpper = this._recurrenceFreq.toUpperCase();
+    let rule = `FREQ=${freqUpper}`;
+    if (this._recurrenceUntilDate) {
+      const d = new Date(this._recurrenceUntilDate + "T23:59:59");
+      const untilStr = d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      rule += `;UNTIL=${untilStr}`;
+    }
+    schedulerStore.getState().updateDraft({ recurrenceRule: rule });
   }
 
   // ─── Calendar dropdown ─────────────────────────────────────────────────────
 
   private _calPicker(
-    which: "start" | "end",
+    which: "start" | "end" | "recurrenceUntil",
     selectedIso: string,
     cal: CalState,
     onNav: (d: -1 | 1) => void,
@@ -894,8 +1018,13 @@ export class JanusScheduler extends LitElement {
 
   // ─── Calendar nav helper ───────────────────────────────────────────────────
 
-  private _navCal(which: "start" | "end", delta: -1 | 1) {
-    const prev = which === "start" ? this.startCal : this.endCal;
+  private _navCal(which: "start" | "end" | "recurrenceUntil", delta: -1 | 1) {
+    const prev =
+      which === "start"
+        ? this.startCal
+        : which === "end"
+          ? this.endCal
+          : this.recurrenceCal;
     let { viewYear: y, viewMonth: m } = prev;
     m += delta;
     if (m < 0) {
@@ -908,7 +1037,8 @@ export class JanusScheduler extends LitElement {
     }
     const next: CalState = { viewYear: y, viewMonth: m };
     if (which === "start") this.startCal = next;
-    else this.endCal = next;
+    else if (which === "end") this.endCal = next;
+    else this.recurrenceCal = next;
   }
 
   // ─── Render View Mode ──────────────────────────────────────────────────────
@@ -918,7 +1048,9 @@ export class JanusScheduler extends LitElement {
     const displayDate = multiDay
       ? `${formatDate(draft.startDate)} – ${formatDate(draft.endDate)}`
       : formatDate(draft.startDate);
-    const displayTime = `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
+    const displayTime = draft.allDay
+      ? "All-day"
+      : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
 
     const leadResourceId = draft.participants[0];
     const leadResourceName = leadResourceId
@@ -959,6 +1091,39 @@ export class JanusScheduler extends LitElement {
               >${displayDate} • ${displayTime}</span
             >
           </div>
+
+          ${draft.recurrenceRule
+            ? html`
+                <div class="view-datetime-row" style="margin-top: 4px;">
+                  <span
+                    class="view-datetime-icon"
+                    style="color: var(--c-${draft.activeColor});"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <polyline points="17 1 21 5 17 9"></polyline>
+                      <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                      <polyline points="7 23 3 19 7 15"></polyline>
+                      <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                    </svg>
+                  </span>
+                  <span
+                    class="view-datetime-text"
+                    style="color: var(--c-${draft.activeColor}); font-weight: 500;"
+                  >
+                    ${formatRecurrence(draft.recurrenceRule)}
+                  </span>
+                </div>
+              `
+            : nothing}
 
           <!-- Lead Resource & Participants -->
           <div class="view-section">
@@ -1093,9 +1258,11 @@ export class JanusScheduler extends LitElement {
       : formatDate(draft.startDate);
 
     // When multi-day, attach the date to each time so the sidebar is unambiguous
-    const sidebarTime = multiDay
-      ? `${formatDateShort(draft.startDate)}, ${formatTime(draft.startTime)} – ${formatDateShort(draft.endDate)}, ${formatTime(draft.endTime)}`
-      : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
+    const sidebarTime = draft.allDay
+      ? "All-day"
+      : multiDay
+        ? `${formatDateShort(draft.startDate)}, ${formatTime(draft.startTime)} – ${formatDateShort(draft.endDate)}, ${formatTime(draft.endTime)}`
+        : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
 
     return html`
       <div
@@ -1137,6 +1304,24 @@ export class JanusScheduler extends LitElement {
                         <div class="meta-value">${sidebarTime}</div>
                       </div>
                     </div>
+                    ${draft.recurrenceRule
+                      ? html`
+                          <div class="meta-item">
+                            <span
+                              class="meta-icon"
+                              style="color: var(--c-${draft.activeColor});"
+                            >
+                              ${RepeatIcon()}
+                            </span>
+                            <div>
+                              <div class="meta-label">Repeat</div>
+                              <div class="meta-value">
+                                ${formatRecurrence(draft.recurrenceRule)}
+                              </div>
+                            </div>
+                          </div>
+                        `
+                      : nothing}
                     <div class="meta-item">
                       <span class="meta-icon">${UsersIcon()}</span>
                       <div>
@@ -1242,14 +1427,16 @@ export class JanusScheduler extends LitElement {
                         <span class="meta-label">Start</span>
                         <span class="meta-value"
                           >${formatDateShort(draft.startDate)}
-                          ${formatTime(draft.startTime)}</span
+                          ${draft.allDay
+                            ? ""
+                            : formatTime(draft.startTime)}</span
                         >
                       </div>
                       <div class="msummary-item">
                         <span class="meta-label">End</span>
                         <span class="meta-value"
                           >${formatDateShort(draft.endDate)}
-                          ${formatTime(draft.endTime)}</span
+                          ${draft.allDay ? "" : formatTime(draft.endTime)}</span
                         >
                       </div>
                       <div class="msummary-item">
@@ -1258,6 +1445,16 @@ export class JanusScheduler extends LitElement {
                           >${draft.participants.length} people</span
                         >
                       </div>
+                      ${draft.recurrenceRule
+                        ? html`
+                            <div class="msummary-item">
+                              <span class="meta-label">Repeat</span>
+                              <span class="meta-value"
+                                >${formatRecurrence(draft.recurrenceRule)}</span
+                              >
+                            </div>
+                          `
+                        : nothing}
                       <div class="msummary-item">
                         <span class="meta-label">Color</span>
                         <div class="swatches swatches--sm">
@@ -1318,9 +1515,109 @@ export class JanusScheduler extends LitElement {
                     <div class="form-section">
                       <div class="section-label">Date &amp; Time</div>
 
+                      <!-- Switches Row -->
+                      <div class="toggle-row">
+                        <div class="toggle-control">
+                          <span class="toggle-label">All-day Event</span>
+                          <button
+                            type="button"
+                            class="switch-btn ${draft.allDay
+                              ? "switch-btn--active"
+                              : ""}"
+                            @click=${this._toggleAllDay}
+                          >
+                            <span class="switch-slider"></span>
+                          </button>
+                        </div>
+                        <div class="toggle-control">
+                          <span class="toggle-label">Repeat Event</span>
+                          <button
+                            type="button"
+                            class="switch-btn ${draft.recurrenceRule
+                              ? "switch-btn--active"
+                              : ""}"
+                            @click=${this._toggleRepeat}
+                          >
+                            <span class="switch-slider"></span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Recurrence Options -->
+                      ${draft.recurrenceRule
+                        ? html`
+                            <div class="recurrence-section">
+                              <div class="dt-row-label">Repeat Frequency</div>
+                              <div class="recurrence-freq-selector">
+                                ${["Daily", "Weekly", "Monthly", "Yearly"].map(
+                                  (freq) => html`
+                                    <button
+                                      type="button"
+                                      class="freq-pill ${this
+                                        ._recurrenceFreq === freq
+                                        ? "freq-pill--active"
+                                        : ""}"
+                                      @click=${() =>
+                                        this._setRepeatFreq(freq as any)}
+                                    >
+                                      ${freq}
+                                    </button>
+                                  `,
+                                )}
+                              </div>
+                              <div
+                                class="dt-row-label"
+                                style="margin-top: 10px;"
+                              >
+                                End Repeat
+                              </div>
+                              <div class="dt-row">
+                                <div class="dt-cell dt-cell--date">
+                                  ${this._triggerBtn(
+                                    CalendarIcon(),
+                                    this._recurrenceUntilDate
+                                      ? formatDateShort(
+                                          this._recurrenceUntilDate,
+                                        )
+                                      : "Never Ends",
+                                    this.openPicker === "recurrenceUntil",
+                                    false,
+                                    "recurrenceUntil",
+                                  )}
+                                  ${this.openPicker === "recurrenceUntil"
+                                    ? this._calPicker(
+                                        "recurrenceUntil",
+                                        this._recurrenceUntilDate,
+                                        this.recurrenceCal,
+                                        (d) =>
+                                          this._navCal("recurrenceUntil", d),
+                                      )
+                                    : nothing}
+                                </div>
+                                ${this._recurrenceUntilDate
+                                  ? html`
+                                      <button
+                                        type="button"
+                                        class="btn-clear-until"
+                                        @click=${() => {
+                                          this._recurrenceUntilDate = "";
+                                          this._updateRecurrenceRule();
+                                        }}
+                                      >
+                                        Clear End Date
+                                      </button>
+                                    `
+                                  : nothing}
+                              </div>
+                            </div>
+                          `
+                        : nothing}
+
                       <!-- START -->
                       <div class="dt-row-label">Start</div>
-                      <div class="dt-row">
+                      <div
+                        class="dt-row ${draft.allDay ? "dt-row--all-day" : ""}"
+                      >
                         <!-- Start date trigger + dropdown -->
                         <div class="dt-cell dt-cell--date">
                           ${this._triggerBtn(
@@ -1340,23 +1637,29 @@ export class JanusScheduler extends LitElement {
                             : nothing}
                         </div>
                         <!-- Start time trigger + dropdown -->
-                        <div class="dt-cell dt-cell--time">
-                          ${this._triggerBtn(
-                            ClockIcon(),
-                            formatTime(draft.startTime),
-                            this.openPicker === "startTime",
-                            false,
-                            "startTime",
-                          )}
-                          ${this.openPicker === "startTime"
-                            ? this._timePicker("start", draft.startTime)
-                            : nothing}
-                        </div>
+                        ${draft.allDay
+                          ? nothing
+                          : html`
+                              <div class="dt-cell dt-cell--time">
+                                ${this._triggerBtn(
+                                  ClockIcon(),
+                                  formatTime(draft.startTime),
+                                  this.openPicker === "startTime",
+                                  false,
+                                  "startTime",
+                                )}
+                                ${this.openPicker === "startTime"
+                                  ? this._timePicker("start", draft.startTime)
+                                  : nothing}
+                              </div>
+                            `}
                       </div>
 
                       <!-- END -->
                       <div class="dt-row-label dt-row-label--end">End</div>
-                      <div class="dt-row">
+                      <div
+                        class="dt-row ${draft.allDay ? "dt-row--all-day" : ""}"
+                      >
                         <!-- End date trigger + dropdown -->
                         <div class="dt-cell dt-cell--date">
                           ${this._triggerBtn(
@@ -1376,18 +1679,22 @@ export class JanusScheduler extends LitElement {
                             : nothing}
                         </div>
                         <!-- End time trigger + dropdown -->
-                        <div class="dt-cell dt-cell--time">
-                          ${this._triggerBtn(
-                            ClockIcon(),
-                            formatTime(draft.endTime),
-                            this.openPicker === "endTime",
-                            timeInvalid,
-                            "endTime",
-                          )}
-                          ${this.openPicker === "endTime"
-                            ? this._timePicker("end", draft.endTime)
-                            : nothing}
-                        </div>
+                        ${draft.allDay
+                          ? nothing
+                          : html`
+                              <div class="dt-cell dt-cell--time">
+                                ${this._triggerBtn(
+                                  ClockIcon(),
+                                  formatTime(draft.endTime),
+                                  this.openPicker === "endTime",
+                                  timeInvalid,
+                                  "endTime",
+                                )}
+                                ${this.openPicker === "endTime"
+                                  ? this._timePicker("end", draft.endTime)
+                                  : nothing}
+                              </div>
+                            `}
                       </div>
 
                       <!-- Validation warning -->

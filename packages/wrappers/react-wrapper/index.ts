@@ -91,6 +91,8 @@ export interface SchedulerProps extends React.HTMLAttributes<HTMLElement> {
   description?: string;
   activeColor?: string;
   error?: string | null;
+  allDay?: boolean;
+  recurrenceRule?: string;
   onClose?: () => void;
   onSave?: (detail: SchedulerSaveData) => void;
   onDelete?: (detail: { id: string | null; title: string }) => void;

@@ -143,6 +143,8 @@ export function SchedulerView({
           }
           description={storeEvent?.description}
           activeColor={storeEvent?.color}
+          allDay={storeEvent?.allDay}
+          recurrenceRule={storeEvent?.recurrenceRule}
           onSave={(data) => {
             const today = new Date().toISOString().split("T")[0];
             try {
@@ -163,6 +165,8 @@ export function SchedulerView({
                   description: data.description,
                   status: "confirmed",
                   color: data.activeColor,
+                  allDay: data.allDay,
+                  recurrenceRule: data.recurrenceRule,
                 });
               } else {
                 manager.addEvent({
@@ -182,6 +186,8 @@ export function SchedulerView({
                   description: data.description,
                   status: "confirmed",
                   color: data.activeColor,
+                  allDay: data.allDay,
+                  recurrenceRule: data.recurrenceRule,
                 });
                 console.log("Event added:", data);
               }

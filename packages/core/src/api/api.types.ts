@@ -31,6 +31,8 @@ export interface TimelineEvent {
   endMs: number;
   color: EventColor;
   date?: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 }
 
 export interface TimelineResource {
@@ -72,6 +74,8 @@ export interface MonthEvent {
   date: string; // "YYYY-MM-DD"
   startTime?: string; // "HH:MM" 24h — optional
   endTime?: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 }
 export interface SchedulerSaveData {
   /** Present when editing an existing event; null/undefined when creating a new one. */
@@ -86,6 +90,8 @@ export interface SchedulerSaveData {
   activeColor: string;
   /** IANA timezone the user was viewing when they entered the times. */
   timezone: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 }
 
 export interface SchedulerDeleteData {

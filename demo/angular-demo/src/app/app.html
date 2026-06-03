@@ -84,6 +84,8 @@
         [participants]="participants()"
         [description]="storeEvent()?.description"
         [activeColor]="storeEvent()?.color"
+        [allDay]="storeEvent()?.allDay"
+        [recurrenceRule]="storeEvent()?.recurrenceRule"
         [error]="schedulerError()"
         (save)="handleSave($event)"
         (delete)="handleDelete($event)"

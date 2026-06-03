@@ -153,7 +153,8 @@ export class SchedulerManager {
    * @returns Event if found, undefined otherwise
    */
   getEvent(id: string): Event | undefined {
-    return schedulerStore.getState().events[id];
+    const baseId = id.includes("_occ_") ? id.split("_occ_")[0] : id;
+    return schedulerStore.getState().events[baseId];
   }
 
   /**
@@ -173,11 +174,26 @@ export class SchedulerManager {
    * @returns The updated Event instance (already visible in the UI)
    */
   updateEvent(id: string, updates: Partial<EventData>): Event {
-    // Shallow-clone the primitive fields BEFORE the store writes.
-    // Without the spread, `snapshot` would be a reference to the same
-    // object that updateEvent() mutates in-place — meaning the rollback
-    // would read already-updated values and restore nothing.
-    const existing = schedulerStore.getState().events[id];
+    const isOcc = id.includes("_occ_");
+    const baseId = isOcc ? id.split("_occ_")[0] : id;
+
+    if (isOcc && updates.startTime) {
+      const parts = id.split("_occ_");
+      const originalOccStartMs = Number(parts[1]);
+      const newStartMs = new Date(updates.startTime).getTime();
+      const deltaMs = newStartMs - originalOccStartMs;
+
+      const parentEvent = schedulerStore.getState().events[baseId];
+      if (parentEvent) {
+        const parentStartMs = new Date(parentEvent.startTime).getTime();
+        const parentEndMs = new Date(parentEvent.endTime).getTime();
+
+        updates.startTime = new Date(parentStartMs + deltaMs).toISOString();
+        updates.endTime = new Date(parentEndMs + deltaMs).toISOString();
+      }
+    }
+
+    const existing = schedulerStore.getState().events[baseId];
     const snapshot = existing
       ? {
           ...existing,
@@ -187,7 +203,7 @@ export class SchedulerManager {
         }
       : null;
 
-    const event = schedulerStore.getState().updateEvent(id, updates);
+    const event = schedulerStore.getState().updateEvent(baseId, updates);
 
     this._fireHook(
       "updateEvent",
@@ -195,7 +211,7 @@ export class SchedulerManager {
       () => {
         if (snapshot) {
           // Roll back original values including resourceIds
-          schedulerStore.getState().updateEvent(id, {
+          schedulerStore.getState().updateEvent(baseId, {
             title: snapshot.title,
             startTime: snapshot.startTime,
             endTime: snapshot.endTime,
@@ -203,6 +219,9 @@ export class SchedulerManager {
             description: snapshot.description,
             resourceId: snapshot.resourceId,
             resourceIds: snapshot.resourceIds,
+            color: snapshot.color,
+            allDay: snapshot.allDay,
+            recurrenceRule: snapshot.recurrenceRule,
           });
         }
       },
@@ -219,14 +238,14 @@ export class SchedulerManager {
    * @returns true if the event was found and deleted, false otherwise
    */
   deleteEvent(id: string): boolean {
-    // Snapshot before deletion so we can restore it
-    const snapshot = schedulerStore.getState().events[id];
-    const deleted = schedulerStore.getState().deleteEvent(id);
+    const baseId = id.includes("_occ_") ? id.split("_occ_")[0] : id;
+    const snapshot = schedulerStore.getState().events[baseId];
+    const deleted = schedulerStore.getState().deleteEvent(baseId);
 
     if (deleted) {
       this._fireHook(
         "deleteEvent",
-        () => this._hooks.onEventDelete?.(id),
+        () => this._hooks.onEventDelete?.(baseId),
         () => {
           if (snapshot) schedulerStore.getState().addEvent(snapshot);
         },

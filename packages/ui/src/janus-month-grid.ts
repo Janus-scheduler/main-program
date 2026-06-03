@@ -19,7 +19,11 @@ import {
   PlusIcon,
 } from "./timeline-icons"; // reuse existing icons
 
-import { schedulerStore } from "@janus-scheduler/core";
+import {
+  schedulerStore,
+  expandEvents,
+  type EventColor,
+} from "@janus-scheduler/core";
 
 @customElement("janus-month-grid")
 export class JanusMonthGrid extends LitElement {
@@ -43,27 +47,58 @@ export class JanusMonthGrid extends LitElement {
   }
 
   private _syncFromStore(state: any) {
-    const coreEvents = Object.values(state.events) as any[];
-    const newEvents = coreEvents.map((e) => {
+    const rawEvents = Object.values(state.events) as any[];
+    const startRange = new Date(this._year, this._month - 1, 1).getTime();
+    const endRange = new Date(this._year, this._month + 2, 0).getTime();
+    const coreEvents = expandEvents(rawEvents, startRange, endRange);
+
+    const newEvents: MonthEvent[] = [];
+    const pad = (n: number) => n.toString().padStart(2, "0");
+
+    for (const e of coreEvents) {
       const startD = new Date(e.startTime);
       const endD = new Date(e.endTime);
-      const pad = (n: number) => n.toString().padStart(2, "0");
-      // Use LOCAL date so event.date matches the calendar cell dateStr,
-      // which is also derived from local date components (see month-grid-utils toDateStr).
-      const localDate = `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`;
-      return {
-        id: e.id,
-        title: e.title,
-        color: e.color || "blue",
-        date: localDate,
-        startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
-        endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
-      };
-    });
 
-    if (newEvents.length > 0) {
-      this.events = newEvents as MonthEvent[];
+      // Create a local midnight/noon safe cursor to iterate through all calendar dates.
+      // Setting time to 12:00:00 avoids timezone/DST boundary jump errors.
+      const current = new Date(
+        startD.getFullYear(),
+        startD.getMonth(),
+        startD.getDate(),
+        12,
+        0,
+        0,
+      );
+      const endLimit = new Date(
+        endD.getFullYear(),
+        endD.getMonth(),
+        endD.getDate(),
+        12,
+        0,
+        0,
+      );
+
+      while (current <= endLimit) {
+        const localDate = `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}`;
+        newEvents.push({
+          id: e.id,
+          title: e.title,
+          color: (e.color || "blue") as EventColor,
+          date: localDate,
+          startTime: e.allDay
+            ? undefined
+            : `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
+          endTime: e.allDay
+            ? undefined
+            : `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
+          allDay: e.allDay,
+          recurrenceRule: e.recurrenceRule,
+        });
+        current.setDate(current.getDate() + 1);
+      }
     }
+
+    this.events = newEvents;
   }
 
   // ── Internal state ────────────────────────────────────────────────────
@@ -106,6 +141,12 @@ export class JanusMonthGrid extends LitElement {
     const now = new Date();
     this._year = now.getFullYear();
     this._month = now.getMonth();
+  }
+
+  willUpdate(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has("_year") || changedProperties.has("_month")) {
+      this._syncFromStore(schedulerStore.getState());
+    }
   }
 
   override firstUpdated() {
@@ -238,11 +279,15 @@ export class JanusMonthGrid extends LitElement {
                   ></div>
                   <div class="mg-day-panel__event-info">
                     <span class="mg-day-panel__event-title">${ev.title}</span>
-                    ${ev.startTime && ev.endTime
-                      ? html`<span class="mg-day-panel__event-time">
-                          ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}
-                        </span>`
-                      : nothing}
+                    ${ev.allDay
+                      ? html`<span class="mg-day-panel__event-time"
+                          >All-day</span
+                        >`
+                      : ev.startTime && ev.endTime
+                        ? html`<span class="mg-day-panel__event-time">
+                            ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}
+                          </span>`
+                        : nothing}
                   </div>
                 </div>
               `,

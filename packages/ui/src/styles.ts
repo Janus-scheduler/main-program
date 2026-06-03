@@ -756,6 +756,136 @@ export const schedulerStyles = css`
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
+
+.dt-row--all-day {
+  grid-template-columns: 1fr;
+}
+
+/* ── Switches Row ───────────────────────────────────────────────────────── */
+.toggle-row {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 8px 0;
+}
+
+.toggle-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.switch-btn {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 99px;
+  border: none;
+  background: #e4e4e7;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  outline: none;
+}
+
+.switch-btn--active {
+  background: var(--orange);
+}
+
+.switch-slider {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s cubic-bezier(0.3, 1.05, 0.4, 1.05);
+}
+
+.switch-btn--active .switch-slider {
+  transform: translateX(20px);
+}
+
+/* ── Recurrence Options ─────────────────────────────────────────────────── */
+.recurrence-section {
+  display: flex;
+  flex-direction: column;
+  background: #fcfcfd;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 8px 0 12px;
+  animation: slideDownShort 0.2s ease-out;
+}
+
+@keyframes slideDownShort {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.recurrence-freq-selector {
+  display: flex;
+  gap: 6px;
+  background: #f4f4f5;
+  padding: 3px;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.freq-pill {
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  outline: none;
+}
+
+.freq-pill:hover {
+  color: var(--text-primary);
+}
+
+.freq-pill--active {
+  background: #ffffff;
+  color: var(--orange);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.btn-clear-until {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: var(--input-radius);
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  outline: none;
+}
+
+.btn-clear-until:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #ef4444;
+}
  
 .dt-cell {
   position: relative; /* anchor for dropdown */

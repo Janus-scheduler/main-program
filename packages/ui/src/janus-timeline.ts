@@ -1,7 +1,11 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
-import { schedulerStore, isoToZonedDisplay } from "@janus-scheduler/core";
+import {
+  schedulerStore,
+  isoToZonedDisplay,
+  expandEvents,
+} from "@janus-scheduler/core";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
 import {
@@ -91,7 +95,11 @@ export class JanusTimeline extends LitElement {
       Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newResources: TimelineResource[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const coreEvents = Object.values(state.events) as any[];
+    const rawEvents = Object.values(state.events) as any[];
+    const centerMs = this._viewStartMs || Date.now();
+    const startRange = centerMs - 365 * 24 * 60 * 60 * 1000;
+    const endRange = centerMs + 365 * 24 * 60 * 60 * 1000;
+    const coreEvents = expandEvents(rawEvents, startRange, endRange);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const coreResources = Object.values(state.resources) as any[];
 

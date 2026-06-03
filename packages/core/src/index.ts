@@ -29,3 +29,5 @@ export {
   formatTimezoneLabel,
   getAllTimezones,
 } from "./utils/time";
+
+export { expandEvents } from "./utils/recurrence";

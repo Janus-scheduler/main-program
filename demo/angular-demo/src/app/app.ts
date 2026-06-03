@@ -131,6 +131,8 @@ export class App {
         description: data.description,
         status: 'confirmed' as const,
         color: data.activeColor,
+        allDay: data.allDay,
+        recurrenceRule: data.recurrenceRule,
       };
 
       if (data.id) {

@@ -10,6 +10,8 @@ export class Event {
   status: "draft" | "confirmed" | "cancelled";
   description: string;
   color?: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 
   constructor(data: EventData) {
     this.id = data.id;
@@ -26,6 +28,8 @@ export class Event {
     this.status = data.status || "draft";
     this.description = data.description || "";
     this.color = data.color;
+    this.allDay = data.allDay;
+    this.recurrenceRule = data.recurrenceRule;
   }
 
   // Check if event data is valid

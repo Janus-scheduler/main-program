@@ -85,6 +85,8 @@ export interface SchedulerProps {
   description?: string;
   activeColor?: string;
   error?: string | null;
+  allDay?: boolean;
+  recurrenceRule?: string;
   onClose?: () => void;
   onSave?: (detail: SchedulerSaveData) => void;
   onDelete?: (detail: SchedulerDeleteData) => void;
@@ -107,6 +109,9 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
       if (props.description !== undefined) el.description = props.description;
       if (props.activeColor !== undefined) el.activeColor = props.activeColor;
       if (props.error !== undefined) el.error = props.error;
+      if (props.allDay !== undefined) el.allDay = props.allDay;
+      if (props.recurrenceRule !== undefined)
+        el.recurrenceRule = props.recurrenceRule;
     }
   });
 
