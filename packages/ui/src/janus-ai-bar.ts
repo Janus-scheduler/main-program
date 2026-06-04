@@ -12,7 +12,7 @@ import { SparkleIcon } from "./timeline-icons";
  */
 @customElement("janus-ai-bar")
 export class JanusAiBar extends LitElement {
-  static styles = aiBarStyles;
+  static readonly styles = aiBarStyles;
 
   /** Placeholder text shown in the input */
   @property({ type: String })
