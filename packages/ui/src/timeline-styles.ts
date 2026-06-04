@@ -606,18 +606,62 @@ export const timelineStyles = css`
     text-align: left;
     font-family: inherit;
     overflow: hidden;
+    box-shadow: 
+      0 3px 8px rgba(0, 0, 0, 0.12),
+      0 1px 3px rgba(0, 0, 0, 0.08);
     transition:
       filter 0.15s,
-      transform 0.12s;
+      transform 0.12s,
+      box-shadow 0.15s;
   }
 
   .tl-event:hover {
     filter: brightness(0.96);
     transform: scaleY(1.02);
+    box-shadow: 
+      0 6px 16px rgba(0, 0, 0, 0.16),
+      0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .tl-event:active {
     transform: scale(0.98);
+    box-shadow: 
+      0 2px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  .tl-event--tiny {
+    padding: 2px 4px;
+    border-left-width: 3px;
+    min-width: 24px;
+    cursor: pointer;
+    overflow: visible; /* allow tooltip ::before to escape the bounds */
+  }
+
+  /* Tooltip shown when event is too narrow to display text inline */
+  .tl-event--tiny::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #18181b;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    padding: 5px 10px;
+    border-radius: 7px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    font-family: "DM Sans", sans-serif;
+  }
+
+  .tl-event--tiny:hover::before {
+    opacity: 1;
   }
 
   .tl-event__title {

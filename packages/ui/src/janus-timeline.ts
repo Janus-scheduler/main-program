@@ -721,63 +721,99 @@ export class JanusTimeline extends LitElement {
                                 ></div>`,
                             )}
                             <!-- Events -->
-                            ${r.events.map((ev) => {
-                              const evLeft = timestampToPx(
-                                ev.startMs,
-                                viewStartMs,
-                                pxPerMs,
+                            ${(() => {
+                              const exactTimeCounts = new Map<number, number>();
+                              const sortedEvents = [...r.events].sort(
+                                (a, b) => a.startMs - b.startMs,
                               );
-                              const evWidth =
-                                timestampToPx(ev.endMs, viewStartMs, pxPerMs) -
-                                evLeft;
-                              // Don't render events that are too small to see
-                              if (evWidth < 2) return nothing;
-                              return html`
-                                <div
-                                  class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
-                                    ev,
-                                  )
-                                    ? "tl-event--dragging"
-                                    : ""}"
-                                  style="left: ${evLeft +
-                                  2}px; width: ${Math.max(evWidth - 6, 4)}px;"
-                                  @pointerdown=${(e: PointerEvent) =>
-                                    this._onEventPointerDown(e, ev, r.id)}
-                                  @click=${(e: Event) =>
-                                    this._handleEventClick(e, ev)}
-                                >
+
+                              return sortedEvents.map((ev, index) => {
+                                const duplicateIndex =
+                                  exactTimeCounts.get(ev.startMs) || 0;
+                                exactTimeCounts.set(
+                                  ev.startMs,
+                                  duplicateIndex + 1,
+                                );
+
+                                const offsetPx = duplicateIndex * 8;
+                                const evLeft =
+                                  timestampToPx(
+                                    ev.startMs,
+                                    viewStartMs,
+                                    pxPerMs,
+                                  ) + offsetPx;
+                                const evWidth =
+                                  timestampToPx(
+                                    ev.endMs,
+                                    viewStartMs,
+                                    pxPerMs,
+                                  ) -
+                                  (evLeft - offsetPx); // width based on time
+                                // Don't render events that are too small to see
+                                if (evWidth < 1) return nothing;
+
+                                // Always enforce a minimum visual width so events remain
+                                // visible and clickable at every zoom level.
+                                const MIN_EVENT_PX = 24;
+                                const displayWidth = Math.max(
+                                  evWidth,
+                                  MIN_EVENT_PX,
+                                );
+                                const isTiny = displayWidth < 60;
+                                const showTime = displayWidth >= 120;
+                                const tooltipLabel = `${ev.title} · ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}`;
+
+                                const zIndex = 10 + index;
+
+                                return html`
                                   <div
-                                    class="tl-event-resize-handle tl-event-resize-handle--start"
+                                    class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
+                                      ev,
+                                    )
+                                      ? "tl-event--dragging"
+                                      : ""} ${isTiny ? "tl-event--tiny" : ""}"
+                                    style="left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
+                                    data-tooltip="${tooltipLabel}"
                                     @pointerdown=${(e: PointerEvent) =>
-                                      this._onResizePointerDown(
-                                        e,
-                                        ev,
-                                        r.id,
-                                        "start",
-                                      )}
-                                  ></div>
-                                  <span class="tl-event__title"
-                                    >${ev.title}</span
+                                      this._onEventPointerDown(e, ev, r.id)}
+                                    @click=${(e: Event) =>
+                                      this._handleEventClick(e, ev)}
                                   >
-                                  ${evWidth > 80
-                                    ? html`<span class="tl-event__time"
-                                        >${fmt12(ev.startTime)} –
-                                        ${fmt12(ev.endTime)}</span
-                                      >`
-                                    : nothing}
-                                  <div
-                                    class="tl-event-resize-handle tl-event-resize-handle--end"
-                                    @pointerdown=${(e: PointerEvent) =>
-                                      this._onResizePointerDown(
-                                        e,
-                                        ev,
-                                        r.id,
-                                        "end",
-                                      )}
-                                  ></div>
-                                </div>
-                              `;
-                            })}
+                                    <div
+                                      class="tl-event-resize-handle tl-event-resize-handle--start"
+                                      @pointerdown=${(e: PointerEvent) =>
+                                        this._onResizePointerDown(
+                                          e,
+                                          ev,
+                                          r.id,
+                                          "start",
+                                        )}
+                                    ></div>
+                                    ${!isTiny
+                                      ? html`<span class="tl-event__title"
+                                          >${ev.title}</span
+                                        >`
+                                      : nothing}
+                                    ${showTime
+                                      ? html`<span class="tl-event__time"
+                                          >${fmt12(ev.startTime)} –
+                                          ${fmt12(ev.endTime)}</span
+                                        >`
+                                      : nothing}
+                                    <div
+                                      class="tl-event-resize-handle tl-event-resize-handle--end"
+                                      @pointerdown=${(e: PointerEvent) =>
+                                        this._onResizePointerDown(
+                                          e,
+                                          ev,
+                                          r.id,
+                                          "end",
+                                        )}
+                                    ></div>
+                                  </div>
+                                `;
+                              });
+                            })()}
                           </div>
                         `,
                       )}
