@@ -2,6 +2,7 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { monthGridStyles } from "./month-grid-styles";
 import { MonthEvent } from "./month-grid-types";
+import "./janus-ai-bar";
 
 import {
   WEEK_DAYS,
@@ -15,7 +16,6 @@ import {
   ChevronRight,
   SearchIcon,
   BellIcon,
-  SparkleIcon,
   PlusIcon,
 } from "./timeline-icons"; // reuse existing icons
 
@@ -70,7 +70,6 @@ export class JanusMonthGrid extends LitElement {
   @state() private _year = new Date().getFullYear();
   @state() private _month = new Date().getMonth(); // 0-based
   @state() private _view: "Timeline" | "Month" = "Month";
-  @state() private _aiPrompt = "";
   @state() private _selectedDateStr: string | null = null;
 
   // ── Navigation ────────────────────────────────────────────────────────
@@ -335,22 +334,6 @@ export class JanusMonthGrid extends LitElement {
 
         <!-- ── Selected day panel (mobile) ── -->
         ${this._renderDayPanel(selectedDay)}
-
-        <!-- ── AI bar ── -->
-        <div class="mg-ai-wrap">
-          <div class="mg-ai-card">
-            ${SparkleIcon()}
-            <input
-              class="mg-ai-card__input"
-              type="text"
-              .value=${this._aiPrompt}
-              @input=${(e: Event) =>
-                (this._aiPrompt = (e.target as HTMLInputElement).value)}
-              placeholder="Try 'Schedule a design sync with Alex tomorrow at 10am in Room A'"
-            />
-            <button class="mg-ai-card__btn">Schedule</button>
-          </div>
-        </div>
 
         <!-- ── FAB ── -->
         <button

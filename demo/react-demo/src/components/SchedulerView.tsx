@@ -1,4 +1,4 @@
-import { Timeline, MonthGrid, Scheduler } from "@janus-scheduler/react";
+import { Timeline, MonthGrid, Scheduler, AiBar } from "@janus-scheduler/react";
 import type { ViewType } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
 import {
@@ -194,6 +194,12 @@ export function SchedulerView({
           onClose={onCloseScheduler}
         />
       )}
+      <AiBar
+        onAiSubmit={({ prompt }) => {
+          console.log("AI prompt submitted:", prompt);
+          // TODO: hook into your NLP integration here
+        }}
+      />
     </>
   );
 }
