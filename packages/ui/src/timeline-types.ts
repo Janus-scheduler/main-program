@@ -4,4 +4,5 @@ export type {
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
+  LayoutItem,
 } from "@janus-scheduler/core";

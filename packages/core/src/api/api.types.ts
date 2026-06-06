@@ -33,6 +33,15 @@ export interface TimelineResource {
   events: TimelineEvent[];
 }
 
+export interface LayoutItem {
+  id: string;
+  type: "group" | "resource";
+  yOffset: number;
+  height: number;
+  label?: string;
+  resource?: TimelineResource;
+}
+
 export interface EventMoveDetail {
   event: TimelineEvent;
   oldResourceId: string;

@@ -362,7 +362,7 @@ export const timelineStyles = css`
   }
 
   /* Group label row */
-  .tl-res-group-label {
+    .tl-res-group-label {
     height: var(--grp-label-h);
     display: flex;
     align-items: center;
@@ -373,10 +373,13 @@ export const timelineStyles = css`
     letter-spacing: 0.7px;
     border-bottom: 1px solid var(--border);
     background: #fafafa;
+    position: absolute;
+    left: 0;
+    right: 0;
   }
 
   /* Resource row */
-  .tl-res-row {
+   .tl-res-row {
     height: var(--row-h);
     display: flex;
     align-items: center;
@@ -384,6 +387,9 @@ export const timelineStyles = css`
     padding: 0 16px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    position: absolute;
+    left: 0;
+    right: 0;
   }
 
   .tl-res-info {
@@ -439,6 +445,23 @@ export const timelineStyles = css`
     color: #92400e;
   }
 
+    /* Single background grid container */
+  .tl-grid-lines {
+    position: absolute;
+    top: calc(var(--hour-hdr-h) + var(--super-hdr-h));
+    bottom: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .tl-res-col-inner {
+    position: relative;
+    width: 100%;
+  }
+
+  
   /* ══════════════════════════════════════════════════════════════════════════════
      SCROLLABLE TIME GRID
   ══════════════════════════════════════════════════════════════════════════════ */
@@ -546,12 +569,17 @@ export const timelineStyles = css`
     border-bottom: 1px solid var(--border);
     background: #fafafa;
     flex-shrink: 0;
+    position: absolute;
+    left: 0;
+    right: 0;
   }
 
   .tl-event-row {
     touch-action: none; 
     height: var(--row-h);
-    position: relative;
+    position: absolute;
+    left: 0;
+    right: 0;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }

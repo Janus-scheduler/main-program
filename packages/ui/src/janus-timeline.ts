@@ -3,7 +3,7 @@ import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
 import { schedulerStore, isoToZonedDisplay } from "@janus-scheduler/core";
 
-import { TimelineEvent, TimelineResource } from "./timeline-types";
+import { TimelineEvent, TimelineResource, LayoutItem } from "./timeline-types";
 import {
   RoomIcon,
   EquipmentIcon,
@@ -54,6 +54,12 @@ export class JanusTimeline extends LitElement {
   /** Zoom: pixels per millisecond (the single universal scale) */
   @state() private _pxPerMs = DEFAULT_PX_PER_MS;
 
+  @state() private _scrollTop = 0;
+  @state() private _viewportHeight = 600;
+
+  // Resize Observer
+  private _resizeObserver?: ResizeObserver;
+
   /**
    * The absolute timestamp (ms) at the LEFT EDGE of the rendered content.
    * The content always spans from _viewStartMs to _viewStartMs + totalWidth/pxPerMs.
@@ -82,6 +88,9 @@ export class JanusTimeline extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -179,6 +188,16 @@ export class JanusTimeline extends LitElement {
     // Center on today at current time
     const now = new Date();
     this._initializeView(now.getTime());
+
+    // watch size changes - adjust vertical viewport for virtualization
+    if (this.gridScrollRef) {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          this._viewportHeight = entry.contentRect.height;
+        }
+      });
+      this._resizeObserver.observe(this.gridScrollRef);
+    }
   }
 
   /**
@@ -224,6 +243,7 @@ export class JanusTimeline extends LitElement {
     // Sync vertical scroll between resource column and time grid
     if (this.resColRef && this.gridScrollRef) {
       this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      this._scrollTop = this.gridScrollRef.scrollTop;
     }
 
     // Skip re-centering during programmatic scroll adjustments
@@ -414,6 +434,55 @@ export class JanusTimeline extends LitElement {
     document.addEventListener("pointerup", handler);
   }
 
+  //computing absolute yOffset values
+  private _computeLayout(resources: TimelineResource[]): {
+    items: LayoutItem[];
+    totalHeight: number;
+  } {
+    const items: LayoutItem[] = [];
+    let y = HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT;
+
+    //group resources
+    const grouped: { label: string; items: TimelineResource[] }[] = [];
+    let cur: (typeof grouped)[0] | null = null;
+    for (const r of resources) {
+      if (r.groupLabel) {
+        cur = { label: r.groupLabel, items: [r] };
+        grouped.push(cur);
+      } else if (cur) {
+        cur.items.push(r);
+      } else {
+        cur = { label: "", items: [r] };
+        grouped.push(cur);
+      }
+    }
+
+    //accumulate absolute positions
+    for (const g of grouped) {
+      if (g.label) {
+        items.push({
+          id: `group:${g.label}`,
+          type: "group",
+          yOffset: y,
+          height: GROUP_LABEL_HEIGHT,
+          label: g.label,
+        });
+        y += GROUP_LABEL_HEIGHT;
+      }
+      for (const r of g.items) {
+        items.push({
+          id: r.id,
+          type: "resource",
+          yOffset: y,
+          height: ROW_HEIGHT,
+          resource: r,
+        });
+        y += ROW_HEIGHT;
+      }
+    }
+    return { items, totalHeight: y };
+  }
+
   // ── Resource layout computation ───────────────────────────────────
 
   private _computeResourceLayout(
@@ -498,47 +567,30 @@ export class JanusTimeline extends LitElement {
     // Collect all events from all resources
     const allResources = this.resources;
 
-    // Grouping
-    const groups: { label: string; items: TimelineResource[] }[] = [];
-    let cur: (typeof groups)[0] | null = null;
-    for (const r of allResources) {
-      if (r.groupLabel) {
-        cur = { label: r.groupLabel, items: [r] };
-        groups.push(cur);
-      } else if (cur) {
-        cur.items.push(r);
-      } else {
-        cur = { label: "", items: [r] };
-        groups.push(cur);
-      }
-    }
+    // Compute the full layout
+    const flatLayout = this._computeLayout(allResources);
+    const totalHeight = flatLayout.totalHeight;
 
-    // Filter events to those visible in the current viewport (with margin)
-    const visibleResources = allResources.map((r) => ({
-      ...r,
-      events: r.events.filter(
-        (ev) => ev.endMs > viewStartMs && ev.startMs < viewEndMs,
-      ),
-    }));
+    // Filter layout items to only those visible in the vertical viewport window
+    const buffer = 3; // Render 3 extra rows above/below viewport
+    const minY = this._scrollTop - buffer * ROW_HEIGHT;
+    const maxY = this._scrollTop + this._viewportHeight + buffer * ROW_HEIGHT;
 
-    // Re-group with visible events
-    const visGroups: { label: string; items: TimelineResource[] }[] = [];
-    let visCur: (typeof visGroups)[0] | null = null;
-    for (const r of visibleResources) {
-      const orig = allResources.find((o) => o.id === r.id);
-      if (orig?.groupLabel) {
-        visCur = { label: orig.groupLabel, items: [r] };
-        visGroups.push(visCur);
-      } else if (visCur) {
-        visCur.items.push(r);
-      } else {
-        visCur = { label: "", items: [r] };
-        visGroups.push(visCur);
-      }
-    }
+    const visibleItems = flatLayout.items.filter((item) => {
+      const itemTop = item.yOffset;
+      const itemBottom = item.yOffset + item.height;
+      return itemBottom >= minY && itemTop <= maxY;
+    });
 
-    // Update drag controller
-    const resourceLayout = this._computeResourceLayout(groups);
+    // Update drag controller layout mappings (filtered for resource row indexing)
+    const resourceLayout = flatLayout.items
+      .filter((item) => item.type === "resource")
+      .map((item, index) => ({
+        id: item.id,
+        yOffset: item.yOffset,
+        index,
+      }));
+
     this._drag.updateLayout(
       this.gridScrollRef,
       resourceLayout,
@@ -622,32 +674,39 @@ export class JanusTimeline extends LitElement {
         <div class="tl-panel">
           <div class="tl-grid-wrap">
             <div class="tl-res-col" @scroll=${(e: Event) => e.preventDefault()}>
-              <div
-                class="tl-res-col__header"
-                style="height: ${HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT}px"
-              >
-                RESOURCE
+              <div class="tl-res-col-inner" style="height: ${totalHeight}px;">
+                <div
+                  class="tl-res-col__header"
+                  style="height: ${HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT}px"
+                >
+                  RESOURCE
+                </div>
+                ${visibleItems.map((item) => {
+                  if (item.type === "group") {
+                    return html`
+                      <div
+                        class="tl-res-group-label"
+                        style="top: ${item.yOffset}px; height: ${GROUP_LABEL_HEIGHT}px;"
+                      >
+                        ${item.label}
+                      </div>
+                    `;
+                  }
+                  const r = item.resource!;
+                  return html`
+                    <div
+                      class="tl-res-row"
+                      style="top: ${item.yOffset}px; height: ${ROW_HEIGHT}px;"
+                    >
+                      ${this.renderAvatar(r)}
+                      <div class="tl-res-info">
+                        <span class="tl-res-name">${r.name}</span>
+                        <span class="tl-res-sub">${r.subtitle}</span>
+                      </div>
+                    </div>
+                  `;
+                })}
               </div>
-              ${groups.map(
-                (g) => html`
-                  <div>
-                    ${g.label
-                      ? html`<div class="tl-res-group-label">${g.label}</div>`
-                      : nothing}
-                    ${g.items.map(
-                      (r) => html`
-                        <div class="tl-res-row">
-                          ${this.renderAvatar(r)}
-                          <div class="tl-res-info">
-                            <span class="tl-res-name">${r.name}</span>
-                            <span class="tl-res-sub">${r.subtitle}</span>
-                          </div>
-                        </div>
-                      `,
-                    )}
-                  </div>
-                `,
-              )}
             </div>
 
             <div
@@ -655,7 +714,10 @@ export class JanusTimeline extends LitElement {
               @scroll=${this._onGridScroll}
               @wheel=${this._handleWheel}
             >
-              <div class="tl-time-inner" style="width: ${totalW}px">
+              <div
+                class="tl-time-inner"
+                style="width: ${totalW}px; height: ${totalHeight}px;"
+              >
                 <!-- Super header row -->
                 ${superLabels.length > 0
                   ? html`
@@ -688,6 +750,17 @@ export class JanusTimeline extends LitElement {
                   )}
                 </div>
 
+                <!-- Single Background Grid Layer -->
+                <div class="tl-grid-lines">
+                  ${columns.map(
+                    (col) =>
+                      html`<div
+                        class="tl-vline"
+                        style="left: ${col.px}px"
+                      ></div>`,
+                  )}
+                </div>
+
                 <!-- Now line -->
                 ${nowPx > 0 && nowPx < totalW
                   ? html`
@@ -698,92 +771,81 @@ export class JanusTimeline extends LitElement {
                   : nothing}
 
                 <!-- Resource rows with events -->
-                ${visGroups.map(
-                  (g) => html`
-                    <div>
-                      ${g.label
-                        ? html`<div class="tl-group-spacer"></div>`
-                        : nothing}
-                      ${g.items.map(
-                        (r) => html`
+                ${visibleItems.map((item) => {
+                  if (item.type === "group") {
+                    return html`
+                      <div
+                        class="tl-group-spacer"
+                        style="top: ${item.yOffset}px; height: ${GROUP_LABEL_HEIGHT}px;"
+                      ></div>
+                    `;
+                  }
+
+                  const r = item.resource!;
+                  // Filter events horizontally to those visible on-screen
+                  const visibleEvents = r.events.filter(
+                    (ev) => ev.endMs > viewStartMs && ev.startMs < viewEndMs,
+                  );
+
+                  return html`
+                    <div
+                      class="tl-event-row"
+                      data-resource-id=${r.id}
+                      style="top: ${item.yOffset}px; height: ${ROW_HEIGHT}px;"
+                      @pointerdown=${(e: PointerEvent) =>
+                        this._onRowPointerDown(e, r.id)}
+                    >
+                      <!-- Events -->
+                      ${visibleEvents.map((ev) => {
+                        const evLeft = timestampToPx(
+                          ev.startMs,
+                          viewStartMs,
+                          pxPerMs,
+                        );
+                        const evWidth =
+                          timestampToPx(ev.endMs, viewStartMs, pxPerMs) -
+                          evLeft;
+                        // Don't render events that are too small to see
+                        if (evWidth < 2) return nothing;
+                        return html`
                           <div
-                            class="tl-event-row"
-                            data-resource-id=${r.id}
+                            class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
+                              ev,
+                            )
+                              ? "tl-event--dragging"
+                              : ""}"
+                            style="left: ${evLeft + 2}px; width: ${Math.max(
+                              evWidth - 6,
+                              4,
+                            )}px;"
                             @pointerdown=${(e: PointerEvent) =>
-                              this._onRowPointerDown(e, r.id)}
+                              this._onEventPointerDown(e, ev, r.id)}
+                            @click=${(e: Event) =>
+                              this._handleEventClick(e, ev)}
                           >
-                            <!-- Column grid lines -->
-                            ${columns.map(
-                              (col) =>
-                                html`<div
-                                  class="tl-vline"
-                                  style="left: ${col.px}px"
-                                ></div>`,
-                            )}
-                            <!-- Events -->
-                            ${r.events.map((ev) => {
-                              const evLeft = timestampToPx(
-                                ev.startMs,
-                                viewStartMs,
-                                pxPerMs,
-                              );
-                              const evWidth =
-                                timestampToPx(ev.endMs, viewStartMs, pxPerMs) -
-                                evLeft;
-                              // Don't render events that are too small to see
-                              if (evWidth < 2) return nothing;
-                              return html`
-                                <div
-                                  class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
-                                    ev,
-                                  )
-                                    ? "tl-event--dragging"
-                                    : ""}"
-                                  style="left: ${evLeft +
-                                  2}px; width: ${Math.max(evWidth - 6, 4)}px;"
-                                  @pointerdown=${(e: PointerEvent) =>
-                                    this._onEventPointerDown(e, ev, r.id)}
-                                  @click=${(e: Event) =>
-                                    this._handleEventClick(e, ev)}
-                                >
-                                  <div
-                                    class="tl-event-resize-handle tl-event-resize-handle--start"
-                                    @pointerdown=${(e: PointerEvent) =>
-                                      this._onResizePointerDown(
-                                        e,
-                                        ev,
-                                        r.id,
-                                        "start",
-                                      )}
-                                  ></div>
-                                  <span class="tl-event__title"
-                                    >${ev.title}</span
-                                  >
-                                  ${evWidth > 80
-                                    ? html`<span class="tl-event__time"
-                                        >${fmt12(ev.startTime)} –
-                                        ${fmt12(ev.endTime)}</span
-                                      >`
-                                    : nothing}
-                                  <div
-                                    class="tl-event-resize-handle tl-event-resize-handle--end"
-                                    @pointerdown=${(e: PointerEvent) =>
-                                      this._onResizePointerDown(
-                                        e,
-                                        ev,
-                                        r.id,
-                                        "end",
-                                      )}
-                                  ></div>
-                                </div>
-                              `;
-                            })}
+                            <div
+                              class="tl-event-resize-handle tl-event-resize-handle--start"
+                              @pointerdown=${(e: PointerEvent) =>
+                                this._onResizePointerDown(e, ev, r.id, "start")}
+                            ></div>
+                            <span class="tl-event__title">${ev.title}</span>
+                            ${evWidth > 80
+                              ? html`<span class="tl-event__time"
+                                  >${fmt12(ev.startTime)} –
+                                  ${fmt12(ev.endTime)}</span
+                                >`
+                              : nothing}
+                            <div
+                              class="tl-event-resize-handle tl-event-resize-handle--end"
+                              @pointerdown=${(e: PointerEvent) =>
+                                this._onResizePointerDown(e, ev, r.id, "end")}
+                            ></div>
                           </div>
-                        `,
-                      )}
+                        `;
+                      })}
                     </div>
-                  `,
-                )}
+                  `;
+                })}
                 ${this._renderDragGhost()}
               </div>
             </div>
