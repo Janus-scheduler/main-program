@@ -186,7 +186,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
       const resEvents = events
 
         .filter(
-          (e: any) =>
+          (
+            e: TimelineEvent & { resourceIds?: string[]; resourceId?: string },
+          ) =>
             (e.resourceIds && e.resourceIds.includes(res.id)) ||
             e.resourceId === res.id,
         )

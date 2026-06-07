@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, PluginOption } from "vite";
 import dts from "vite-plugin-dts";
 import { resolve } from "path";
 
@@ -27,7 +27,7 @@ export default defineConfig({
     dts({
       insertTypesEntry: true,
       rollupTypes: true,
-    }) as any,
+    }) as PluginOption,
   ],
 
   resolve: {

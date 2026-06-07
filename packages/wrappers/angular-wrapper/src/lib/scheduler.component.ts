@@ -13,6 +13,7 @@ import {
 // Side-effect import: ensures the <janus-scheduler> custom element is registered
 import { JanusScheduler } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _ = JanusScheduler;
 import { SchedulerSaveData, SchedulerDeleteData } from "./types";
 
@@ -100,6 +101,7 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private _syncProps(): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const el = this._elRef()?.nativeElement as any;
     if (el) {
       if (this.error() !== undefined) el.error = this.error();

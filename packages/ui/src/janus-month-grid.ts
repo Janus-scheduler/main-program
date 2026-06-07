@@ -42,7 +42,9 @@ export class JanusMonthGrid extends LitElement {
     if (this._unsubStore) this._unsubStore();
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _syncFromStore(state: any) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const coreEvents = Object.values(state.events) as any[];
     const newEvents = coreEvents.map((e) => {
       const startD = new Date(e.startTime);
