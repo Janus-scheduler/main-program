@@ -21,6 +21,96 @@ import {
 
 import { schedulerStore } from "@janus-scheduler/core";
 
+/** Shape of a raw event coming from the Zustand store */
+interface StoreEvent {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+}
+
+/** Shape of the Zustand store state we care about */
+interface StoreState {
+  events: Record<string, StoreEvent>;
+}
+
+/** "YYYY-MM-DD" from a Date using local components */
+function toLocalDateStr(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** "HH:MM" from a Date using UTC components */
+function toUtcTimeStr(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
+}
+
+/** Expand a single store event into one MonthEvent per calendar day it spans */
+function expandToMonthEvents(e: StoreEvent): MonthEvent[] {
+  const startD = new Date(e.startTime);
+  const endD = new Date(e.endTime);
+
+  const startDateStr = toLocalDateStr(startD);
+  const endDateStr = toLocalDateStr(endD);
+  const startTime = toUtcTimeStr(startD);
+  const endTime = toUtcTimeStr(endD);
+
+  const startMidnight = new Date(
+    startD.getFullYear(),
+    startD.getMonth(),
+    startD.getDate(),
+  );
+  const endMidnight = new Date(
+    endD.getFullYear(),
+    endD.getMonth(),
+    endD.getDate(),
+  );
+  const daySpan = Math.round(
+    (endMidnight.getTime() - startMidnight.getTime()) / 86400000,
+  );
+
+  if (daySpan === 0) {
+    return [
+      {
+        id: e.id,
+        title: e.title,
+        color: "blue",
+        date: startDateStr,
+        startTime,
+        endTime,
+        isMultiDay: false,
+        spanPosition: "single",
+        endDate: endDateStr,
+      },
+    ];
+  }
+
+  const result: MonthEvent[] = [];
+  for (let i = 0; i <= daySpan; i++) {
+    const dayD = new Date(startMidnight);
+    dayD.setDate(startMidnight.getDate() + i);
+
+    let spanPosition: MonthEvent["spanPosition"];
+    if (i === 0) spanPosition = "start";
+    else if (i === daySpan) spanPosition = "end";
+    else spanPosition = "middle";
+
+    result.push({
+      id: e.id,
+      title: e.title,
+      color: "blue",
+      date: toLocalDateStr(dayD),
+      startTime: i === 0 ? startTime : undefined,
+      endTime: i === daySpan ? endTime : undefined,
+      isMultiDay: true,
+      spanPosition,
+      endDate: endDateStr,
+    });
+  }
+  return result;
+}
+
 @customElement("janus-month-grid")
 export class JanusMonthGrid extends LitElement {
   static readonly styles = monthGridStyles;
@@ -42,27 +132,11 @@ export class JanusMonthGrid extends LitElement {
     if (this._unsubStore) this._unsubStore();
   }
 
-  private _syncFromStore(state: any) {
-    const coreEvents = Object.values(state.events) as any[];
-    const newEvents = coreEvents.map((e) => {
-      const startD = new Date(e.startTime);
-      const endD = new Date(e.endTime);
-      const pad = (n: number) => n.toString().padStart(2, "0");
-      // Use LOCAL date so event.date matches the calendar cell dateStr,
-      // which is also derived from local date components (see month-grid-utils toDateStr).
-      const localDate = `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`;
-      return {
-        id: e.id,
-        title: e.title,
-        color: "blue",
-        date: localDate,
-        startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
-        endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
-      };
-    });
-
+  private _syncFromStore(state: StoreState) {
+    const coreEvents = Object.values(state.events);
+    const newEvents = coreEvents.flatMap(expandToMonthEvents);
     if (newEvents.length > 0) {
-      this.events = newEvents as MonthEvent[];
+      this.events = newEvents;
     }
   }
 
@@ -166,7 +240,7 @@ export class JanusMonthGrid extends LitElement {
       <button
         class="mg-event mg-event--${ev.color}"
         @click=${(e: Event) => {
-          e.stopPropagation(); // don't also fire day-click
+          e.stopPropagation();
           this._handleEventClick(ev);
         }}
         title="${timeLabel}${ev.title}"
