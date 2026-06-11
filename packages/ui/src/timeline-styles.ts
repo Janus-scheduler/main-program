@@ -820,83 +820,6 @@ export const timelineStyles = css`
     transform: scale(0.96);
   }
 
-  /* ══════════════════════════════════════════════════════════════════════════════
-     AI FLOATING CARD
-  ══════════════════════════════════════════════════════════════════════════════ */
-  .tl-ai-wrap {
-    height: var(--aicard-area-h);
-    min-height: var(--aicard-area-h);
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    padding: 0 24px;
-    background: var(--bg);
-  }
-
-  .tl-ai-card {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--white);
-    border: 1.5px solid var(--border);
-    border-radius: 14px;
-    padding: 6px 12px;
-    box-shadow:
-      0 4px 20px rgba(0, 0, 0, 0.08),
-      0 1px 4px rgba(0, 0, 0, 0.04);
-    transition:
-      border-color 0.2s,
-      box-shadow 0.2s;
-  }
-
-  .tl-ai-card:focus-within {
-    border-color: var(--orange);
-    box-shadow:
-      0 4px 20px rgba(249, 115, 22, 0.12),
-      0 0 0 3px rgba(249, 115, 22, 0.08);
-  }
-
-  .tl-ai-card__input {
-    flex: 1;
-    min-width: 0;
-    border: none;
-    outline: none;
-    font-family: inherit;
-    font-size: 14px;
-    color: var(--text-1);
-    background: transparent;
-  }
-
-  .tl-ai-card__input::placeholder {
-    color: var(--text-3);
-  }
-
-  .tl-ai-card__btn {
-    padding: 6px 18px;
-    background: var(--orange);
-    color: #fff;
-    border: none;
-    border-radius: 9px;
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
-    transition:
-      background 0.15s,
-      transform 0.12s;
-  }
-
-  .tl-ai-card__btn:hover {
-    background: #ea6c0a;
-  }
-
-  .tl-ai-card__btn:active {
-    transform: scale(0.97);
-  }
-
   /* SCROLLBARS */
   .tl-time-scroll::-webkit-scrollbar {
     height: 6px;
@@ -989,31 +912,6 @@ export const timelineStyles = css`
     .tl-res-col__header {
       font-size: 0;
       padding: 0;
-    }
-    /* Smaller AI bar */
-    .tl-ai-wrap {
-      height: auto;
-      min-height: auto;
-      padding: 8px 12px;
-    }
-
-    .tl-ai-card {
-      padding: 4px 10px;
-      border-radius: 10px;
-    }
-
-    .tl-ai-card__input {
-      font-size: 12px;
-    }
-
-    .tl-ai-card__input::placeholder {
-      font-size: 11px;
-    }
-
-    .tl-ai-card__btn {
-      padding: 5px 12px;
-      font-size: 12px;
-      border-radius: 7px;
     }
 
     /* Smaller FAB */
