@@ -418,6 +418,7 @@ export class JanusTimeline extends LitElement {
 
   private _computeResourceLayout(
     groups: { label: string; items: TimelineResource[] }[],
+    resourceTrackMap: Map<string, { trackCount: number }>,
   ): ResourceLayout[] {
     const layout: ResourceLayout[] = [];
     let y = HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT;
@@ -426,7 +427,8 @@ export class JanusTimeline extends LitElement {
       if (g.label) y += GROUP_LABEL_HEIGHT;
       for (const r of g.items) {
         layout.push({ id: r.id, yOffset: y, index: idx });
-        y += ROW_HEIGHT;
+        const tracks = resourceTrackMap.get(r.id)?.trackCount || 1;
+        y += ROW_HEIGHT * tracks;
         idx++;
       }
     }
@@ -498,6 +500,28 @@ export class JanusTimeline extends LitElement {
     // Collect all events from all resources
     const allResources = this.resources;
 
+    const resourceTrackMap = new Map<
+      string,
+      { trackCount: number; eventTracks: Map<string, number> }
+    >();
+    for (const r of allResources) {
+      const sorted = [...r.events].sort((a, b) => a.startMs - b.startMs);
+      const tracks: number[] = [];
+      const eventTracks = new Map<string, number>();
+      for (const ev of sorted) {
+        let t = 0;
+        while (t < tracks.length && tracks[t] > ev.startMs) {
+          t++;
+        }
+        tracks[t] = ev.endMs;
+        eventTracks.set(ev.id, t);
+      }
+      resourceTrackMap.set(r.id, {
+        trackCount: Math.max(1, tracks.length),
+        eventTracks,
+      });
+    }
+
     // Grouping
     const groups: { label: string; items: TimelineResource[] }[] = [];
     let cur: (typeof groups)[0] | null = null;
@@ -537,8 +561,10 @@ export class JanusTimeline extends LitElement {
       }
     }
 
-    // Update drag controller
-    const resourceLayout = this._computeResourceLayout(groups);
+    const resourceLayout = this._computeResourceLayout(
+      groups,
+      resourceTrackMap,
+    );
     this._drag.updateLayout(
       this.gridScrollRef,
       resourceLayout,
@@ -634,17 +660,23 @@ export class JanusTimeline extends LitElement {
                     ${g.label
                       ? html`<div class="tl-res-group-label">${g.label}</div>`
                       : nothing}
-                    ${g.items.map(
-                      (r) => html`
-                        <div class="tl-res-row">
+                    ${g.items.map((r) => {
+                      const tracksCount =
+                        resourceTrackMap.get(r.id)?.trackCount || 1;
+                      const rowHeightPx = tracksCount * ROW_HEIGHT;
+                      return html`
+                        <div
+                          class="tl-res-row"
+                          style="height: ${rowHeightPx}px"
+                        >
                           ${this.renderAvatar(r)}
                           <div class="tl-res-info">
                             <span class="tl-res-name">${r.name}</span>
                             <span class="tl-res-sub">${r.subtitle}</span>
                           </div>
                         </div>
-                      `,
-                    )}
+                      `;
+                    })}
                   </div>
                 `,
               )}
@@ -704,10 +736,15 @@ export class JanusTimeline extends LitElement {
                       ${g.label
                         ? html`<div class="tl-group-spacer"></div>`
                         : nothing}
-                      ${g.items.map(
-                        (r) => html`
+                      ${g.items.map((r) => {
+                        const trackInfo = resourceTrackMap.get(r.id);
+                        const tracksCount = trackInfo?.trackCount || 1;
+                        const evTracks = trackInfo?.eventTracks;
+                        const rowHeightPx = tracksCount * ROW_HEIGHT;
+                        return html`
                           <div
                             class="tl-event-row"
+                            style="height: ${rowHeightPx}px"
                             data-resource-id=${r.id}
                             @pointerdown=${(e: PointerEvent) =>
                               this._onRowPointerDown(e, r.id)}
@@ -722,33 +759,25 @@ export class JanusTimeline extends LitElement {
                             )}
                             <!-- Events -->
                             ${(() => {
-                              const exactTimeCounts = new Map<number, number>();
                               const sortedEvents = [...r.events].sort(
                                 (a, b) => a.startMs - b.startMs,
                               );
 
                               return sortedEvents.map((ev, index) => {
-                                const duplicateIndex =
-                                  exactTimeCounts.get(ev.startMs) || 0;
-                                exactTimeCounts.set(
-                                  ev.startMs,
-                                  duplicateIndex + 1,
-                                );
+                                const trackIndex = evTracks?.get(ev.id) || 0;
+                                const evTop = trackIndex * ROW_HEIGHT + 8;
 
-                                const offsetPx = duplicateIndex * 8;
-                                const evLeft =
-                                  timestampToPx(
-                                    ev.startMs,
-                                    viewStartMs,
-                                    pxPerMs,
-                                  ) + offsetPx;
+                                const evLeft = timestampToPx(
+                                  ev.startMs,
+                                  viewStartMs,
+                                  pxPerMs,
+                                );
                                 const evWidth =
                                   timestampToPx(
                                     ev.endMs,
                                     viewStartMs,
                                     pxPerMs,
-                                  ) -
-                                  (evLeft - offsetPx); // width based on time
+                                  ) - evLeft; // width based on time
                                 // Don't render events that are too small to see
                                 if (evWidth < 1) return nothing;
 
@@ -772,7 +801,8 @@ export class JanusTimeline extends LitElement {
                                     )
                                       ? "tl-event--dragging"
                                       : ""} ${isTiny ? "tl-event--tiny" : ""}"
-                                    style="left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
+                                    style="top: ${evTop}px; bottom: auto; height: ${ROW_HEIGHT -
+                                    16}px; left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
                                     data-tooltip="${tooltipLabel}"
                                     @pointerdown=${(e: PointerEvent) =>
                                       this._onEventPointerDown(e, ev, r.id)}
@@ -815,8 +845,8 @@ export class JanusTimeline extends LitElement {
                               });
                             })()}
                           </div>
-                        `,
-                      )}
+                        `;
+                      })}
                     </div>
                   `,
                 )}
