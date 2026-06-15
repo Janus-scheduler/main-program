@@ -369,9 +369,10 @@ export class JanusTimeline extends LitElement {
     e: PointerEvent,
     ev: TimelineEvent,
     resourceId: string,
+    evTop: number,
   ) {
     if (e.button !== 0) return;
-    this._drag.startMove(e, ev, resourceId);
+    this._drag.startMove(e, ev, resourceId, evTop);
     this._addDragUpListener();
   }
 
@@ -380,9 +381,10 @@ export class JanusTimeline extends LitElement {
     ev: TimelineEvent,
     resourceId: string,
     edge: "start" | "end",
+    evTop: number,
   ) {
     if (e.button !== 0) return;
-    this._drag.startResize(e, ev, resourceId, edge);
+    this._drag.startResize(e, ev, resourceId, edge, evTop);
     this._addDragUpListener();
   }
 
@@ -804,7 +806,12 @@ export class JanusTimeline extends LitElement {
                                     16}px; left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
                                     data-tooltip="${tooltipLabel}"
                                     @pointerdown=${(e: PointerEvent) =>
-                                      this._onEventPointerDown(e, ev, r.id)}
+                                      this._onEventPointerDown(
+                                        e,
+                                        ev,
+                                        r.id,
+                                        evTop,
+                                      )}
                                     @click=${(e: Event) =>
                                       this._handleEventClick(e, ev)}
                                   >
@@ -816,6 +823,7 @@ export class JanusTimeline extends LitElement {
                                           ev,
                                           r.id,
                                           "start",
+                                          evTop,
                                         )}
                                     ></div>
                                     ${!isTiny
@@ -837,6 +845,7 @@ export class JanusTimeline extends LitElement {
                                           ev,
                                           r.id,
                                           "end",
+                                          evTop,
                                         )}
                                     ></div>
                                   </div>
