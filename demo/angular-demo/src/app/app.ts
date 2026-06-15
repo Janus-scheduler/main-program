@@ -9,6 +9,7 @@ import {
   SchedulerComponent,
   TimelineComponent,
   MonthGridComponent,
+  AiBarComponent,
   type TimelineEvent,
   type SchedulerSaveData,
   type EventMoveDetail,
@@ -25,7 +26,7 @@ import {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [SchedulerComponent, TimelineComponent, MonthGridComponent],
+  imports: [SchedulerComponent, TimelineComponent, MonthGridComponent, AiBarComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './app.html',
   styleUrl: './app.css',
@@ -199,5 +200,10 @@ export class App {
       resourceIds: [data.resourceId],
       status: 'confirmed',
     });
+  }
+
+  handleAiSubmit(detail: { prompt: string }): void {
+    console.log('AI prompt submitted:', detail.prompt);
+    // TODO: NLP integration
   }
 }

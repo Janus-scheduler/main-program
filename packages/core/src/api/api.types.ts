@@ -62,6 +62,9 @@ export interface MonthEvent {
   date: string; // "YYYY-MM-DD"
   startTime?: string; // "HH:MM" 24h — optional
   endTime?: string;
+  isMultiDay?: boolean;
+  spanPosition?: "start" | "middle" | "end" | "single";
+  endDate?: string;
 }
 export interface SchedulerSaveData {
   /** Present when editing an existing event; null/undefined when creating a new one. */
