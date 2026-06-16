@@ -90,4 +90,30 @@ describe("Recurrence Expansion", () => {
     expect(expanded).toHaveLength(1);
     expect(expanded[0].id).toBe("evt-1");
   });
+
+  it("should calculate a single-day nominal duration for projected recurring occurrences", () => {
+    const events = [
+      new Event({
+        id: "evt-1",
+        title: "Weekly Event",
+        startTime: "2026-06-04T10:00:00Z",
+        endTime: "2026-06-04T11:00:00Z",
+        resourceId: "r1",
+        recurrenceRule: "FREQ=WEEKLY;UNTIL=20260625T235959Z",
+      }),
+    ];
+
+    const expanded = expandEvents(
+      events,
+      new Date("2026-06-01").getTime(),
+      new Date("2026-06-30").getTime(),
+    );
+
+    expect(expanded).toHaveLength(4);
+    for (const occ of expanded) {
+      const durationMs =
+        new Date(occ.endTime).getTime() - new Date(occ.startTime).getTime();
+      expect(durationMs).toBe(3600000); // 1 hour
+    }
+  });
 });

@@ -7,6 +7,11 @@ import {
   schedulerStore,
   getAllTimezones,
   formatTimezoneLabel,
+  Event as SchedulerEvent,
+  expandEvents,
+  zonedInputToISO,
+  isoToZonedDisplay,
+  type EventData,
 } from "@janus-scheduler/core";
 import { schedulerStyles } from "./styles";
 
@@ -458,27 +463,126 @@ export class JanusScheduler extends LitElement {
   private get _invalid() {
     const draft = schedulerStore.getState().eventDraft;
     if (!draft) return false;
-    const timeInvalid = isEndBeforeStart(
-      draft.startDate,
-      draft.startTime,
-      draft.endDate,
-      draft.endTime,
-    );
+    const timeInvalid = this._timeInvalid;
     const titleInvalid = !draft.title || !draft.title.trim();
     const participantsInvalid =
       !draft.participants || draft.participants.length === 0;
-    return timeInvalid || titleInvalid || participantsInvalid;
+    const resourceConflict = this._resourceConflict.hasConflict;
+    return (
+      timeInvalid || titleInvalid || participantsInvalid || resourceConflict
+    );
   }
 
   private get _timeInvalid() {
     const draft = schedulerStore.getState().eventDraft;
     if (!draft) return false;
-    return isEndBeforeStart(
+
+    const occInvalid = isEndBeforeStart(
       draft.startDate,
       draft.startTime,
       draft.endDate,
       draft.endTime,
     );
+    if (occInvalid) return true;
+
+    if (draft.recurrenceRule && this._recurrenceUntilDate) {
+      if (this._recurrenceUntilDate < draft.startDate) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private get _resourceConflict(): { hasConflict: boolean; message: string } {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft || !draft.title || draft.participants.length === 0) {
+      return { hasConflict: false, message: "" };
+    }
+
+    const tz = this._selectedTz;
+    const startRange = new Date(draft.startDate + "T00:00:00").getTime();
+    const endRange = new Date(draft.endDate + "T23:59:59").getTime();
+
+    let draftOccurrences: EventData[];
+    try {
+      const draftStartIso = zonedInputToISO(
+        draft.startDate,
+        draft.startTime,
+        tz,
+      );
+      const draftEndIso = zonedInputToISO(draft.endDate, draft.endTime, tz);
+
+      const tempEvent = new SchedulerEvent({
+        id: "draft",
+        title: draft.title,
+        startTime: draftStartIso,
+        endTime: draftEndIso,
+        resourceIds: draft.participants,
+        allDay: draft.allDay,
+        recurrenceRule: draft.recurrenceRule,
+      });
+      draftOccurrences = expandEvents([tempEvent], startRange, endRange);
+    } catch {
+      return { hasConflict: false, message: "" };
+    }
+
+    if (draftOccurrences.length === 0) {
+      return { hasConflict: false, message: "" };
+    }
+
+    const baseEventId =
+      this.eventId && this.eventId.includes("_occ_")
+        ? this.eventId.split("_occ_")[0]
+        : this.eventId;
+
+    const existingEvents = Object.values(
+      schedulerStore.getState().events,
+    ).filter((e) => e.id !== baseEventId);
+
+    const existingOccurrences = expandEvents(
+      existingEvents,
+      startRange,
+      endRange,
+    );
+
+    for (const dOcc of draftOccurrences) {
+      const dStart = new Date(dOcc.startTime).getTime();
+      const dEnd = new Date(dOcc.endTime).getTime();
+
+      for (const eOcc of existingOccurrences) {
+        const eStart = new Date(eOcc.startTime).getTime();
+        const eEnd = new Date(eOcc.endTime).getTime();
+
+        if (dStart < eEnd && dEnd > eStart) {
+          const dResources =
+            dOcc.resourceIds || (dOcc.resourceId ? [dOcc.resourceId] : []);
+          const eResources =
+            eOcc.resourceIds || (eOcc.resourceId ? [eOcc.resourceId] : []);
+          const conflictingResources = dResources.filter((resId: string) =>
+            eResources.includes(resId),
+          );
+
+          if (conflictingResources.length > 0) {
+            const names = conflictingResources.map((id: string) =>
+              this._resolveResourceName(id),
+            );
+            const dateLabel = new Date(dOcc.startTime).toLocaleDateString(
+              undefined,
+              {
+                month: "short",
+                day: "numeric",
+              },
+            );
+            return {
+              hasConflict: true,
+              message: `Conflict: ${names.join(", ")} already scheduled on ${dateLabel} between ${new Date(eOcc.startTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} and ${new Date(eOcc.endTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} in "${eOcc.title}".`,
+            };
+          }
+        }
+      }
+    }
+
+    return { hasConflict: false, message: "" };
   }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
@@ -487,12 +591,13 @@ export class JanusScheduler extends LitElement {
     if (changedProperties.has("eventId")) {
       this._isEditing = this.eventId === null;
 
+      const todayStr = new Date().toISOString().split("T")[0];
       const defaults = {
         title: this.title,
-        startDate: this.startDate,
-        startTime: this.startTime,
-        endDate: this.endDate,
-        endTime: this.endTime,
+        startDate: this.startDate || todayStr,
+        startTime: this.startTime || "09:00",
+        endDate: this.endDate || this.startDate || todayStr,
+        endTime: this.endTime || "10:00",
         participants: this._participants,
         description: this.description,
         activeColor: this.activeColor || "orange",
@@ -508,7 +613,11 @@ export class JanusScheduler extends LitElement {
         this._selectedTz = draft.timezone || schedulerStore.getState().timezone;
         if (draft.recurrenceRule) {
           const parsed = parseRRule(draft.recurrenceRule);
-          this._recurrenceFreq = parsed.freq as any;
+          this._recurrenceFreq = parsed.freq as
+            | "Daily"
+            | "Weekly"
+            | "Monthly"
+            | "Yearly";
           this._recurrenceUntilDate = parsed.until;
           if (parsed.until) {
             const [y, m] = parsed.until.split("-").map(Number);
@@ -748,6 +857,7 @@ export class JanusScheduler extends LitElement {
     } else {
       schedulerStore.getState().updateDraft({ endTime: val });
     }
+    this.openPicker = null;
   }
 
   // ─── Calendar date selection ───────────────────────────────────────────────
@@ -763,15 +873,22 @@ export class JanusScheduler extends LitElement {
     if (!draft) return;
 
     if (which === "start") {
-      schedulerStore.getState().updateDraft({ startDate: iso });
+      const updates: Partial<EventDraft> = { startDate: iso };
       this.startCal = { viewYear: y, viewMonth: mo };
-      // If end is now before start on the same day, nudge end date forward
-      if (
-        isEndBeforeStart(iso, draft.startTime, draft.endDate, draft.endTime)
-      ) {
-        schedulerStore.getState().updateDraft({ endDate: iso });
+      if (draft.allDay) {
+        updates.endDate = iso;
         this.endCal = { viewYear: y, viewMonth: mo };
+      } else {
+        if (
+          !draft.endDate ||
+          draft.endDate < iso ||
+          isEndBeforeStart(iso, draft.startTime, draft.endDate, draft.endTime)
+        ) {
+          updates.endDate = iso;
+          this.endCal = { viewYear: y, viewMonth: mo };
+        }
       }
+      schedulerStore.getState().updateDraft(updates);
     } else if (which === "end") {
       schedulerStore.getState().updateDraft({ endDate: iso });
       this.endCal = { viewYear: y, viewMonth: mo };
@@ -788,9 +905,13 @@ export class JanusScheduler extends LitElement {
     if (!draft) return;
     const newAllDay = !draft.allDay;
     if (newAllDay) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const targetStart = draft.startDate || todayStr;
       schedulerStore.getState().updateDraft({
         allDay: true,
+        startDate: targetStart,
         startTime: "00:00",
+        endDate: targetStart,
         endTime: "23:59",
       });
     } else {
@@ -808,7 +929,11 @@ export class JanusScheduler extends LitElement {
       this._recurrenceUntilDate = "";
     } else {
       this._recurrenceFreq = "Weekly";
-      this._recurrenceUntilDate = "";
+      const start = new Date(draft.startDate + "T00:00:00");
+      start.setMonth(start.getMonth() + 1);
+      this._recurrenceUntilDate = start.toISOString().split("T")[0];
+      const [y, m] = this._recurrenceUntilDate.split("-").map(Number);
+      this.recurrenceCal = { viewYear: y, viewMonth: m - 1 };
       this._updateRecurrenceRule();
     }
   }
@@ -819,6 +944,8 @@ export class JanusScheduler extends LitElement {
   }
 
   private _updateRecurrenceRule() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
     const freqUpper = this._recurrenceFreq.toUpperCase();
     let rule = `FREQ=${freqUpper}`;
     if (this._recurrenceUntilDate) {
@@ -1047,169 +1174,155 @@ export class JanusScheduler extends LitElement {
   // ─── Render View Mode ──────────────────────────────────────────────────────
 
   private _renderViewMode(draft: EventDraft) {
-    const multiDay = draft.startDate !== draft.endDate;
+    let displayStartDate = draft.startDate;
+    let displayEndDate = draft.endDate;
+
+    if (this.eventId && this.eventId.includes("_occ_")) {
+      const parts = this.eventId.split("_occ_");
+      const occStartMs = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(occStartMs)) {
+        try {
+          const tz = this._selectedTz;
+          const baseStartIso = zonedInputToISO(
+            draft.startDate,
+            draft.startTime,
+            tz,
+          );
+          const baseEndIso = zonedInputToISO(draft.endDate, draft.endTime, tz);
+          const durationMs =
+            new Date(baseEndIso).getTime() - new Date(baseStartIso).getTime();
+
+          const occEndMs = occStartMs + durationMs;
+
+          const startParts = isoToZonedDisplay(
+            new Date(occStartMs).toISOString(),
+            tz,
+          );
+          const endParts = isoToZonedDisplay(
+            new Date(occEndMs).toISOString(),
+            tz,
+          );
+
+          displayStartDate = startParts.date;
+          displayEndDate = endParts.date;
+        } catch {
+          // Fallback to draft dates on failure
+        }
+      }
+    }
+
+    const multiDay = displayStartDate !== displayEndDate;
+
     const displayDate = multiDay
-      ? `${formatDate(draft.startDate)} – ${formatDate(draft.endDate)}`
-      : formatDate(draft.startDate);
+      ? `${formatDate(displayStartDate)} – ${formatDate(displayEndDate)}`
+      : formatDate(displayStartDate);
+
     const displayTime = draft.allDay
-      ? "All-day"
+      ? "All-day event"
       : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
 
-    const leadResourceId = draft.participants[0];
-    const leadResourceName = leadResourceId
-      ? this._resolveResourceName(leadResourceId)
-      : "";
-    const otherParticipants = draft.participants.slice(1);
-
-    const colorClass = `color-${draft.activeColor}`;
+    const color = draft.activeColor || "orange";
 
     return html`
       <div class="view-panel">
-        <!-- Header -->
-        <header class="view-header ${colorClass}">
-          <div class="view-header-left">
-            <div class="view-header-icon-box">${CalendarIcon()}</div>
-            <div class="view-header-titles">
-              <span class="view-header-tag">Janus Scheduler</span>
-              <h2 class="view-header-title">
-                ${draft.title || "Untitled Event"}
-              </h2>
+        <!-- Colour accent bar + title block -->
+        <div class="view-hero color-${color}">
+          <div class="view-hero-bar"></div>
+          <div class="view-hero-body">
+            <div class="view-hero-top">
+              <button
+                class="close-btn"
+                @click=${() => this._onClose(false)}
+                aria-label="Close"
+              >
+                ${XIcon()}
+              </button>
             </div>
+            <h2 class="view-hero-title">${draft.title || "Untitled Event"}</h2>
+            <div class="view-hero-datetime">
+              <span class="view-hero-datetime-icon">${CalendarIcon()}</span>
+              <span>${displayDate}</span>
+              ${!draft.allDay
+                ? html`
+                    <span class="view-hero-sep">·</span>
+                    <span class="view-hero-datetime-icon">${ClockIcon()}</span>
+                    <span>${displayTime}</span>
+                  `
+                : html`
+                    <span class="view-hero-sep">·</span>
+                    <span class="view-allday-badge">All-day</span>
+                  `}
+            </div>
+            ${draft.recurrenceRule
+              ? html`
+                  <div class="view-hero-recurrence">
+                    ${RepeatIcon()}
+                    <span>${formatRecurrence(draft.recurrenceRule)}</span>
+                  </div>
+                `
+              : nothing}
           </div>
-          <button
-            class="close-btn"
-            @click=${() => this._onClose(false)}
-            aria-label="Close"
-          >
-            ${XIcon()}
-          </button>
-        </header>
+        </div>
 
         <!-- Body -->
         <div class="view-body">
-          <!-- Date & Time -->
-          <div class="view-datetime-row">
-            <span class="view-datetime-icon">${ClockIcon()}</span>
-            <span class="view-datetime-text"
-              >${displayDate} • ${displayTime}</span
-            >
-          </div>
-
-          ${draft.recurrenceRule
-            ? html`
-                <div class="view-datetime-row" style="margin-top: 4px;">
-                  <span
-                    class="view-datetime-icon"
-                    style="color: var(--c-${draft.activeColor});"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <polyline points="17 1 21 5 17 9"></polyline>
-                      <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
-                      <polyline points="7 23 3 19 7 15"></polyline>
-                      <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
-                    </svg>
-                  </span>
-                  <span
-                    class="view-datetime-text"
-                    style="color: var(--c-${draft.activeColor}); font-weight: 500;"
-                  >
-                    ${formatRecurrence(draft.recurrenceRule)}
-                  </span>
-                </div>
-              `
-            : nothing}
-
-          <!-- Lead Resource & Participants -->
+          <!-- Participants -->
           <div class="view-section">
-            <div class="view-section-label">Lead Resource & Participants</div>
-            <div class="view-resource-card">
-              ${leadResourceId
-                ? html`
-                    <div class="view-lead-info">
-                      ${avatarHtml(leadResourceName)}
-                      <div class="view-lead-details">
-                        <div class="view-lead-name">${leadResourceName}</div>
-                        <div class="view-lead-role">Primary Resource</div>
-                      </div>
-                    </div>
-                  `
-                : html`
-                    <div class="view-lead-info">
-                      <span class="avatar avatar-more">?</span>
-                      <div class="view-lead-details">
-                        <div class="view-lead-name">No resource assigned</div>
-                        <div class="view-lead-role">
-                          Click Edit to add participants
-                        </div>
-                      </div>
-                    </div>
-                  `}
-              ${otherParticipants.length > 0
-                ? html`
-                    <div class="view-avatar-stack">
-                      ${otherParticipants
-                        .slice(0, 3)
-                        .map((p: string) =>
-                          avatarHtml(this._resolveResourceName(p)),
-                        )}
-                      ${otherParticipants.length > 3
-                        ? html`<span class="avatar avatar-more"
-                            >+${otherParticipants.length - 3}</span
+            <div class="view-section-label">Participants</div>
+            <div class="view-participants-list">
+              ${draft.participants.map((p: string, idx: number) => {
+                const name = this._resolveResourceName(p);
+                const isLead = idx === 0;
+                return html`
+                  <div class="view-participant-item">
+                    ${avatarHtml(name)}
+                    <div class="view-participant-info">
+                      <span class="view-participant-name">${name}</span>
+                      ${isLead
+                        ? html`<span class="view-participant-role-badge"
+                            >Primary</span
                           >`
                         : nothing}
                     </div>
+                  </div>
+                `;
+              })}
+              ${draft.participants.length === 0
+                ? html`
+                    <div class="view-empty-row">No participants assigned</div>
                   `
                 : nothing}
             </div>
           </div>
 
-          <!-- Description / Notes -->
-          <div class="view-section">
-            <div class="view-section-label">Agenda & Notes</div>
-            <div class="view-desc-card">
-              ${draft.description
-                ? html`<div class="view-desc-text">${draft.description}</div>`
-                : html`<div class="view-desc-text view-desc-text--empty">
-                    No description or agenda provided.
-                  </div>`}
-            </div>
-          </div>
+          <!-- Description -->
+          ${draft.description
+            ? html`
+                <div class="view-section">
+                  <div class="view-section-label">Description</div>
+                  <div class="view-desc">${draft.description}</div>
+                </div>
+              `
+            : nothing}
 
-          <!-- Timezone & Event Color / Status -->
-          <div class="view-meta-grid">
-            <div class="view-meta-col">
-              <div class="view-section-label">Timezone</div>
-              <div class="view-meta-val-row">
-                <span class="view-meta-icon">${GlobeIcon()}</span>
-                <span class="view-meta-val">
-                  ${this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
-                  this._selectedTz}
-                </span>
-              </div>
+          <!-- Meta row: timezone + color -->
+          <div class="view-meta-row">
+            <div class="view-meta-chip">
+              ${GlobeIcon()}
+              <span
+                >${this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
+                this._selectedTz}</span
+              >
             </div>
-            <div class="view-meta-col">
-              <div class="view-section-label">Event Color</div>
-              <div class="view-meta-val-row">
-                <span class="view-color-dot swatch-${draft.activeColor}"></span>
-                <span class="view-meta-val capitalize"
-                  >${draft.activeColor}</span
-                >
-              </div>
+            <div class="view-meta-chip">
+              <span class="view-color-dot swatch-${color}"></span>
+              <span class="capitalize">${color}</span>
             </div>
           </div>
         </div>
 
         <!-- Footer -->
-        <footer class="view-footer">
+        <div class="view-footer">
           <button class="btn-delete" @click=${this._onDelete}>
             ${TrashIcon()} Delete
           </button>
@@ -1218,7 +1331,7 @@ export class JanusScheduler extends LitElement {
               Close
             </button>
             <button
-              class="btn-edit-event"
+              class="btn-edit-event color-btn-${color}"
               @click=${() => (this._isEditing = true)}
             >
               <svg
@@ -1230,7 +1343,7 @@ export class JanusScheduler extends LitElement {
                 stroke-width="2.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                style="margin-right: 4px; vertical-align: middle;"
+                style="margin-right:4px;vertical-align:middle;"
               >
                 <path d="M12 20h9" />
                 <path
@@ -1240,11 +1353,10 @@ export class JanusScheduler extends LitElement {
               Edit Event
             </button>
           </div>
-        </footer>
+        </div>
       </div>
     `;
   }
-
   // ─── Render ────────────────────────────────────────────────────────────────
 
   render() {
@@ -1573,7 +1685,13 @@ export class JanusScheduler extends LitElement {
                                         ? "freq-pill--active"
                                         : ""}"
                                       @click=${() =>
-                                        this._setRepeatFreq(freq as any)}
+                                        this._setRepeatFreq(
+                                          freq as
+                                            | "Daily"
+                                            | "Weekly"
+                                            | "Monthly"
+                                            | "Yearly",
+                                        )}
                                     >
                                       ${freq}
                                     </button>
@@ -1584,7 +1702,7 @@ export class JanusScheduler extends LitElement {
                                 class="dt-row-label"
                                 style="margin-top: 10px;"
                               >
-                                End Repeat
+                                Repeat Until
                               </div>
                               <div class="dt-row">
                                 <div class="dt-cell dt-cell--date">
@@ -1720,6 +1838,14 @@ export class JanusScheduler extends LitElement {
                               >End must be after start. Please adjust the date
                               or time.</span
                             >
+                          </div>`
+                        : nothing}
+
+                      <!-- Conflict warning -->
+                      ${this._resourceConflict.hasConflict
+                        ? html`<div class="dt-invalid-notice">
+                            <span>⚠</span>
+                            <span>${this._resourceConflict.message}</span>
                           </div>`
                         : nothing}
 

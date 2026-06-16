@@ -3,6 +3,7 @@ import {
   JanusScheduler as JanusSchedulerWC,
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
+  JanusAiBar as JanusAiBarWC,
 } from "@janus-scheduler/ui";
 import type {
   TimelineEvent,
@@ -51,6 +52,7 @@ declare module "solid-js" {
       "janus-scheduler": Record<string, unknown>;
       "janus-timeline": Record<string, unknown>;
       "janus-month-grid": Record<string, unknown>;
+      "janus-ai-bar": Record<string, unknown>;
     }
   }
 }
@@ -64,6 +66,9 @@ if (!customElements.get("janus-timeline")) {
 }
 if (!customElements.get("janus-month-grid")) {
   customElements.define("janus-month-grid", JanusMonthGridWC);
+}
+if (!customElements.get("janus-ai-bar")) {
+  customElements.define("janus-ai-bar", JanusAiBarWC);
 }
 
 /**
@@ -241,6 +246,39 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
       ref={(el: HTMLElement) => {
         ref = el;
       }}
+    />
+  );
+};
+
+export interface AiBarProps {
+  placeholder?: string;
+  buttonLabel?: string;
+  onAiSubmit?: (detail: { prompt: string }) => void;
+  onAiInput?: (detail: { prompt: string }) => void;
+}
+
+export const AiBar: Component<AiBarProps> = (props) => {
+  let ref!: HTMLElement;
+
+  onMount(() => {
+    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
+      if (handler) {
+        const listener = (e: Event) => handler((e as CustomEvent).detail);
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
+      }
+    };
+    attach("ai-submit", props.onAiSubmit);
+    attach("ai-input", props.onAiInput);
+  });
+
+  return (
+    <janus-ai-bar
+      ref={(el: HTMLElement) => {
+        ref = el;
+      }}
+      placeholder={props.placeholder}
+      button-label={props.buttonLabel}
     />
   );
 };

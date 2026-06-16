@@ -4,6 +4,7 @@ import {
   JanusScheduler as JanusSchedulerWC,
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
+  JanusAiBar as JanusAiBarWC,
 } from "@janus-scheduler/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -207,6 +208,38 @@ export function MonthGrid(props: MonthGridProps): React.JSX.Element {
           props.onViewChange!(
             (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
           )
+      : undefined,
+  });
+}
+
+const _AiBar = createComponent({
+  tagName: "janus-ai-bar",
+  elementClass: JanusAiBarWC,
+  react: React,
+  events: {
+    onAiSubmit: "ai-submit",
+    onAiInput: "ai-input",
+  },
+});
+
+export interface AiBarProps extends React.HTMLAttributes<HTMLElement> {
+  placeholder?: string;
+  value?: string;
+  buttonLabel?: string;
+  onAiSubmit?: (detail: { prompt: string }) => void;
+  onAiInput?: (detail: { prompt: string }) => void;
+}
+
+export function AiBar(props: AiBarProps): React.JSX.Element {
+  return React.createElement(_AiBar, {
+    ...props,
+    onAiSubmit: props.onAiSubmit
+      ? (e: Event) =>
+          props.onAiSubmit!((e as CustomEvent<{ prompt: string }>).detail)
+      : undefined,
+    onAiInput: props.onAiInput
+      ? (e: Event) =>
+          props.onAiInput!((e as CustomEvent<{ prompt: string }>).detail)
       : undefined,
   });
 }

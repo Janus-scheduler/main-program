@@ -4,6 +4,7 @@ import {
   Timeline,
   Scheduler,
   MonthGrid,
+  AiBar,
   type ViewType,
   SchedulerManager,
   getBrowserTimezone,
@@ -314,6 +315,13 @@ function App() {
             }}
           />
         </Show>
+
+        <AiBar
+          onAiSubmit={(detail) => {
+            console.log("AI prompt submitted:", detail.prompt);
+            // TODO: NLP integration
+          }}
+        />
       </main>
     </div>
   );

@@ -76,6 +76,10 @@ export interface MonthEvent {
   endTime?: string;
   allDay?: boolean;
   recurrenceRule?: string;
+  isMultiDay?: boolean;
+  spanPosition?: "start" | "middle" | "end" | "single";
+  startDate?: string;
+  endDate?: string;
 }
 export interface SchedulerSaveData {
   /** Present when editing an existing event; null/undefined when creating a new one. */

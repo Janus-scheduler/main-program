@@ -43,6 +43,10 @@
     @delete="handleDelete"
     @close="$emit('close-scheduler')"
   />
+
+  <janus-ai-bar
+    @ai-submit="handleAiSubmit"
+  />
 </template>
 
 <script setup lang="ts">
@@ -198,5 +202,11 @@ function handleEventCreate(e: Event) {
     resourceIds: [resourceId],
     status: "confirmed",
   });
+}
+
+function handleAiSubmit(e: Event) {
+  const { prompt } = (e as CustomEvent<{ prompt: string }>).detail;
+  console.log("AI prompt submitted:", prompt);
+  // TODO: NLP integration
 }
 </script>

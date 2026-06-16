@@ -393,9 +393,27 @@ export const monthGridStyles = css`
     transition: filter 0.12s, transform 0.1s;
   }
 
-  .mg-event:hover {
+  .mg-event:hover,
+  .mg-event--hovered {
     filter: brightness(0.95);
     transform: scaleX(0.99);
+  }
+
+  .mg-event--clip-left {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-left: none !important;
+    margin-left: 0 !important;
+    width: calc(100% - 4px) !important;
+  }
+  .mg-event--clip-right {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    margin-right: 0 !important;
+    width: calc(100% - 4px) !important;
+  }
+  .mg-event--clip-left.mg-event--clip-right {
+    width: 100% !important;
   }
 
   .mg-event:active {
@@ -485,7 +503,7 @@ export const monthGridStyles = css`
 
   .mg-fab {
     position: absolute;
-    bottom: calc(var(--aicard-area-h) + 16px);
+    bottom: 16px;
     right: 28px;
     width: 52px;
     height: 52px;
@@ -509,75 +527,6 @@ export const monthGridStyles = css`
 
   .mg-fab:active {
     transform: scale(0.96);
-  }
-
-  /* ── AI Bar ──────────────────────────────────────────────────────────────── */
-
-  .mg-ai-wrap {
-    height: var(--aicard-area-h);
-    min-height: var(--aicard-area-h);
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    padding: 0 24px;
-    background: var(--bg);
-  }
-
-  .mg-ai-card {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--white);
-    border: 1.5px solid var(--border);
-    border-radius: 14px;
-    padding: 6px 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  .mg-ai-card:focus-within {
-    border-color: var(--orange);
-    box-shadow: 0 4px 20px rgba(249, 115, 22, 0.12),
-      0 0 0 3px rgba(249, 115, 22, 0.08);
-  }
-
-  .mg-ai-card__input {
-    flex: 1;
-    min-width: 0;
-    border: none;
-    outline: none;
-    font-family: inherit;
-    font-size: 14px;
-    color: var(--text-1);
-    background: transparent;
-  }
-
-  .mg-ai-card__input::placeholder {
-    color: var(--text-3);
-  }
-
-  .mg-ai-card__btn {
-    padding: 6px 18px;
-    background: var(--orange);
-    color: #fff;
-    border: none;
-    border-radius: 9px;
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
-    transition: background 0.15s, transform 0.12s;
-  }
-
-  .mg-ai-card__btn:hover {
-    background: #ea6c0a;
-  }
-
-  .mg-ai-card__btn:active {
-    transform: scale(0.97);
   }
 
   /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
@@ -845,38 +794,13 @@ export const monthGridStyles = css`
     .mg-fab {
       width: 42px;
       height: 42px;
-      bottom: calc(var(--aicard-area-h) + 12px);
+      bottom: 12px;
       right: 16px;
     }
 
     .mg-fab svg {
       width: 18px;
       height: 18px;
-    }
-
-    .mg-ai-wrap {
-      height: auto;
-      min-height: auto;
-      padding: 8px 12px;
-    }
-
-    .mg-ai-card {
-      padding: 4px 10px;
-      border-radius: 10px;
-    }
-
-    .mg-ai-card__input {
-      font-size: 12px;
-    }
-
-    .mg-ai-card__btn {
-      padding: 5px 12px;
-      font-size: 12px;
-      border-radius: 7px;
-    }
-
-    .mg-ai-card__input::placeholder {
-      font-size: 11px;
     }
   }
 

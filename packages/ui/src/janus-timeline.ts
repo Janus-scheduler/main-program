@@ -6,6 +6,7 @@ import {
   isoToZonedDisplay,
   expandEvents,
 } from "@janus-scheduler/core";
+import "./janus-ai-bar";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
 import {
@@ -15,7 +16,6 @@ import {
   ChevronRight,
   SearchIcon,
   BellIcon,
-  SparkleIcon,
   PlusIcon,
   PencilRulerIcon,
 } from "./timeline-icons";
@@ -52,7 +52,6 @@ export class JanusTimeline extends LitElement {
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
 
   @state() view: "Timeline" | "Month" = "Timeline";
-  @state() aiPrompt = "";
   @state() private _dragVersion = 0; // bumped to trigger re-render during drag
 
   /** Zoom: pixels per millisecond (the single universal scale) */
@@ -794,21 +793,6 @@ export class JanusTimeline extends LitElement {
                 )}
                 ${this._renderDragGhost()}
               </div>
-            </div>
-          </div>
-
-          <div class="tl-ai-wrap">
-            <div class="tl-ai-card">
-              ${SparkleIcon()}
-              <input
-                class="tl-ai-card__input"
-                type="text"
-                .value=${this.aiPrompt}
-                @input=${(e: Event) =>
-                  (this.aiPrompt = (e.target as HTMLInputElement).value)}
-                placeholder="Try 'Schedule a design sync with Alex tomorrow at 10am in Room A'"
-              />
-              <button class="tl-ai-card__btn">Schedule</button>
             </div>
           </div>
         </div>

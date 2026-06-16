@@ -1624,6 +1624,7 @@ export const schedulerStyles = css`
       flex-direction: column;
       max-width: 100%;
       width: 100%;
+      height: 95vh;
       max-height: 95vh;
       border-radius: 20px 20px 0 0;
       border-bottom: none;
@@ -1809,6 +1810,8 @@ export const schedulerStyles = css`
    ══════════════════════════════════ */
   .modal--view {
     max-width: 500px;
+    height: 600px;
+    max-height: 90vh;
   }
 
   .view-panel {
@@ -2116,4 +2119,252 @@ export const schedulerStyles = css`
   .btn-edit-event.color-indigo { background-color: var(--c-indigo); color: white; }
   .btn-edit-event.color-cyan { background-color: var(--c-cyan); color: white; }
   .btn-edit-event.color-teal { background-color: var(--c-teal); color: white; }
+
+  /* ── View mode ───────────────────────────────────────────────────────────── */
+
+.view-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.view-hero {
+  flex-shrink: 0;
+}
+
+.view-hero-bar {
+  height: 5px;
+  width: 100%;
+}
+
+.color-orange .view-hero-bar  { background: var(--orange); }
+.color-blue .view-hero-bar    { background: #3b82f6; }
+.color-green .view-hero-bar   { background: #22c55e; }
+.color-yellow .view-hero-bar  { background: var(--c-yellow); }
+.color-purple .view-hero-bar  { background: var(--c-purple); }
+.color-red .view-hero-bar     { background: #ef4444; }
+.color-pink .view-hero-bar    { background: #ec4899; }
+.color-indigo .view-hero-bar  { background: #6366f1; }
+.color-cyan .view-hero-bar    { background: #06b6d4; }
+.color-teal .view-hero-bar    { background: #14b8a6; }
+
+.view-hero-body {
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar-bg);
+}
+
+.view-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.swatch-bg-orange { background: #fff7ed; color: #c2410c; }
+.swatch-bg-blue   { background: #eff6ff; color: #1d4ed8; }
+.swatch-bg-green  { background: #f0fdf4; color: #15803d; }
+.swatch-bg-yellow { background: #fefce8; color: #a16207; }
+.swatch-bg-purple { background: #faf5ff; color: #7e22ce; }
+.swatch-bg-red    { background: #fef2f2; color: #b91c1c; }
+.swatch-bg-pink   { background: #fdf2f8; color: #9d174d; }
+.swatch-bg-indigo { background: #eef2ff; color: #4338ca; }
+.swatch-bg-cyan   { background: #ecfeff; color: #0e7490; }
+.swatch-bg-teal   { background: #f0fdfa; color: #0f766e; }
+
+.view-hero-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+  line-height: 1.3;
+}
+
+.view-hero-datetime {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.view-hero-datetime-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.view-hero-sep {
+  color: var(--text-muted);
+}
+
+.view-allday-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: var(--orange-light);
+  color: var(--orange);
+  border-radius: 20px;
+}
+
+.view-hero-recurrence {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.view-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.view-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.view-section-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.view-participants-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.view-participant-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.view-participant-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-participant-name {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.view-participant-role-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--border);
+  color: var(--text-secondary);
+}
+
+.view-empty-row {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.view-desc {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 13px;
+  white-space: pre-wrap;
+}
+
+.view-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.view-meta-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  border-radius: 20px;
+  padding: 4px 10px;
+}
+
+.view-color-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.view-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-bg);
+  flex-shrink: 0;
+}
+
+.view-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-edit-event {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-edit-event:hover { opacity: 0.88; }
+
+.color-btn-orange { background: var(--orange);  color: #fff; }
+.color-btn-blue   { background: #3b82f6;         color: #fff; }
+.color-btn-green  { background: #22c55e;          color: #fff; }
+.color-btn-yellow { background: var(--c-yellow); color: #fff; }
+.color-btn-purple { background: var(--c-purple); color: #fff; }
+.color-btn-red    { background: #ef4444;          color: #fff; }
+.color-btn-pink   { background: #ec4899;          color: #fff; }
+.color-btn-indigo { background: #6366f1;          color: #fff; }
+.color-btn-cyan   { background: #06b6d4;          color: #fff; }
+.color-btn-teal   { background: #14b8a6;          color: #fff; }
+
+.capitalize { text-transform: capitalize; }
 `;
