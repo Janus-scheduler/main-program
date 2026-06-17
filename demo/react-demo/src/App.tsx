@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import "./App.css";
 
 import { Sidebar } from "./components/Sidebar";
+import { MobileHeader, MobileBottomNav } from "./components/MobileShell";
 import { SchedulerView } from "./components/SchedulerView";
 import type { ViewType } from "@janus-scheduler/react";
 import { ErrorToast } from "./components/ErrorToast";
@@ -40,6 +41,8 @@ function App() {
       <Sidebar />
 
       <main className="app-main">
+        <MobileHeader />
+
         <SchedulerView
           currentView={currentView}
           showScheduler={showScheduler}
@@ -64,6 +67,8 @@ function App() {
             onDismiss={() => setHookError(null)}
           />
         )}
+
+        <MobileBottomNav />
       </main>
     </div>
   );

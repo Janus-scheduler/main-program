@@ -1,7 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { aiBarStyles } from "./ai-bar-styles";
-import { SparkleIcon } from "./timeline-icons";
+import { SparkleIcon, MicIcon, SendIcon } from "./timeline-icons";
 
 /**
  * <janus-ai-bar>
@@ -31,8 +31,10 @@ export class JanusAiBar extends LitElement {
 
   override render() {
     return html`
+      <div class="ai-bar-drag-handle"></div>
       <div class="ai-card">
-        ${SparkleIcon()}
+        <div class="ai-card__icon-desktop">${SparkleIcon()}</div>
+        <div class="ai-card__icon-mobile">${MicIcon()}</div>
         <input
           class="ai-card__input"
           type="text"
@@ -42,7 +44,8 @@ export class JanusAiBar extends LitElement {
           @keydown=${this._handleKeydown}
         />
         <button class="ai-card__btn" @click=${this._handleSubmit}>
-          ${this.buttonLabel}
+          <span class="ai-card__btn-text">${this.buttonLabel}</span>
+          <span class="ai-card__btn-icon">${SendIcon()}</span>
         </button>
       </div>
     `;

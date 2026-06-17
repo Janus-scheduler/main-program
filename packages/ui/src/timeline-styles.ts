@@ -549,7 +549,6 @@ export const timelineStyles = css`
   }
 
   .tl-event-row {
-    touch-action: none; 
     height: var(--row-h);
     position: relative;
     border-bottom: 1px solid var(--border);
@@ -590,7 +589,7 @@ export const timelineStyles = css`
      EVENT BLOCKS
   ══════════════════════════════════════════════════════════════════════════════ */
   .tl-event {
-    touch-action: none; 
+    touch-action: none;
     position: absolute;
     top: 8px;
     bottom: 8px;
@@ -606,7 +605,7 @@ export const timelineStyles = css`
     text-align: left;
     font-family: inherit;
     overflow: hidden;
-    box-shadow: 
+    box-shadow:
       0 3px 8px rgba(0, 0, 0, 0.12),
       0 1px 3px rgba(0, 0, 0, 0.08);
     transition:
@@ -618,15 +617,14 @@ export const timelineStyles = css`
   .tl-event:hover {
     filter: brightness(0.96);
     transform: scaleY(1.02);
-    box-shadow: 
+    box-shadow:
       0 6px 16px rgba(0, 0, 0, 0.16),
       0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .tl-event:active {
     transform: scale(0.98);
-    box-shadow: 
-      0 2px 4px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
   }
 
   .tl-event--tiny {
@@ -816,13 +814,13 @@ export const timelineStyles = css`
   }
 
   /* Empty-space creation cursor */
-  .tl-event-row {
-    touch-action: none; 
+  .tl-component-shell--draw-mode .tl-event-row {
+    touch-action: none;
     cursor: crosshair;
   }
 
   .tl-event {
-    touch-action: none; 
+    touch-action: none;
     cursor: grab;
   }
 
@@ -899,113 +897,158 @@ export const timelineStyles = css`
   }
 
   @media (max-width: 768px) {
+    /* Main Layout */
     :host {
-      --res-col-w: 160px;
+      --res-col-w: 72px;
+      --aicard-area-h: 70px;
+      --topbar-h: 64px;
+    }
+
+    /* Hide unnecessary headers */
+    .tl-super-header,
+    .tl-res-group-label {
+      display: none;
+    }
+    .tl-hour-header {
+      top: 0;
+    }
+    .tl-now-line {
+      top: var(--hour-hdr-h);
+    }
+    .tl-res-col__header {
+      height: var(--hour-hdr-h) !important;
+      color: transparent;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Topbar styling matching mockup */
+    .tl-topbar {
+      padding: 0 16px;
+      justify-content: center;
+    }
+    .tl-topbar__right {
+      display: none; /* Hide right actions */
+    }
+    .tl-nav {
+      flex: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tl-nav__arrow:first-child {
+      order: 1;
+    }
+    .tl-nav__arrow:nth-of-type(3) {
+      order: 3;
+    }
+    .tl-nav__today {
+      display: none;
+    }
+
+    .tl-nav__arrow {
+      color: #18181b;
+      background: transparent;
     }
     .tl-nav__date {
       display: none;
     }
     .tl-nav__date--short {
-      display: block;
+      order: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* Center-align text */
+      margin: 0;
+      line-height: 1.2;
     }
-    .tl-nav__today {
-      padding: 4px 8px;
-      font-size: 12px;
+    .tl-nav-day-name {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--text-2);
+      font-weight: 700;
+      letter-spacing: 0.5px;
     }
-    .tl-topbar {
-      padding: 0 12px;
-      gap: 8px;
+    .tl-nav-date-text {
+      font-size: 16px;
+      color: #1d4ed8; /* Match mockup blue text */
+      font-weight: 700;
     }
-  }
 
-  @media (max-width: 640px) {
+    /* Resource Column Vertical Stacking */
+    .tl-res-row {
+      flex-direction: column;
+      justify-content: center;
+      align-items: center; /* Ensures avatar and text are centered horizontally */
+      gap: 6px;
+      padding: 0 4px;
+    }
+    .tl-res-info {
+      display: flex;
+      width: 100%;
+      justify-content: center;
+    }
     .tl-res-sub {
       display: none;
     }
     .tl-res-name {
-      font-size: 12px;
-    }
-    .tl-nav__date {
-      display: none;
-    }
-    .tl-view-toggle__btn {
-      padding: 4px 10px;
-      font-size: 12px;
-    }
-    .tl-topbar {
-      padding: 0 10px;
-      gap: 6px;
-    }
-    /* Hide name and subtitle, show only avatar */
-    .tl-res-info {
-      display: none;
+      font-size: 10.5px;
+      text-align: center;
+      white-space: normal;
+      line-height: 1.1;
+      font-weight: 500;
+      color: #18181b;
+      word-break: break-word;
     }
 
-    /* Shrink resource column to just fit the avatar */
-    :host {
-      --res-col-w: 60px;
+    .tl-avatar {
+      width: 32px;
+      height: 32px;
+    }
+    .tl-avatar--initials {
+      font-size: 11px;
     }
 
-    /* Center avatar in the narrower column */
-    .tl-res-row {
-      padding: 0 8px;
+    /* Time grid adjustments */
+    .tl-hour-cell {
       justify-content: center;
-      gap: 0;
-    }
-
-    .tl-res-col__header {
-      font-size: 0;
       padding: 0;
+      font-size: 11px;
+      font-weight: 600;
+      color: #52525b;
+      border-right: none;
     }
 
-    /* Smaller FAB */
+    .tl-now-line {
+      width: 1px;
+      background: #dc2626; /* Red line for now like mockup */
+    }
+    .tl-now-dot {
+      width: 8px;
+      height: 8px;
+      background: #dc2626;
+      border: 2px solid #fff;
+    }
+
+    .tl-vline {
+      background: #f4f4f5;
+    }
+
+    .tl-event-row {
+      border-bottom: 1px solid #f4f4f5;
+    }
+
+    /* Hide floating add button if bottom nav handles it */
     .tl-fab {
-      width: 42px;
-      height: 42px;
-      bottom: calc(var(--aicard-area-h) + 12px);
-      right: 16px;
-    }
-
-    .tl-fab svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    :host {
-      --aicard-area-h: 48px;
+      display: none;
     }
   }
 
   @media (max-width: 480px) {
-    .tl-view-toggle__btn {
-      padding: 3px 8px;
-      font-size: 11px;
+    /* Mobile micro-adjustments */
+    :host {
+      --res-col-w: 64px;
     }
-
-    .tl-icon-btn {
-      width: 28px;
-      height: 28px;
+    .tl-res-name {
+      font-size: 9.5px;
     }
-
-    .tl-icon-btn svg {
-      width: 15px;
-      height: 15px;
-    }
-
-    .tl-nav {
-      gap: 2px;
-    }
-
-    .tl-nav__arrow {
-      width: 24px;
-      height: 24px;
-    }
-
-    .tl-nav__date--short {
-      margin-left: 4px;
-    }
-
-    .tl-topbar {
-      padding: 0 6px;
-    }
+  }
 `;

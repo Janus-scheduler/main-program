@@ -577,8 +577,20 @@ export class JanusTimeline extends LitElement {
     const visibleCenter = this._getVisibleCenterMs();
     const navLabel = formatNavDate(visibleCenter, level, tz);
 
+    // Mobile short date format (e.g. THURSDAY \n Oct 26)
+    const d = new Date(visibleCenter); // Approximation for simple parsing without full timezone logic here
+    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+    const shortDate = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
     return html`
-      <div class="tl-component-shell">
+      <div
+        class="tl-component-shell ${this.allowCreate
+          ? "tl-component-shell--draw-mode"
+          : ""}"
+      >
         <header class="tl-topbar">
           <nav class="tl-nav">
             <button
@@ -599,7 +611,10 @@ export class JanusTimeline extends LitElement {
               ${ChevronRight()}
             </button>
             <span class="tl-nav__date">${navLabel}</span>
-            <span class="tl-nav__date--short">${navLabel}</span>
+            <div class="tl-nav__date--short">
+              <span class="tl-nav-day-name">${dayName}</span>
+              <span class="tl-nav-date-text">${shortDate}</span>
+            </div>
           </nav>
           <div class="tl-topbar__right">
             ${this._zoomPercent() !== 100
