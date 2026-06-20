@@ -467,10 +467,7 @@ export class JanusScheduler extends LitElement {
     const titleInvalid = !draft.title || !draft.title.trim();
     const participantsInvalid =
       !draft.participants || draft.participants.length === 0;
-    const resourceConflict = this._resourceConflict.hasConflict;
-    return (
-      timeInvalid || titleInvalid || participantsInvalid || resourceConflict
-    );
+    return timeInvalid || titleInvalid || participantsInvalid;
   }
 
   private get _timeInvalid() {
@@ -714,12 +711,17 @@ export class JanusScheduler extends LitElement {
     // Clear draft
     schedulerStore.getState().clearDraft(true);
 
+    const baseId =
+      this.eventId && this.eventId.includes("_occ_")
+        ? this.eventId.split("_occ_")[0]
+        : this.eventId;
+
     this.dispatchEvent(
       new CustomEvent("save", {
         bubbles: true,
         composed: true,
         detail: {
-          id: this.eventId,
+          id: baseId,
           title: draft.title,
           startDate: draft.startDate,
           startTime: draft.startTime,
@@ -743,13 +745,18 @@ export class JanusScheduler extends LitElement {
     // Clear draft
     schedulerStore.getState().clearDraft(true);
 
+    const baseId =
+      this.eventId && this.eventId.includes("_occ_")
+        ? this.eventId.split("_occ_")[0]
+        : this.eventId;
+
     this.dispatchEvent(
       new CustomEvent("delete", {
         bubbles: true,
         composed: true,
         // id is what the host needs to call manager.deleteEvent(id).
         // title is included for display purposes (e.g. confirmation messages).
-        detail: { id: this.eventId, title: titleVal } as SchedulerDeleteData,
+        detail: { id: baseId, title: titleVal } as SchedulerDeleteData,
       }),
     );
   }
@@ -1176,6 +1183,8 @@ export class JanusScheduler extends LitElement {
   private _renderViewMode(draft: EventDraft) {
     let displayStartDate = draft.startDate;
     let displayEndDate = draft.endDate;
+    let startTimeVal = draft.startTime;
+    let endTimeVal = draft.endTime;
 
     if (this.eventId && this.eventId.includes("_occ_")) {
       const parts = this.eventId.split("_occ_");
@@ -1205,6 +1214,8 @@ export class JanusScheduler extends LitElement {
 
           displayStartDate = startParts.date;
           displayEndDate = endParts.date;
+          startTimeVal = startParts.time;
+          endTimeVal = endParts.time;
         } catch {
           // Fallback to draft dates on failure
         }
@@ -1219,7 +1230,7 @@ export class JanusScheduler extends LitElement {
 
     const displayTime = draft.allDay
       ? "All-day event"
-      : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
+      : `${formatTime(startTimeVal)} – ${formatTime(endTimeVal)}`;
 
     const color = draft.activeColor || "orange";
 
@@ -1241,17 +1252,28 @@ export class JanusScheduler extends LitElement {
             <h2 class="view-hero-title">${draft.title || "Untitled Event"}</h2>
             <div class="view-hero-datetime">
               <span class="view-hero-datetime-icon">${CalendarIcon()}</span>
-              <span>${displayDate}</span>
-              ${!draft.allDay
+              ${draft.allDay
                 ? html`
-                    <span class="view-hero-sep">·</span>
-                    <span class="view-hero-datetime-icon">${ClockIcon()}</span>
-                    <span>${displayTime}</span>
-                  `
-                : html`
+                    <span>${displayDate}</span>
                     <span class="view-hero-sep">·</span>
                     <span class="view-allday-badge">All-day</span>
-                  `}
+                  `
+                : multiDay
+                  ? html`
+                      <span>
+                        ${formatDate(displayStartDate)},
+                        ${formatTime(startTimeVal)} –
+                        ${formatDate(displayEndDate)}, ${formatTime(endTimeVal)}
+                      </span>
+                    `
+                  : html`
+                      <span>${displayDate}</span>
+                      <span class="view-hero-sep">·</span>
+                      <span class="view-hero-datetime-icon"
+                        >${ClockIcon()}</span
+                      >
+                      <span>${displayTime}</span>
+                    `}
             </div>
             ${draft.recurrenceRule
               ? html`
@@ -1843,7 +1865,7 @@ export class JanusScheduler extends LitElement {
 
                       <!-- Conflict warning -->
                       ${this._resourceConflict.hasConflict
-                        ? html`<div class="dt-invalid-notice">
+                        ? html`<div class="dt-conflict-warning">
                             <span>⚠</span>
                             <span>${this._resourceConflict.message}</span>
                           </div>`

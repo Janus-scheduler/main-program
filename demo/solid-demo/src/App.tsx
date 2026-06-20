@@ -289,8 +289,8 @@ function App() {
                   recurrenceRule: data.recurrenceRule,
                 };
 
-                if (selectedEventId()) {
-                  manager.updateEvent(selectedEventId()!, eventData);
+                if (data.id) {
+                  manager.updateEvent(data.id, eventData);
                 } else {
                   manager.addEvent(eventData);
                 }

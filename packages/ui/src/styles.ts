@@ -966,6 +966,19 @@ export const schedulerStyles = css`
   font-size: 12.5px;
   color: #b91c1c;
 }
+
+.dt-conflict-warning {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 9px 13px;
+  background: rgba(217, 119, 6, 0.06);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: #b45309;
+}
  
 /* ── Calendar dropdown ───────────────────────────────────────────────────── */
  
