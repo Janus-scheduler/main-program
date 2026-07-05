@@ -63,6 +63,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** When true, dragging on empty row space creates a new event */
   readonly allowCreate = input<boolean>(false);
 
+  /** When true, resource conflicts/double-bookings are strictly blocked */
+  readonly preventConflicts = input<boolean>(false);
+
   /** Emitted when an event is clicked */
   readonly eventClick = output<TimelineEvent>();
 
@@ -260,11 +263,10 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private _applyAllowCreate(): void {
-    const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { allowCreate: boolean })
-      | undefined;
+    const el = this._elRef()?.nativeElement as any;
     if (el) {
       el.allowCreate = this.allowCreate();
+      el.preventConflicts = this.preventConflicts();
     }
   }
 }

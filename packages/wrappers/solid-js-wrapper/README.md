@@ -38,6 +38,19 @@ export default function App() {
 - **Native Solid DX**: Fully strongly-typed props and inline callbacks.
 - **No Boilerplate**: Payload events are automatically unwrapped from native DOM CustomEvents.
 - **Timezone Aware**: Built-in support for IANA timezones and local browser time.
+- **Conflict Management & Prevention**: Control warning or strict blocking behaviors using `preventConflicts={true}`.
+
+## Conflict Prevention Config
+
+You can pass the prop directly to `<Timeline>` or `<Scheduler>` components:
+
+```tsx
+// Strict double-booking prevention mode
+<Timeline
+  preventConflicts={true}
+  onEventMove={...}
+/>
+```
 
 ## Documentation
 

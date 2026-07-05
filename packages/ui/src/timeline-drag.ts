@@ -82,6 +82,30 @@ export class TimelineDragController {
   // Bound handler for cleanup
   private _boundMove: (e: PointerEvent) => void;
 
+  get targetResourceId(): string {
+    return this._targetResourceId;
+  }
+
+  get originResourceId(): string {
+    return this._originResourceId;
+  }
+
+  get activeEvent(): TimelineEvent | null {
+    return this._event;
+  }
+
+  get originalStartMs(): number {
+    return this._originalStartMs;
+  }
+
+  get originalEndMs(): number {
+    return this._originalEndMs;
+  }
+
+  get snapMs(): number {
+    return this._getSnapMs();
+  }
+
   constructor(requestUpdate: () => void) {
     this._requestUpdate = requestUpdate;
     this._boundMove = this._onPointerMove.bind(this);

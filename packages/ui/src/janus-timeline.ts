@@ -40,6 +40,8 @@ import {
   timestampToPx,
   formatNavDate,
   getNavStepMs,
+  pxToTimestamp,
+  snapTimestamp,
 } from "./timeline-zoom";
 import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
@@ -50,9 +52,17 @@ export class JanusTimeline extends LitElement {
   @property({ type: Array }) resources: TimelineResource[] = [];
   /** When true, dragging on empty row space creates a new event. Default: false */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
+  @property({ type: Boolean, attribute: "prevent-conflicts" })
+  preventConflicts = true;
+
+  @state() private _showBlockedConflictDialog = false;
+  @state() private _blockedConflictMessage = "";
 
   @state() view: "Timeline" | "Month" = "Timeline";
   @state() private _dragVersion = 0; // bumped to trigger re-render during drag
+  @state() private _showConflictDetails = false;
+  @state() private _isConflictsBannerDismissed = false;
+  private _lastConflictIdsKey = "";
 
   /** Zoom: pixels per millisecond (the single universal scale) */
   @state() private _pxPerMs = DEFAULT_PX_PER_MS;
@@ -179,6 +189,18 @@ export class JanusTimeline extends LitElement {
 
     if (newResources.length > 0) {
       this.resources = newResources;
+    }
+  }
+
+  willUpdate(changedProperties: Map<string, unknown>) {
+    super.willUpdate(changedProperties);
+    const conflicts = this._timelineConflicts;
+    const currentIdsKey = Array.from(conflicts.conflictingEventIds)
+      .sort()
+      .join(",");
+    if (currentIdsKey !== this._lastConflictIdsKey) {
+      this._isConflictsBannerDismissed = false;
+      this._lastConflictIdsKey = currentIdsKey;
     }
   }
 
@@ -409,6 +431,55 @@ export class JanusTimeline extends LitElement {
       const result = this._drag.completeAndGetResult();
       if (result) {
         this._wasDragging = true;
+
+        if (this.preventConflicts) {
+          let hasConflict = false;
+          let targetResId = "";
+          let actionVerb = "";
+
+          if (result.type === "event-move") {
+            const { event, newResourceId, newStartTime, newEndTime } =
+              result.detail;
+            targetResId = newResourceId;
+            actionVerb = "move";
+            const startMs = new Date(newStartTime).getTime();
+            const endMs = new Date(newEndTime).getTime();
+            hasConflict = this._checkConflict(
+              newResourceId,
+              startMs,
+              endMs,
+              event.id,
+            );
+          } else if (result.type === "event-resize") {
+            const { event, resourceId, newStartTime, newEndTime } =
+              result.detail;
+            targetResId = resourceId;
+            actionVerb = "resize";
+            const startMs = new Date(newStartTime).getTime();
+            const endMs = new Date(newEndTime).getTime();
+            hasConflict = this._checkConflict(
+              resourceId,
+              startMs,
+              endMs,
+              event.id,
+            );
+          } else if (result.type === "event-create") {
+            const { resourceId, startTime, endTime } = result.detail;
+            targetResId = resourceId;
+            actionVerb = "create";
+            const startMs = new Date(startTime).getTime();
+            const endMs = new Date(endTime).getTime();
+            hasConflict = this._checkConflict(resourceId, startMs, endMs);
+          }
+
+          if (hasConflict) {
+            const resourceName = this._resolveResourceName(targetResId);
+            this._blockedConflictMessage = `Cannot ${actionVerb} event. ${resourceName} is already scheduled during this time. Double-booking is disabled.`;
+            this._showBlockedConflictDialog = true;
+            return;
+          }
+        }
+
         this.dispatchEvent(
           new CustomEvent(result.type, {
             detail: result.detail,
@@ -419,6 +490,103 @@ export class JanusTimeline extends LitElement {
       }
     };
     document.addEventListener("pointerup", handler);
+  }
+
+  private _resolveResourceName(id: string): string {
+    const res = this.resources.find((r) => r.id === id);
+    return res ? res.name : id;
+  }
+
+  private _closeBlockedConflictDialog() {
+    this._showBlockedConflictDialog = false;
+    this._blockedConflictMessage = "";
+  }
+
+  private _checkConflict(
+    resourceId: string,
+    startMs: number,
+    endMs: number,
+    ignoreEventId?: string,
+  ): boolean {
+    const resource = this.resources.find((r) => r.id === resourceId);
+    if (!resource) return false;
+
+    for (const ev of resource.events) {
+      if (ignoreEventId && ev.id === ignoreEventId) continue;
+      if (startMs < ev.endMs && endMs > ev.startMs) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private get _timelineConflicts(): {
+    hasConflict: boolean;
+    messages: string[];
+    conflictingEventIds: Set<string>;
+  } {
+    const conflictingEventIds = new Set<string>();
+    const messages: string[] = [];
+    const tz = schedulerStore.getState().timezone;
+
+    for (const r of this.resources) {
+      const events = r.events;
+      for (let i = 0; i < events.length; i++) {
+        const evA = events[i];
+        for (let j = i + 1; j < events.length; j++) {
+          const evB = events[j];
+          if (evA.startMs < evB.endMs && evA.endMs > evB.startMs) {
+            conflictingEventIds.add(evA.id);
+            conflictingEventIds.add(evB.id);
+
+            const overlapStartMs = Math.max(evA.startMs, evB.startMs);
+            const overlapEndMs = Math.min(evA.endMs, evB.endMs);
+            const overlapStartIso = new Date(overlapStartMs).toISOString();
+            const overlapEndIso = new Date(overlapEndMs).toISOString();
+            const { date: zonedDate, time: zonedStartTime } = isoToZonedDisplay(
+              overlapStartIso,
+              tz,
+            );
+            const { time: zonedEndTime } = isoToZonedDisplay(overlapEndIso, tz);
+
+            const [, monthStr, dayStr] = zonedDate.split("-");
+            const monthNames = [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec",
+            ];
+            const monthIdx = parseInt(monthStr, 10) - 1;
+            const dateLabel =
+              monthIdx >= 0 && monthIdx < 12
+                ? `${monthNames[monthIdx]} ${parseInt(dayStr, 10)}`
+                : zonedDate;
+
+            const startTimeLabel = fmt12(zonedStartTime);
+            const endTimeLabel = fmt12(zonedEndTime);
+
+            const msg = `Conflict: ${r.name} has overlapping events "${evA.title}" and "${evB.title}" on ${dateLabel} between ${startTimeLabel} and ${endTimeLabel}.`;
+            if (!messages.includes(msg)) {
+              messages.push(msg);
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      hasConflict: conflictingEventIds.size > 0,
+      messages,
+      conflictingEventIds,
+    };
   }
 
   // ── Resource layout computation ───────────────────────────────────
@@ -461,12 +629,60 @@ export class JanusTimeline extends LitElement {
     if (!this._drag.active) return nothing;
     void this._dragVersion;
     const g = this._drag.ghost;
+
+    const targetResourceId =
+      this._drag.targetResourceId || this._drag.originResourceId;
+    let ghostStartMs = 0;
+    let ghostEndMs = 0;
+    const eventId = this._drag.activeEvent?.id;
+    const snapMs = this._drag.snapMs;
+
+    if (this._drag.mode === "moving") {
+      const durationMs = this._drag.originalEndMs - this._drag.originalStartMs;
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+      ghostEndMs = ghostStartMs + durationMs;
+    } else if (this._drag.mode === "resize-start") {
+      ghostEndMs = this._drag.originalEndMs;
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+    } else if (this._drag.mode === "resize-end") {
+      ghostStartMs = this._drag.originalStartMs;
+      const rawEnd = pxToTimestamp(
+        g.left + g.width,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
+      ghostEndMs = snapTimestamp(rawEnd, snapMs);
+    } else if (this._drag.mode === "creating") {
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      const rawEnd = pxToTimestamp(
+        g.left + g.width,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+      ghostEndMs = snapTimestamp(rawEnd, snapMs);
+      if (ghostEndMs <= ghostStartMs) ghostEndMs = ghostStartMs + snapMs;
+    }
+
+    const hasDragConflict = targetResourceId
+      ? this._checkConflict(targetResourceId, ghostStartMs, ghostEndMs, eventId)
+      : false;
+
     return html`
       <div
-        class="tl-drag-ghost tl-drag-ghost--${g.color}"
+        class="tl-drag-ghost tl-drag-ghost--${g.color} ${hasDragConflict
+          ? "tl-drag-ghost--conflict"
+          : ""}"
         style="left: ${g.left}px; top: ${g.top}px; width: ${g.width}px;"
       >
-        <span class="tl-drag-ghost__title">${g.title}</span>
+        <span class="tl-drag-ghost__title">
+          ${hasDragConflict
+            ? html`<span class="tl-drag-ghost__conflict-icon">⚠</span> `
+            : nothing}
+          ${g.title}
+        </span>
         <span class="tl-drag-ghost__time">${g.timeLabel}</span>
       </div>
     `;
@@ -478,6 +694,7 @@ export class JanusTimeline extends LitElement {
   }
 
   render() {
+    const conflicts = this._timelineConflicts;
     const pxPerMs = this._pxPerMs;
     const viewStartMs = this._viewStartMs;
     const viewEndMs = this._getViewEndMs();
@@ -587,6 +804,18 @@ export class JanusTimeline extends LitElement {
                   >${this._zoomPercent()}% · ${level.unit}</span
                 >`
               : nothing}
+            ${conflicts.hasConflict && this._isConflictsBannerDismissed
+              ? html`
+                  <button
+                    class="tl-warning-badge"
+                    @click=${() => (this._isConflictsBannerDismissed = false)}
+                    title="Restore conflict warning banner"
+                  >
+                    <span>⚠</span>
+                    <span>${conflicts.messages.length}</span>
+                  </button>
+                `
+              : nothing}
             <div class="tl-view-toggle">
               ${(["Timeline", "Month"] as const).map(
                 (v) => html`
@@ -625,6 +854,55 @@ export class JanusTimeline extends LitElement {
             </button>
           </div>
         </header>
+
+        <!-- Conflict warning banner -->
+        ${conflicts.hasConflict && !this._isConflictsBannerDismissed
+          ? html`
+              <div class="tl-conflict-banner">
+                <span class="tl-conflict-banner__icon">⚠</span>
+                <div class="tl-conflict-banner__content">
+                  ${conflicts.messages.length === 1
+                    ? html`<span class="tl-conflict-banner__message"
+                        >${conflicts.messages[0]}</span
+                      >`
+                    : html`
+                        <div class="tl-conflict-banner__summary">
+                          <span
+                            >Multiple scheduling conflicts detected
+                            (${conflicts.messages.length} conflicts).</span
+                          >
+                          <button
+                            class="tl-conflict-details-toggle"
+                            @click=${() =>
+                              (this._showConflictDetails =
+                                !this._showConflictDetails)}
+                          >
+                            ${this._showConflictDetails
+                              ? "Hide Details"
+                              : "Show Details"}
+                          </button>
+                        </div>
+                        ${this._showConflictDetails
+                          ? html`
+                              <ul class="tl-conflict-details-list">
+                                ${conflicts.messages.map(
+                                  (msg) => html`<li>${msg}</li>`,
+                                )}
+                              </ul>
+                            `
+                          : nothing}
+                      `}
+                </div>
+                <button
+                  class="tl-conflict-banner__close"
+                  @click=${() => (this._isConflictsBannerDismissed = true)}
+                  aria-label="Dismiss warning"
+                >
+                  ×
+                </button>
+              </div>
+            `
+          : nothing}
 
         <div class="tl-panel">
           <div class="tl-grid-wrap">
@@ -745,6 +1023,10 @@ export class JanusTimeline extends LitElement {
                                     ev,
                                   )
                                     ? "tl-event--dragging"
+                                    : ""} ${conflicts.conflictingEventIds.has(
+                                    ev.id,
+                                  )
+                                    ? "tl-event--conflict"
                                     : ""}"
                                   style="left: ${evLeft +
                                   2}px; width: ${Math.max(evWidth - 6, 4)}px;"
@@ -764,7 +1046,12 @@ export class JanusTimeline extends LitElement {
                                       )}
                                   ></div>
                                   <span class="tl-event__title"
-                                    >${ev.title}</span
+                                    >${conflicts.conflictingEventIds.has(ev.id)
+                                      ? html`<span
+                                          class="tl-event__conflict-icon"
+                                          >⚠</span
+                                        > `
+                                      : nothing}${ev.title}</span
                                   >
                                   ${evWidth > 80
                                     ? html`<span class="tl-event__time"
@@ -804,6 +1091,36 @@ export class JanusTimeline extends LitElement {
         >
           ${PlusIcon()}
         </button>
+
+        <!-- Blocked Conflict Alert Dialog -->
+        ${this._showBlockedConflictDialog
+          ? html`
+              <div class="tl-alert-dialog-backdrop">
+                <div
+                  class="tl-alert-dialog"
+                  role="alertdialog"
+                  aria-modal="true"
+                >
+                  <div class="tl-alert-dialog__header">
+                    <span class="tl-alert-dialog__title"
+                      >Schedule Conflict Blocked</span
+                    >
+                  </div>
+                  <div class="tl-alert-dialog__body">
+                    <p>${this._blockedConflictMessage}</p>
+                  </div>
+                  <div class="tl-alert-dialog__footer">
+                    <button
+                      class="tl-alert-dialog__btn"
+                      @click=${this._closeBlockedConflictDialog}
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `
+          : nothing}
       </div>
     `;
   }

@@ -78,6 +78,22 @@ Features:
 - Shadow DOM encapsulation prevents CSS bleeding.
 - Responsive layouts and modern UI aesthetics.
 
+### Conflict Management & Prevention
+
+Janus Scheduler includes a built-in timezone-aware scheduling conflict checker to manage double-bookings of resources (people, rooms, equipment, etc.). Developers can configure how conflicts are handled using the `prevent-conflicts` (or React `preventConflicts`) option:
+
+1. **Visual Conflicts Warning (Default: `preventConflicts = false`)**:
+   - Double-bookings are allowed to be scheduled.
+   - Any resource conflicts trigger a slide-down warning banner displaying timezone-aware overlap details. If multiple overlaps occur, the banner displays a summary alongside a clickable **"Show Details"** bulleted list of all overlaps.
+   - The warning banner can be dismissed, minimizing into a subtle warning count badge in the header. Clicking this badge restores the banner.
+   - If a new conflict is created, the banner automatically slides back open.
+   - Overlapping events on the grid are highlighted with a dashed red outline and pre-pended warning icons.
+
+2. **Hard Blocking Conflicts (Active: `preventConflicts = true`)**:
+   - Double-bookings are completely prevented.
+   - In the **Editor Modal**, saving is disabled when a conflict exists, and the warning banner is colored red stating: `(Saving disabled due to schedule conflict)`.
+   - On the **Timeline Grid**, dragging, resizing, or drawing an event over an occupied slot is intercepted. The custom save/update event is blocked (cancelling the action naturally), and a styled backdrop-blurred modal dialog scales in alerting: _“Cannot move event. [Resource Name] is already scheduled during this time. Double-booking is disabled.”_
+
 ### `@janus-scheduler/react` — React Wrapper
 
 Wraps the Lit Web Component into a native React component using `@lit/react`:

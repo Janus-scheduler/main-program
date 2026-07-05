@@ -398,6 +398,8 @@ export class JanusScheduler extends LitElement {
    * - a string         → edit mode     (onSave should call updateEvent, onDelete should call deleteEvent)
    */
   @property({ type: String }) eventId: string | null = null;
+  @property({ type: Boolean, attribute: "prevent-conflicts" })
+  preventConflicts = false;
 
   // Safe accessor — guards against React passing undefined for array props
   private get _participants(): string[] {
@@ -467,7 +469,11 @@ export class JanusScheduler extends LitElement {
     const titleInvalid = !draft.title || !draft.title.trim();
     const participantsInvalid =
       !draft.participants || draft.participants.length === 0;
-    return timeInvalid || titleInvalid || participantsInvalid;
+    const conflictInvalid =
+      this.preventConflicts && this._resourceConflict.hasConflict;
+    return (
+      timeInvalid || titleInvalid || participantsInvalid || conflictInvalid
+    );
   }
 
   private get _timeInvalid() {
@@ -1865,9 +1871,18 @@ export class JanusScheduler extends LitElement {
 
                       <!-- Conflict warning -->
                       ${this._resourceConflict.hasConflict
-                        ? html`<div class="dt-conflict-warning">
+                        ? html`<div
+                            class="dt-conflict-warning ${this.preventConflicts
+                              ? "dt-conflict-warning--blocking"
+                              : ""}"
+                          >
                             <span>⚠</span>
-                            <span>${this._resourceConflict.message}</span>
+                            <span
+                              >${this._resourceConflict.message}${this
+                                .preventConflicts
+                                ? " (Saving disabled due to schedule conflict)"
+                                : ""}</span
+                            >
                           </div>`
                         : nothing}
 

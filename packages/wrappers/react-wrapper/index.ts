@@ -94,6 +94,7 @@ export interface SchedulerProps extends React.HTMLAttributes<HTMLElement> {
   error?: string | null;
   allDay?: boolean;
   recurrenceRule?: string;
+  preventConflicts?: boolean;
   onClose?: () => void;
   onSave?: (detail: SchedulerSaveData) => void;
   onDelete?: (detail: { id: string | null; title: string }) => void;
@@ -135,6 +136,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   view?: "Timeline" | "Month";
   currentDate?: Date;
   aiPrompt?: string;
+  preventConflicts?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onEventMove?: (detail: EventMoveDetail) => void;
   onEventResize?: (detail: EventResizeDetail) => void;

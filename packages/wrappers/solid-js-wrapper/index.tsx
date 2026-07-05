@@ -92,6 +92,7 @@ export interface SchedulerProps {
   error?: string | null;
   allDay?: boolean;
   recurrenceRule?: string;
+  preventConflicts?: boolean;
   onClose?: () => void;
   onSave?: (detail: SchedulerSaveData) => void;
   onDelete?: (detail: SchedulerDeleteData) => void;
@@ -117,6 +118,8 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
       if (props.allDay !== undefined) el.allDay = props.allDay;
       if (props.recurrenceRule !== undefined)
         el.recurrenceRule = props.recurrenceRule;
+      if (props.preventConflicts !== undefined)
+        el.preventConflicts = props.preventConflicts;
     }
   });
 
@@ -160,6 +163,7 @@ export interface TimelineProps {
   view?: "Timeline" | "Month";
   currentDate?: Date;
   aiPrompt?: string;
+  preventConflicts?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onAddEvent?: () => void;
   onEventMove?: (detail: EventMoveDetail) => void;
@@ -178,6 +182,8 @@ export const Timeline: Component<TimelineProps> = (props) => {
       if (props.view !== undefined) el.view = props.view;
       if (props.currentDate !== undefined) el.currentDate = props.currentDate;
       if (props.aiPrompt !== undefined) el.aiPrompt = props.aiPrompt;
+      if (props.preventConflicts !== undefined)
+        el.preventConflicts = props.preventConflicts;
     }
   });
 
