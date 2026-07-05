@@ -86,6 +86,12 @@ export const timelineStyles = css`
     flex: 1;
   }
 
+  .tl-nav__center {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .tl-nav__arrow {
     width: 30px;
     height: 30px;
@@ -935,12 +941,6 @@ export const timelineStyles = css`
       justify-content: space-between;
       align-items: center;
     }
-    .tl-nav__arrow:first-child {
-      order: 1;
-    }
-    .tl-nav__arrow:nth-of-type(3) {
-      order: 3;
-    }
     .tl-nav__today {
       display: none;
     }
@@ -953,7 +953,6 @@ export const timelineStyles = css`
       display: none;
     }
     .tl-nav__date--short {
-      order: 2;
       display: flex;
       flex-direction: column;
       align-items: center; /* Center-align text */

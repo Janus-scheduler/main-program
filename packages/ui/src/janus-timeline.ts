@@ -600,9 +600,16 @@ export class JanusTimeline extends LitElement {
             >
               ${ChevronLeft()}
             </button>
-            <button class="tl-nav__today" @click=${this._goToToday}>
-              Today
-            </button>
+            <div class="tl-nav__center">
+              <button class="tl-nav__today" @click=${this._goToToday}>
+                Today
+              </button>
+              <span class="tl-nav__date">${navLabel}</span>
+              <div class="tl-nav__date--short">
+                <span class="tl-nav-day-name">${dayName}</span>
+                <span class="tl-nav-date-text">${shortDate}</span>
+              </div>
+            </div>
             <button
               class="tl-nav__arrow"
               aria-label="Next"
@@ -610,11 +617,6 @@ export class JanusTimeline extends LitElement {
             >
               ${ChevronRight()}
             </button>
-            <span class="tl-nav__date">${navLabel}</span>
-            <div class="tl-nav__date--short">
-              <span class="tl-nav-day-name">${dayName}</span>
-              <span class="tl-nav-date-text">${shortDate}</span>
-            </div>
           </nav>
           <div class="tl-topbar__right">
             ${this._zoomPercent() !== 100
