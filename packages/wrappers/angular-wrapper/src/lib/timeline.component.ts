@@ -81,6 +81,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Emitted when the user toggles the view */
   readonly viewChange = output<{ view: "Timeline" | "Month" }>();
 
+  /** Emitted when the date/zoom nav state changes */
+  readonly navChange = output<Record<string, unknown>>();
+
   private _unsubStore?: () => void;
 
   private _eventClickHandler = (e: Event) => {
@@ -107,6 +110,42 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.viewChange.emit((e as CustomEvent).detail);
   };
+  private _navChangeHandler = (e: Event) => {
+    e.stopPropagation();
+    this.navChange.emit((e as CustomEvent).detail);
+  };
+
+  public goToPrev(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToPrev: () => void }
+    ).goToPrev();
+  }
+
+  public goToNext(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToNext: () => void }
+    ).goToNext();
+  }
+
+  public goToToday(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToToday: () => void }
+    ).goToToday();
+  }
+
+  public setView(view: "Timeline" | "Month"): void {
+    (
+      this._elRef().nativeElement as HTMLElement & {
+        setView: (v: string) => void;
+      }
+    ).setView(view);
+  }
+
+  public toggleCreate(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { toggleCreate: () => void }
+    ).toggleCreate();
+  }
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
@@ -116,6 +155,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("event-resize", this._eventResizeHandler);
     el.addEventListener("event-create", this._eventCreateHandler);
     el.addEventListener("view-change", this._viewChangeHandler);
+    el.addEventListener("nav-change", this._navChangeHandler);
 
     this._applyAllowCreate();
 
@@ -142,6 +182,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("event-resize", this._eventResizeHandler);
     el?.removeEventListener("event-create", this._eventCreateHandler);
     el?.removeEventListener("view-change", this._viewChangeHandler);
+    el?.removeEventListener("nav-change", this._navChangeHandler);
     this._unsubStore?.();
   }
 

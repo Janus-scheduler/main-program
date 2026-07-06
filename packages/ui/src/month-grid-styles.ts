@@ -32,8 +32,8 @@ export const monthGridStyles = css`
     /* Layout */
     --topbar-h: 56px;
     --aicard-area-h: 60px;
-    --day-hdr-h: 40px;       /* weekday label row height */
-    --today-bg: #fff7ed;     /* highlight for today's cell */
+    --day-hdr-h: 40px; /* weekday label row height */
+    --today-bg: #fff7ed; /* highlight for today's cell */
 
     display: flex;
     flex-direction: column;
@@ -58,155 +58,6 @@ export const monthGridStyles = css`
     height: 100%;
     overflow: hidden;
     position: relative;
-  }
-
-  /* ── Top Bar ──────────────────────────────────────────────────────────────── */
-  
-  .mg-topbar {
-    height: var(--topbar-h);
-    min-height: var(--topbar-h);
-    flex-shrink: 0;
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 20px;
-    z-index: 50;
-  }
-
-  .mg-nav {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex: 1;
-  }
-
-  .mg-nav__arrow {
-    width: 30px;
-    height: 30px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-2);
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .mg-nav__arrow svg {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    stroke: currentColor;
-  }
-
-  .mg-nav__arrow:hover {
-    background: var(--bg);
-    color: var(--text-1);
-  }
-
-  .mg-nav__today {
-    padding: 5px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: 7px;
-    background: var(--white);
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-1);
-    cursor: pointer;
-    transition: border-color 0.15s;
-  }
-
-  .mg-nav__today:hover {
-    border-color: var(--orange);
-  }
-
-  .mg-nav__month {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-1);
-    margin-left: 8px;
-    letter-spacing: -0.3px;
-  }
-
-  /* Right side — view toggle + icons */
-  .mg-topbar__right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-  }
-
-  .mg-view-toggle {
-    display: flex;
-    background: var(--bg);
-    border-radius: 8px;
-    padding: 3px;
-    gap: 2px;
-  }
-
-  .mg-view-toggle__btn {
-    padding: 5px 14px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-2);
-    cursor: pointer;
-    transition: background 0.15s,
-    color: 0.15s;
-  }
-
-  .mg-view-toggle__btn.active {
-    background: var(--white);
-    color: var(--text-1);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  }
-
-  .mg-icon-btn {
-    width: 34px;
-    height: 34px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-2);
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .mg-icon-btn svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-  }
-
-  .mg-icon-btn:hover {
-    background: var(--bg);
-    color: var(--text-1);
-  }
-
-  .mg-icon-btn--bell {
-    position: relative;
-  }
-
-  .mg-bell-dot {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 7px;
-    height: 7px;
-    background: var(--orange);
-    border-radius: 50%;
-    border: 1.5px solid var(--white);
   }
 
   /* ── Main Panel ──────────────────────────────────────────────────────────────── */
@@ -375,7 +226,9 @@ export const monthGridStyles = css`
     text-overflow: ellipsis;
     width: 100%;
     flex-shrink: 0;
-    transition: filter 0.12s, transform 0.1s;
+    transition:
+      filter 0.12s,
+      transform 0.1s;
   }
 
   .mg-event:hover {
@@ -453,7 +306,10 @@ export const monthGridStyles = css`
     align-items: center;
     justify-content: center;
     box-shadow: 0 4px 18px rgba(249, 115, 22, 0.45);
-    transition: background 0.18s, transform 0.14s, box-shadow 0.18s;
+    transition:
+      background 0.18s,
+      transform 0.14s,
+      box-shadow 0.18s;
     z-index: 200;
   }
 
@@ -484,7 +340,7 @@ export const monthGridStyles = css`
     background: #a1a1aa;
   }
 
-    /* ══════════════════════════════════════════════════════════════════════════
+  /* ══════════════════════════════════════════════════════════════════════════
    SELECTED DAY PANEL (mobile only)
   ══════════════════════════════════════════════════════════════════════════ */
   .mg-day-panel {
@@ -553,11 +409,21 @@ export const monthGridStyles = css`
     align-self: center;
   }
 
-  .mg-day-panel__color-bar--orange { background: var(--c-orange-bd); }
-  .mg-day-panel__color-bar--blue   { background: var(--c-blue-bd); }
-  .mg-day-panel__color-bar--yellow { background: var(--c-yellow-bd); }
-  .mg-day-panel__color-bar--purple { background: var(--c-purple-bd); }
-  .mg-day-panel__color-bar--green  { background: var(--c-green-bd); }
+  .mg-day-panel__color-bar--orange {
+    background: var(--c-orange-bd);
+  }
+  .mg-day-panel__color-bar--blue {
+    background: var(--c-blue-bd);
+  }
+  .mg-day-panel__color-bar--yellow {
+    background: var(--c-yellow-bd);
+  }
+  .mg-day-panel__color-bar--purple {
+    background: var(--c-purple-bd);
+  }
+  .mg-day-panel__color-bar--green {
+    background: var(--c-green-bd);
+  }
 
   .mg-day-panel__event-info {
     display: flex;
@@ -589,39 +455,14 @@ export const monthGridStyles = css`
     RESPONSIVE
   ══════════════════════════════════════════════════════════════════════════ */
   @media (max-width: 900px) {
-    .mg-nav__month {
-      font-size: 14px;
-    }
   }
 
   @media (max-width: 768px) {
-    .mg-topbar {
-      padding: 0 12px;
-      gap: 8px;
-    }
-    .mg-nav__today {
-      padding: 4px 8px;
-      font-size: 12px;
-    }
   }
 
   @media (max-width: 640px) {
     :host {
       --aicard-area-h: 48px;
-    }
-
-    .mg-topbar {
-      padding: 0 10px;
-      gap: 6px;
-    }
-
-    .mg-icon-btn--bell {
-      display: none;
-    }
-
-    .mg-view-toggle__btn {
-      padding: 4px 10px;
-      font-size: 12px;
     }
 
     /* Shell becomes scrollable column on mobile */
@@ -712,11 +553,26 @@ export const monthGridStyles = css`
     }
 
     /* Override the border-left from colour variants */
-    .mg-event--orange { border-left: none; background: var(--c-orange-bd); }
-    .mg-event--blue   { border-left: none; background: var(--c-blue-bd); }
-    .mg-event--yellow { border-left: none; background: var(--c-yellow-bd); }
-    .mg-event--purple { border-left: none; background: var(--c-purple-bd); }
-    .mg-event--green  { border-left: none; background: var(--c-green-bd); }
+    .mg-event--orange {
+      border-left: none;
+      background: var(--c-orange-bd);
+    }
+    .mg-event--blue {
+      border-left: none;
+      background: var(--c-blue-bd);
+    }
+    .mg-event--yellow {
+      border-left: none;
+      background: var(--c-yellow-bd);
+    }
+    .mg-event--purple {
+      border-left: none;
+      background: var(--c-purple-bd);
+    }
+    .mg-event--green {
+      border-left: none;
+      background: var(--c-green-bd);
+    }
 
     .mg-fab {
       width: 42px;

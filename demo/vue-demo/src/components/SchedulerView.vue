@@ -5,23 +5,43 @@
     Functionally identical to React's SchedulerView.tsx and Angular's app.html.
   -->
 
+  <janus-topbar
+    .navLabel="navData.navLabel"
+    .dayName="navData.dayName"
+    .shortDate="navData.shortDate"
+    .view="currentView"
+    .allowCreate="allowCreate"
+    .zoomPercent="navData.zoomPercent"
+    .zoomUnit="navData.zoomUnit"
+    @prev-click="handlePrevClick"
+    @next-click="handleNextClick"
+    @today-click="handleTodayClick"
+    @view-switch="handleViewChange"
+    @toggle-create="handleToggleCreate"
+  />
+
   <!-- Timeline view -->
   <janus-timeline
     v-if="currentView === 'Timeline'"
+    ref="timelineEl"
+    .allowCreate="allowCreate"
     @event-click="handleEventClick"
     @add-event="handleAddEvent"
     @event-move="handleEventMove"
     @event-resize="handleEventResize"
     @event-create="handleEventCreate"
     @view-change="handleViewChange"
+    @nav-change="handleNavChange"
   />
 
   <!-- Month view -->
   <janus-month-grid
     v-if="currentView === 'Month'"
+    ref="monthGridEl"
     @add-event="handleAddEvent"
     @event-click="handleEventClick"
     @view-change="handleViewChange"
+    @nav-change="handleNavChange"
   />
 
   <!-- Scheduler modal -->
@@ -47,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, reactive } from "vue";
 import { SchedulerManager } from "@janus-scheduler/core";
 import type {
   EventMoveDetail,
@@ -84,6 +104,58 @@ const emit = defineEmits<{
 const storeEvent = computed(() =>
   props.selectedEventId ? props.manager.getEvent(props.selectedEventId) : null
 );
+
+const timelineEl = ref<any>(null);
+const monthGridEl = ref<any>(null);
+
+const allowCreate = ref(false);
+const navData = reactive({
+  navLabel: "",
+  dayName: "",
+  shortDate: "",
+  zoomPercent: 100,
+  zoomUnit: "",
+});
+
+function handleNavChange(e: Event) {
+  const detail = (e as CustomEvent<any>).detail;
+  navData.navLabel = detail.navLabel || "";
+  navData.dayName = detail.dayName || "";
+  navData.shortDate = detail.shortDate || "";
+  navData.zoomPercent = detail.zoomPercent || 100;
+  navData.zoomUnit = detail.zoomUnit || "";
+}
+
+function handlePrevClick() {
+  if (props.currentView === "Timeline") {
+    timelineEl.value?.goToPrev();
+  } else {
+    monthGridEl.value?.goToPrev();
+  }
+}
+
+function handleNextClick() {
+  if (props.currentView === "Timeline") {
+    timelineEl.value?.goToNext();
+  } else {
+    monthGridEl.value?.goToNext();
+  }
+}
+
+function handleTodayClick() {
+  if (props.currentView === "Timeline") {
+    timelineEl.value?.goToToday();
+  } else {
+    monthGridEl.value?.goToToday();
+  }
+}
+
+function handleToggleCreate() {
+  if (props.currentView === "Timeline") {
+    timelineEl.value?.toggleCreate();
+  }
+  allowCreate.value = !allowCreate.value;
+}
 
 // Convert a UTC ISO string → local { date, time } using the store's selected timezone.
 const splitISO = (iso: string | undefined) => {

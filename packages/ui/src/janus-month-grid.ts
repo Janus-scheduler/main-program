@@ -11,13 +11,7 @@ import {
   formatMonthYear,
   fmt12,
 } from "./month-grid-utils";
-import {
-  ChevronLeft,
-  ChevronRight,
-  SearchIcon,
-  BellIcon,
-  PlusIcon,
-} from "./timeline-icons"; // reuse existing icons
+import { PlusIcon } from "./timeline-icons"; // reuse existing icons
 
 import { schedulerStore } from "@janus-scheduler/core";
 
@@ -147,7 +141,7 @@ export class JanusMonthGrid extends LitElement {
   @state() private _selectedDateStr: string | null = null;
 
   // ── Navigation ────────────────────────────────────────────────────────
-  private _prevMonth() {
+  public goToPrev() {
     if (this._month === 0) {
       this._month = 11;
       this._year -= 1;
@@ -159,9 +153,10 @@ export class JanusMonthGrid extends LitElement {
     this._selectedDateStr = new Date(this._year, this._month, 1)
       .toISOString()
       .split("T")[0];
+    this._emitNavChange();
   }
 
-  private _nextMonth() {
+  public goToNext() {
     if (this._month === 11) {
       this._month = 0;
       this._year += 1;
@@ -173,12 +168,14 @@ export class JanusMonthGrid extends LitElement {
     this._selectedDateStr = new Date(this._year, this._month, 1)
       .toISOString()
       .split("T")[0];
+    this._emitNavChange();
   }
 
-  private _goToToday() {
+  public goToToday() {
     const now = new Date();
     this._year = now.getFullYear();
     this._month = now.getMonth();
+    this._emitNavChange();
   }
 
   override firstUpdated() {
@@ -189,6 +186,24 @@ export class JanusMonthGrid extends LitElement {
     requestAnimationFrame(() => {
       this.requestUpdate();
     });
+    this._emitNavChange();
+  }
+
+  private _emitNavChange() {
+    const navLabel = formatMonthYear(this._year, this._month);
+    this.dispatchEvent(
+      new CustomEvent("nav-change", {
+        detail: {
+          navLabel,
+          dayName: "",
+          shortDate: "",
+          zoomPercent: 100,
+          zoomUnit: "",
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   // ── Event dispatchers ─────────────────────────────────────────────────
@@ -219,7 +234,7 @@ export class JanusMonthGrid extends LitElement {
     );
   }
 
-  private _handleViewSwitch(v: "Timeline" | "Month") {
+  public setView(v: "Timeline" | "Month") {
     this._view = v;
     // Let the parent app know so it can swap components if needed
     this.dispatchEvent(
@@ -327,61 +342,12 @@ export class JanusMonthGrid extends LitElement {
   // ── Main render ───────────────────────────────────────────────────────
   render() {
     const grid = buildCalendarGrid(this._year, this._month, this.events);
-    const monthLabel = formatMonthYear(this._year, this._month);
     const rowCount = grid.length;
     const selectedDay =
       grid.flat().find((d) => d.dateStr === this._selectedDateStr) ?? null;
 
     return html`
       <div class="mg-shell">
-        <!-- ── Top bar ── -->
-        <header class="mg-topbar">
-          <nav class="mg-nav">
-            <button
-              class="mg-nav__arrow"
-              aria-label="Previous month"
-              @click=${this._prevMonth}
-            >
-              ${ChevronLeft()}
-            </button>
-            <span class="mg-nav__month">${monthLabel}</span>
-            <button
-              class="mg-nav__arrow"
-              aria-label="Next month"
-              @click=${this._nextMonth}
-            >
-              ${ChevronRight()}
-            </button>
-          </nav>
-
-          <div class="mg-topbar__right">
-            <div class="mg-view-toggle">
-              ${(["Timeline", "Month"] as const).map(
-                (v) => html`
-                  <button
-                    class="mg-view-toggle__btn ${this._view === v
-                      ? "active"
-                      : ""}"
-                    @click=${() => this._handleViewSwitch(v)}
-                  >
-                    ${v}
-                  </button>
-                `,
-              )}
-            </div>
-            <button class="mg-icon-btn" aria-label="Search">
-              ${SearchIcon()}
-            </button>
-            <button
-              class="mg-icon-btn mg-icon-btn--bell"
-              aria-label="Notifications"
-            >
-              ${BellIcon()}
-              <span class="mg-bell-dot"></span>
-            </button>
-          </div>
-        </header>
-
         <!-- ── Calendar panel ── -->
         <div class="mg-panel">
           <!-- Weekday labels row -->
