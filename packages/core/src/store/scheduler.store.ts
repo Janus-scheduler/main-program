@@ -105,25 +105,47 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     const event = state.events[id];
     if (!event) throw new Error(`Event ${id} not found`);
 
-    if (updates.title) event.title = updates.title;
-    if (updates.startTime) event.startTime = updates.startTime;
-    if (updates.endTime) event.endTime = updates.endTime;
-    if (updates.resourceIds) {
-      event.resourceIds = updates.resourceIds;
-      event.resourceId = updates.resourceIds[0] || "";
-    } else if (updates.resourceId) {
-      event.resourceId = updates.resourceId;
-      event.resourceIds = [updates.resourceId];
-    }
-    if (updates.status) event.status = updates.status;
-    if (updates.description !== undefined)
-      event.description = updates.description;
+    let resourceIds = event.resourceIds;
+    let resourceId = event.resourceId;
 
-    // To ensure reactivity in zustand, we create a new object reference for the events record.
+    if (updates.resourceIds) {
+      resourceIds = updates.resourceIds;
+      resourceId = updates.resourceIds[0] || "";
+    } else if (
+      updates.resourceId !== undefined &&
+      updates.resourceId !== null
+    ) {
+      resourceId = updates.resourceId;
+      resourceIds = updates.resourceId ? [updates.resourceId] : [];
+    }
+
+    const updatedEvent = new Event({
+      id: event.id,
+      title:
+        updates.title !== undefined && updates.title.trim() !== ""
+          ? updates.title
+          : event.title,
+      startTime:
+        updates.startTime !== undefined && updates.startTime.trim() !== ""
+          ? updates.startTime
+          : event.startTime,
+      endTime:
+        updates.endTime !== undefined && updates.endTime.trim() !== ""
+          ? updates.endTime
+          : event.endTime,
+      resourceIds,
+      resourceId,
+      status: updates.status !== undefined ? updates.status : event.status,
+      description:
+        updates.description !== undefined
+          ? updates.description
+          : event.description,
+    });
+
     set((state) => ({
-      events: { ...state.events, [id]: event },
+      events: { ...state.events, [id]: updatedEvent },
     }));
-    return event;
+    return updatedEvent;
   },
 
   deleteEvent: (id) => {
@@ -155,14 +177,20 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     const resource = state.resources[id];
     if (!resource) throw new Error(`Resource ${id} not found`);
 
-    if (updates.name) resource.name = updates.name;
-    if (updates.type) resource.type = updates.type;
-    if (updates.email !== undefined) resource.email = updates.email;
+    const updatedResource = new Resource({
+      id: resource.id,
+      name:
+        updates.name !== undefined && updates.name.trim() !== ""
+          ? updates.name
+          : resource.name,
+      type: updates.type !== undefined ? updates.type : resource.type,
+      email: updates.email !== undefined ? updates.email : resource.email,
+    });
 
     set((state) => ({
-      resources: { ...state.resources, [id]: resource },
+      resources: { ...state.resources, [id]: updatedResource },
     }));
-    return resource;
+    return updatedResource;
   },
 
   deleteResource: (id) => {

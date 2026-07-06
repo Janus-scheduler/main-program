@@ -121,6 +121,36 @@ describe("Scheduler Store", () => {
       }).toThrow("Event non-existent not found");
     });
 
+    it("should maintain immutability and handle whitespace validation on update", () => {
+      const store = schedulerStore.getState();
+      const originalEvent = store.addEvent({
+        id: "evt-imm",
+        title: "Original Title",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+        description: "Original Description",
+      });
+
+      // 1. Check immutability: updateEvent should return a new reference, not mutate in-place
+      const updatedEvent = store.updateEvent("evt-imm", {
+        description: "Updated Description",
+      });
+      expect(updatedEvent).not.toBe(originalEvent); // Different reference
+      expect(originalEvent.description).toBe("Original Description"); // Original is untouched
+      expect(updatedEvent.description).toBe("Updated Description"); // New reference has update
+
+      // 2. Check whitespace vulnerability: updates with empty/whitespace titles must be ignored,
+      // but other updates in the same payload should still apply.
+      const mixedUpdate = store.updateEvent("evt-imm", {
+        title: "   ", // Whitespace title, should be ignored
+        description: "Mixed Description", // Should be applied
+      });
+
+      expect(mixedUpdate.title).toBe("Original Title"); // Unchanged
+      expect(mixedUpdate.description).toBe("Mixed Description"); // Updated
+    });
+
     it("should delete an event", () => {
       const store = schedulerStore.getState();
       store.addEvent({
