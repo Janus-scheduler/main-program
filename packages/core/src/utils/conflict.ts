@@ -53,46 +53,11 @@ export function computeTimelineConflicts(
 
         const overlapStartMs = Math.max(evA.startMs, evB.startMs);
         const overlapEndMs = Math.min(evA.endMs, evB.endMs);
-        const { date: zonedDate, time: zonedStartTime } = isoToZonedDisplay(
+        const { dateLabel, startTimeLabel, endTimeLabel } = formatZonedOverlap(
           new Date(overlapStartMs).toISOString(),
-          timezone,
-        );
-        const { time: zonedEndTime } = isoToZonedDisplay(
           new Date(overlapEndMs).toISOString(),
           timezone,
         );
-
-        // Format dates e.g. "Jun 21"
-        const [, monthStr, dayStr] = zonedDate.split("-");
-        const monthNames = [
-          "Jan",
-          "Feb",
-          "Mar",
-          "Apr",
-          "May",
-          "Jun",
-          "Jul",
-          "Aug",
-          "Sep",
-          "Oct",
-          "Nov",
-          "Dec",
-        ];
-        const monthIdx = parseInt(monthStr, 10) - 1;
-        const dateLabel =
-          monthIdx >= 0 && monthIdx < 12
-            ? `${monthNames[monthIdx]} ${parseInt(dayStr, 10)}`
-            : zonedDate;
-
-        // Custom time formatting helper
-        const formatTimeStr = (t: string) => {
-          if (!t) return "";
-          const [h, m] = t.split(":").map(Number);
-          return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
-        };
-
-        const startTimeLabel = formatTimeStr(zonedStartTime);
-        const endTimeLabel = formatTimeStr(zonedEndTime);
 
         const msg = `Conflict: ${r.name} has overlapping events "${evA.title}" and "${evB.title}" on ${dateLabel} between ${startTimeLabel} and ${endTimeLabel}.`;
         if (!messages.includes(msg)) {
@@ -232,45 +197,8 @@ export function checkDraftConflict(
         );
 
         if (conflictingResources.length > 0) {
-          // Resolve resource conflict messaging timezone-awarely
-          const { date: zonedDate, time: zonedStartTime } = isoToZonedDisplay(
-            eOcc.startTime,
-            timezone,
-          );
-          const { time: zonedEndTime } = isoToZonedDisplay(
-            eOcc.endTime,
-            timezone,
-          );
-
-          const [, monthStr, dayStr] = zonedDate.split("-");
-          const monthNames = [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-          ];
-          const monthIdx = parseInt(monthStr, 10) - 1;
-          const dateLabel =
-            monthIdx >= 0 && monthIdx < 12
-              ? `${monthNames[monthIdx]} ${parseInt(dayStr, 10)}`
-              : zonedDate;
-
-          const formatTimeStr = (t: string) => {
-            if (!t) return "";
-            const [h, m] = t.split(":").map(Number);
-            return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
-          };
-
-          const startTimeLabel = formatTimeStr(zonedStartTime);
-          const endTimeLabel = formatTimeStr(zonedEndTime);
+          const { dateLabel, startTimeLabel, endTimeLabel } =
+            formatZonedOverlap(eOcc.startTime, eOcc.endTime, timezone);
 
           return {
             hasConflict: true,
@@ -283,4 +211,49 @@ export function checkDraftConflict(
   }
 
   return { hasConflict: false, message: "", resourceIds: [] };
+}
+
+function formatZonedOverlap(
+  startIso: string,
+  endIso: string,
+  timezone: string,
+): { dateLabel: string; startTimeLabel: string; endTimeLabel: string } {
+  const { date: zonedDate, time: zonedStartTime } = isoToZonedDisplay(
+    startIso,
+    timezone,
+  );
+  const { time: zonedEndTime } = isoToZonedDisplay(endIso, timezone);
+
+  const [, monthStr, dayStr] = zonedDate.split("-");
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const monthIdx = parseInt(monthStr, 10) - 1;
+  const dateLabel =
+    monthIdx >= 0 && monthIdx < 12
+      ? `${monthNames[monthIdx]} ${parseInt(dayStr, 10)}`
+      : zonedDate;
+
+  const formatTimeStr = (t: string) => {
+    if (!t) return "";
+    const [h, m] = t.split(":").map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+  };
+
+  return {
+    dateLabel,
+    startTimeLabel: formatTimeStr(zonedStartTime),
+    endTimeLabel: formatTimeStr(zonedEndTime),
+  };
 }
