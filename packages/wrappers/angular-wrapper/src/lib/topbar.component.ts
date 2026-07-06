@@ -113,10 +113,13 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     }
 
     // Props
-    (el as HTMLElement & Record<string, unknown>).view = this.view();
-    (el as HTMLElement & Record<string, unknown>).allowCreate =
-      this.allowCreate();
-    (el as HTMLElement & Record<string, unknown>).zoomPercent =
-      this.zoomPercent();
+    const element = el as HTMLElement & {
+      view?: string;
+      allowCreate?: boolean;
+      zoomPercent?: number;
+    };
+    element.view = this.view();
+    element.allowCreate = this.allowCreate();
+    element.zoomPercent = this.zoomPercent();
   }
 }

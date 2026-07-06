@@ -145,43 +145,40 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   onNavChange?: (detail: Record<string, unknown>) => void;
 }
 
-export const Timeline = React.forwardRef<HTMLElement, TimelineProps>(
-  (props, ref) => {
-    return React.createElement(_Timeline, {
-      ...props,
-      ref,
-      onEventClick: props.onEventClick
-        ? (e: Event) =>
-            props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
-        : undefined,
-      onEventMove: props.onEventMove
-        ? (e: Event) =>
-            props.onEventMove!((e as CustomEvent<EventMoveDetail>).detail)
-        : undefined,
-      onEventResize: props.onEventResize
-        ? (e: Event) =>
-            props.onEventResize!((e as CustomEvent<EventResizeDetail>).detail)
-        : undefined,
-      onEventCreate: props.onEventCreate
-        ? (e: Event) =>
-            props.onEventCreate!((e as CustomEvent<EventCreateDetail>).detail)
-        : undefined,
-      onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
-      onViewChange: props.onViewChange
-        ? (e: Event) =>
-            props.onViewChange!(
-              (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-            )
-        : undefined,
-      onNavChange: props.onNavChange
-        ? (e: Event) =>
-            props.onNavChange!(
-              (e as CustomEvent<Record<string, unknown>>).detail,
-            )
-        : undefined,
-    });
-  },
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Timeline = React.forwardRef<any, TimelineProps>((props, ref) => {
+  return React.createElement(_Timeline, {
+    ...props,
+    ref,
+    onEventClick: props.onEventClick
+      ? (e: Event) =>
+          props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+      : undefined,
+    onEventMove: props.onEventMove
+      ? (e: Event) =>
+          props.onEventMove!((e as CustomEvent<EventMoveDetail>).detail)
+      : undefined,
+    onEventResize: props.onEventResize
+      ? (e: Event) =>
+          props.onEventResize!((e as CustomEvent<EventResizeDetail>).detail)
+      : undefined,
+    onEventCreate: props.onEventCreate
+      ? (e: Event) =>
+          props.onEventCreate!((e as CustomEvent<EventCreateDetail>).detail)
+      : undefined,
+    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+    onViewChange: props.onViewChange
+      ? (e: Event) =>
+          props.onViewChange!(
+            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+          )
+      : undefined,
+    onNavChange: props.onNavChange
+      ? (e: Event) =>
+          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
+      : undefined,
+  });
+});
 
 const _MonthGrid = createComponent({
   tagName: "janus-month-grid",
@@ -204,35 +201,32 @@ export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
   onNavChange?: (detail: Record<string, unknown>) => void;
 }
 
-export const MonthGrid = React.forwardRef<HTMLElement, MonthGridProps>(
-  (props, ref) => {
-    return React.createElement(_MonthGrid, {
-      ...props,
-      ref,
-      onEventClick: props.onEventClick
-        ? (e: Event) =>
-            props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
-        : undefined,
-      onDayClick: props.onDayClick
-        ? (e: Event) =>
-            props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
-        : undefined,
-      onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
-      onViewChange: props.onViewChange
-        ? (e: Event) =>
-            props.onViewChange!(
-              (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-            )
-        : undefined,
-      onNavChange: props.onNavChange
-        ? (e: Event) =>
-            props.onNavChange!(
-              (e as CustomEvent<Record<string, unknown>>).detail,
-            )
-        : undefined,
-    });
-  },
-);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const MonthGrid = React.forwardRef<any, MonthGridProps>((props, ref) => {
+  return React.createElement(_MonthGrid, {
+    ...props,
+    ref,
+    onEventClick: props.onEventClick
+      ? (e: Event) =>
+          props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+      : undefined,
+    onDayClick: props.onDayClick
+      ? (e: Event) =>
+          props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
+      : undefined,
+    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+    onViewChange: props.onViewChange
+      ? (e: Event) =>
+          props.onViewChange!(
+            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+          )
+      : undefined,
+    onNavChange: props.onNavChange
+      ? (e: Event) =>
+          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
+      : undefined,
+  });
+});
 
 const _AiBar = createComponent({
   tagName: "janus-ai-bar",

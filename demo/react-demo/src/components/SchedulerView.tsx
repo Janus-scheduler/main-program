@@ -81,8 +81,21 @@ export function SchedulerView({
   const startParts = storeEvent ? splitISO(storeEvent.startTime) : null;
   const endParts = storeEvent ? splitISO(storeEvent.endTime) : null;
 
-  const timelineRef = useRef<HTMLElement & Record<string, unknown>>(null);
-  const monthGridRef = useRef<HTMLElement & Record<string, unknown>>(null);
+  const timelineRef = useRef<
+    HTMLElement & {
+      goToPrev: () => void;
+      goToNext: () => void;
+      goToToday: () => void;
+      toggleCreate: () => void;
+    }
+  >(null);
+  const monthGridRef = useRef<
+    HTMLElement & {
+      goToPrev: () => void;
+      goToNext: () => void;
+      goToToday: () => void;
+    }
+  >(null);
 
   const [navData, setNavData] = useState({
     navLabel: "",
@@ -95,11 +108,11 @@ export function SchedulerView({
 
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
-      navLabel: detail.navLabel || "",
-      dayName: detail.dayName || "",
-      shortDate: detail.shortDate || "",
-      zoomPercent: detail.zoomPercent || 100,
-      zoomUnit: detail.zoomUnit || "",
+      navLabel: (detail.navLabel as string) || "",
+      dayName: (detail.dayName as string) || "",
+      shortDate: (detail.shortDate as string) || "",
+      zoomPercent: (detail.zoomPercent as number) || 100,
+      zoomUnit: (detail.zoomUnit as string) || "",
     });
   };
 

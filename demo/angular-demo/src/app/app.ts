@@ -25,6 +25,14 @@ import {
   schedulerStore,
 } from '@janus-scheduler/angular';
 
+export interface NavData {
+  navLabel: string;
+  dayName: string;
+  shortDate: string;
+  zoomPercent: number;
+  zoomUnit: string;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -45,7 +53,7 @@ export class App {
   showScheduler = false;
   selectedEventId = signal<string | null>(null);
 
-  navData = signal<Record<string, unknown>>({
+  navData = signal<NavData>({
     navLabel: '',
     dayName: '',
     shortDate: '',
@@ -183,7 +191,7 @@ export class App {
     this.currentView = data.view;
   }
 
-  handleNavChange(detail: Record<string, unknown>): void {
+  handleNavChange(detail: Partial<NavData>): void {
     this.navData.set({
       navLabel: detail.navLabel || '',
       dayName: detail.dayName || '',
