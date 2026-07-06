@@ -244,7 +244,6 @@ export const timelineStyles = css`
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    contain: layout style;
   }
 
   /* Super header (parent-level labels: day name, month, year) */
@@ -900,32 +899,53 @@ export const timelineStyles = css`
   }
 
   .tl-warning-badge {
-    height: 30px;
+    height: 28px;
     padding: 0 10px;
-    border-radius: 15px;
-    background: #fffbeb;
-    border: 1px solid #fef3c7;
-    color: #b45309;
-    font-size: 12px;
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    font-size: 11px;
     font-weight: 600;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     font-family: inherit;
-    transition: all 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     margin-right: 8px;
+    box-shadow: 0 1px 2px rgba(239, 68, 68, 0.05);
   }
 
   .tl-warning-badge:hover {
-    background: #fef3c7;
-    border-color: #f59e0b;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.35);
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.12);
     transform: translateY(-0.5px);
   }
 
   .tl-warning-badge:active {
     transform: translateY(0);
+  }
+
+  .tl-warning-badge span:first-child {
+    font-size: 13px;
+    animation: tlPulse 2s infinite ease-in-out;
+  }
+
+  @keyframes tlPulse {
+    0% {
+      opacity: 0.7;
+      transform: scale(0.95);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+    100% {
+      opacity: 0.7;
+      transform: scale(0.95);
+    }
   }
 
   .tl-event--conflict {

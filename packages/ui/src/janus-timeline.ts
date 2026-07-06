@@ -216,6 +216,18 @@ export class JanusTimeline extends LitElement {
     }
   }
 
+  updated(changedProperties: Map<string, unknown>) {
+    super.updated(changedProperties);
+    if (changedProperties.has("_isConflictsBannerDismissed")) {
+      const scrollEl = this.gridScrollRef;
+      if (scrollEl) {
+        const originalScroll = scrollEl.scrollTop;
+        scrollEl.scrollTop = originalScroll + 1;
+        scrollEl.scrollTop = originalScroll;
+      }
+    }
+  }
+
   firstUpdated() {
     // Center on today at current time
     const now = new Date();
@@ -801,8 +813,9 @@ export class JanusTimeline extends LitElement {
           @view-switch=${(e: CustomEvent) =>
             this._handleViewSwitch(e.detail.view)}
           @toggle-create=${this._toggleCreate}
+          @restore-conflicts-banner=${() =>
+            (this._isConflictsBannerDismissed = false)}
         ></janus-topbar>
-        >>>>>>> origin/dev
 
         <!-- Conflict warning banner -->
         ${conflicts.hasConflict && !this._isConflictsBannerDismissed
