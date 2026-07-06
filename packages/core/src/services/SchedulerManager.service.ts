@@ -153,7 +153,7 @@ export class SchedulerManager {
    * @returns Event if found, undefined otherwise
    */
   getEvent(id: string): Event | undefined {
-    const baseId = id.includes("_occ_") ? id.split("_occ_")[0] : id;
+    const baseId = id.replace(/_occ_\d+$/, "");
     return schedulerStore.getState().events[baseId];
   }
 
@@ -174,12 +174,11 @@ export class SchedulerManager {
    * @returns The updated Event instance (already visible in the UI)
    */
   updateEvent(id: string, updates: Partial<EventData>): Event {
-    const isOcc = id.includes("_occ_");
-    const baseId = isOcc ? id.split("_occ_")[0] : id;
+    const occMatch = id.match(/^(.+)_occ_(\d+)$/);
+    const baseId = occMatch ? occMatch[1] : id;
 
-    if (isOcc && updates.startTime) {
-      const parts = id.split("_occ_");
-      const originalOccStartMs = Number(parts[1]);
+    if (occMatch && updates.startTime) {
+      const originalOccStartMs = Number(occMatch[2]);
       const newStartMs = new Date(updates.startTime).getTime();
       const deltaMs = newStartMs - originalOccStartMs;
 
@@ -238,7 +237,7 @@ export class SchedulerManager {
    * @returns true if the event was found and deleted, false otherwise
    */
   deleteEvent(id: string): boolean {
-    const baseId = id.includes("_occ_") ? id.split("_occ_")[0] : id;
+    const baseId = id.replace(/_occ_\d+$/, "");
     const snapshot = schedulerStore.getState().events[baseId];
     const deleted = schedulerStore.getState().deleteEvent(baseId);
 

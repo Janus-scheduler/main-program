@@ -5,6 +5,9 @@ import {
   schedulerStore,
   isoToZonedDisplay,
   expandEvents,
+  computeTimelineConflicts,
+  checkSlotConflict,
+  type ConflictResource,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";
 
@@ -63,6 +66,11 @@ export class JanusTimeline extends LitElement {
   @state() private _showConflictDetails = false;
   @state() private _isConflictsBannerDismissed = false;
   private _lastConflictIdsKey = "";
+  @state() private _cachedConflicts = {
+    hasConflict: false,
+    messages: [] as string[],
+    conflictingEventIds: new Set<string>(),
+  };
 
   /** Zoom: pixels per millisecond (the single universal scale) */
   @state() private _pxPerMs = DEFAULT_PX_PER_MS;
@@ -194,13 +202,25 @@ export class JanusTimeline extends LitElement {
 
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
-    const conflicts = this._timelineConflicts;
-    const currentIdsKey = Array.from(conflicts.conflictingEventIds)
-      .sort()
-      .join(",");
-    if (currentIdsKey !== this._lastConflictIdsKey) {
-      this._isConflictsBannerDismissed = false;
-      this._lastConflictIdsKey = currentIdsKey;
+    if (
+      changedProperties.has("resources") ||
+      changedProperties.has("preventConflicts") ||
+      (this._cachedConflicts.conflictingEventIds.size === 0 &&
+        this.resources.length > 0)
+    ) {
+      const conflictResources = this.resources as unknown as ConflictResource[];
+      const tz = schedulerStore.getState().timezone;
+      this._cachedConflicts = computeTimelineConflicts(conflictResources, tz);
+
+      const currentIdsKey = Array.from(
+        this._cachedConflicts.conflictingEventIds,
+      )
+        .sort()
+        .join(",");
+      if (currentIdsKey !== this._lastConflictIdsKey) {
+        this._isConflictsBannerDismissed = false;
+        this._lastConflictIdsKey = currentIdsKey;
+      }
     }
   }
 
@@ -432,57 +452,92 @@ export class JanusTimeline extends LitElement {
       if (result) {
         this._wasDragging = true;
 
-        if (this.preventConflicts) {
-          let hasConflict = false;
-          let targetResId = "";
-          let actionVerb = "";
+        let hasConflict = false;
+        let targetResId = "";
+        let actionVerb = "";
 
-          if (result.type === "event-move") {
-            const { event, newResourceId, newStartTime, newEndTime } =
-              result.detail;
-            targetResId = newResourceId;
-            actionVerb = "move";
-            const startMs = new Date(newStartTime).getTime();
-            const endMs = new Date(newEndTime).getTime();
-            hasConflict = this._checkConflict(
-              newResourceId,
+        if (result.type === "event-move") {
+          const { event, newResourceId, newStartTime, newEndTime } =
+            result.detail;
+          targetResId = newResourceId;
+          actionVerb = "move";
+          const startMs = new Date(newStartTime).getTime();
+          const endMs = new Date(newEndTime).getTime();
+
+          const resource = this.resources.find((r) => r.id === newResourceId);
+          if (resource) {
+            hasConflict = checkSlotConflict(
+              resource.events as unknown as any[],
               startMs,
               endMs,
               event.id,
             );
-          } else if (result.type === "event-resize") {
-            const { event, resourceId, newStartTime, newEndTime } =
-              result.detail;
-            targetResId = resourceId;
-            actionVerb = "resize";
-            const startMs = new Date(newStartTime).getTime();
-            const endMs = new Date(newEndTime).getTime();
-            hasConflict = this._checkConflict(
-              resourceId,
-              startMs,
-              endMs,
-              event.id,
-            );
-          } else if (result.type === "event-create") {
-            const { resourceId, startTime, endTime } = result.detail;
-            targetResId = resourceId;
-            actionVerb = "create";
-            const startMs = new Date(startTime).getTime();
-            const endMs = new Date(endTime).getTime();
-            hasConflict = this._checkConflict(resourceId, startMs, endMs);
           }
+        } else if (result.type === "event-resize") {
+          const { event, resourceId, newStartTime, newEndTime } = result.detail;
+          targetResId = resourceId;
+          actionVerb = "resize";
+          const startMs = new Date(newStartTime).getTime();
+          const endMs = new Date(newEndTime).getTime();
 
-          if (hasConflict) {
-            const resourceName = this._resolveResourceName(targetResId);
-            this._blockedConflictMessage = `Cannot ${actionVerb} event. ${resourceName} is already scheduled during this time. Double-booking is disabled.`;
+          const resource = this.resources.find((r) => r.id === resourceId);
+          if (resource) {
+            hasConflict = checkSlotConflict(
+              resource.events as unknown as any[],
+              startMs,
+              endMs,
+              event.id,
+            );
+          }
+        } else if (result.type === "event-create") {
+          const { resourceId, startTime, endTime } = result.detail;
+          targetResId = resourceId;
+          actionVerb = "create";
+          const startMs = new Date(startTime).getTime();
+          const endMs = new Date(endTime).getTime();
+
+          const resource = this.resources.find((r) => r.id === resourceId);
+          if (resource) {
+            hasConflict = checkSlotConflict(
+              resource.events as unknown as any[],
+              startMs,
+              endMs,
+            );
+          }
+        }
+
+        const resourceName = this._resolveResourceName(targetResId);
+        const conflictMessage = `Cannot ${actionVerb} event. ${resourceName} is already scheduled during this time. Double-booking is disabled.`;
+
+        if (hasConflict) {
+          // Dispatch a cancelable conflict-detected event
+          const conflictEvent = new CustomEvent("conflict-detected", {
+            detail: {
+              message: conflictMessage,
+              action: actionVerb,
+              detail: result.detail,
+            },
+            bubbles: true,
+            composed: true,
+            cancelable: true,
+          });
+          this.dispatchEvent(conflictEvent);
+
+          if (this.preventConflicts && !conflictEvent.defaultPrevented) {
+            this._blockedConflictMessage = conflictMessage;
             this._showBlockedConflictDialog = true;
             return;
           }
         }
 
+        // Always dispatch the custom action event (Unidirectional data flow)
         this.dispatchEvent(
           new CustomEvent(result.type, {
-            detail: result.detail,
+            detail: {
+              ...result.detail,
+              hasConflict,
+              conflictMessage: hasConflict ? conflictMessage : "",
+            },
             bubbles: true,
             composed: true,
           }),
@@ -500,93 +555,6 @@ export class JanusTimeline extends LitElement {
   private _closeBlockedConflictDialog() {
     this._showBlockedConflictDialog = false;
     this._blockedConflictMessage = "";
-  }
-
-  private _checkConflict(
-    resourceId: string,
-    startMs: number,
-    endMs: number,
-    ignoreEventId?: string,
-  ): boolean {
-    const resource = this.resources.find((r) => r.id === resourceId);
-    if (!resource) return false;
-
-    for (const ev of resource.events) {
-      if (ignoreEventId && ev.id === ignoreEventId) continue;
-      if (startMs < ev.endMs && endMs > ev.startMs) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private get _timelineConflicts(): {
-    hasConflict: boolean;
-    messages: string[];
-    conflictingEventIds: Set<string>;
-  } {
-    const conflictingEventIds = new Set<string>();
-    const messages: string[] = [];
-    const tz = schedulerStore.getState().timezone;
-
-    for (const r of this.resources) {
-      const events = r.events;
-      for (let i = 0; i < events.length; i++) {
-        const evA = events[i];
-        for (let j = i + 1; j < events.length; j++) {
-          const evB = events[j];
-          if (evA.startMs < evB.endMs && evA.endMs > evB.startMs) {
-            conflictingEventIds.add(evA.id);
-            conflictingEventIds.add(evB.id);
-
-            const overlapStartMs = Math.max(evA.startMs, evB.startMs);
-            const overlapEndMs = Math.min(evA.endMs, evB.endMs);
-            const overlapStartIso = new Date(overlapStartMs).toISOString();
-            const overlapEndIso = new Date(overlapEndMs).toISOString();
-            const { date: zonedDate, time: zonedStartTime } = isoToZonedDisplay(
-              overlapStartIso,
-              tz,
-            );
-            const { time: zonedEndTime } = isoToZonedDisplay(overlapEndIso, tz);
-
-            const [, monthStr, dayStr] = zonedDate.split("-");
-            const monthNames = [
-              "Jan",
-              "Feb",
-              "Mar",
-              "Apr",
-              "May",
-              "Jun",
-              "Jul",
-              "Aug",
-              "Sep",
-              "Oct",
-              "Nov",
-              "Dec",
-            ];
-            const monthIdx = parseInt(monthStr, 10) - 1;
-            const dateLabel =
-              monthIdx >= 0 && monthIdx < 12
-                ? `${monthNames[monthIdx]} ${parseInt(dayStr, 10)}`
-                : zonedDate;
-
-            const startTimeLabel = fmt12(zonedStartTime);
-            const endTimeLabel = fmt12(zonedEndTime);
-
-            const msg = `Conflict: ${r.name} has overlapping events "${evA.title}" and "${evB.title}" on ${dateLabel} between ${startTimeLabel} and ${endTimeLabel}.`;
-            if (!messages.includes(msg)) {
-              messages.push(msg);
-            }
-          }
-        }
-      }
-    }
-
-    return {
-      hasConflict: conflictingEventIds.size > 0,
-      messages,
-      conflictingEventIds,
-    };
   }
 
   // ── Resource layout computation ───────────────────────────────────
@@ -666,8 +634,16 @@ export class JanusTimeline extends LitElement {
       if (ghostEndMs <= ghostStartMs) ghostEndMs = ghostStartMs + snapMs;
     }
 
-    const hasDragConflict = targetResourceId
-      ? this._checkConflict(targetResourceId, ghostStartMs, ghostEndMs, eventId)
+    const resource = targetResourceId
+      ? this.resources.find((r) => r.id === targetResourceId)
+      : null;
+    const hasDragConflict = resource
+      ? checkSlotConflict(
+          resource.events as unknown as any[],
+          ghostStartMs,
+          ghostEndMs,
+          eventId,
+        )
       : false;
 
     return html`
@@ -694,7 +670,7 @@ export class JanusTimeline extends LitElement {
   }
 
   render() {
-    const conflicts = this._timelineConflicts;
+    const conflicts = this._cachedConflicts;
     const pxPerMs = this._pxPerMs;
     const viewStartMs = this._viewStartMs;
     const viewEndMs = this._getViewEndMs();
@@ -1046,13 +1022,14 @@ export class JanusTimeline extends LitElement {
                                       )}
                                   ></div>
                                   <span class="tl-event__title"
-                                    >${conflicts.conflictingEventIds.has(ev.id)
-                                      ? html`<span
-                                          class="tl-event__conflict-icon"
-                                          >⚠</span
-                                        > `
-                                      : nothing}${ev.title}</span
+                                    >${ev.title}</span
                                   >
+                                  ${conflicts.conflictingEventIds.has(ev.id)
+                                    ? html`<span
+                                        class="tl-event__conflict-dot"
+                                        title="Conflict overlap detected"
+                                      ></span>`
+                                    : nothing}
                                   ${evWidth > 80
                                     ? html`<span class="tl-event__time"
                                         >${fmt12(ev.startTime)} –

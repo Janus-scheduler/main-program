@@ -54,12 +54,13 @@ export class AppComponent {
 
 ## Conflict Prevention Config
 
-You can pass the binding to `<janus-timeline-ng>` or `<janus-scheduler-ng>` components:
+You can pass the binding to `<janus-timeline-ng>` or `<janus-scheduler-ng>` components, and capture conflict callbacks via the `(conflictDetected)` output:
 
 ```html
-<!-- Strict double-booking prevention mode -->
+<!-- Strict double-booking prevention mode with callback -->
 <janus-timeline-ng
   [preventConflicts]="true"
+  (conflictDetected)="handleConflict($event)"
   (eventMove)="handleEventMove($event)"
 >
 </janus-timeline-ng>

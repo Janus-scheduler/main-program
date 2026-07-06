@@ -128,6 +128,7 @@ const _Timeline = createComponent({
     onEventCreate: "event-create",
     onAddEvent: "add-event",
     onViewChange: "view-change",
+    onConflictDetected: "conflict-detected",
   },
 });
 
@@ -143,26 +144,49 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   onEventCreate?: (detail: EventCreateDetail) => void;
   onAddEvent?: () => void;
   onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onConflictDetected?: (detail: {
+    message: string;
+    action: string;
+    detail: any;
+  }) => void;
 }
 
 export function Timeline(props: TimelineProps): React.JSX.Element {
   return React.createElement(_Timeline, {
     ...props,
+    onConflictDetected: props.onConflictDetected
+      ? (e: Event) => props.onConflictDetected!((e as CustomEvent).detail)
+      : undefined,
     onEventClick: props.onEventClick
       ? (e: Event) =>
           props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
       : undefined,
     onEventMove: props.onEventMove
-      ? (e: Event) =>
-          props.onEventMove!((e as CustomEvent<EventMoveDetail>).detail)
+      ? (e: Event) => {
+          const detail = (e as CustomEvent<EventMoveDetail>).detail;
+          if (props.preventConflicts && (detail as any).hasConflict) {
+            return;
+          }
+          props.onEventMove!(detail);
+        }
       : undefined,
     onEventResize: props.onEventResize
-      ? (e: Event) =>
-          props.onEventResize!((e as CustomEvent<EventResizeDetail>).detail)
+      ? (e: Event) => {
+          const detail = (e as CustomEvent<EventResizeDetail>).detail;
+          if (props.preventConflicts && (detail as any).hasConflict) {
+            return;
+          }
+          props.onEventResize!(detail);
+        }
       : undefined,
     onEventCreate: props.onEventCreate
-      ? (e: Event) =>
-          props.onEventCreate!((e as CustomEvent<EventCreateDetail>).detail)
+      ? (e: Event) => {
+          const detail = (e as CustomEvent<EventCreateDetail>).detail;
+          if (props.preventConflicts && (detail as any).hasConflict) {
+            return;
+          }
+          props.onEventCreate!(detail);
+        }
       : undefined,
     onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
     onViewChange: props.onViewChange

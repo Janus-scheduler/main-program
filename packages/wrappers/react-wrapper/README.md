@@ -50,13 +50,16 @@ export default function App() {
 
 ## Conflict Prevention Config
 
-You can pass `preventConflicts` to either `<Timeline>` or `<Scheduler>` components:
+You can pass `preventConflicts` to either `<Timeline>` or `<Scheduler>` components. You can also listen to conflict-detected events using `onConflictDetected`:
 
 ```tsx
-// Strict double-booking prevention mode
+// Strict double-booking prevention mode with callback
 <Timeline
   preventConflicts={true}
-  onEventMove={...}
+  onConflictDetected={({ message, action, detail }) => {
+    console.warn(`Double-booking prevented during ${action}: ${message}`);
+  }}
+  onEventMove={handleEventMove}
 />
 ```
 

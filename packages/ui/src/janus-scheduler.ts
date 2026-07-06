@@ -7,11 +7,9 @@ import {
   schedulerStore,
   getAllTimezones,
   formatTimezoneLabel,
-  Event as SchedulerEvent,
-  expandEvents,
+  checkDraftConflict,
   zonedInputToISO,
   isoToZonedDisplay,
-  type EventData,
 } from "@janus-scheduler/core";
 import { schedulerStyles } from "./styles";
 
@@ -502,87 +500,21 @@ export class JanusScheduler extends LitElement {
       return { hasConflict: false, message: "" };
     }
 
-    const tz = this._selectedTz;
-    const startRange = new Date(draft.startDate + "T00:00:00").getTime();
-    const endRange = new Date(draft.endDate + "T23:59:59").getTime();
+    const eventsList = Object.values(schedulerStore.getState().events);
+    const result = checkDraftConflict(draft, eventsList, this._selectedTz);
 
-    let draftOccurrences: EventData[];
-    try {
-      const draftStartIso = zonedInputToISO(
-        draft.startDate,
-        draft.startTime,
-        tz,
+    if (result.hasConflict && result.resourceIds.length > 0) {
+      const names = result.resourceIds.map((id) =>
+        this._resolveResourceName(id),
       );
-      const draftEndIso = zonedInputToISO(draft.endDate, draft.endTime, tz);
-
-      const tempEvent = new SchedulerEvent({
-        id: "draft",
-        title: draft.title,
-        startTime: draftStartIso,
-        endTime: draftEndIso,
-        resourceIds: draft.participants,
-        allDay: draft.allDay,
-        recurrenceRule: draft.recurrenceRule,
-      });
-      draftOccurrences = expandEvents([tempEvent], startRange, endRange);
-    } catch {
-      return { hasConflict: false, message: "" };
-    }
-
-    if (draftOccurrences.length === 0) {
-      return { hasConflict: false, message: "" };
-    }
-
-    const baseEventId =
-      this.eventId && this.eventId.includes("_occ_")
-        ? this.eventId.split("_occ_")[0]
-        : this.eventId;
-
-    const existingEvents = Object.values(
-      schedulerStore.getState().events,
-    ).filter((e) => e.id !== baseEventId);
-
-    const existingOccurrences = expandEvents(
-      existingEvents,
-      startRange,
-      endRange,
-    );
-
-    for (const dOcc of draftOccurrences) {
-      const dStart = new Date(dOcc.startTime).getTime();
-      const dEnd = new Date(dOcc.endTime).getTime();
-
-      for (const eOcc of existingOccurrences) {
-        const eStart = new Date(eOcc.startTime).getTime();
-        const eEnd = new Date(eOcc.endTime).getTime();
-
-        if (dStart < eEnd && dEnd > eStart) {
-          const dResources =
-            dOcc.resourceIds || (dOcc.resourceId ? [dOcc.resourceId] : []);
-          const eResources =
-            eOcc.resourceIds || (eOcc.resourceId ? [eOcc.resourceId] : []);
-          const conflictingResources = dResources.filter((resId: string) =>
-            eResources.includes(resId),
-          );
-
-          if (conflictingResources.length > 0) {
-            const names = conflictingResources.map((id: string) =>
-              this._resolveResourceName(id),
-            );
-            const dateLabel = new Date(dOcc.startTime).toLocaleDateString(
-              undefined,
-              {
-                month: "short",
-                day: "numeric",
-              },
-            );
-            return {
-              hasConflict: true,
-              message: `Conflict: ${names.join(", ")} already scheduled on ${dateLabel} between ${new Date(eOcc.startTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} and ${new Date(eOcc.endTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} in "${eOcc.title}".`,
-            };
-          }
-        }
-      }
+      const message = result.message.replace(
+        "[REPLACE_RESOURCES]",
+        names.join(", "),
+      );
+      return {
+        hasConflict: true,
+        message,
+      };
     }
 
     return { hasConflict: false, message: "" };
@@ -717,10 +649,9 @@ export class JanusScheduler extends LitElement {
     // Clear draft
     schedulerStore.getState().clearDraft(true);
 
-    const baseId =
-      this.eventId && this.eventId.includes("_occ_")
-        ? this.eventId.split("_occ_")[0]
-        : this.eventId;
+    const baseId = this.eventId
+      ? this.eventId.replace(/_occ_\d+$/, "")
+      : this.eventId;
 
     this.dispatchEvent(
       new CustomEvent("save", {
@@ -751,10 +682,9 @@ export class JanusScheduler extends LitElement {
     // Clear draft
     schedulerStore.getState().clearDraft(true);
 
-    const baseId =
-      this.eventId && this.eventId.includes("_occ_")
-        ? this.eventId.split("_occ_")[0]
-        : this.eventId;
+    const baseId = this.eventId
+      ? this.eventId.replace(/_occ_\d+$/, "")
+      : this.eventId;
 
     this.dispatchEvent(
       new CustomEvent("delete", {
@@ -944,7 +874,10 @@ export class JanusScheduler extends LitElement {
       this._recurrenceFreq = "Weekly";
       const start = new Date(draft.startDate + "T00:00:00");
       start.setMonth(start.getMonth() + 1);
-      this._recurrenceUntilDate = start.toISOString().split("T")[0];
+      const year = start.getFullYear();
+      const month = String(start.getMonth() + 1).padStart(2, "0");
+      const day = String(start.getDate()).padStart(2, "0");
+      this._recurrenceUntilDate = `${year}-${month}-${day}`;
       const [y, m] = this._recurrenceUntilDate.split("-").map(Number);
       this.recurrenceCal = { viewYear: y, viewMonth: m - 1 };
       this._updateRecurrenceRule();
@@ -1192,9 +1125,11 @@ export class JanusScheduler extends LitElement {
     let startTimeVal = draft.startTime;
     let endTimeVal = draft.endTime;
 
-    if (this.eventId && this.eventId.includes("_occ_")) {
-      const parts = this.eventId.split("_occ_");
-      const occStartMs = parseInt(parts[parts.length - 1], 10);
+    const occMatch = this.eventId
+      ? this.eventId.match(/^(.+)_occ_(\d+)$/)
+      : null;
+    if (occMatch) {
+      const occStartMs = parseInt(occMatch[2], 10);
       if (!isNaN(occStartMs)) {
         try {
           const tz = this._selectedTz;

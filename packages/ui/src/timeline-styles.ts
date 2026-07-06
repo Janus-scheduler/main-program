@@ -1159,14 +1159,20 @@ export const timelineStyles = css`
   }
 
   .tl-event--conflict {
-    outline: 1.5px dashed #ef4444;
-    outline-offset: -1.5px;
+    /* No outline border, style conflicts purely with a corner warning badge dot */
   }
 
-  .tl-event__conflict-icon {
-    color: #ef4444;
-    font-weight: 700;
-    margin-right: 2px;
+  .tl-event__conflict-dot {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 6px;
+    height: 6px;
+    background-color: #ef4444;
+    border-radius: 50%;
+    border: 1px solid #ffffff;
+    box-shadow: 0 0 3px rgba(239, 68, 68, 0.5);
+    z-index: 4;
   }
 
   .tl-drag-ghost--conflict {

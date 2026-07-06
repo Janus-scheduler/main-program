@@ -170,6 +170,11 @@ export interface TimelineProps {
   onEventResize?: (detail: EventResizeDetail) => void;
   onEventCreate?: (detail: EventCreateDetail) => void;
   onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onConflictDetected?: (detail: {
+    message: string;
+    action: string;
+    detail: any;
+  }) => void;
 }
 
 export const Timeline: Component<TimelineProps> = (props) => {
@@ -195,12 +200,31 @@ export const Timeline: Component<TimelineProps> = (props) => {
         onCleanup(() => ref?.removeEventListener(eventName, listener));
       }
     };
+
+    const attachMoveResizeCreate = <T,>(
+      eventName: string,
+      handler?: (detail: T) => void,
+    ) => {
+      if (handler) {
+        const listener = (e: Event) => {
+          const detail = (e as CustomEvent).detail;
+          if (props.preventConflicts && (detail as any).hasConflict) {
+            return;
+          }
+          handler(detail as T);
+        };
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
+      }
+    };
+
     attach("event-click", props.onEventClick);
     attach("add-event", props.onAddEvent);
-    attach("event-move", props.onEventMove);
-    attach("event-resize", props.onEventResize);
-    attach("event-create", props.onEventCreate);
+    attachMoveResizeCreate("event-move", props.onEventMove);
+    attachMoveResizeCreate("event-resize", props.onEventResize);
+    attachMoveResizeCreate("event-create", props.onEventCreate);
     attach("view-change", props.onViewChange);
+    attach("conflict-detected", props.onConflictDetected);
   });
 
   return (
