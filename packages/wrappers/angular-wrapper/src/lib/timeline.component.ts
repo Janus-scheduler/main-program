@@ -101,29 +101,28 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.addEvent.emit();
   };
-  private _eventMoveHandler = (e: Event) => {
-    e.stopPropagation();
-    const detail = (e as CustomEvent).detail;
+  private _emitWithConflictBypass<T>(
+    output: { emit: (val: T) => void },
+    event: Event,
+  ) {
+    const detail = (event as CustomEvent).detail;
     if (this.preventConflicts() && detail.hasConflict) {
       return;
     }
-    this.eventMove.emit(detail);
+    output.emit(detail);
+  }
+
+  private _eventMoveHandler = (e: Event) => {
+    e.stopPropagation();
+    this._emitWithConflictBypass(this.eventMove, e);
   };
   private _eventResizeHandler = (e: Event) => {
     e.stopPropagation();
-    const detail = (e as CustomEvent).detail;
-    if (this.preventConflicts() && detail.hasConflict) {
-      return;
-    }
-    this.eventResize.emit(detail);
+    this._emitWithConflictBypass(this.eventResize, e);
   };
   private _eventCreateHandler = (e: Event) => {
     e.stopPropagation();
-    const detail = (e as CustomEvent).detail;
-    if (this.preventConflicts() && detail.hasConflict) {
-      return;
-    }
-    this.eventCreate.emit(detail);
+    this._emitWithConflictBypass(this.eventCreate, e);
   };
   private _viewChangeHandler = (e: Event) => {
     e.stopPropagation();

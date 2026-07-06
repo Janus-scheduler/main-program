@@ -151,6 +151,20 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   }) => void;
 }
 
+function withConflictBypass<T>(
+  prevent: boolean | undefined,
+  callback?: (detail: T) => void,
+) {
+  if (!callback) return undefined;
+  return (e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    if (prevent && detail?.hasConflict) {
+      return;
+    }
+    callback(detail);
+  };
+}
+
 export function Timeline(props: TimelineProps): React.JSX.Element {
   return React.createElement(_Timeline, {
     ...props,
@@ -161,33 +175,15 @@ export function Timeline(props: TimelineProps): React.JSX.Element {
       ? (e: Event) =>
           props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
       : undefined,
-    onEventMove: props.onEventMove
-      ? (e: Event) => {
-          const detail = (e as CustomEvent<EventMoveDetail>).detail;
-          if (props.preventConflicts && (detail as any).hasConflict) {
-            return;
-          }
-          props.onEventMove!(detail);
-        }
-      : undefined,
-    onEventResize: props.onEventResize
-      ? (e: Event) => {
-          const detail = (e as CustomEvent<EventResizeDetail>).detail;
-          if (props.preventConflicts && (detail as any).hasConflict) {
-            return;
-          }
-          props.onEventResize!(detail);
-        }
-      : undefined,
-    onEventCreate: props.onEventCreate
-      ? (e: Event) => {
-          const detail = (e as CustomEvent<EventCreateDetail>).detail;
-          if (props.preventConflicts && (detail as any).hasConflict) {
-            return;
-          }
-          props.onEventCreate!(detail);
-        }
-      : undefined,
+    onEventMove: withConflictBypass(props.preventConflicts, props.onEventMove),
+    onEventResize: withConflictBypass(
+      props.preventConflicts,
+      props.onEventResize,
+    ),
+    onEventCreate: withConflictBypass(
+      props.preventConflicts,
+      props.onEventCreate,
+    ),
     onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
     onViewChange: props.onViewChange
       ? (e: Event) =>
