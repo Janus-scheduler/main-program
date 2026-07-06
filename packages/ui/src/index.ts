@@ -1,6 +1,7 @@
 export * from "./timeline-types";
 export * from "./janus-scheduler";
 export * from "./janus-timeline";
+export * from "./janus-topbar";
 export * from "./month-grid-types";
 export * from "./janus-month-grid";
 export * from "./janus-ai-bar";

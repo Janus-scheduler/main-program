@@ -3,18 +3,10 @@ import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
 import { schedulerStore, isoToZonedDisplay } from "@janus-scheduler/core";
 import "./janus-ai-bar";
+import "./janus-topbar";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
-import {
-  RoomIcon,
-  EquipmentIcon,
-  ChevronLeft,
-  ChevronRight,
-  SearchIcon,
-  BellIcon,
-  PlusIcon,
-  PencilRulerIcon,
-} from "./timeline-icons";
+import { RoomIcon, EquipmentIcon, PlusIcon } from "./timeline-icons";
 import {
   ROW_HEIGHT,
   GROUP_LABEL_HEIGHT,
@@ -591,77 +583,21 @@ export class JanusTimeline extends LitElement {
           ? "tl-component-shell--draw-mode"
           : ""}"
       >
-        <header class="tl-topbar">
-          <nav class="tl-nav">
-            <button
-              class="tl-nav__arrow"
-              aria-label="Previous"
-              @click=${this._goToPrev}
-            >
-              ${ChevronLeft()}
-            </button>
-            <div class="tl-nav__center">
-              <button class="tl-nav__today" @click=${this._goToToday}>
-                Today
-              </button>
-              <span class="tl-nav__date">${navLabel}</span>
-              <div class="tl-nav__date--short">
-                <span class="tl-nav-day-name">${dayName}</span>
-                <span class="tl-nav-date-text">${shortDate}</span>
-              </div>
-            </div>
-            <button
-              class="tl-nav__arrow"
-              aria-label="Next"
-              @click=${this._goToNext}
-            >
-              ${ChevronRight()}
-            </button>
-          </nav>
-          <div class="tl-topbar__right">
-            ${this._zoomPercent() !== 100
-              ? html`<span class="tl-zoom-badge"
-                  >${this._zoomPercent()}% · ${level.unit}</span
-                >`
-              : nothing}
-            <div class="tl-view-toggle">
-              ${(["Timeline", "Month"] as const).map(
-                (v) => html`
-                  <button
-                    class="tl-view-toggle__btn ${this.view === v
-                      ? "active"
-                      : ""}"
-                    @click=${() => this._handleViewSwitch(v)}
-                  >
-                    ${v}
-                  </button>
-                `,
-              )}
-            </div>
-            <button
-              class="tl-icon-btn tl-draw-toggle ${this.allowCreate
-                ? "tl-draw-toggle--active"
-                : ""}"
-              aria-label="Toggle draw-to-create"
-              data-tooltip="${this.allowCreate
-                ? "Draw Event ON — click to disable"
-                : "Draw Event OFF — drag on empty space to create an event"}"
-              @click=${this._toggleCreate}
-            >
-              ${PencilRulerIcon()}
-            </button>
-            <button class="tl-icon-btn" aria-label="Search">
-              ${SearchIcon()}
-            </button>
-            <button
-              class="tl-icon-btn tl-icon-btn--bell"
-              aria-label="Notifications"
-            >
-              ${BellIcon()}
-              <span class="tl-bell-dot"></span>
-            </button>
-          </div>
-        </header>
+        <janus-topbar
+          nav-label="${navLabel}"
+          day-name="${dayName}"
+          short-date="${shortDate}"
+          .view=${this.view}
+          ?allow-create=${this.allowCreate}
+          .zoomPercent=${this._zoomPercent()}
+          zoom-unit="${level.unit}"
+          @prev-click=${this._goToPrev}
+          @next-click=${this._goToNext}
+          @today-click=${this._goToToday}
+          @view-switch=${(e: CustomEvent) =>
+            this._handleViewSwitch(e.detail.view)}
+          @toggle-create=${this._toggleCreate}
+        ></janus-topbar>
 
         <div class="tl-panel">
           <div class="tl-grid-wrap">
