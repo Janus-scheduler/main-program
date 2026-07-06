@@ -339,7 +339,7 @@ export function generateColumns(
   const columns: ColumnTick[] = [];
   let cursor = floorToUnit(viewStartMs, level.unit);
   let safety = 0;
-  while (cursor < viewEndMs && safety < 300) {
+  while (cursor < viewEndMs && safety < 2500) {
     const nextCursor = advanceByUnit(cursor, level.unit);
     const px = (cursor - viewStartMs) * pxPerMs;
     const width = (nextCursor - cursor) * pxPerMs;
@@ -371,7 +371,7 @@ export function generateSuperLabels(
   const labels: SuperLabel[] = [];
   let cursor = floorToUnit(viewStartMs, parentUnit);
   let safety = 0;
-  while (cursor < viewEndMs && safety < 100) {
+  while (cursor < viewEndMs && safety < 2500) {
     const nextCursor = advanceByUnit(cursor, parentUnit);
     const clippedStart = Math.max(cursor, viewStartMs);
     const clippedEnd = Math.min(nextCursor, viewEndMs);
@@ -463,8 +463,8 @@ export function formatNavDate(
 
 /**
  * Compute the min/max bounds for pxPerMs.
- * Min = most zoomed out (year columns at ~40px)
+ * Min = most zoomed out (10% of default zoom)
  * Max = most zoomed in (5 min columns at ~200px)
  */
-export const MIN_PX_PER_MS = 40 / MS_YEAR_AVG;
+export const MIN_PX_PER_MS = DEFAULT_PX_PER_MS * 0.1;
 export const MAX_PX_PER_MS = 200 / (5 * MS_MIN);

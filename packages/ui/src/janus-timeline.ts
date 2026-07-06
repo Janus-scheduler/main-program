@@ -10,18 +10,10 @@ import {
   type ConflictResource,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";
+import "./janus-topbar";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
-import {
-  RoomIcon,
-  EquipmentIcon,
-  ChevronLeft,
-  ChevronRight,
-  SearchIcon,
-  BellIcon,
-  PlusIcon,
-  PencilRulerIcon,
-} from "./timeline-icons";
+import { RoomIcon, EquipmentIcon, PlusIcon } from "./timeline-icons";
 import {
   ROW_HEIGHT,
   GROUP_LABEL_HEIGHT,
@@ -419,9 +411,10 @@ export class JanusTimeline extends LitElement {
     e: PointerEvent,
     ev: TimelineEvent,
     resourceId: string,
+    evTop: number,
   ) {
     if (e.button !== 0) return;
-    this._drag.startMove(e, ev, resourceId);
+    this._drag.startMove(e, ev, resourceId, evTop);
     this._addDragUpListener();
   }
 
@@ -430,9 +423,10 @@ export class JanusTimeline extends LitElement {
     ev: TimelineEvent,
     resourceId: string,
     edge: "start" | "end",
+    evTop: number,
   ) {
     if (e.button !== 0) return;
-    this._drag.startResize(e, ev, resourceId, edge);
+    this._drag.startResize(e, ev, resourceId, edge, evTop);
     this._addDragUpListener();
   }
 
@@ -561,6 +555,7 @@ export class JanusTimeline extends LitElement {
 
   private _computeResourceLayout(
     groups: { label: string; items: TimelineResource[] }[],
+    resourceTrackMap: Map<string, { trackCount: number }>,
   ): ResourceLayout[] {
     const layout: ResourceLayout[] = [];
     let y = HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT;
@@ -569,7 +564,8 @@ export class JanusTimeline extends LitElement {
       if (g.label) y += GROUP_LABEL_HEIGHT;
       for (const r of g.items) {
         layout.push({ id: r.id, yOffset: y, index: idx });
-        y += ROW_HEIGHT;
+        const tracks = resourceTrackMap.get(r.id)?.trackCount || 1;
+        y += ROW_HEIGHT * tracks;
         idx++;
       }
     }
@@ -698,6 +694,28 @@ export class JanusTimeline extends LitElement {
     // Collect all events from all resources
     const allResources = this.resources;
 
+    const resourceTrackMap = new Map<
+      string,
+      { trackCount: number; eventTracks: Map<string, number> }
+    >();
+    for (const r of allResources) {
+      const sorted = [...r.events].sort((a, b) => a.startMs - b.startMs);
+      const tracks: number[] = [];
+      const eventTracks = new Map<string, number>();
+      for (const ev of sorted) {
+        let t = 0;
+        while (t < tracks.length && tracks[t] > ev.startMs) {
+          t++;
+        }
+        tracks[t] = ev.endMs;
+        eventTracks.set(ev.id, t);
+      }
+      resourceTrackMap.set(r.id, {
+        trackCount: Math.max(1, tracks.length),
+        eventTracks,
+      });
+    }
+
     // Grouping
     const groups: { label: string; items: TimelineResource[] }[] = [];
     let cur: (typeof groups)[0] | null = null;
@@ -737,8 +755,10 @@ export class JanusTimeline extends LitElement {
       }
     }
 
-    // Update drag controller
-    const resourceLayout = this._computeResourceLayout(groups);
+    const resourceLayout = this._computeResourceLayout(
+      groups,
+      resourceTrackMap,
+    );
     this._drag.updateLayout(
       this.gridScrollRef,
       resourceLayout,
@@ -750,86 +770,39 @@ export class JanusTimeline extends LitElement {
     const visibleCenter = this._getVisibleCenterMs();
     const navLabel = formatNavDate(visibleCenter, level, tz);
 
+    // Mobile short date format (e.g. THURSDAY \n Oct 26)
+    const d = new Date(visibleCenter); // Approximation for simple parsing without full timezone logic here
+    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+    const shortDate = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
     return html`
-      <div class="tl-component-shell">
-        <header class="tl-topbar">
-          <nav class="tl-nav">
-            <button
-              class="tl-nav__arrow"
-              aria-label="Previous"
-              @click=${this._goToPrev}
-            >
-              ${ChevronLeft()}
-            </button>
-            <button class="tl-nav__today" @click=${this._goToToday}>
-              Today
-            </button>
-            <button
-              class="tl-nav__arrow"
-              aria-label="Next"
-              @click=${this._goToNext}
-            >
-              ${ChevronRight()}
-            </button>
-            <span class="tl-nav__date">${navLabel}</span>
-            <span class="tl-nav__date--short">${navLabel}</span>
-          </nav>
-          <div class="tl-topbar__right">
-            ${this._zoomPercent() !== 100
-              ? html`<span class="tl-zoom-badge"
-                  >${this._zoomPercent()}% · ${level.unit}</span
-                >`
-              : nothing}
-            ${conflicts.hasConflict && this._isConflictsBannerDismissed
-              ? html`
-                  <button
-                    class="tl-warning-badge"
-                    @click=${() => (this._isConflictsBannerDismissed = false)}
-                    title="Restore conflict warning banner"
-                  >
-                    <span>⚠</span>
-                    <span>${conflicts.messages.length}</span>
-                  </button>
-                `
-              : nothing}
-            <div class="tl-view-toggle">
-              ${(["Timeline", "Month"] as const).map(
-                (v) => html`
-                  <button
-                    class="tl-view-toggle__btn ${this.view === v
-                      ? "active"
-                      : ""}"
-                    @click=${() => this._handleViewSwitch(v)}
-                  >
-                    ${v}
-                  </button>
-                `,
-              )}
-            </div>
-            <button
-              class="tl-icon-btn tl-draw-toggle ${this.allowCreate
-                ? "tl-draw-toggle--active"
-                : ""}"
-              aria-label="Toggle draw-to-create"
-              data-tooltip="${this.allowCreate
-                ? "Draw Event ON — click to disable"
-                : "Draw Event OFF — drag on empty space to create an event"}"
-              @click=${this._toggleCreate}
-            >
-              ${PencilRulerIcon()}
-            </button>
-            <button class="tl-icon-btn" aria-label="Search">
-              ${SearchIcon()}
-            </button>
-            <button
-              class="tl-icon-btn tl-icon-btn--bell"
-              aria-label="Notifications"
-            >
-              ${BellIcon()}
-              <span class="tl-bell-dot"></span>
-            </button>
-          </div>
-        </header>
+      <div
+        class="tl-component-shell ${this.allowCreate
+          ? "tl-component-shell--draw-mode"
+          : ""}"
+      >
+        <janus-topbar
+          nav-label="${navLabel}"
+          day-name="${dayName}"
+          short-date="${shortDate}"
+          .view=${this.view}
+          ?allow-create=${this.allowCreate}
+          .zoomPercent=${this._zoomPercent()}
+          zoom-unit="${level.unit}"
+          ?has-conflict=${conflicts.hasConflict}
+          .conflict-count=${conflicts.messages.length}
+          ?is-conflicts-banner-dismissed=${this._isConflictsBannerDismissed}
+          @prev-click=${this._goToPrev}
+          @next-click=${this._goToNext}
+          @today-click=${this._goToToday}
+          @view-switch=${(e: CustomEvent) =>
+            this._handleViewSwitch(e.detail.view)}
+          @toggle-create=${this._toggleCreate}
+        ></janus-topbar>
+        >>>>>>> origin/dev
 
         <!-- Conflict warning banner -->
         ${conflicts.hasConflict && !this._isConflictsBannerDismissed
@@ -895,17 +868,23 @@ export class JanusTimeline extends LitElement {
                     ${g.label
                       ? html`<div class="tl-res-group-label">${g.label}</div>`
                       : nothing}
-                    ${g.items.map(
-                      (r) => html`
-                        <div class="tl-res-row">
+                    ${g.items.map((r) => {
+                      const tracksCount =
+                        resourceTrackMap.get(r.id)?.trackCount || 1;
+                      const rowHeightPx = tracksCount * ROW_HEIGHT;
+                      return html`
+                        <div
+                          class="tl-res-row"
+                          style="height: ${rowHeightPx}px"
+                        >
                           ${this.renderAvatar(r)}
                           <div class="tl-res-info">
                             <span class="tl-res-name">${r.name}</span>
                             <span class="tl-res-sub">${r.subtitle}</span>
                           </div>
                         </div>
-                      `,
-                    )}
+                      `;
+                    })}
                   </div>
                 `,
               )}
@@ -965,10 +944,15 @@ export class JanusTimeline extends LitElement {
                       ${g.label
                         ? html`<div class="tl-group-spacer"></div>`
                         : nothing}
-                      ${g.items.map(
-                        (r) => html`
+                      ${g.items.map((r) => {
+                        const trackInfo = resourceTrackMap.get(r.id);
+                        const tracksCount = trackInfo?.trackCount || 1;
+                        const evTracks = trackInfo?.eventTracks;
+                        const rowHeightPx = tracksCount * ROW_HEIGHT;
+                        return html`
                           <div
                             class="tl-event-row"
+                            style="height: ${rowHeightPx}px"
                             data-resource-id=${r.id}
                             @pointerdown=${(e: PointerEvent) =>
                               this._onRowPointerDown(e, r.id)}
@@ -982,76 +966,114 @@ export class JanusTimeline extends LitElement {
                                 ></div>`,
                             )}
                             <!-- Events -->
-                            ${r.events.map((ev) => {
-                              const evLeft = timestampToPx(
-                                ev.startMs,
-                                viewStartMs,
-                                pxPerMs,
+                            ${(() => {
+                              const sortedEvents = [...r.events].sort(
+                                (a, b) => a.startMs - b.startMs,
                               );
-                              const evWidth =
-                                timestampToPx(ev.endMs, viewStartMs, pxPerMs) -
-                                evLeft;
-                              // Don't render events that are too small to see
-                              if (evWidth < 2) return nothing;
-                              return html`
-                                <div
-                                  class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
-                                    ev,
-                                  )
-                                    ? "tl-event--dragging"
-                                    : ""} ${conflicts.conflictingEventIds.has(
-                                    ev.id,
-                                  )
-                                    ? "tl-event--conflict"
-                                    : ""}"
-                                  style="left: ${evLeft +
-                                  2}px; width: ${Math.max(evWidth - 6, 4)}px;"
-                                  @pointerdown=${(e: PointerEvent) =>
-                                    this._onEventPointerDown(e, ev, r.id)}
-                                  @click=${(e: Event) =>
-                                    this._handleEventClick(e, ev)}
-                                >
+
+                              return sortedEvents.map((ev, index) => {
+                                const trackIndex = evTracks?.get(ev.id) || 0;
+                                const evTop = trackIndex * ROW_HEIGHT + 8;
+
+                                const evLeft = timestampToPx(
+                                  ev.startMs,
+                                  viewStartMs,
+                                  pxPerMs,
+                                );
+                                const evWidth =
+                                  timestampToPx(
+                                    ev.endMs,
+                                    viewStartMs,
+                                    pxPerMs,
+                                  ) - evLeft; // width based on time
+                                // Don't render events that are too small to see
+                                if (evWidth < 1) return nothing;
+
+                                // Always enforce a minimum visual width so events remain
+                                // visible and clickable at every zoom level.
+                                const MIN_EVENT_PX = 24;
+                                const displayWidth = Math.max(
+                                  evWidth,
+                                  MIN_EVENT_PX,
+                                );
+                                const isTiny = displayWidth < 60;
+                                const showTime = displayWidth >= 120;
+                                const tooltipLabel = `${ev.title} · ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}`;
+
+                                const zIndex = 10 + index;
+
+                                return html`
                                   <div
-                                    class="tl-event-resize-handle tl-event-resize-handle--start"
+                                    class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
+                                      ev,
+                                    )
+                                      ? "tl-event--dragging"
+                                      : ""} ${isTiny
+                                      ? "tl-event--tiny"
+                                      : ""} ${conflicts.conflictingEventIds.has(
+                                      ev.id,
+                                    )
+                                      ? "tl-event--conflict"
+                                      : ""}"
+                                    style="top: ${evTop}px; bottom: auto; height: ${ROW_HEIGHT -
+                                    16}px; left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
+                                    data-tooltip="${tooltipLabel}"
                                     @pointerdown=${(e: PointerEvent) =>
-                                      this._onResizePointerDown(
+                                      this._onEventPointerDown(
                                         e,
                                         ev,
                                         r.id,
-                                        "start",
+                                        evTop,
                                       )}
-                                  ></div>
-                                  <span class="tl-event__title"
-                                    >${ev.title}</span
+                                    @click=${(e: Event) =>
+                                      this._handleEventClick(e, ev)}
                                   >
-                                  ${conflicts.conflictingEventIds.has(ev.id)
-                                    ? html`<span
-                                        class="tl-event__conflict-dot"
-                                        title="Conflict overlap detected"
-                                      ></span>`
-                                    : nothing}
-                                  ${evWidth > 80
-                                    ? html`<span class="tl-event__time"
-                                        >${fmt12(ev.startTime)} –
-                                        ${fmt12(ev.endTime)}</span
-                                      >`
-                                    : nothing}
-                                  <div
-                                    class="tl-event-resize-handle tl-event-resize-handle--end"
-                                    @pointerdown=${(e: PointerEvent) =>
-                                      this._onResizePointerDown(
-                                        e,
-                                        ev,
-                                        r.id,
-                                        "end",
-                                      )}
-                                  ></div>
-                                </div>
-                              `;
-                            })}
+                                    <div
+                                      class="tl-event-resize-handle tl-event-resize-handle--start"
+                                      @pointerdown=${(e: PointerEvent) =>
+                                        this._onResizePointerDown(
+                                          e,
+                                          ev,
+                                          r.id,
+                                          "start",
+                                          evTop,
+                                        )}
+                                    ></div>
+                                    ${!isTiny
+                                      ? html`<span class="tl-event__title"
+                                          >${ev.title}</span
+                                        >`
+                                      : nothing}
+                                    ${conflicts.conflictingEventIds.has(ev.id)
+                                      ? html`<span
+                                          class="tl-event__conflict-dot"
+                                          title="Conflict overlap detected"
+                                        ></span>`
+                                      : nothing}
+                                    ${showTime
+                                      ? html`<span class="tl-event__time"
+                                          >${fmt12(ev.startTime)} –
+                                          ${fmt12(ev.endTime)}</span
+                                        >`
+                                      : nothing}
+                                    <div
+                                      class="tl-event-resize-handle tl-event-resize-handle--end"
+                                      @pointerdown=${(e: PointerEvent) =>
+                                        this._onResizePointerDown(
+                                          e,
+                                          ev,
+                                          r.id,
+                                          "end",
+                                          evTop,
+                                        )}
+                                    ></div>
+                                  </div>
+                                `;
+                              });
+                            })()}
                           </div>
-                        `,
-                      )}
+                        `;
+                      })}
                     </div>
                   `,
                 )}

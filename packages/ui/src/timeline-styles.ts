@@ -78,254 +78,6 @@ export const timelineStyles = css`
   }
 
   /* ══════════════════════════════════════════════════════════════════════════════
-     TOP BAR
-  ══════════════════════════════════════════════════════════════════════════════ */
-  .tl-topbar {
-    height: var(--topbar-h);
-    min-height: var(--topbar-h);
-    flex-shrink: 0;
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 20px;
-    z-index: 50;
-  }
-
-  /* Centre nav */
-  .tl-nav {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex: 1;
-  }
-
-  .tl-nav__arrow {
-    width: 30px;
-    height: 30px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-2);
-    transition:
-      background 0.15s,
-      color 0.15s;
-  }
-
-  .tl-nav__arrow svg {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    stroke: currentColor;
-  }
-
-  .tl-nav__arrow:hover {
-    background: var(--bg);
-    color: var(--text-1);
-  }
-
-  .tl-nav__today {
-    padding: 5px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: 7px;
-    background: var(--white);
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-1);
-    cursor: pointer;
-    transition: border-color 0.15s;
-  }
-
-  .tl-nav__today:hover {
-    border-color: var(--orange);
-  }
-
-  .tl-nav__date {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-1);
-    margin-left: 8px;
-    letter-spacing: -0.3px;
-  }
-
-  .tl-nav__date--short {
-    display: none;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-1);
-    margin-left: 8px;
-    letter-spacing: -0.2px;
-  }
-
-  /* Right actions */
-  .tl-topbar__right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-  }
-
-  .tl-view-toggle {
-    display: flex;
-    background: var(--bg);
-    border-radius: 8px;
-    padding: 3px;
-    gap: 2px;
-  }
-
-  .tl-view-toggle__btn {
-    padding: 5px 14px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-2);
-    cursor: pointer;
-    transition:
-      background 0.15s,
-      color 0.15s;
-  }
-
-  .tl-view-toggle__btn.active {
-    background: var(--white);
-    color: var(--text-1);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  }
-
-  .tl-icon-btn {
-    width: 34px;
-    height: 34px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-2);
-    transition:
-      background 0.15s,
-      color 0.15s;
-  }
-
-  .tl-icon-btn svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-  }
-
-  .tl-icon-btn:hover {
-    background: var(--bg);
-    color: var(--text-1);
-  }
-
-  .tl-icon-btn--bell {
-    position: relative;
-  }
-
-  .tl-bell-dot {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 7px;
-    height: 7px;
-    background: var(--orange);
-    border-radius: 50%;
-    border: 1.5px solid var(--white);
-  }
-
-  /* Zoom badge */
-  .tl-zoom-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 3px 10px;
-    border-radius: 6px;
-    background: var(--orange-lt);
-    color: var(--orange);
-    font-size: 12px;
-    font-weight: 600;
-    font-family: "DM Mono", monospace;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
-    user-select: none;
-    transition: opacity 0.2s;
-  }
-
-  .tl-draw-toggle {
-    position: relative;
-  }
-
-  .tl-draw-toggle--active {
-    background: var(--orange);
-    color: #fff;
-  }
-
-  .tl-draw-toggle--active:hover {
-    background: #ea6c0a;
-    color: #fff;
-  }
-
-  /* Custom tooltip using data-tooltip attribute (title doesn't work in Shadow DOM) */
-  .tl-draw-toggle::before {
-    content: attr(data-tooltip);
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    transform: translateY(-4px);
-    background: #18181b;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 1.5;
-    white-space: normal;
-    max-width: 220px;
-    width: max-content;
-    padding: 8px 12px;
-    border-radius: 8px;
-    pointer-events: none;
-    opacity: 0;
-    transition:
-      opacity 0.18s ease,
-      transform 0.18s ease;
-    z-index: 9999;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    font-family: "DM Sans", sans-serif;
-    text-align: left;
-  }
-
-  /* Tooltip caret — points UP, aligned to right side */
-  .tl-draw-toggle::after {
-    content: "";
-    position: absolute;
-    top: calc(100% + 2px);
-    right: 10px;
-    transform: translateY(-4px);
-    border: 5px solid transparent;
-    border-bottom-color: #18181b;
-    pointer-events: none;
-    opacity: 0;
-    transition:
-      opacity 0.18s ease,
-      transform 0.18s ease;
-    z-index: 9999;
-  }
-
-  .tl-draw-toggle:hover::before,
-  .tl-draw-toggle:hover::after {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* ══════════════════════════════════════════════════════════════════════════════
      TIMELINE CONTENT
   ══════════════════════════════════════════════════════════════════════════════ */
   .tl-panel {
@@ -621,18 +373,61 @@ export const timelineStyles = css`
     text-align: left;
     font-family: inherit;
     overflow: hidden;
+    box-shadow:
+      0 3px 8px rgba(0, 0, 0, 0.12),
+      0 1px 3px rgba(0, 0, 0, 0.08);
     transition:
       filter 0.15s,
-      transform 0.12s;
+      transform 0.12s,
+      box-shadow 0.15s;
   }
 
   .tl-event:hover {
     filter: brightness(0.96);
     transform: scaleY(1.02);
+    box-shadow:
+      0 6px 16px rgba(0, 0, 0, 0.16),
+      0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   .tl-event:active {
     transform: scale(0.98);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  }
+
+  .tl-event--tiny {
+    padding: 2px 4px;
+    border-left-width: 3px;
+    min-width: 24px;
+    cursor: pointer;
+    overflow: visible; /* allow tooltip ::before to escape the bounds */
+  }
+
+  /* Tooltip shown when event is too narrow to display text inline */
+  .tl-event--tiny::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #18181b;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    padding: 5px 10px;
+    border-radius: 7px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    font-family: "DM Sans", sans-serif;
+  }
+
+  .tl-event--tiny:hover::before {
+    opacity: 1;
   }
 
   .tl-event__title {
@@ -847,7 +642,7 @@ export const timelineStyles = css`
   }
 
   /* Empty-space creation cursor */
-  .tl-event-row {
+  .tl-component-shell--draw-mode .tl-event-row {
     touch-action: none;
     cursor: crosshair;
   }
@@ -915,132 +710,107 @@ export const timelineStyles = css`
      RESPONSIVE
   ══════════════════════════════════════════════════════════════════════════════ */
   @media (max-width: 1100px) {
-    .tl-nav__date {
-      font-size: 15px;
-    }
   }
 
   @media (max-width: 900px) {
     :host {
       --res-col-w: 180px;
     }
-    .tl-nav__date {
-      font-size: 13px;
-    }
   }
 
   @media (max-width: 768px) {
+    /* Main Layout */
     :host {
-      --res-col-w: 160px;
+      --res-col-w: 72px;
+      --aicard-area-h: 70px;
     }
-    .tl-nav__date {
-      display: none;
-    }
-    .tl-nav__date--short {
-      display: block;
-    }
-    .tl-nav__today {
-      padding: 4px 8px;
-      font-size: 12px;
-    }
-    .tl-topbar {
-      padding: 0 12px;
-      gap: 8px;
-    }
-  }
 
-  @media (max-width: 640px) {
+    /* Fit group labels into the narrow 72px resource column */
+    .tl-res-group-label {
+      justify-content: center;
+      padding: 0;
+      font-size: 9px;
+      letter-spacing: 0.2px;
+    }
+
+    /* Resource Column Vertical Stacking */
+    .tl-res-row {
+      flex-direction: column;
+      justify-content: center;
+      align-items: center; /* Ensures avatar and text are centered horizontally */
+      gap: 6px;
+      padding: 0 4px;
+    }
+    .tl-res-info {
+      display: flex;
+      width: 100%;
+      justify-content: center;
+    }
     .tl-res-sub {
       display: none;
     }
     .tl-res-name {
-      font-size: 12px;
-    }
-    .tl-nav__date {
-      display: none;
-    }
-    .tl-view-toggle__btn {
-      padding: 4px 10px;
-      font-size: 12px;
-    }
-    .tl-topbar {
-      padding: 0 10px;
-      gap: 6px;
-    }
-    /* Hide name and subtitle, show only avatar */
-    .tl-res-info {
-      display: none;
+      font-size: 10.5px;
+      text-align: center;
+      white-space: normal;
+      line-height: 1.1;
+      font-weight: 500;
+      color: #18181b;
+      word-break: break-word;
     }
 
-    /* Shrink resource column to just fit the avatar */
-    :host {
-      --res-col-w: 60px;
+    .tl-avatar {
+      width: 32px;
+      height: 32px;
+    }
+    .tl-avatar--initials {
+      font-size: 11px;
     }
 
-    /* Center avatar in the narrower column */
-    .tl-res-row {
-      padding: 0 8px;
+    /* Time grid adjustments */
+    .tl-hour-cell {
       justify-content: center;
-      gap: 0;
-    }
-
-    .tl-res-col__header {
-      font-size: 0;
       padding: 0;
+      font-size: 11px;
+      font-weight: 600;
+      color: #52525b;
+      border-right: none;
     }
 
-    /* Smaller FAB */
+    .tl-now-line {
+      width: 1px;
+      background: #dc2626; /* Red line for now like mockup */
+    }
+    .tl-now-dot {
+      width: 8px;
+      height: 8px;
+      background: #dc2626;
+      border: 2px solid #fff;
+    }
+
+    .tl-vline {
+      background: #f4f4f5;
+    }
+
+    .tl-event-row {
+      border-bottom: 1px solid #f4f4f5;
+    }
+
+    /* Hide floating add button if bottom nav handles it */
     .tl-fab {
-      width: 42px;
-      height: 42px;
-      bottom: calc(var(--aicard-area-h) + 12px);
-      right: 16px;
-    }
-
-    .tl-fab svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    :host {
-      --aicard-area-h: 48px;
+      display: none;
     }
   }
 
   @media (max-width: 480px) {
-    .tl-view-toggle__btn {
-      padding: 3px 8px;
-      font-size: 11px;
+    /* Mobile micro-adjustments */
+    :host {
+      --res-col-w: 64px;
     }
-
-    .tl-icon-btn {
-      width: 28px;
-      height: 28px;
-    }
-
-    .tl-icon-btn svg {
-      width: 15px;
-      height: 15px;
-    }
-
-    .tl-nav {
-      gap: 2px;
-    }
-
-    .tl-nav__arrow {
-      width: 24px;
-      height: 24px;
-    }
-
-    .tl-nav__date--short {
-      margin-left: 4px;
-    }
-
-    .tl-topbar {
-      padding: 0 6px;
+    .tl-res-name {
+      font-size: 9.5px;
     }
   }
-
   /* ── Time Conflict Banner & Indicators ───────────────────────────────────── */
   .tl-conflict-banner {
     background: #fffbeb;

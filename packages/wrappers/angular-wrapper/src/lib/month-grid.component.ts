@@ -103,17 +103,20 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     state: ReturnType<typeof schedulerStore.getState>,
   ): void {
     const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { events: any[] })
+      | (HTMLElement & { events: unknown[] })
       | undefined;
     if (!el) return;
 
-    const coreEvents = Object.values(state.events) as any[];
+    const coreEvents = Object.values(state.events) as Array<{
+      id: string;
+      title: string;
+      startTime: string;
+      endTime: string;
+    }>;
     if (coreEvents.length === 0) return;
 
     const tz = state.timezone;
     const mapped = coreEvents.map((e) => {
-      const startD = new Date(e.startTime);
-      const endD = new Date(e.endTime);
       const { date: localDate, time: startTime } = isoToZonedDisplay(
         e.startTime,
         tz,
@@ -136,7 +139,7 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     const data = this.events();
     if (!data) return;
     const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { events: any[] })
+      | (HTMLElement & { events: unknown[] })
       | undefined;
     if (el) {
       el.events = data;
