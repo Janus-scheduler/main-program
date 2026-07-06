@@ -19,6 +19,8 @@ export interface EventDraft {
   description: string;
   activeColor: string;
   timezone: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 }
 
 export interface SchedulerState {
@@ -118,6 +120,10 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     if (updates.status) event.status = updates.status;
     if (updates.description !== undefined)
       event.description = updates.description;
+    if (updates.color !== undefined) event.color = updates.color;
+    if (updates.allDay !== undefined) event.allDay = updates.allDay;
+    if (updates.recurrenceRule !== undefined)
+      event.recurrenceRule = updates.recurrenceRule;
 
     // To ensure reactivity in zustand, we create a new object reference for the events record.
     set((state) => ({
@@ -245,6 +251,8 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
       description: defaults.description ?? "",
       activeColor: defaults.activeColor ?? "orange",
       timezone: defaults.timezone ?? get().timezone,
+      allDay: defaults.allDay ?? false,
+      recurrenceRule: defaults.recurrenceRule ?? "",
     };
 
     if (id === null) {

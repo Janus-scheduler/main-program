@@ -50,6 +50,21 @@ export class AppComponent {
 - **Native Angular DX**: Uses Angular Signals internally to map state properties.
 - **No Boilerplate**: Payload events are automatically unwrapped from native DOM CustomEvents.
 - **Timezone Aware**: Built-in support for IANA timezones and local browser time.
+- **Conflict Management & Prevention**: Control warning or strict blocking behaviors using `[preventConflicts]="true"`.
+
+## Conflict Prevention Config
+
+You can pass the binding to `<janus-timeline-ng>` or `<janus-scheduler-ng>` components, and capture conflict callbacks via the `(conflictDetected)` output:
+
+```html
+<!-- Strict double-booking prevention mode with callback -->
+<janus-timeline-ng
+  [preventConflicts]="true"
+  (conflictDetected)="handleConflict($event)"
+  (eventMove)="handleEventMove($event)"
+>
+</janus-timeline-ng>
+```
 
 ## Documentation
 

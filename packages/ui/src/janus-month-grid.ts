@@ -19,19 +19,17 @@ import {
   PlusIcon,
 } from "./timeline-icons"; // reuse existing icons
 
-import { schedulerStore } from "@janus-scheduler/core";
+import {
+  schedulerStore,
+  expandEvents,
+  type EventColor,
+  type SchedulerState,
+} from "@janus-scheduler/core";
 
-/** Shape of a raw event coming from the Zustand store */
-interface StoreEvent {
-  id: string;
-  title: string;
-  startTime: string;
-  endTime: string;
-}
-
-/** Shape of the Zustand store state we care about */
-interface StoreState {
-  events: Record<string, StoreEvent>;
+interface WeekEventBar extends MonthEvent {
+  startIdx: number;
+  endIdx: number;
+  track: number;
 }
 
 /** "YYYY-MM-DD" from a Date using local components */
@@ -44,71 +42,6 @@ function toLocalDateStr(d: Date): string {
 function toUtcTimeStr(d: Date): string {
   const pad = (n: number) => n.toString().padStart(2, "0");
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-}
-
-/** Expand a single store event into one MonthEvent per calendar day it spans */
-function expandToMonthEvents(e: StoreEvent): MonthEvent[] {
-  const startD = new Date(e.startTime);
-  const endD = new Date(e.endTime);
-
-  const startDateStr = toLocalDateStr(startD);
-  const endDateStr = toLocalDateStr(endD);
-  const startTime = toUtcTimeStr(startD);
-  const endTime = toUtcTimeStr(endD);
-
-  const startMidnight = new Date(
-    startD.getFullYear(),
-    startD.getMonth(),
-    startD.getDate(),
-  );
-  const endMidnight = new Date(
-    endD.getFullYear(),
-    endD.getMonth(),
-    endD.getDate(),
-  );
-  const daySpan = Math.round(
-    (endMidnight.getTime() - startMidnight.getTime()) / 86400000,
-  );
-
-  if (daySpan === 0) {
-    return [
-      {
-        id: e.id,
-        title: e.title,
-        color: "blue",
-        date: startDateStr,
-        startTime,
-        endTime,
-        isMultiDay: false,
-        spanPosition: "single",
-        endDate: endDateStr,
-      },
-    ];
-  }
-
-  const result: MonthEvent[] = [];
-  for (let i = 0; i <= daySpan; i++) {
-    const dayD = new Date(startMidnight);
-    dayD.setDate(startMidnight.getDate() + i);
-
-    let spanPosition: MonthEvent["spanPosition"];
-    if (i === 0) spanPosition = "start";
-    else if (i === daySpan) spanPosition = "end";
-    else spanPosition = "middle";
-
-    result.push({
-      id: e.id,
-      title: e.title,
-      color: "blue",
-      date: toLocalDateStr(dayD),
-      startTime: i === 0 ? startTime : undefined,
-      endTime: i === daySpan ? endTime : undefined,
-      isMultiDay: true,
-      spanPosition,
-      endDate: endDateStr,
-    });
-  }
-  return result;
 }
 
 @customElement("janus-month-grid")
@@ -132,12 +65,93 @@ export class JanusMonthGrid extends LitElement {
     if (this._unsubStore) this._unsubStore();
   }
 
-  private _syncFromStore(state: StoreState) {
-    const coreEvents = Object.values(state.events);
-    const newEvents = coreEvents.flatMap(expandToMonthEvents);
-    if (newEvents.length > 0) {
-      this.events = newEvents;
+  private _syncFromStore(state: SchedulerState) {
+    const rawEvents = Object.values(state.events);
+    const startRange = new Date(this._year, this._month - 1, 1).getTime();
+    const endRange = new Date(
+      this._year,
+      this._month + 2,
+      0,
+      23,
+      59,
+      59,
+      999,
+    ).getTime();
+    const coreEvents = expandEvents(rawEvents, startRange, endRange);
+
+    const newEvents: MonthEvent[] = [];
+
+    for (const e of coreEvents) {
+      const startD = new Date(e.startTime);
+      const endD = new Date(e.endTime);
+
+      const startDateStr = toLocalDateStr(startD);
+      const endDateStr = toLocalDateStr(endD);
+      const startTimeStr = toUtcTimeStr(startD);
+      const endTimeStr = toUtcTimeStr(endD);
+
+      // Clamp loop bounds to the visible month window [startRange, endRange]
+      const loopStartMs = Math.max(startD.getTime(), startRange);
+      const loopEndMs = Math.min(endD.getTime(), endRange);
+
+      if (loopStartMs > loopEndMs) continue;
+
+      const loopStartD = new Date(loopStartMs);
+      const loopEndD = new Date(loopEndMs);
+
+      // Create a local midnight/noon safe cursor to iterate through all calendar dates.
+      // Setting time to 12:00:00 avoids timezone/DST boundary jump errors.
+      const current = new Date(
+        loopStartD.getFullYear(),
+        loopStartD.getMonth(),
+        loopStartD.getDate(),
+        12,
+        0,
+        0,
+      );
+      const endLimit = new Date(
+        loopEndD.getFullYear(),
+        loopEndD.getMonth(),
+        loopEndD.getDate(),
+        12,
+        0,
+        0,
+      );
+
+      while (current <= endLimit) {
+        const currentDateStr = toLocalDateStr(current);
+        const isMultiDay = startDateStr !== endDateStr;
+
+        let spanPosition: MonthEvent["spanPosition"] = "single";
+        if (isMultiDay) {
+          if (currentDateStr === startDateStr) {
+            spanPosition = "start";
+          } else if (currentDateStr === endDateStr) {
+            spanPosition = "end";
+          } else {
+            spanPosition = "middle";
+          }
+        }
+
+        newEvents.push({
+          id: e.id,
+          title: e.title,
+          color: (e.color || "blue") as EventColor,
+          date: currentDateStr,
+          startTime: e.allDay ? undefined : startTimeStr,
+          endTime: e.allDay ? undefined : endTimeStr,
+          allDay: e.allDay,
+          recurrenceRule: e.recurrenceRule,
+          isMultiDay,
+          spanPosition,
+          startDate: startDateStr,
+          endDate: endDateStr,
+        });
+        current.setDate(current.getDate() + 1);
+      }
     }
+
+    this.events = newEvents;
   }
 
   // ── Internal state ────────────────────────────────────────────────────
@@ -145,6 +159,7 @@ export class JanusMonthGrid extends LitElement {
   @state() private _month = new Date().getMonth(); // 0-based
   @state() private _view: "Timeline" | "Month" = "Month";
   @state() private _selectedDateStr: string | null = null;
+  @state() private _hoveredEventId: string | null = null;
 
   // ── Navigation ────────────────────────────────────────────────────────
   private _prevMonth() {
@@ -179,6 +194,12 @@ export class JanusMonthGrid extends LitElement {
     const now = new Date();
     this._year = now.getFullYear();
     this._month = now.getMonth();
+  }
+
+  willUpdate(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has("_year") || changedProperties.has("_month")) {
+      this._syncFromStore(schedulerStore.getState());
+    }
   }
 
   override firstUpdated() {
@@ -233,55 +254,6 @@ export class JanusMonthGrid extends LitElement {
 
   // ── Render helpers ────────────────────────────────────────────────────
 
-  /** Renders a single event chip inside a day cell */
-  private _renderEventChip(ev: MonthEvent) {
-    const timeLabel = ev.startTime ? `${fmt12(ev.startTime)} · ` : "";
-    return html`
-      <button
-        class="mg-event mg-event--${ev.color}"
-        @click=${(e: Event) => {
-          e.stopPropagation();
-          this._handleEventClick(ev);
-        }}
-        title="${timeLabel}${ev.title}"
-      >
-        <span class="mg-event__title">${ev.title}</span>
-      </button>
-    `;
-  }
-
-  /** Renders one day cell */
-  private _renderDay(day: CalendarDay) {
-    const MAX_VISIBLE = 3; // how many chips to show before "+N more"
-    const visible = day.events.slice(0, MAX_VISIBLE);
-
-    const classes = [
-      "mg-day-cell",
-      day.isCurrentMonth ? "" : "mg-day-cell--other",
-      day.isToday ? "mg-day-cell--today" : "",
-      day.dateStr === this._selectedDateStr ? "mg-day-cell--selected" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-
-    return html`
-      <div class=${classes} @click=${() => this._handleDayClick(day)}>
-        <div class="mg-day-cell__top">
-          ${day.isToday
-            ? html`
-                <span class="mg-today-badge">${day.dayNum}</span>
-                <span class="mg-today-label">TODAY</span>
-              `
-            : html`<span class="mg-day-cell__num">${day.dayNum}</span>`}
-        </div>
-
-        <div class="mg-day-cell__dots">
-          ${visible.map((ev) => this._renderEventChip(ev))}
-        </div>
-      </div>
-    `;
-  }
-
   private _renderDayPanel(day: CalendarDay | null) {
     if (!day) return nothing;
 
@@ -311,11 +283,15 @@ export class JanusMonthGrid extends LitElement {
                   ></div>
                   <div class="mg-day-panel__event-info">
                     <span class="mg-day-panel__event-title">${ev.title}</span>
-                    ${ev.startTime && ev.endTime
-                      ? html`<span class="mg-day-panel__event-time">
-                          ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}
-                        </span>`
-                      : nothing}
+                    ${ev.allDay
+                      ? html`<span class="mg-day-panel__event-time"
+                          >All-day</span
+                        >`
+                      : ev.startTime && ev.endTime
+                        ? html`<span class="mg-day-panel__event-time">
+                            ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}
+                          </span>`
+                        : nothing}
                   </div>
                 </div>
               `,
@@ -396,13 +372,179 @@ export class JanusMonthGrid extends LitElement {
             class="mg-grid"
             style="grid-template-rows: repeat(${rowCount}, 1fr)"
           >
-            ${grid.map(
-              (week) => html`
-                <div class="mg-week-row">
-                  ${week.map((day) => this._renderDay(day))}
+            ${grid.map((week) => {
+              const weekEvents: WeekEventBar[] = [];
+              const uniqueIds = new Set<string>();
+              for (const day of week) {
+                for (const ev of day.events) {
+                  uniqueIds.add(ev.id);
+                }
+              }
+
+              for (const id of uniqueIds) {
+                let startIdx = -1;
+                let endIdx = -1;
+                let eventRef: MonthEvent | undefined;
+
+                for (let idx = 0; idx < 7; idx++) {
+                  const ev = week[idx].events.find((e) => e.id === id);
+                  if (ev) {
+                    if (startIdx === -1) {
+                      startIdx = idx;
+                    }
+                    endIdx = idx;
+                    eventRef = ev;
+                  }
+                }
+
+                if (eventRef) {
+                  weekEvents.push({
+                    id: eventRef.id,
+                    title: eventRef.title,
+                    color: eventRef.color,
+                    allDay: eventRef.allDay,
+                    startTime: eventRef.startTime,
+                    endTime: eventRef.endTime,
+                    date: eventRef.date,
+                    isMultiDay: eventRef.isMultiDay,
+                    spanPosition: eventRef.spanPosition,
+                    startDate: eventRef.startDate,
+                    endDate: eventRef.endDate,
+                    startIdx,
+                    endIdx,
+                    track: -1,
+                  });
+                }
+              }
+
+              // Sort bars: wider first
+              weekEvents.sort((a, b) => {
+                const durA = a.endIdx - a.startIdx;
+                const durB = b.endIdx - b.startIdx;
+                if (durA !== durB) return durB - durA;
+                return a.startIdx - b.startIdx;
+              });
+
+              // Greedy track assignment
+              const trackFills: boolean[][] = [];
+              for (const bar of weekEvents) {
+                let assignedTrack = 0;
+                while (true) {
+                  if (!trackFills[assignedTrack]) {
+                    trackFills[assignedTrack] = new Array(7).fill(false);
+                  }
+                  let hasConflict = false;
+                  for (let day = bar.startIdx; day <= bar.endIdx; day++) {
+                    if (trackFills[assignedTrack][day]) {
+                      hasConflict = true;
+                      break;
+                    }
+                  }
+                  if (!hasConflict) {
+                    bar.track = assignedTrack;
+                    for (let day = bar.startIdx; day <= bar.endIdx; day++) {
+                      trackFills[assignedTrack][day] = true;
+                    }
+                    break;
+                  }
+                  assignedTrack++;
+                }
+              }
+
+              const numTracks = trackFills.length;
+              const spanRows = numTracks + 2;
+
+              return html`
+                <div
+                  class="mg-week-row"
+                  style="grid-template-rows: 28px repeat(${numTracks}, 26px) 1fr; padding-bottom: 4px;"
+                >
+                  <!-- Background Day Cells -->
+                  ${week.map((day, colIdx) => {
+                    const classes = [
+                      "mg-day-cell",
+                      day.isCurrentMonth ? "" : "mg-day-cell--other",
+                      day.isToday ? "mg-day-cell--today" : "",
+                      day.dateStr === this._selectedDateStr
+                        ? "mg-day-cell--selected"
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
+                    return html`
+                      <div
+                        class=${classes}
+                        style="grid-column: ${colIdx +
+                        1}; grid-row: 1 / span ${spanRows};"
+                        @click=${() => this._handleDayClick(day)}
+                      >
+                        <div class="mg-day-cell__top">
+                          ${day.isToday
+                            ? html`
+                                <span class="mg-today-badge"
+                                  >${day.dayNum}</span
+                                >
+                                <span class="mg-today-label">TODAY</span>
+                              `
+                            : html`<span class="mg-day-cell__num"
+                                >${day.dayNum}</span
+                              >`}
+                        </div>
+                      </div>
+                    `;
+                  })}
+
+                  <!-- Overlay Event Bars -->
+                  ${weekEvents.map((bar) => {
+                    const timeLabel = bar.startTime
+                      ? `${fmt12(bar.startTime)} · `
+                      : "";
+                    const clipLeft =
+                      bar.startDate && bar.startDate < week[0].dateStr;
+                    const clipRight =
+                      bar.endDate && bar.endDate > week[6].dateStr;
+                    const isHovered = this._hoveredEventId === bar.id;
+
+                    const barClasses = [
+                      "mg-event",
+                      `mg-event--${bar.color}`,
+                      clipLeft ? "mg-event--clip-left" : "",
+                      clipRight ? "mg-event--clip-right" : "",
+                      isHovered ? "mg-event--hovered" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
+                    return html`
+                      <button
+                        class=${barClasses}
+                        style="
+                            grid-column: ${bar.startIdx +
+                        1} / span ${bar.endIdx - bar.startIdx + 1}; 
+                            grid-row: ${bar.track + 2}; 
+                            margin: 1px 4px; 
+                            width: calc(100% - 8px);
+                          "
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          this._handleEventClick(bar);
+                        }}
+                        @mouseenter=${() => {
+                          this._hoveredEventId = bar.id;
+                        }}
+                        @mouseleave=${() => {
+                          this._hoveredEventId = null;
+                        }}
+                        title="${timeLabel}${bar.title}"
+                      >
+                        <span class="mg-event__title">${bar.title}</span>
+                      </button>
+                    `;
+                  })}
                 </div>
-              `,
-            )}
+              `;
+            })}
           </div>
         </div>
 

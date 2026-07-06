@@ -131,6 +131,9 @@ export class App {
         resourceIds: data.participants || ['r1'],
         description: data.description,
         status: 'confirmed' as const,
+        color: data.activeColor,
+        allDay: data.allDay,
+        recurrenceRule: data.recurrenceRule,
       };
 
       if (data.id) {

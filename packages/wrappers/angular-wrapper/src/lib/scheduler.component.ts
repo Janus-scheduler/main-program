@@ -58,6 +58,9 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly participants = input<string[] | undefined>(undefined);
   readonly description = input<string | undefined>(undefined);
   readonly activeColor = input<string | undefined>(undefined);
+  readonly allDay = input<boolean | undefined>(undefined);
+  readonly recurrenceRule = input<string | undefined>(undefined);
+  readonly preventConflicts = input<boolean | undefined>(undefined);
 
   /** Emitted when the user closes the scheduler modal */
   readonly close = output<void>();
@@ -115,6 +118,11 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
         el.participants = this.participants();
       if (this.description() !== undefined) el.description = this.description();
       if (this.activeColor() !== undefined) el.activeColor = this.activeColor();
+      if (this.allDay() !== undefined) el.allDay = this.allDay();
+      if (this.recurrenceRule() !== undefined)
+        el.recurrenceRule = this.recurrenceRule();
+      if (this.preventConflicts() !== undefined)
+        el.preventConflicts = this.preventConflicts();
     }
   }
 }

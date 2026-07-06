@@ -92,6 +92,9 @@ export interface SchedulerProps extends React.HTMLAttributes<HTMLElement> {
   description?: string;
   activeColor?: string;
   error?: string | null;
+  allDay?: boolean;
+  recurrenceRule?: string;
+  preventConflicts?: boolean;
   onClose?: () => void;
   onSave?: (detail: SchedulerSaveData) => void;
   onDelete?: (detail: { id: string | null; title: string }) => void;
@@ -125,6 +128,7 @@ const _Timeline = createComponent({
     onEventCreate: "event-create",
     onAddEvent: "add-event",
     onViewChange: "view-change",
+    onConflictDetected: "conflict-detected",
   },
 });
 
@@ -133,33 +137,53 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   view?: "Timeline" | "Month";
   currentDate?: Date;
   aiPrompt?: string;
+  preventConflicts?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onEventMove?: (detail: EventMoveDetail) => void;
   onEventResize?: (detail: EventResizeDetail) => void;
   onEventCreate?: (detail: EventCreateDetail) => void;
   onAddEvent?: () => void;
   onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onConflictDetected?: (detail: {
+    message: string;
+    action: string;
+    detail: any;
+  }) => void;
+}
+
+function withConflictBypass<T>(
+  prevent: boolean | undefined,
+  callback?: (detail: T) => void,
+) {
+  if (!callback) return undefined;
+  return (e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    if (prevent && detail?.hasConflict) {
+      return;
+    }
+    callback(detail);
+  };
 }
 
 export function Timeline(props: TimelineProps): React.JSX.Element {
   return React.createElement(_Timeline, {
     ...props,
+    onConflictDetected: props.onConflictDetected
+      ? (e: Event) => props.onConflictDetected!((e as CustomEvent).detail)
+      : undefined,
     onEventClick: props.onEventClick
       ? (e: Event) =>
           props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
       : undefined,
-    onEventMove: props.onEventMove
-      ? (e: Event) =>
-          props.onEventMove!((e as CustomEvent<EventMoveDetail>).detail)
-      : undefined,
-    onEventResize: props.onEventResize
-      ? (e: Event) =>
-          props.onEventResize!((e as CustomEvent<EventResizeDetail>).detail)
-      : undefined,
-    onEventCreate: props.onEventCreate
-      ? (e: Event) =>
-          props.onEventCreate!((e as CustomEvent<EventCreateDetail>).detail)
-      : undefined,
+    onEventMove: withConflictBypass(props.preventConflicts, props.onEventMove),
+    onEventResize: withConflictBypass(
+      props.preventConflicts,
+      props.onEventResize,
+    ),
+    onEventCreate: withConflictBypass(
+      props.preventConflicts,
+      props.onEventCreate,
+    ),
     onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
     onViewChange: props.onViewChange
       ? (e: Event) =>

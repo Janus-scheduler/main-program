@@ -90,6 +90,9 @@ export interface SchedulerProps {
   description?: string;
   activeColor?: string;
   error?: string | null;
+  allDay?: boolean;
+  recurrenceRule?: string;
+  preventConflicts?: boolean;
   onClose?: () => void;
   onSave?: (detail: SchedulerSaveData) => void;
   onDelete?: (detail: SchedulerDeleteData) => void;
@@ -112,6 +115,11 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
       if (props.description !== undefined) el.description = props.description;
       if (props.activeColor !== undefined) el.activeColor = props.activeColor;
       if (props.error !== undefined) el.error = props.error;
+      if (props.allDay !== undefined) el.allDay = props.allDay;
+      if (props.recurrenceRule !== undefined)
+        el.recurrenceRule = props.recurrenceRule;
+      if (props.preventConflicts !== undefined)
+        el.preventConflicts = props.preventConflicts;
     }
   });
 
@@ -155,12 +163,18 @@ export interface TimelineProps {
   view?: "Timeline" | "Month";
   currentDate?: Date;
   aiPrompt?: string;
+  preventConflicts?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onAddEvent?: () => void;
   onEventMove?: (detail: EventMoveDetail) => void;
   onEventResize?: (detail: EventResizeDetail) => void;
   onEventCreate?: (detail: EventCreateDetail) => void;
   onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onConflictDetected?: (detail: {
+    message: string;
+    action: string;
+    detail: any;
+  }) => void;
 }
 
 export const Timeline: Component<TimelineProps> = (props) => {
@@ -173,6 +187,8 @@ export const Timeline: Component<TimelineProps> = (props) => {
       if (props.view !== undefined) el.view = props.view;
       if (props.currentDate !== undefined) el.currentDate = props.currentDate;
       if (props.aiPrompt !== undefined) el.aiPrompt = props.aiPrompt;
+      if (props.preventConflicts !== undefined)
+        el.preventConflicts = props.preventConflicts;
     }
   });
 
@@ -184,12 +200,31 @@ export const Timeline: Component<TimelineProps> = (props) => {
         onCleanup(() => ref?.removeEventListener(eventName, listener));
       }
     };
+
+    const attachMoveResizeCreate = <T,>(
+      eventName: string,
+      handler?: (detail: T) => void,
+    ) => {
+      if (handler) {
+        const listener = (e: Event) => {
+          const detail = (e as CustomEvent).detail;
+          if (props.preventConflicts && (detail as any).hasConflict) {
+            return;
+          }
+          handler(detail as T);
+        };
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
+      }
+    };
+
     attach("event-click", props.onEventClick);
     attach("add-event", props.onAddEvent);
-    attach("event-move", props.onEventMove);
-    attach("event-resize", props.onEventResize);
-    attach("event-create", props.onEventCreate);
+    attachMoveResizeCreate("event-move", props.onEventMove);
+    attachMoveResizeCreate("event-resize", props.onEventResize);
+    attachMoveResizeCreate("event-create", props.onEventCreate);
     attach("view-change", props.onViewChange);
+    attach("conflict-detected", props.onConflictDetected);
   });
 
   return (

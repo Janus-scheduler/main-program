@@ -49,6 +49,20 @@ export class JanusTopbar extends LitElement {
   /** Current zoom-level unit label (e.g. "15 min", "1 hr"). */
   @property({ type: String, attribute: "zoom-unit" }) zoomUnit = "";
 
+  @property({ type: Boolean, attribute: "has-conflict" }) hasConflict = false;
+  @property({ type: Number, attribute: "conflict-count" }) conflictCount = 0;
+  @property({ type: Boolean, attribute: "is-conflicts-banner-dismissed" })
+  isConflictsBannerDismissed = false;
+
+  private _emitRestoreConflicts() {
+    this.dispatchEvent(
+      new CustomEvent("restore-conflicts-banner", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   /* ──────────────────────────────────────────────────────────────────────── */
   /*  Event dispatchers                                                      */
   /* ──────────────────────────────────────────────────────────────────────── */
@@ -121,6 +135,18 @@ export class JanusTopbar extends LitElement {
           </button>
         </nav>
         <div class="tl-topbar__right">
+          ${this.hasConflict && this.isConflictsBannerDismissed
+            ? html`
+                <button
+                  class="tl-warning-badge"
+                  @click=${this._emitRestoreConflicts}
+                  title="Restore conflict warning banner"
+                >
+                  <span>⚠</span>
+                  <span>${this.conflictCount}</span>
+                </button>
+              `
+            : nothing}
           ${this.zoomPercent !== 100
             ? html`<span class="tl-zoom-badge"
                 >${this.zoomPercent}% · ${this.zoomUnit}</span

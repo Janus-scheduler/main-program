@@ -143,6 +143,35 @@ describe("SchedulerManager", () => {
       expect(manager.getEventsByDate("2026-06-02")).toEqual([e1, e2]);
       expect(manager.getEventsByDate("2026-06-03")).toEqual([]);
     });
+
+    it("should resolve occurrence IDs and shift time on updateEvent", () => {
+      const manager = new SchedulerManager();
+      const parentEvent = manager.addEvent({
+        id: "evt-recur",
+        title: "Recurring Event",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+        recurrenceRule: "FREQ=WEEKLY",
+      });
+
+      // 1. Check resolving occurrence ID to its base event
+      const occId = "evt-recur_occ_1773050400000"; // some timestamp
+      const resolved = manager.getEvent(occId);
+      expect(resolved).toBe(parentEvent);
+
+      // 2. Check time shift logic when updating an occurrence
+      const originalOccStartMs = new Date("2026-06-09T10:00:00Z").getTime(); // 1 week later
+      const occShiftedStartIso = "2026-06-09T12:30:00Z"; // shifted by 2.5 hours
+      const targetOccId = `evt-recur_occ_${originalOccStartMs}`;
+
+      manager.updateEvent(targetOccId, { startTime: occShiftedStartIso });
+
+      // Parent event should be shifted by 2.5 hours (10:00 -> 12:30)
+      const updatedParent = manager.getEvent("evt-recur");
+      expect(updatedParent?.startTime).toBe("2026-06-02T12:30:00.000Z");
+      expect(updatedParent?.endTime).toBe("2026-06-02T13:30:00.000Z");
+    });
   });
 
   describe("Resources", () => {
