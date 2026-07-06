@@ -1,0 +1,353 @@
+import { css } from "lit";
+
+export const topbarStyles = css`
+  /* ── Design tokens (inherited from host) ───────────────────────────────── */
+  :host {
+    --white: #ffffff;
+    --bg: #f4f4f5;
+    --border: #e4e4e7;
+    --text-1: #18181b;
+    --text-2: #71717a;
+    --text-3: #a1a1aa;
+    --orange: #f97316;
+    --orange-lt: #fff7ed;
+    --topbar-h: 56px;
+
+    display: block;
+    font-family: "DM Sans", sans-serif;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════
+     TOP BAR
+  ══════════════════════════════════════════════════════════════════════════════ */
+  .tl-topbar {
+    height: var(--topbar-h);
+    min-height: var(--topbar-h);
+    flex-shrink: 0;
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 20px;
+    z-index: 50;
+  }
+
+  /* Centre nav */
+  .tl-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .tl-nav__center {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tl-nav__arrow {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-2);
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+
+  .tl-nav__arrow svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke: currentColor;
+  }
+
+  .tl-nav__arrow:hover {
+    background: var(--bg);
+    color: var(--text-1);
+  }
+
+  .tl-nav__today {
+    padding: 5px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    background: var(--white);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-1);
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .tl-nav__today:hover {
+    border-color: var(--orange);
+  }
+
+  .tl-nav__date {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-1);
+    margin-left: 8px;
+    letter-spacing: -0.3px;
+  }
+
+  .tl-nav__date--short {
+    display: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
+    margin-left: 8px;
+    letter-spacing: -0.2px;
+  }
+
+  /* Right actions */
+  .tl-topbar__right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .tl-view-toggle {
+    display: flex;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+
+  .tl-view-toggle__btn {
+    padding: 5px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+
+  .tl-view-toggle__btn.active {
+    background: var(--white);
+    color: var(--text-1);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  }
+
+  .tl-icon-btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-2);
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+
+  .tl-icon-btn svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .tl-icon-btn:hover {
+    background: var(--bg);
+    color: var(--text-1);
+  }
+
+  .tl-icon-btn--bell {
+    position: relative;
+  }
+
+  .tl-bell-dot {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 7px;
+    height: 7px;
+    background: var(--orange);
+    border-radius: 50%;
+    border: 1.5px solid var(--white);
+  }
+
+  /* Zoom badge */
+  .tl-zoom-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: var(--orange-lt);
+    color: var(--orange);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: "DM Mono", monospace;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    user-select: none;
+    transition: opacity 0.2s;
+  }
+
+  .tl-draw-toggle {
+    position: relative;
+  }
+
+  .tl-draw-toggle--active {
+    background: var(--orange);
+    color: #fff;
+  }
+
+  .tl-draw-toggle--active:hover {
+    background: #ea6c0a;
+    color: #fff;
+  }
+
+  /* Custom tooltip using data-tooltip attribute (title doesn't work in Shadow DOM) */
+  .tl-draw-toggle::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    transform: translateY(-4px);
+    background: #18181b;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: normal;
+    max-width: 220px;
+    width: max-content;
+    padding: 8px 12px;
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+    z-index: 9999;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    font-family: "DM Sans", sans-serif;
+    text-align: left;
+  }
+
+  /* Tooltip caret — points UP, aligned to right side */
+  .tl-draw-toggle::after {
+    content: "";
+    position: absolute;
+    top: calc(100% + 2px);
+    right: 10px;
+    transform: translateY(-4px);
+    border: 5px solid transparent;
+    border-bottom-color: #18181b;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+    z-index: 9999;
+  }
+
+  .tl-draw-toggle:hover::before,
+  .tl-draw-toggle:hover::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════
+     RESPONSIVE
+  ══════════════════════════════════════════════════════════════════════════════ */
+  @media (max-width: 1100px) {
+    .tl-nav__date {
+      font-size: 15px;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .tl-nav__date {
+      font-size: 13px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    :host {
+      --topbar-h: 64px;
+    }
+
+    /* Topbar styling matching mockup */
+    .tl-topbar {
+      height: auto;
+      padding: 12px 16px;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+    .tl-topbar__right {
+      width: 100%;
+      margin-left: 0;
+      justify-content: space-between;
+    }
+    .tl-view-toggle {
+      margin-right: auto;
+    }
+    .tl-nav {
+      flex: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .tl-nav__today {
+      display: none;
+    }
+
+    .tl-nav__arrow {
+      color: #18181b;
+      background: transparent;
+    }
+    .tl-nav__date {
+      display: none;
+    }
+    .tl-nav__date--short {
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* Center-align text */
+      margin: 0;
+      line-height: 1.2;
+    }
+    .tl-nav-day-name {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--text-2);
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .tl-nav-date-text {
+      font-size: 16px;
+      color: #1d4ed8; /* Match mockup blue text */
+      font-weight: 700;
+    }
+  }
+`;

@@ -1,9 +1,9 @@
-import { defineConfig } from "vite";
+import { defineConfig, PluginOption } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import path from "path";
 
 export default defineConfig({
-  plugins: [solidPlugin() as any],
+  plugins: [solidPlugin() as PluginOption],
   server: {
     port: 3000,
   },

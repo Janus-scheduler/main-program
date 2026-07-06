@@ -25,6 +25,7 @@ export class JanusEventBus {
   off<K extends keyof JanusEventMap>(event: K, handler: EventHandler<K>): void {
     if (!this.listeners[event]) return;
     const currentListeners = this.listeners[event] as Array<EventHandler<K>>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this.listeners as any)[event] = currentListeners.filter(
       (h) => h !== handler,
     );

@@ -11,13 +11,18 @@ export const aiBarStyles = css`
     --aicard-area-h: 60px;
 
     display: flex;
+    flex-direction: column;
+    justify-content: center;
     height: var(--aicard-area-h);
     min-height: var(--aicard-area-h);
-    align-items: center;
     padding: 0 24px;
     background: var(--bg);
     width: 100%;
     box-sizing: border-box;
+  }
+
+  .ai-bar-drag-handle {
+    display: none;
   }
 
   .ai-card {
@@ -84,28 +89,80 @@ export const aiBarStyles = css`
     transform: scale(0.97);
   }
 
+  .ai-card__icon-desktop {
+    display: flex;
+    align-items: center;
+    color: var(--orange);
+  }
+
+  .ai-card__icon-mobile {
+    display: none;
+    align-items: center;
+    color: var(--text-2);
+  }
+
+  .ai-card__btn-icon {
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+
   @media (max-width: 640px) {
     :host {
-      --aicard-area-h: 48px;
-      padding: 0 12px;
+      --aicard-area-h: 90px;
+      padding: 8px 16px 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .ai-bar-drag-handle {
+      display: block;
+      width: 36px;
+      height: 6px;
+      background: #d4d4d8;
+      border-radius: 4px;
+      margin: 0 auto 12px;
     }
 
     .ai-card {
-      border-radius: 10px;
-      padding: 4px 10px;
+      border-radius: 9999px; /* Pill shape */
+      padding: 6px 6px 6px 16px; /* Less padding on right for the circle button */
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      gap: 8px;
+    }
+
+    .ai-card__icon-desktop {
+      display: none;
+    }
+
+    .ai-card__icon-mobile {
+      display: flex;
     }
 
     .ai-card__input {
       font-size: 13px;
     }
 
-    .ai-card__btn {
-      padding: 5px 14px;
+    .ai-card__input::placeholder {
       font-size: 13px;
+      color: var(--text-3);
     }
 
-    .ai-card__input::placeholder {
-      font-size: 12px;
+    .ai-card__btn {
+      padding: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%; /* Circle button */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ai-card__btn-text {
+      display: none;
+    }
+
+    .ai-card__btn-icon {
+      display: flex;
     }
   }
 `;

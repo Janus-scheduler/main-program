@@ -78,6 +78,7 @@ export class TimelineDragController {
   private _requestUpdate: () => void;
   private _pxPerMs = 0;
   private _viewStartMs = 0;
+  private _originalRowTopOffset = 8;
 
   // Bound handler for cleanup
   private _boundMove: (e: PointerEvent) => void;
@@ -107,13 +108,19 @@ export class TimelineDragController {
 
   // ── Start handlers ──────────────────────────────────────────────────
 
-  startMove(e: PointerEvent, ev: TimelineEvent, resourceId: string) {
+  startMove(
+    e: PointerEvent,
+    ev: TimelineEvent,
+    resourceId: string,
+    rowTopOffset: number = 8,
+  ) {
     e.stopPropagation();
     e.preventDefault();
     this.mode = "moving";
     this._event = ev;
     this._originResourceId = resourceId;
     this._targetResourceId = resourceId;
+    this._originalRowTopOffset = rowTopOffset;
     this._originalStartMs = ev.startMs;
     this._originalEndMs = ev.endMs;
     this._startClientX = e.clientX;
@@ -127,6 +134,7 @@ export class TimelineDragController {
     ev: TimelineEvent,
     resourceId: string,
     edge: "start" | "end",
+    rowTopOffset: number = 8,
   ) {
     e.stopPropagation();
     e.preventDefault();
@@ -134,6 +142,7 @@ export class TimelineDragController {
     this._event = ev;
     this._originResourceId = resourceId;
     this._targetResourceId = resourceId;
+    this._originalRowTopOffset = rowTopOffset;
     this._originalStartMs = ev.startMs;
     this._originalEndMs = ev.endMs;
     this._startClientX = e.clientX;
@@ -260,9 +269,14 @@ export class TimelineDragController {
     const startLabel = msToTimeStr(newStartMs);
     const endLabel = msToTimeStr(newEndMs);
 
+    const ghostTopOffset =
+      this._targetResourceId === this._originResourceId
+        ? this._originalRowTopOffset
+        : 8;
+
     this.ghost = {
       left: timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
-      top: targetRow.yOffset + 8,
+      top: targetRow.yOffset + ghostTopOffset,
       width:
         timestampToPx(newEndMs, this._viewStartMs, this._pxPerMs) -
         timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
@@ -292,7 +306,7 @@ export class TimelineDragController {
 
     this.ghost = {
       left: timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
-      top: (rowEntry?.yOffset ?? 0) + 8,
+      top: (rowEntry?.yOffset ?? 0) + this._originalRowTopOffset,
       width:
         timestampToPx(endMs, this._viewStartMs, this._pxPerMs) -
         timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
@@ -321,7 +335,7 @@ export class TimelineDragController {
 
     this.ghost = {
       left: timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
-      top: (rowEntry?.yOffset ?? 0) + 8,
+      top: (rowEntry?.yOffset ?? 0) + this._originalRowTopOffset,
       width:
         timestampToPx(newEndMs, this._viewStartMs, this._pxPerMs) -
         timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
