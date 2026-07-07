@@ -87,7 +87,13 @@ function App() {
   const [selectedEventId, setSelectedEventId] = createSignal<string | null>(
     null,
   );
-  const [navData, setNavData] = createSignal<Record<string, unknown>>({
+  const [navData, setNavData] = createSignal<{
+    navLabel: string;
+    dayName: string;
+    shortDate: string;
+    zoomPercent: number;
+    zoomUnit: string;
+  }>({
     navLabel: "",
     dayName: "",
     shortDate: "",
@@ -96,8 +102,17 @@ function App() {
   });
   const [allowCreate, setAllowCreate] = createSignal(false);
 
-  let timelineRef: HTMLElement & Record<string, unknown>;
-  let monthGridRef: HTMLElement & Record<string, unknown>;
+  let timelineRef: HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+    toggleCreate: () => void;
+  };
+  let monthGridRef: HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+  };
 
   // Initialize the core manager once and populate initial data
   const manager = new SchedulerManager();
@@ -225,7 +240,7 @@ function App() {
 
         <Show when={currentView() === "Timeline"}>
           <Timeline
-            ref={(el) => (timelineRef = el)}
+            ref={(el) => (timelineRef = el as unknown as typeof timelineRef)}
             allowCreate={allowCreate()}
             onAddEvent={() => {
               setSelectedEventId(null);
@@ -274,18 +289,18 @@ function App() {
             onViewChange={(detail) => setCurrentView(detail.view)}
             onNavChange={(detail) => {
               setNavData({
-                navLabel: detail.navLabel || "",
-                dayName: detail.dayName || "",
-                shortDate: detail.shortDate || "",
-                zoomPercent: detail.zoomPercent || 100,
-                zoomUnit: detail.zoomUnit || "",
+                navLabel: (detail.navLabel as string) || "",
+                dayName: (detail.dayName as string) || "",
+                shortDate: (detail.shortDate as string) || "",
+                zoomPercent: (detail.zoomPercent as number) || 100,
+                zoomUnit: (detail.zoomUnit as string) || "",
               });
             }}
           />
         </Show>
         <Show when={currentView() === "Month"}>
           <MonthGrid
-            ref={(el) => (monthGridRef = el)}
+            ref={(el) => (monthGridRef = el as unknown as typeof monthGridRef)}
             onAddEvent={() => {
               setSelectedEventId(null);
               setSchedulerError(null);
@@ -299,11 +314,11 @@ function App() {
             onViewChange={(detail) => setCurrentView(detail.view)}
             onNavChange={(detail) => {
               setNavData({
-                navLabel: detail.navLabel || "",
-                dayName: detail.dayName || "",
-                shortDate: detail.shortDate || "",
-                zoomPercent: detail.zoomPercent || 100,
-                zoomUnit: detail.zoomUnit || "",
+                navLabel: (detail.navLabel as string) || "",
+                dayName: (detail.dayName as string) || "",
+                shortDate: (detail.shortDate as string) || "",
+                zoomPercent: (detail.zoomPercent as number) || 100,
+                zoomUnit: (detail.zoomUnit as string) || "",
               });
             }}
           />
