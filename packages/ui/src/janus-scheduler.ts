@@ -417,6 +417,8 @@ export class JanusScheduler extends LitElement {
   @state() private _selectedTz: string = schedulerStore.getState().timezone;
   @state() private _showCreateConfirm = false;
   @state() private _showDeleteConfirm = false;
+  @state() private _titleTouched = false;
+  @state() private _participantsTouched = false;
   @state() private _recurrenceFreq: "Daily" | "Weekly" | "Monthly" | "Yearly" =
     "Weekly";
   @state() private _recurrenceUntilDate = "";
@@ -534,6 +536,8 @@ export class JanusScheduler extends LitElement {
       this._isEditing = this.eventId === null;
       this._showCreateConfirm =
         this.eventId === null && this.showConfirmOnCreate;
+      this._titleTouched = false;
+      this._participantsTouched = false;
 
       const todayStr = new Date().toISOString().split("T")[0];
       const defaults = {
@@ -649,7 +653,15 @@ export class JanusScheduler extends LitElement {
   }
 
   private _handleSaveClick() {
-    if (this._invalid) return;
+    this._titleTouched = true;
+    this._participantsTouched = true;
+    if (this._invalid) {
+      this._shakeInput = true;
+      setTimeout(() => {
+        this._shakeInput = false;
+      }, 500);
+      return;
+    }
     if (this.eventId !== null) {
       this._onSave();
     } else {
@@ -734,6 +746,7 @@ export class JanusScheduler extends LitElement {
   private _removeParticipant(id: string) {
     const draft = schedulerStore.getState().eventDraft;
     if (!draft) return;
+    this._participantsTouched = true;
     const participants = draft.participants.filter((p) => p !== id);
     schedulerStore.getState().updateDraft({ participants });
   }
@@ -742,6 +755,7 @@ export class JanusScheduler extends LitElement {
     const draft = schedulerStore.getState().eventDraft;
     if (!draft) return;
 
+    this._participantsTouched = true;
     if (!draft.participants.includes(id)) {
       const participants = [...draft.participants, id];
       schedulerStore.getState().updateDraft({ participants });
@@ -1628,14 +1642,20 @@ export class JanusScheduler extends LitElement {
                                   id="event-title"
                                   type="text"
                                   .value=${draft.title}
-                                  @input=${(e: Event) =>
+                                  @input=${(e: Event) => {
+                                    this._titleTouched = true;
                                     schedulerStore.getState().updateDraft({
                                       title: (e.target as HTMLInputElement)
                                         .value,
-                                    })}
+                                    });
+                                  }}
+                                  @blur=${() => {
+                                    this._titleTouched = true;
+                                  }}
                                   placeholder="Add a title…"
                                 />
-                                ${!draft.title || !draft.title.trim()
+                                ${this._titleTouched &&
+                                (!draft.title || !draft.title.trim())
                                   ? html`<div
                                       class="dt-invalid-notice"
                                       style="margin-top: 6px;"
@@ -2031,8 +2051,9 @@ export class JanusScheduler extends LitElement {
                                       </div>
                                     `
                                   : nothing}
-                                ${!draft.participants ||
-                                draft.participants.length === 0
+                                ${this._participantsTouched &&
+                                (!draft.participants ||
+                                  draft.participants.length === 0)
                                   ? html`<div
                                       class="dt-invalid-notice"
                                       style="margin-top: 6px;"
@@ -2084,7 +2105,9 @@ export class JanusScheduler extends LitElement {
                               </button>
                               <button
                                 class="btn-save"
-                                ?disabled=${invalid}
+                                ?disabled=${this._titleTouched &&
+                                this._participantsTouched &&
+                                invalid}
                                 @click=${this._handleSaveClick}
                               >
                                 ${this.eventId ? "Save" : "Create"}
