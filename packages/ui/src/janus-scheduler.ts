@@ -396,7 +396,8 @@ export class JanusScheduler extends LitElement {
    * - a string         → edit mode     (onSave should call updateEvent, onDelete should call deleteEvent)
    */
   @property({ type: String }) eventId: string | null = null;
-  @property({ type: Boolean }) showConfirmOnCreate = false;
+  @property({ type: Boolean, attribute: "show-confirm-on-create" })
+  showConfirmOnCreate = false;
   @property({ type: Boolean, attribute: "prevent-conflicts" })
   preventConflicts = false;
 
@@ -2121,8 +2122,9 @@ export class JanusScheduler extends LitElement {
           : "#ffffff"};"
         role="alertdialog"
         aria-modal="true"
+        aria-labelledby="confirm-title"
       >
-        <h2 class="confirm-title">Confirm new event</h2>
+        <h2 class="confirm-title" id="confirm-title">Confirm new event</h2>
         <p class="confirm-subtitle">
           Review the details before creating this event.
         </p>
@@ -2277,8 +2279,9 @@ export class JanusScheduler extends LitElement {
         style="border-top: 5px solid var(--c-red); --confirm-accent: var(--c-red); --confirm-accent-text: #ffffff;"
         role="alertdialog"
         aria-modal="true"
+        aria-labelledby="delete-confirm-title"
       >
-        <h2 class="confirm-title">Delete event?</h2>
+        <h2 class="confirm-title" id="delete-confirm-title">Delete event?</h2>
         <p class="confirm-subtitle" style="margin-bottom: 20px;">
           Are you sure you want to delete this event? This action cannot be
           undone.

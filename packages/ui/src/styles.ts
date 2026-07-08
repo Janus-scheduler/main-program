@@ -2425,6 +2425,7 @@ export const schedulerStyles = css`
     padding: 28px;
     color: var(--text-primary);
     box-sizing: border-box;
+    align-self: center;
     animation: confirmSlideUp 0.22s cubic-bezier(0.25, 1, 0.5, 1);
   }
 
