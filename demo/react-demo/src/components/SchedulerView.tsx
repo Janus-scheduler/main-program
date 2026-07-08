@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Timeline, MonthGrid, Scheduler, AiBar } from "@janus-scheduler/react";
 import type { ViewType } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
@@ -64,6 +65,15 @@ export function SchedulerView({
   onOpenScheduler,
   onCloseScheduler,
 }: SchedulerViewProps) {
+  const [tempEventData, setTempEventData] = useState<{
+    startDate?: string;
+    startTime?: string;
+    endDate?: string;
+    endTime?: string;
+    participants?: string[];
+    showConfirmOnCreate?: boolean;
+  } | null>(null);
+
   // ── Helper to split ISO ────────────────────────────────────────────────
   // Convert a UTC ISO string → local { date, time } for display in the modal.
   // Uses the store's selected timezone for consistent display.
@@ -108,14 +118,17 @@ export function SchedulerView({
             });
           }}
           onEventCreate={({ resourceId, startTime, endTime }) => {
-            manager.addEvent({
-              id: `evt_${Date.now()}`,
-              title: "New Event",
-              startTime,
-              endTime,
-              resourceIds: [resourceId],
-              status: "confirmed",
+            const startStr = splitISO(startTime);
+            const endStr = splitISO(endTime);
+            setTempEventData({
+              startDate: startStr.date,
+              startTime: startStr.time,
+              endDate: endStr.date,
+              endTime: endStr.time,
+              participants: [resourceId],
+              showConfirmOnCreate: true,
             });
+            onOpenScheduler();
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
         />
@@ -132,23 +145,29 @@ export function SchedulerView({
       {showScheduler && (
         <Scheduler
           preventConflicts={preventConflicts}
-          // eventId tells the web component which event is being edited.
-          // null/undefined → create mode. string → edit mode.
-          // The component includes this in its onSave and onDelete payloads.
           eventId={selectedEventId}
           error={schedulerError}
-          title={storeEvent?.title}
-          startDate={startParts?.date}
-          startTime={startParts?.time}
-          endDate={endParts?.date}
-          endTime={endParts?.time}
+          title={
+            storeEvent ? storeEvent.title : tempEventData ? "New Event" : ""
+          }
+          startDate={storeEvent ? startParts?.date : tempEventData?.startDate}
+          startTime={storeEvent ? startParts?.time : tempEventData?.startTime}
+          endDate={storeEvent ? endParts?.date : tempEventData?.endDate}
+          endTime={storeEvent ? endParts?.time : tempEventData?.endTime}
           participants={
-            storeEvent?.resourceIds ? storeEvent.resourceIds : undefined
+            storeEvent
+              ? storeEvent.resourceIds
+                ? storeEvent.resourceIds
+                : undefined
+              : tempEventData?.participants
           }
           description={storeEvent?.description}
           activeColor={storeEvent?.color}
           allDay={storeEvent?.allDay}
           recurrenceRule={storeEvent?.recurrenceRule}
+          showConfirmOnCreate={
+            !selectedEventId && !!tempEventData?.showConfirmOnCreate
+          }
           onSave={(data) => {
             const today = new Date().toISOString().split("T")[0];
             try {
@@ -175,7 +194,7 @@ export function SchedulerView({
               } else {
                 manager.addEvent({
                   id: `evt_${Date.now()}`,
-                  title: data.title,
+                  title: data.title || "New Event",
                   startTime: zonedInputToISO(
                     data.startDate || today,
                     data.startTime,
@@ -195,6 +214,7 @@ export function SchedulerView({
                 });
                 console.log("Event added:", data);
               }
+              setTempEventData(null);
               onCloseScheduler();
             } catch (err: unknown) {
               console.error("Store rejected the event:", err);
@@ -202,9 +222,13 @@ export function SchedulerView({
           }}
           onDelete={({ id }) => {
             if (id) manager.deleteEvent(id);
+            setTempEventData(null);
             onCloseScheduler();
           }}
-          onClose={onCloseScheduler}
+          onClose={() => {
+            setTempEventData(null);
+            onCloseScheduler();
+          }}
         />
       )}
       <AiBar
