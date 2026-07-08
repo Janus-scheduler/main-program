@@ -280,19 +280,7 @@ export const topbarStyles = css`
   /* ══════════════════════════════════════════════════════════════════════════════
      RESPONSIVE
   ══════════════════════════════════════════════════════════════════════════════ */
-  @media (max-width: 1100px) {
-    .tl-nav__date {
-      font-size: 15px;
-    }
-  }
-
-  @media (max-width: 900px) {
-    .tl-nav__date {
-      font-size: 13px;
-    }
-  }
-
-  @media (max-width: 768px) {
+  @media (max-width: 700px) {
     :host {
       --topbar-h: 64px;
     }
