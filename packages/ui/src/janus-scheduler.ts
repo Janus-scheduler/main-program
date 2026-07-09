@@ -12,6 +12,7 @@ import {
   isoToZonedDisplay,
 } from "@janus-scheduler/core";
 import { schedulerStyles } from "./styles";
+import "./janus-confirm-dialog";
 
 const COLORS = [
   "orange",
@@ -2134,320 +2135,34 @@ export class JanusScheduler extends LitElement {
   }
 
   private _renderConfirmDialog(draft: any) {
-    if (!draft) return nothing;
-
     return html`
-      <div
-        class="confirm-card"
-        style="border-top: 5px solid var(--c-${draft.activeColor}); --confirm-accent: var(--c-${draft.activeColor}); --confirm-accent-text: ${draft.activeColor ===
-        "yellow"
-          ? "#18181b"
-          : "#ffffff"};"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-title"
-      >
-        <h2 class="confirm-title" id="confirm-title">Confirm new event</h2>
-        <p class="confirm-subtitle">
-          Review the details before creating this event.
-        </p>
-
-        <div class="confirm-scroll-content">
-          <div class="confirm-summary-list">
-            <!-- Event Title with Active Color Dot -->
-            <div class="confirm-summary-item">
-              <div class="confirm-summary-item-val event-title-val">
-                <span
-                  class="confirm-color-dot"
-                  style="background-color: var(--c-${draft.activeColor});"
-                ></span>
-                ${draft.title || "Untitled Event"}
-              </div>
-            </div>
-
-            <!-- Date Row with Calendar SVG Icon -->
-            <div class="confirm-summary-item">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              <div class="confirm-summary-item-val">
-                ${this._formatConfirmDate(draft.startDate)}
-              </div>
-            </div>
-
-            <!-- Time Row with Clock SVG Icon -->
-            ${!draft.allDay
-              ? html`
-                  <div class="confirm-summary-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    <div class="confirm-summary-item-val">
-                      ${formatTime(draft.startTime)} –
-                      ${formatTime(draft.endTime)}
-                    </div>
-                  </div>
-                `
-              : html`
-                  <div class="confirm-summary-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    <div class="confirm-summary-item-val">All Day</div>
-                  </div>
-                `}
-
-            <!-- Repeat Row with Repeat SVG Icon -->
-            ${draft.recurrenceRule
-              ? html`
-                  <div class="confirm-summary-item">
-                    ${RepeatIcon()}
-                    <div class="confirm-summary-item-val">
-                      ${formatRecurrence(draft.recurrenceRule)}
-                    </div>
-                  </div>
-                `
-              : nothing}
-
-            <!-- Resources/Participants Row with Users SVG Icon -->
-            ${draft.participants && draft.participants.length > 0
-              ? html`
-                  <div class="confirm-summary-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path
-                        d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"
-                      ></path>
-                      <circle cx="9" cy="7" r="4"></circle>
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                    <div class="confirm-summary-item-val">
-                      ${draft.participants
-                        .map((pId: string) => this._resolveResourceName(pId))
-                        .join(", ")}
-                    </div>
-                  </div>
-                `
-              : nothing}
-          </div>
-
-          <!-- Divider & Description -->
-          ${draft.description
-            ? html`
-                <hr class="confirm-divider" />
-                <p class="confirm-description">${draft.description}</p>
-              `
-            : nothing}
-        </div>
-
-        <!-- Footer Buttons -->
-        <div class="confirm-footer">
-          <button
-            class="confirm-btn-back"
-            @click=${() => (this._showCreateConfirm = false)}
-          >
-            Back to edit
-          </button>
-          <button class="confirm-btn-create" @click=${this._onConfirmCreate}>
-            Confirm and create
-          </button>
-        </div>
-      </div>
+      <janus-confirm-dialog
+        .draft=${draft}
+        .resolveResourceName=${(pId: string) => this._resolveResourceName(pId)}
+        title="Confirm new event"
+        subtitle="Review the details before creating this event."
+        confirmText="Confirm and create"
+        cancelText="Back to edit"
+        accentColor="orange"
+        @confirm=${this._onConfirmCreate}
+        @cancel=${() => (this._showCreateConfirm = false)}
+      ></janus-confirm-dialog>
     `;
   }
 
   private _renderDeleteConfirmDialog(draft: any) {
-    if (!draft) return nothing;
-
     return html`
-      <div
-        class="confirm-card"
-        style="border-top: 5px solid var(--c-red); --confirm-accent: var(--c-red); --confirm-accent-text: #ffffff;"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="delete-confirm-title"
-      >
-        <h2 class="confirm-title" id="delete-confirm-title">Delete event?</h2>
-        <p class="confirm-subtitle" style="margin-bottom: 20px;">
-          Are you sure you want to delete this event? This action cannot be
-          undone.
-        </p>
-
-        <div class="confirm-scroll-content">
-          <div class="confirm-summary-list">
-            <!-- Event Title with Active Color Dot -->
-            <div class="confirm-summary-item">
-              <div class="confirm-summary-item-val event-title-val">
-                <span
-                  class="confirm-color-dot"
-                  style="background-color: var(--c-${draft.activeColor});"
-                ></span>
-                ${draft.title || "Untitled Event"}
-              </div>
-            </div>
-
-            <!-- Date Row with Calendar SVG Icon -->
-            <div class="confirm-summary-item">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              <div class="confirm-summary-item-val">
-                ${this._formatConfirmDate(draft.startDate)}
-              </div>
-            </div>
-
-            <!-- Time Row with Clock SVG Icon -->
-            ${!draft.allDay
-              ? html`
-                  <div class="confirm-summary-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    <div class="confirm-summary-item-val">
-                      ${formatTime(draft.startTime)} –
-                      ${formatTime(draft.endTime)}
-                    </div>
-                  </div>
-                `
-              : html`
-                  <div class="confirm-summary-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                    <div class="confirm-summary-item-val">All Day</div>
-                  </div>
-                `}
-
-            <!-- Repeat Row with Repeat SVG Icon -->
-            ${draft.recurrenceRule
-              ? html`
-                  <div class="confirm-summary-item">
-                    ${RepeatIcon()}
-                    <div class="confirm-summary-item-val">
-                      ${formatRecurrence(draft.recurrenceRule)}
-                    </div>
-                  </div>
-                `
-              : nothing}
-
-            <!-- Resources/Participants Row with Users SVG Icon -->
-            ${draft.participants && draft.participants.length > 0
-              ? html`
-                  <div class="confirm-summary-item">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path
-                        d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"
-                      ></path>
-                      <circle cx="9" cy="7" r="4"></circle>
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                    <div class="confirm-summary-item-val">
-                      ${draft.participants
-                        .map((pId: string) => this._resolveResourceName(pId))
-                        .join(", ")}
-                    </div>
-                  </div>
-                `
-              : nothing}
-          </div>
-
-          <!-- Divider & Description -->
-          ${draft.description
-            ? html`
-                <hr class="confirm-divider" />
-                <p class="confirm-description">${draft.description}</p>
-              `
-            : nothing}
-        </div>
-
-        <!-- Footer Buttons -->
-        <div class="confirm-footer">
-          <button
-            class="confirm-btn-back"
-            @click=${() => (this._showDeleteConfirm = false)}
-          >
-            Cancel
-          </button>
-          <button class="confirm-btn-create" @click=${this._onConfirmDelete}>
-            Delete Event
-          </button>
-        </div>
-      </div>
+      <janus-confirm-dialog
+        .draft=${draft}
+        .resolveResourceName=${(pId: string) => this._resolveResourceName(pId)}
+        title="Delete event?"
+        subtitle="Are you sure you want to delete this event? This action cannot be undone."
+        confirmText="Delete Event"
+        cancelText="Cancel"
+        accentColor="red"
+        @confirm=${this._onConfirmDelete}
+        @cancel=${() => (this._showDeleteConfirm = false)}
+      ></janus-confirm-dialog>
     `;
   }
 }
