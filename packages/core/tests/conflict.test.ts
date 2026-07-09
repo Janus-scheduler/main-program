@@ -1,0 +1,156 @@
+import {
+  checkSlotConflict,
+  checkDraftConflict,
+  computeTimelineConflicts,
+  type ConflictResource,
+  type ConflictEvent,
+} from "../src/utils/conflict";
+import { type EventDraft } from "../src/index";
+
+describe("Conflict Utilities", () => {
+  describe("checkSlotConflict", () => {
+    const events: ConflictEvent[] = [
+      { id: "e1", startMs: 1000, endMs: 2000 },
+      { id: "e2", startMs: 3000, endMs: 4000 },
+    ];
+
+    it("should return false when there are no events in the slot", () => {
+      expect(checkSlotConflict(events, 0, 500)).toBe(false);
+    });
+
+    it("should return false when checking an occupied slot but ignoring its own event ID", () => {
+      expect(checkSlotConflict(events, 1200, 1800, "e1")).toBe(false);
+    });
+
+    it("should return true when a slot overlaps with an existing event", () => {
+      expect(checkSlotConflict(events, 1500, 2500)).toBe(true);
+      expect(checkSlotConflict(events, 500, 1500)).toBe(true);
+      expect(checkSlotConflict(events, 1200, 1800)).toBe(true);
+    });
+
+    it("should return false when events just touch but do not overlap", () => {
+      expect(checkSlotConflict(events, 2000, 3000)).toBe(false);
+    });
+  });
+
+  describe("checkDraftConflict", () => {
+    const existingEvents = [
+      {
+        id: "existing_1",
+        title: "Team Meeting",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceIds: ["res_1"],
+        allDay: false,
+      },
+    ];
+
+    it("should return no conflict for empty/incomplete draft properties", () => {
+      const draft: Partial<EventDraft> = {
+        title: "",
+        participants: [],
+      };
+      expect(checkDraftConflict(draft as EventDraft, [], "UTC")).toEqual({
+        hasConflict: false,
+        message: "",
+        resourceIds: [],
+      });
+    });
+
+    it("should detect conflict when a draft overlaps with an existing event for a shared participant", () => {
+      const draft: EventDraft = {
+        title: "1-on-1 Review",
+        startDate: "2026-06-02",
+        startTime: "10:15",
+        endDate: "2026-06-02",
+        endTime: "10:45",
+        participants: ["res_1"],
+        allDay: false,
+        recurrenceRule: "",
+      };
+
+      const result = checkDraftConflict(draft, existingEvents as any, "UTC");
+      expect(result.hasConflict).toBe(true);
+      expect(result.resourceIds).toContain("res_1");
+      expect(result.message).toContain("Team Meeting");
+    });
+
+    it("should not detect conflict if participants do not overlap", () => {
+      const draft: EventDraft = {
+        title: "1-on-1 Review",
+        startDate: "2026-06-02",
+        startTime: "10:15",
+        endDate: "2026-06-02",
+        endTime: "10:45",
+        participants: ["res_2"],
+        allDay: false,
+        recurrenceRule: "",
+      };
+
+      const result = checkDraftConflict(draft, existingEvents as any, "UTC");
+      expect(result.hasConflict).toBe(false);
+    });
+
+    it("should handle error gracefully and return no conflicts if zoning conversions throw errors", () => {
+      const draft: EventDraft = {
+        title: "Invalid Zone Test",
+        startDate: "2026-06-02",
+        startTime: "10:00",
+        endDate: "2026-06-02",
+        endTime: "11:00",
+        participants: ["res_1"],
+        allDay: false,
+        recurrenceRule: "",
+      };
+      // Forcing error via invalid timezone
+      const result = checkDraftConflict(
+        draft,
+        existingEvents as any,
+        "Invalid/TimeZone",
+      );
+      expect(result.hasConflict).toBe(false);
+    });
+  });
+
+  describe("computeTimelineConflicts", () => {
+    it("should return no conflicts for an empty resources list", () => {
+      expect(computeTimelineConflicts([], "UTC")).toEqual({
+        hasConflict: false,
+        messages: [],
+        conflictingEventIds: new Set(),
+      });
+    });
+
+    it("should find and group overlaps timezone-awarely", () => {
+      const resources: ConflictResource[] = [
+        {
+          id: "res_1",
+          name: "Conference Room A",
+          events: [
+            {
+              id: "ev_1",
+              title: "Scrum Daily",
+              startMs: Date.UTC(2026, 5, 2, 9, 0, 0),
+              endMs: Date.UTC(2026, 5, 2, 10, 0, 0),
+            },
+            {
+              id: "ev_2",
+              title: "Product Sync",
+              startMs: Date.UTC(2026, 5, 2, 9, 30, 0),
+              endMs: Date.UTC(2026, 5, 2, 10, 30, 0),
+            },
+          ],
+        },
+      ];
+
+      const result = computeTimelineConflicts(resources, "UTC");
+      expect(result.hasConflict).toBe(true);
+      expect(result.conflictingEventIds.has("ev_1")).toBe(true);
+      expect(result.conflictingEventIds.has("ev_2")).toBe(true);
+      expect(result.messages[0]).toContain("Conference Room A");
+      expect(result.messages[0]).toContain("Scrum Daily");
+      expect(result.messages[0]).toContain("Product Sync");
+      expect(result.messages[0]).toContain("9:30 AM");
+    });
+  });
+});

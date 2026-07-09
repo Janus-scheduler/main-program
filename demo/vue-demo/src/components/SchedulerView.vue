@@ -56,6 +56,9 @@
     .endTime="endParts.time"
     .participants="storeEvent?.resourceIds ? storeEvent.resourceIds : undefined"
     .description="storeEvent?.description"
+    .activeColor="storeEvent?.color"
+    .allDay="storeEvent?.allDay"
+    .recurrenceRule="storeEvent?.recurrenceRule"
     @save="handleSave"
     @delete="handleDelete"
     @close="$emit('close-scheduler')"
@@ -198,6 +201,9 @@ function handleSave(e: Event) {
         resourceIds: data.participants || ["r1"],
         description: data.description,
         status: "confirmed",
+        color: data.activeColor,
+        allDay: data.allDay,
+        recurrenceRule: data.recurrenceRule,
       });
     } else {
       props.manager.addEvent({
@@ -208,6 +214,9 @@ function handleSave(e: Event) {
         resourceIds: data.participants || ["r1"],
         description: data.description,
         status: "confirmed",
+        color: data.activeColor,
+        allDay: data.allDay,
+        recurrenceRule: data.recurrenceRule,
       });
     }
     emit("close-scheduler");

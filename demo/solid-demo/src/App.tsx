@@ -336,6 +336,9 @@ function App() {
               storeEvent()?.resourceIds ? storeEvent()!.resourceIds : undefined
             }
             description={storeEvent()?.description}
+            activeColor={storeEvent()?.color}
+            allDay={storeEvent()?.allDay}
+            recurrenceRule={storeEvent()?.recurrenceRule}
             error={schedulerError()}
             onSave={(data) => {
               try {
@@ -356,10 +359,13 @@ function App() {
                   resourceIds: data.participants || ["r1"],
                   description: data.description,
                   status: "confirmed" as const,
+                  color: data.activeColor,
+                  allDay: data.allDay,
+                  recurrenceRule: data.recurrenceRule,
                 };
 
-                if (selectedEventId()) {
-                  manager.updateEvent(selectedEventId()!, eventData);
+                if (data.id) {
+                  manager.updateEvent(data.id, eventData);
                 } else {
                   manager.addEvent(eventData);
                 }

@@ -63,6 +63,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** When true, dragging on empty row space creates a new event */
   readonly allowCreate = input<boolean>(false);
 
+  /** When true, resource conflicts/double-bookings are strictly blocked */
+  readonly preventConflicts = input<boolean>(false);
+
   /** Emitted when an event is clicked */
   readonly eventClick = output<TimelineEvent>();
 
@@ -83,6 +86,12 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   /** Emitted when the date/zoom nav state changes */
   readonly navChange = output<Record<string, unknown>>();
+  /** Emitted when a resource conflict is detected */
+  readonly conflictDetected = output<{
+    message: string;
+    action: string;
+    detail: any;
+  }>();
 
   private _unsubStore?: () => void;
 
@@ -94,17 +103,28 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.addEvent.emit();
   };
+  private _emitWithConflictBypass<T>(
+    output: { emit: (val: T) => void },
+    event: Event,
+  ) {
+    const detail = (event as CustomEvent).detail;
+    if (this.preventConflicts() && detail.hasConflict) {
+      return;
+    }
+    output.emit(detail);
+  }
+
   private _eventMoveHandler = (e: Event) => {
     e.stopPropagation();
-    this.eventMove.emit((e as CustomEvent).detail);
+    this._emitWithConflictBypass(this.eventMove, e);
   };
   private _eventResizeHandler = (e: Event) => {
     e.stopPropagation();
-    this.eventResize.emit((e as CustomEvent).detail);
+    this._emitWithConflictBypass(this.eventResize, e);
   };
   private _eventCreateHandler = (e: Event) => {
     e.stopPropagation();
-    this.eventCreate.emit((e as CustomEvent).detail);
+    this._emitWithConflictBypass(this.eventCreate, e);
   };
   private _viewChangeHandler = (e: Event) => {
     e.stopPropagation();
@@ -146,6 +166,10 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
       this._elRef().nativeElement as HTMLElement & { toggleCreate: () => void }
     ).toggleCreate();
   }
+  private _conflictDetectedHandler = (e: Event) => {
+    e.stopPropagation();
+    this.conflictDetected.emit((e as CustomEvent).detail);
+  };
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
@@ -156,6 +180,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("event-create", this._eventCreateHandler);
     el.addEventListener("view-change", this._viewChangeHandler);
     el.addEventListener("nav-change", this._navChangeHandler);
+    el.addEventListener("conflict-detected", this._conflictDetectedHandler);
 
     this._applyAllowCreate();
 
@@ -183,6 +208,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("event-create", this._eventCreateHandler);
     el?.removeEventListener("view-change", this._viewChangeHandler);
     el?.removeEventListener("nav-change", this._navChangeHandler);
+    el?.removeEventListener("conflict-detected", this._conflictDetectedHandler);
     this._unsubStore?.();
   }
 
@@ -304,10 +330,11 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private _applyAllowCreate(): void {
     const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { allowCreate: boolean })
+      | (HTMLElement & { allowCreate: boolean; preventConflicts: boolean })
       | undefined;
     if (el) {
       el.allowCreate = this.allowCreate();
+      el.preventConflicts = this.preventConflicts();
     }
   }
 }

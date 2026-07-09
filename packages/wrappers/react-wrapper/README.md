@@ -46,6 +46,22 @@ export default function App() {
 - **Native React DX**: Fully strongly-typed props and inline callbacks.
 - **No Boilerplate**: Payload events are automatically unwrapped from native DOM CustomEvents.
 - **Timezone Aware**: Built-in support for IANA timezones and local browser time.
+- **Conflict Management & Prevention**: Configure warning or strict double-booking prevention modes using `preventConflicts={true}`.
+
+## Conflict Prevention Config
+
+You can pass `preventConflicts` to either `<Timeline>` or `<Scheduler>` components. You can also listen to conflict-detected events using `onConflictDetected`:
+
+```tsx
+// Strict double-booking prevention mode with callback
+<Timeline
+  preventConflicts={true}
+  onConflictDetected={({ message, action, detail }) => {
+    console.warn(`Double-booking prevented during ${action}: ${message}`);
+  }}
+  onEventMove={handleEventMove}
+/>
+```
 
 ## Documentation
 

@@ -29,6 +29,7 @@ interface SchedulerViewProps {
   selectedEventId: string | null;
   /** The SchedulerManager instance — used to mutate store state */
   manager: SchedulerManager;
+  preventConflicts: boolean;
   /**
    * @param eventId - string when opening in edit mode (event was clicked),
    *                  undefined/null when opening in create mode (FAB was clicked).
@@ -65,6 +66,7 @@ export function SchedulerView({
   schedulerError,
   selectedEventId,
   manager,
+  preventConflicts,
   onViewChange,
   onOpenScheduler,
   onCloseScheduler,
@@ -148,6 +150,7 @@ export function SchedulerView({
         <Timeline
           ref={timelineRef}
           allowCreate={allowCreate}
+          preventConflicts={preventConflicts}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
           onEventMove={({
@@ -201,6 +204,7 @@ export function SchedulerView({
 
       {showScheduler && (
         <Scheduler
+          preventConflicts={preventConflicts}
           // eventId tells the web component which event is being edited.
           // null/undefined → create mode. string → edit mode.
           // The component includes this in its onSave and onDelete payloads.
@@ -215,6 +219,9 @@ export function SchedulerView({
             storeEvent?.resourceIds ? storeEvent.resourceIds : undefined
           }
           description={storeEvent?.description}
+          activeColor={storeEvent?.color}
+          allDay={storeEvent?.allDay}
+          recurrenceRule={storeEvent?.recurrenceRule}
           onSave={(data) => {
             const today = new Date().toISOString().split("T")[0];
             try {
@@ -234,6 +241,9 @@ export function SchedulerView({
                   resourceIds: data.participants || ["r1"],
                   description: data.description,
                   status: "confirmed",
+                  color: data.activeColor,
+                  allDay: data.allDay,
+                  recurrenceRule: data.recurrenceRule,
                 });
               } else {
                 manager.addEvent({
@@ -252,6 +262,9 @@ export function SchedulerView({
                   resourceIds: data.participants || ["r1"],
                   description: data.description,
                   status: "confirmed",
+                  color: data.activeColor,
+                  allDay: data.allDay,
+                  recurrenceRule: data.recurrenceRule,
                 });
                 console.log("Event added:", data);
               }

@@ -194,6 +194,57 @@ export const topbarStyles = css`
     border: 1.5px solid var(--white);
   }
 
+  /* Warning count badge */
+  .tl-warning-badge {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-right: 8px;
+    box-shadow: 0 1px 2px rgba(239, 68, 68, 0.05);
+  }
+
+  .tl-warning-badge:hover {
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.35);
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.12);
+    transform: translateY(-0.5px);
+  }
+
+  .tl-warning-badge:active {
+    transform: translateY(0);
+  }
+
+  .tl-warning-badge span:first-child {
+    font-size: 13px;
+    animation: tlPulse 2s infinite ease-in-out;
+  }
+
+  @keyframes tlPulse {
+    0% {
+      opacity: 0.7;
+      transform: scale(0.95);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+    100% {
+      opacity: 0.7;
+      transform: scale(0.95);
+    }
+  }
+
   /* Zoom badge */
   .tl-zoom-badge {
     display: inline-flex;

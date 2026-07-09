@@ -7,4 +7,7 @@ export interface EventData {
   resourceIds?: string[];
   status?: "draft" | "confirmed" | "cancelled";
   description?: string;
+  color?: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 }

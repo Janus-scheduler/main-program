@@ -2,7 +2,17 @@
  * Color options for scheduler events.
  * Used in both TimelineEvent and MonthEvent.
  */
-export type EventColor = "orange" | "blue" | "yellow" | "purple" | "green";
+export type EventColor =
+  | "orange"
+  | "blue"
+  | "yellow"
+  | "purple"
+  | "green"
+  | "red"
+  | "pink"
+  | "indigo"
+  | "cyan"
+  | "teal";
 
 /**
  * The two supported calendar views.
@@ -21,6 +31,8 @@ export interface TimelineEvent {
   endMs: number;
   color: EventColor;
   date?: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 }
 
 export interface TimelineResource {
@@ -62,8 +74,11 @@ export interface MonthEvent {
   date: string; // "YYYY-MM-DD"
   startTime?: string; // "HH:MM" 24h — optional
   endTime?: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
   isMultiDay?: boolean;
   spanPosition?: "start" | "middle" | "end" | "single";
+  startDate?: string;
   endDate?: string;
 }
 export interface SchedulerSaveData {
@@ -79,6 +94,8 @@ export interface SchedulerSaveData {
   activeColor: string;
   /** IANA timezone the user was viewing when they entered the times. */
   timezone: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
 }
 
 export interface SchedulerDeleteData {

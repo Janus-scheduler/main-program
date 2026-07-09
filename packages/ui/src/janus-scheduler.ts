@@ -7,10 +7,24 @@ import {
   schedulerStore,
   getAllTimezones,
   formatTimezoneLabel,
+  checkDraftConflict,
+  zonedInputToISO,
+  isoToZonedDisplay,
 } from "@janus-scheduler/core";
 import { schedulerStyles } from "./styles";
 
-const COLORS = ["orange", "blue", "green", "yellow", "purple"];
+const COLORS = [
+  "orange",
+  "blue",
+  "green",
+  "yellow",
+  "purple",
+  "red",
+  "pink",
+  "indigo",
+  "cyan",
+  "teal",
+];
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -123,6 +137,23 @@ const GlobeIcon = () =>
     <path
       d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
     />
+  </svg>`;
+
+const RepeatIcon = () =>
+  html`<svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polyline points="17 1 21 5 17 9" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <polyline points="7 23 3 19 7 15" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
   </svg>`;
 
 const UsersIcon = () =>
@@ -256,6 +287,40 @@ function isEndBeforeStart(
   return new Date(`${ed}T${et}`).getTime() <= new Date(`${sd}T${st}`).getTime();
 }
 
+function parseRRule(rruleStr: string): { freq: string; until: string } {
+  const result = { freq: "Weekly", until: "" };
+  if (!rruleStr) return result;
+
+  const parts = rruleStr.split(";");
+  for (const part of parts) {
+    const [key, val] = part.split("=");
+    if (!key || !val) continue;
+    if (key === "FREQ") {
+      const lower = val.toLowerCase();
+      const capitalized = lower.charAt(0).toUpperCase() + lower.slice(1);
+      if (["Daily", "Weekly", "Monthly", "Yearly"].includes(capitalized)) {
+        result.freq = capitalized;
+      }
+    } else if (key === "UNTIL") {
+      const match = val.match(/^(\d{4})(\d{2})(\d{2})/);
+      if (match) {
+        result.until = `${match[1]}-${match[2]}-${match[3]}`;
+      }
+    }
+  }
+  return result;
+}
+
+function formatRecurrence(rruleStr: string): string {
+  if (!rruleStr) return "";
+  const { freq, until } = parseRRule(rruleStr);
+  let label = `Repeats ${freq.toLowerCase()}`;
+  if (until) {
+    label += ` until ${formatDate(until)}`;
+  }
+  return label;
+}
+
 // ─── Calendar helpers ─────────────────────────────────────────────────────────
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -302,6 +367,7 @@ type OpenPicker =
   | "endDate"
   | "endTime"
   | "timezone"
+  | "recurrenceUntil"
   | null;
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -322,12 +388,16 @@ export class JanusScheduler extends LitElement {
   @property({ type: String }) description = "";
   @property({ type: String }) activeColor = "orange";
   @property({ type: String }) error: string | null = null;
+  @property({ type: Boolean }) allDay = false;
+  @property({ type: String }) recurrenceRule = "";
   /**
    * The ID of the event being edited.
    * - `null` / omitted → creation mode (onSave should call addEvent)
    * - a string         → edit mode     (onSave should call updateEvent, onDelete should call deleteEvent)
    */
   @property({ type: String }) eventId: string | null = null;
+  @property({ type: Boolean, attribute: "prevent-conflicts" })
+  preventConflicts = false;
 
   // Safe accessor — guards against React passing undefined for array props
   private get _participants(): string[] {
@@ -343,6 +413,13 @@ export class JanusScheduler extends LitElement {
   @state() openPicker: OpenPicker = null;
   @state() private _tzSearch = "";
   @state() private _selectedTz: string = schedulerStore.getState().timezone;
+  @state() private _recurrenceFreq: "Daily" | "Weekly" | "Monthly" | "Yearly" =
+    "Weekly";
+  @state() private _recurrenceUntilDate = "";
+  @state() recurrenceCal: CalState = {
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(),
+  };
 
   // Calendar view: sync to the selected date when a property is set,
   // otherwise default to current month
@@ -386,12 +463,61 @@ export class JanusScheduler extends LitElement {
   private get _invalid() {
     const draft = schedulerStore.getState().eventDraft;
     if (!draft) return false;
-    return isEndBeforeStart(
+    const timeInvalid = this._timeInvalid;
+    const titleInvalid = !draft.title || !draft.title.trim();
+    const participantsInvalid =
+      !draft.participants || draft.participants.length === 0;
+    const conflictInvalid =
+      this.preventConflicts && this._resourceConflict.hasConflict;
+    return (
+      timeInvalid || titleInvalid || participantsInvalid || conflictInvalid
+    );
+  }
+
+  private get _timeInvalid() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return false;
+
+    const occInvalid = isEndBeforeStart(
       draft.startDate,
       draft.startTime,
       draft.endDate,
       draft.endTime,
     );
+    if (occInvalid) return true;
+
+    if (draft.recurrenceRule && this._recurrenceUntilDate) {
+      if (this._recurrenceUntilDate < draft.startDate) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private get _resourceConflict(): { hasConflict: boolean; message: string } {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft || !draft.title || draft.participants.length === 0) {
+      return { hasConflict: false, message: "" };
+    }
+
+    const eventsList = Object.values(schedulerStore.getState().events);
+    const result = checkDraftConflict(draft, eventsList, this._selectedTz);
+
+    if (result.hasConflict && result.resourceIds.length > 0) {
+      const names = result.resourceIds.map((id) =>
+        this._resolveResourceName(id),
+      );
+      const message = result.message.replace(
+        "[REPLACE_RESOURCES]",
+        names.join(", "),
+      );
+      return {
+        hasConflict: true,
+        message,
+      };
+    }
+
+    return { hasConflict: false, message: "" };
   }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
@@ -400,16 +526,19 @@ export class JanusScheduler extends LitElement {
     if (changedProperties.has("eventId")) {
       this._isEditing = this.eventId === null;
 
+      const todayStr = new Date().toISOString().split("T")[0];
       const defaults = {
         title: this.title,
-        startDate: this.startDate,
-        startTime: this.startTime,
-        endDate: this.endDate,
-        endTime: this.endTime,
+        startDate: this.startDate || todayStr,
+        startTime: this.startTime || "09:00",
+        endDate: this.endDate || this.startDate || todayStr,
+        endTime: this.endTime || "10:00",
         participants: this._participants,
         description: this.description,
         activeColor: this.activeColor || "orange",
         timezone: schedulerStore.getState().timezone,
+        allDay: this.allDay,
+        recurrenceRule: this.recurrenceRule,
       };
 
       schedulerStore.getState().startDraft(this.eventId, defaults);
@@ -417,6 +546,22 @@ export class JanusScheduler extends LitElement {
       const draft = schedulerStore.getState().eventDraft;
       if (draft) {
         this._selectedTz = draft.timezone || schedulerStore.getState().timezone;
+        if (draft.recurrenceRule) {
+          const parsed = parseRRule(draft.recurrenceRule);
+          this._recurrenceFreq = parsed.freq as
+            | "Daily"
+            | "Weekly"
+            | "Monthly"
+            | "Yearly";
+          this._recurrenceUntilDate = parsed.until;
+          if (parsed.until) {
+            const [y, m] = parsed.until.split("-").map(Number);
+            this.recurrenceCal = { viewYear: y, viewMonth: m - 1 };
+          }
+        } else {
+          this._recurrenceFreq = "Weekly";
+          this._recurrenceUntilDate = "";
+        }
       }
     }
   }
@@ -504,12 +649,16 @@ export class JanusScheduler extends LitElement {
     // Clear draft
     schedulerStore.getState().clearDraft(true);
 
+    const baseId = this.eventId
+      ? this.eventId.replace(/_occ_\d+$/, "")
+      : this.eventId;
+
     this.dispatchEvent(
       new CustomEvent("save", {
         bubbles: true,
         composed: true,
         detail: {
-          id: this.eventId,
+          id: baseId,
           title: draft.title,
           startDate: draft.startDate,
           startTime: draft.startTime,
@@ -519,6 +668,8 @@ export class JanusScheduler extends LitElement {
           description: draft.description,
           activeColor: draft.activeColor,
           timezone: this._selectedTz,
+          allDay: draft.allDay,
+          recurrenceRule: draft.recurrenceRule,
         } as SchedulerSaveData,
       }),
     );
@@ -531,13 +682,17 @@ export class JanusScheduler extends LitElement {
     // Clear draft
     schedulerStore.getState().clearDraft(true);
 
+    const baseId = this.eventId
+      ? this.eventId.replace(/_occ_\d+$/, "")
+      : this.eventId;
+
     this.dispatchEvent(
       new CustomEvent("delete", {
         bubbles: true,
         composed: true,
         // id is what the host needs to call manager.deleteEvent(id).
         // title is included for display purposes (e.g. confirmation messages).
-        detail: { id: this.eventId, title: titleVal } as SchedulerDeleteData,
+        detail: { id: baseId, title: titleVal } as SchedulerDeleteData,
       }),
     );
   }
@@ -645,12 +800,13 @@ export class JanusScheduler extends LitElement {
     } else {
       schedulerStore.getState().updateDraft({ endTime: val });
     }
+    this.openPicker = null;
   }
 
   // ─── Calendar date selection ───────────────────────────────────────────────
 
   private _selectDate(
-    which: "start" | "end",
+    which: "start" | "end" | "recurrenceUntil",
     y: number,
     mo: number,
     d: number,
@@ -660,26 +816,96 @@ export class JanusScheduler extends LitElement {
     if (!draft) return;
 
     if (which === "start") {
-      schedulerStore.getState().updateDraft({ startDate: iso });
+      const updates: Partial<EventDraft> = { startDate: iso };
       this.startCal = { viewYear: y, viewMonth: mo };
-      // If end is now before start on the same day, nudge end date forward
-      if (
-        isEndBeforeStart(iso, draft.startTime, draft.endDate, draft.endTime)
-      ) {
-        schedulerStore.getState().updateDraft({ endDate: iso });
+      if (draft.allDay) {
+        updates.endDate = iso;
         this.endCal = { viewYear: y, viewMonth: mo };
+      } else {
+        if (
+          !draft.endDate ||
+          draft.endDate < iso ||
+          isEndBeforeStart(iso, draft.startTime, draft.endDate, draft.endTime)
+        ) {
+          updates.endDate = iso;
+          this.endCal = { viewYear: y, viewMonth: mo };
+        }
       }
-    } else {
+      schedulerStore.getState().updateDraft(updates);
+    } else if (which === "end") {
       schedulerStore.getState().updateDraft({ endDate: iso });
       this.endCal = { viewYear: y, viewMonth: mo };
+    } else {
+      this._recurrenceUntilDate = iso;
+      this.recurrenceCal = { viewYear: y, viewMonth: mo };
+      this._updateRecurrenceRule();
     }
     this.openPicker = null;
+  }
+
+  private _toggleAllDay() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+    const newAllDay = !draft.allDay;
+    if (newAllDay) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const targetStart = draft.startDate || todayStr;
+      schedulerStore.getState().updateDraft({
+        allDay: true,
+        startDate: targetStart,
+        startTime: "00:00",
+        endDate: targetStart,
+        endTime: "23:59",
+      });
+    } else {
+      schedulerStore.getState().updateDraft({
+        allDay: false,
+      });
+    }
+  }
+
+  private _toggleRepeat() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+    if (draft.recurrenceRule) {
+      schedulerStore.getState().updateDraft({ recurrenceRule: "" });
+      this._recurrenceUntilDate = "";
+    } else {
+      this._recurrenceFreq = "Weekly";
+      const start = new Date(draft.startDate + "T00:00:00");
+      start.setMonth(start.getMonth() + 1);
+      const year = start.getFullYear();
+      const month = String(start.getMonth() + 1).padStart(2, "0");
+      const day = String(start.getDate()).padStart(2, "0");
+      this._recurrenceUntilDate = `${year}-${month}-${day}`;
+      const [y, m] = this._recurrenceUntilDate.split("-").map(Number);
+      this.recurrenceCal = { viewYear: y, viewMonth: m - 1 };
+      this._updateRecurrenceRule();
+    }
+  }
+
+  private _setRepeatFreq(freq: "Daily" | "Weekly" | "Monthly" | "Yearly") {
+    this._recurrenceFreq = freq;
+    this._updateRecurrenceRule();
+  }
+
+  private _updateRecurrenceRule() {
+    const draft = schedulerStore.getState().eventDraft;
+    if (!draft) return;
+    const freqUpper = this._recurrenceFreq.toUpperCase();
+    let rule = `FREQ=${freqUpper}`;
+    if (this._recurrenceUntilDate) {
+      const d = new Date(this._recurrenceUntilDate + "T23:59:59");
+      const untilStr = d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+      rule += `;UNTIL=${untilStr}`;
+    }
+    schedulerStore.getState().updateDraft({ recurrenceRule: rule });
   }
 
   // ─── Calendar dropdown ─────────────────────────────────────────────────────
 
   private _calPicker(
-    which: "start" | "end",
+    which: "start" | "end" | "recurrenceUntil",
     selectedIso: string,
     cal: CalState,
     onNav: (d: -1 | 1) => void,
@@ -868,8 +1094,13 @@ export class JanusScheduler extends LitElement {
 
   // ─── Calendar nav helper ───────────────────────────────────────────────────
 
-  private _navCal(which: "start" | "end", delta: -1 | 1) {
-    const prev = which === "start" ? this.startCal : this.endCal;
+  private _navCal(which: "start" | "end" | "recurrenceUntil", delta: -1 | 1) {
+    const prev =
+      which === "start"
+        ? this.startCal
+        : which === "end"
+          ? this.endCal
+          : this.recurrenceCal;
     let { viewYear: y, viewMonth: m } = prev;
     m += delta;
     if (m < 0) {
@@ -882,140 +1113,179 @@ export class JanusScheduler extends LitElement {
     }
     const next: CalState = { viewYear: y, viewMonth: m };
     if (which === "start") this.startCal = next;
-    else this.endCal = next;
+    else if (which === "end") this.endCal = next;
+    else this.recurrenceCal = next;
   }
 
   // ─── Render View Mode ──────────────────────────────────────────────────────
 
   private _renderViewMode(draft: EventDraft) {
-    const multiDay = draft.startDate !== draft.endDate;
+    let displayStartDate = draft.startDate;
+    let displayEndDate = draft.endDate;
+    let startTimeVal = draft.startTime;
+    let endTimeVal = draft.endTime;
+
+    const occMatch = this.eventId
+      ? this.eventId.match(/^(.+)_occ_(\d+)$/)
+      : null;
+    if (occMatch) {
+      const occStartMs = parseInt(occMatch[2], 10);
+      if (!isNaN(occStartMs)) {
+        try {
+          const tz = this._selectedTz;
+          const baseStartIso = zonedInputToISO(
+            draft.startDate,
+            draft.startTime,
+            tz,
+          );
+          const baseEndIso = zonedInputToISO(draft.endDate, draft.endTime, tz);
+          const durationMs =
+            new Date(baseEndIso).getTime() - new Date(baseStartIso).getTime();
+
+          const occEndMs = occStartMs + durationMs;
+
+          const startParts = isoToZonedDisplay(
+            new Date(occStartMs).toISOString(),
+            tz,
+          );
+          const endParts = isoToZonedDisplay(
+            new Date(occEndMs).toISOString(),
+            tz,
+          );
+
+          displayStartDate = startParts.date;
+          displayEndDate = endParts.date;
+          startTimeVal = startParts.time;
+          endTimeVal = endParts.time;
+        } catch {
+          // Fallback to draft dates on failure
+        }
+      }
+    }
+
+    const multiDay = displayStartDate !== displayEndDate;
+
     const displayDate = multiDay
-      ? `${formatDate(draft.startDate)} – ${formatDate(draft.endDate)}`
-      : formatDate(draft.startDate);
-    const displayTime = `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
+      ? `${formatDate(displayStartDate)} – ${formatDate(displayEndDate)}`
+      : formatDate(displayStartDate);
 
-    const leadResourceId = draft.participants[0];
-    const leadResourceName = leadResourceId
-      ? this._resolveResourceName(leadResourceId)
-      : "";
-    const otherParticipants = draft.participants.slice(1);
+    const displayTime = draft.allDay
+      ? "All-day event"
+      : `${formatTime(startTimeVal)} – ${formatTime(endTimeVal)}`;
 
-    const colorClass = `color-${draft.activeColor}`;
+    const color = draft.activeColor || "orange";
 
     return html`
       <div class="view-panel">
-        <!-- Header -->
-        <header class="view-header ${colorClass}">
-          <div class="view-header-left">
-            <div class="view-header-icon-box">${CalendarIcon()}</div>
-            <div class="view-header-titles">
-              <span class="view-header-tag">Janus Scheduler</span>
-              <h2 class="view-header-title">
-                ${draft.title || "Untitled Event"}
-              </h2>
+        <!-- Colour accent bar + title block -->
+        <div class="view-hero color-${color}">
+          <div class="view-hero-bar"></div>
+          <div class="view-hero-body">
+            <div class="view-hero-top">
+              <button
+                class="close-btn"
+                @click=${() => this._onClose(false)}
+                aria-label="Close"
+              >
+                ${XIcon()}
+              </button>
             </div>
+            <h2 class="view-hero-title">${draft.title || "Untitled Event"}</h2>
+            <div class="view-hero-datetime">
+              <span class="view-hero-datetime-icon">${CalendarIcon()}</span>
+              ${draft.allDay
+                ? html`
+                    <span>${displayDate}</span>
+                    <span class="view-hero-sep">·</span>
+                    <span class="view-allday-badge">All-day</span>
+                  `
+                : multiDay
+                  ? html`
+                      <span>
+                        ${formatDate(displayStartDate)},
+                        ${formatTime(startTimeVal)} –
+                        ${formatDate(displayEndDate)}, ${formatTime(endTimeVal)}
+                      </span>
+                    `
+                  : html`
+                      <span>${displayDate}</span>
+                      <span class="view-hero-sep">·</span>
+                      <span class="view-hero-datetime-icon"
+                        >${ClockIcon()}</span
+                      >
+                      <span>${displayTime}</span>
+                    `}
+            </div>
+            ${draft.recurrenceRule
+              ? html`
+                  <div class="view-hero-recurrence">
+                    ${RepeatIcon()}
+                    <span>${formatRecurrence(draft.recurrenceRule)}</span>
+                  </div>
+                `
+              : nothing}
           </div>
-          <button
-            class="close-btn"
-            @click=${() => this._onClose(false)}
-            aria-label="Close"
-          >
-            ${XIcon()}
-          </button>
-        </header>
+        </div>
 
         <!-- Body -->
         <div class="view-body">
-          <!-- Date & Time -->
-          <div class="view-datetime-row">
-            <span class="view-datetime-icon">${ClockIcon()}</span>
-            <span class="view-datetime-text"
-              >${displayDate} • ${displayTime}</span
-            >
-          </div>
-
-          <!-- Lead Resource & Participants -->
+          <!-- Participants -->
           <div class="view-section">
-            <div class="view-section-label">Lead Resource & Participants</div>
-            <div class="view-resource-card">
-              ${leadResourceId
-                ? html`
-                    <div class="view-lead-info">
-                      ${avatarHtml(leadResourceName)}
-                      <div class="view-lead-details">
-                        <div class="view-lead-name">${leadResourceName}</div>
-                        <div class="view-lead-role">Primary Resource</div>
-                      </div>
-                    </div>
-                  `
-                : html`
-                    <div class="view-lead-info">
-                      <span class="avatar avatar-more">?</span>
-                      <div class="view-lead-details">
-                        <div class="view-lead-name">No resource assigned</div>
-                        <div class="view-lead-role">
-                          Click Edit to add participants
-                        </div>
-                      </div>
-                    </div>
-                  `}
-              ${otherParticipants.length > 0
-                ? html`
-                    <div class="view-avatar-stack">
-                      ${otherParticipants
-                        .slice(0, 3)
-                        .map((p: string) =>
-                          avatarHtml(this._resolveResourceName(p)),
-                        )}
-                      ${otherParticipants.length > 3
-                        ? html`<span class="avatar avatar-more"
-                            >+${otherParticipants.length - 3}</span
+            <div class="view-section-label">Participants</div>
+            <div class="view-participants-list">
+              ${draft.participants.map((p: string, idx: number) => {
+                const name = this._resolveResourceName(p);
+                const isLead = idx === 0;
+                return html`
+                  <div class="view-participant-item">
+                    ${avatarHtml(name)}
+                    <div class="view-participant-info">
+                      <span class="view-participant-name">${name}</span>
+                      ${isLead
+                        ? html`<span class="view-participant-role-badge"
+                            >Primary</span
                           >`
                         : nothing}
                     </div>
+                  </div>
+                `;
+              })}
+              ${draft.participants.length === 0
+                ? html`
+                    <div class="view-empty-row">No participants assigned</div>
                   `
                 : nothing}
             </div>
           </div>
 
-          <!-- Description / Notes -->
-          <div class="view-section">
-            <div class="view-section-label">Agenda & Notes</div>
-            <div class="view-desc-card">
-              ${draft.description
-                ? html`<div class="view-desc-text">${draft.description}</div>`
-                : html`<div class="view-desc-text view-desc-text--empty">
-                    No description or agenda provided.
-                  </div>`}
-            </div>
-          </div>
+          <!-- Description -->
+          ${draft.description
+            ? html`
+                <div class="view-section">
+                  <div class="view-section-label">Description</div>
+                  <div class="view-desc">${draft.description}</div>
+                </div>
+              `
+            : nothing}
 
-          <!-- Timezone & Event Color / Status -->
-          <div class="view-meta-grid">
-            <div class="view-meta-col">
-              <div class="view-section-label">Timezone</div>
-              <div class="view-meta-val-row">
-                <span class="view-meta-icon">${GlobeIcon()}</span>
-                <span class="view-meta-val">
-                  ${this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
-                  this._selectedTz}
-                </span>
-              </div>
+          <!-- Meta row: timezone + color -->
+          <div class="view-meta-row">
+            <div class="view-meta-chip">
+              ${GlobeIcon()}
+              <span
+                >${this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
+                this._selectedTz}</span
+              >
             </div>
-            <div class="view-meta-col">
-              <div class="view-section-label">Event Color</div>
-              <div class="view-meta-val-row">
-                <span class="view-color-dot swatch-${draft.activeColor}"></span>
-                <span class="view-meta-val capitalize"
-                  >${draft.activeColor}</span
-                >
-              </div>
+            <div class="view-meta-chip">
+              <span class="view-color-dot swatch-${color}"></span>
+              <span class="capitalize">${color}</span>
             </div>
           </div>
         </div>
 
         <!-- Footer -->
-        <footer class="view-footer">
+        <div class="view-footer">
           <button class="btn-delete" @click=${this._onDelete}>
             ${TrashIcon()} Delete
           </button>
@@ -1024,7 +1294,7 @@ export class JanusScheduler extends LitElement {
               Close
             </button>
             <button
-              class="btn-edit-event ${colorClass}"
+              class="btn-edit-event color-btn-${color}"
               @click=${() => (this._isEditing = true)}
             >
               <svg
@@ -1036,7 +1306,7 @@ export class JanusScheduler extends LitElement {
                 stroke-width="2.5"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                style="margin-right: 4px; vertical-align: middle;"
+                style="margin-right:4px;vertical-align:middle;"
               >
                 <path d="M12 20h9" />
                 <path
@@ -1046,11 +1316,10 @@ export class JanusScheduler extends LitElement {
               Edit Event
             </button>
           </div>
-        </footer>
+        </div>
       </div>
     `;
   }
-
   // ─── Render ────────────────────────────────────────────────────────────────
 
   render() {
@@ -1058,6 +1327,7 @@ export class JanusScheduler extends LitElement {
     if (!draft) return nothing;
 
     const invalid = this._invalid;
+    const timeInvalid = this._timeInvalid;
 
     const multiDay = draft.startDate !== draft.endDate;
 
@@ -1066,9 +1336,11 @@ export class JanusScheduler extends LitElement {
       : formatDate(draft.startDate);
 
     // When multi-day, attach the date to each time so the sidebar is unambiguous
-    const sidebarTime = multiDay
-      ? `${formatDateShort(draft.startDate)}, ${formatTime(draft.startTime)} – ${formatDateShort(draft.endDate)}, ${formatTime(draft.endTime)}`
-      : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
+    const sidebarTime = draft.allDay
+      ? "All-day"
+      : multiDay
+        ? `${formatDateShort(draft.startDate)}, ${formatTime(draft.startTime)} – ${formatDateShort(draft.endDate)}, ${formatTime(draft.endTime)}`
+        : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
 
     return html`
       <div
@@ -1110,6 +1382,24 @@ export class JanusScheduler extends LitElement {
                         <div class="meta-value">${sidebarTime}</div>
                       </div>
                     </div>
+                    ${draft.recurrenceRule
+                      ? html`
+                          <div class="meta-item">
+                            <span
+                              class="meta-icon"
+                              style="color: var(--c-${draft.activeColor});"
+                            >
+                              ${RepeatIcon()}
+                            </span>
+                            <div>
+                              <div class="meta-label">Repeat</div>
+                              <div class="meta-value">
+                                ${formatRecurrence(draft.recurrenceRule)}
+                              </div>
+                            </div>
+                          </div>
+                        `
+                      : nothing}
                     <div class="meta-item">
                       <span class="meta-icon">${UsersIcon()}</span>
                       <div>
@@ -1215,14 +1505,16 @@ export class JanusScheduler extends LitElement {
                         <span class="meta-label">Start</span>
                         <span class="meta-value"
                           >${formatDateShort(draft.startDate)}
-                          ${formatTime(draft.startTime)}</span
+                          ${draft.allDay
+                            ? ""
+                            : formatTime(draft.startTime)}</span
                         >
                       </div>
                       <div class="msummary-item">
                         <span class="meta-label">End</span>
                         <span class="meta-value"
                           >${formatDateShort(draft.endDate)}
-                          ${formatTime(draft.endTime)}</span
+                          ${draft.allDay ? "" : formatTime(draft.endTime)}</span
                         >
                       </div>
                       <div class="msummary-item">
@@ -1231,6 +1523,16 @@ export class JanusScheduler extends LitElement {
                           >${draft.participants.length} people</span
                         >
                       </div>
+                      ${draft.recurrenceRule
+                        ? html`
+                            <div class="msummary-item">
+                              <span class="meta-label">Repeat</span>
+                              <span class="meta-value"
+                                >${formatRecurrence(draft.recurrenceRule)}</span
+                              >
+                            </div>
+                          `
+                        : nothing}
                       <div class="msummary-item">
                         <span class="meta-label">Color</span>
                         <div class="swatches swatches--sm">
@@ -1275,6 +1577,15 @@ export class JanusScheduler extends LitElement {
                             })}
                           placeholder="Add a title…"
                         />
+                        ${!draft.title || !draft.title.trim()
+                          ? html`<div
+                              class="dt-invalid-notice"
+                              style="margin-top: 6px;"
+                            >
+                              <span>⚠</span>
+                              <span>Event Title is required.</span>
+                            </div>`
+                          : nothing}
                       </div>
                     </div>
 
@@ -1282,9 +1593,127 @@ export class JanusScheduler extends LitElement {
                     <div class="form-section">
                       <div class="section-label">Date &amp; Time</div>
 
+                      <!-- Switches Row -->
+                      <div class="toggle-row">
+                        <div class="toggle-control">
+                          <span class="toggle-label" id="all-day-label"
+                            >All-day Event</span
+                          >
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked="${draft.allDay ? "true" : "false"}"
+                            aria-labelledby="all-day-label"
+                            class="switch-btn ${draft.allDay
+                              ? "switch-btn--active"
+                              : ""}"
+                            @click=${this._toggleAllDay}
+                          >
+                            <span class="switch-slider"></span>
+                          </button>
+                        </div>
+                        <div class="toggle-control">
+                          <span class="toggle-label" id="repeat-label"
+                            >Repeat Event</span
+                          >
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked="${draft.recurrenceRule
+                              ? "true"
+                              : "false"}"
+                            aria-labelledby="repeat-label"
+                            class="switch-btn ${draft.recurrenceRule
+                              ? "switch-btn--active"
+                              : ""}"
+                            @click=${this._toggleRepeat}
+                          >
+                            <span class="switch-slider"></span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Recurrence Options -->
+                      ${draft.recurrenceRule
+                        ? html`
+                            <div class="recurrence-section">
+                              <div class="dt-row-label">Repeat Frequency</div>
+                              <div class="recurrence-freq-selector">
+                                ${["Daily", "Weekly", "Monthly", "Yearly"].map(
+                                  (freq) => html`
+                                    <button
+                                      type="button"
+                                      class="freq-pill ${this
+                                        ._recurrenceFreq === freq
+                                        ? "freq-pill--active"
+                                        : ""}"
+                                      @click=${() =>
+                                        this._setRepeatFreq(
+                                          freq as
+                                            | "Daily"
+                                            | "Weekly"
+                                            | "Monthly"
+                                            | "Yearly",
+                                        )}
+                                    >
+                                      ${freq}
+                                    </button>
+                                  `,
+                                )}
+                              </div>
+                              <div
+                                class="dt-row-label"
+                                style="margin-top: 10px;"
+                              >
+                                Repeat Until
+                              </div>
+                              <div class="dt-row">
+                                <div class="dt-cell dt-cell--date">
+                                  ${this._triggerBtn(
+                                    CalendarIcon(),
+                                    this._recurrenceUntilDate
+                                      ? formatDateShort(
+                                          this._recurrenceUntilDate,
+                                        )
+                                      : "Never Ends",
+                                    this.openPicker === "recurrenceUntil",
+                                    false,
+                                    "recurrenceUntil",
+                                  )}
+                                  ${this.openPicker === "recurrenceUntil"
+                                    ? this._calPicker(
+                                        "recurrenceUntil",
+                                        this._recurrenceUntilDate,
+                                        this.recurrenceCal,
+                                        (d) =>
+                                          this._navCal("recurrenceUntil", d),
+                                      )
+                                    : nothing}
+                                </div>
+                                ${this._recurrenceUntilDate
+                                  ? html`
+                                      <button
+                                        type="button"
+                                        class="btn-clear-until"
+                                        @click=${() => {
+                                          this._recurrenceUntilDate = "";
+                                          this._updateRecurrenceRule();
+                                        }}
+                                      >
+                                        Clear End Date
+                                      </button>
+                                    `
+                                  : nothing}
+                              </div>
+                            </div>
+                          `
+                        : nothing}
+
                       <!-- START -->
                       <div class="dt-row-label">Start</div>
-                      <div class="dt-row">
+                      <div
+                        class="dt-row ${draft.allDay ? "dt-row--all-day" : ""}"
+                      >
                         <!-- Start date trigger + dropdown -->
                         <div class="dt-cell dt-cell--date">
                           ${this._triggerBtn(
@@ -1304,30 +1733,36 @@ export class JanusScheduler extends LitElement {
                             : nothing}
                         </div>
                         <!-- Start time trigger + dropdown -->
-                        <div class="dt-cell dt-cell--time">
-                          ${this._triggerBtn(
-                            ClockIcon(),
-                            formatTime(draft.startTime),
-                            this.openPicker === "startTime",
-                            false,
-                            "startTime",
-                          )}
-                          ${this.openPicker === "startTime"
-                            ? this._timePicker("start", draft.startTime)
-                            : nothing}
-                        </div>
+                        ${draft.allDay
+                          ? nothing
+                          : html`
+                              <div class="dt-cell dt-cell--time">
+                                ${this._triggerBtn(
+                                  ClockIcon(),
+                                  formatTime(draft.startTime),
+                                  this.openPicker === "startTime",
+                                  false,
+                                  "startTime",
+                                )}
+                                ${this.openPicker === "startTime"
+                                  ? this._timePicker("start", draft.startTime)
+                                  : nothing}
+                              </div>
+                            `}
                       </div>
 
                       <!-- END -->
                       <div class="dt-row-label dt-row-label--end">End</div>
-                      <div class="dt-row">
+                      <div
+                        class="dt-row ${draft.allDay ? "dt-row--all-day" : ""}"
+                      >
                         <!-- End date trigger + dropdown -->
                         <div class="dt-cell dt-cell--date">
                           ${this._triggerBtn(
                             CalendarIcon(),
                             formatDateShort(draft.endDate),
                             this.openPicker === "endDate",
-                            invalid,
+                            timeInvalid,
                             "endDate",
                           )}
                           ${this.openPicker === "endDate"
@@ -1340,27 +1775,48 @@ export class JanusScheduler extends LitElement {
                             : nothing}
                         </div>
                         <!-- End time trigger + dropdown -->
-                        <div class="dt-cell dt-cell--time">
-                          ${this._triggerBtn(
-                            ClockIcon(),
-                            formatTime(draft.endTime),
-                            this.openPicker === "endTime",
-                            invalid,
-                            "endTime",
-                          )}
-                          ${this.openPicker === "endTime"
-                            ? this._timePicker("end", draft.endTime)
-                            : nothing}
-                        </div>
+                        ${draft.allDay
+                          ? nothing
+                          : html`
+                              <div class="dt-cell dt-cell--time">
+                                ${this._triggerBtn(
+                                  ClockIcon(),
+                                  formatTime(draft.endTime),
+                                  this.openPicker === "endTime",
+                                  timeInvalid,
+                                  "endTime",
+                                )}
+                                ${this.openPicker === "endTime"
+                                  ? this._timePicker("end", draft.endTime)
+                                  : nothing}
+                              </div>
+                            `}
                       </div>
 
                       <!-- Validation warning -->
-                      ${invalid
+                      ${timeInvalid
                         ? html` <div class="dt-invalid-notice">
                             <span>⚠</span>
                             <span
                               >End must be after start. Please adjust the date
                               or time.</span
+                            >
+                          </div>`
+                        : nothing}
+
+                      <!-- Conflict warning -->
+                      ${this._resourceConflict.hasConflict
+                        ? html`<div
+                            class="dt-conflict-warning ${this.preventConflicts
+                              ? "dt-conflict-warning--blocking"
+                              : ""}"
+                          >
+                            <span>⚠</span>
+                            <span
+                              >${this._resourceConflict.message}${this
+                                .preventConflicts
+                                ? " (Saving disabled due to schedule conflict)"
+                                : ""}</span
                             >
                           </div>`
                         : nothing}
@@ -1476,6 +1932,15 @@ export class JanusScheduler extends LitElement {
                                     `}
                               </div>
                             `
+                          : nothing}
+                        ${!draft.participants || draft.participants.length === 0
+                          ? html`<div
+                              class="dt-invalid-notice"
+                              style="margin-top: 6px;"
+                            >
+                              <span>⚠</span>
+                              <span>At least one participant is required.</span>
+                            </div>`
                           : nothing}
                       </div>
                     </div>

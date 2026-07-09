@@ -78,6 +78,26 @@ Features:
 - Shadow DOM encapsulation prevents CSS bleeding.
 - Responsive layouts and modern UI aesthetics.
 
+### Conflict Management & Prevention
+
+Janus Scheduler includes a built-in timezone-aware scheduling conflict checker to manage double-bookings of resources (people, rooms, equipment, etc.). Developers can configure how conflicts are handled using the `prevent-conflicts` (or React `preventConflicts`) option:
+
+1. **Visual Conflicts Warning (Default: `preventConflicts = false`)**:
+   - Double-bookings are allowed to be scheduled.
+   - Any resource conflicts trigger a slide-down warning banner displaying timezone-aware overlap details. If multiple overlaps occur, the banner displays a summary alongside a clickable **"Show Details"** bulleted list of all overlaps.
+   - The warning banner can be dismissed, minimizing into a subtle warning count badge in the header. Clicking this badge restores the banner.
+   - If a new conflict is created, the banner automatically slides open.
+   - Overlapping events on the grid are indicated by a subtle red warning dot badge positioned at the top-right corner of their event card.
+
+2. **Hard Blocking Conflicts (Active: `preventConflicts = true`)**:
+   - Double-bookings are completely prevented.
+   - In the **Editor Modal**, saving is disabled when a conflict exists, and the warning banner is colored red stating: `(Saving disabled due to schedule conflict)`.
+   - On the **Timeline Grid**, dragging, resizing, or drawing an event over an occupied slot is intercepted. The custom save/update event is blocked (cancelling the action naturally), and a styled backdrop-blurred modal dialog scales in alerting: _“Cannot move event. [Resource Name] is already scheduled during this time. Double-booking is disabled.”_
+
+3. **Cancelable Conflict Detected Callback Event**:
+   - The `<janus-timeline>` component dispatches a cancelable custom event `"conflict-detected"` (mapped to `onConflictDetected` in React/Solid or `conflictDetected` in Angular) when a scheduling conflict occurs.
+   - Developers can listen to this event and call `e.preventDefault()` to customize warning behaviors, programmatically log conflicts, or suppress the default built-in blocker alert dialog.
+
 ### `@janus-scheduler/react` — React Wrapper
 
 Wraps the Lit Web Component into a native React component using `@lit/react`:
