@@ -2134,7 +2134,7 @@ export class JanusScheduler extends LitElement {
     });
   }
 
-  private _renderConfirmDialog(draft: any) {
+  private _renderConfirmDialog(draft: EventDraft) {
     return html`
       <janus-confirm-dialog
         .draft=${draft}
@@ -2150,7 +2150,7 @@ export class JanusScheduler extends LitElement {
     `;
   }
 
-  private _renderDeleteConfirmDialog(draft: any) {
+  private _renderDeleteConfirmDialog(draft: EventDraft) {
     return html`
       <janus-confirm-dialog
         .draft=${draft}

@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { type EventDraft } from "@janus-scheduler/core";
 
 // Helper functions for dates & times formatting
 function formatDate(iso: string): string {
@@ -28,7 +29,7 @@ export class JanusConfirmDialog extends LitElement {
   @property({ type: String }) confirmText = "Confirm";
   @property({ type: String }) cancelText = "Cancel";
   @property({ type: String }) accentColor = ""; // "red" or "orange"
-  @property({ type: Object }) draft: any = null;
+  @property({ type: Object }) draft: EventDraft | null = null;
   @property({ type: Object }) resolveResourceName: (id: string) => string = (
     id,
   ) => id;
