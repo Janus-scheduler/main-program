@@ -30,9 +30,8 @@ export class JanusConfirmDialog extends LitElement {
   @property({ type: String }) cancelText = "Cancel";
   @property({ type: String }) accentColor = ""; // "red" or "orange"
   @property({ type: Object }) draft: EventDraft | null = null;
-  @property({ type: Object }) resolveResourceName: (id: string) => string = (
-    id,
-  ) => id;
+  @property({ attribute: false }) resolveResourceName: (id: string) => string =
+    (id) => id;
 
   static styles = css`
     :host {

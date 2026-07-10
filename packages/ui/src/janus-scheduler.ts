@@ -530,13 +530,9 @@ export class JanusScheduler extends LitElement {
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
 
   willUpdate(changedProperties: Map<string, unknown>) {
-    if (
-      changedProperties.has("eventId") ||
-      changedProperties.has("showConfirmOnCreate")
-    ) {
+    if (changedProperties.has("eventId")) {
       this._isEditing = this.eventId === null;
-      this._showCreateConfirm =
-        this.eventId === null && this.showConfirmOnCreate;
+      this._showCreateConfirm = false;
       this._titleTouched = false;
       this._participantsTouched = false;
 
@@ -665,8 +661,10 @@ export class JanusScheduler extends LitElement {
     }
     if (this.eventId !== null) {
       this._onSave();
-    } else {
+    } else if (this.showConfirmOnCreate) {
       this._showCreateConfirm = true;
+    } else {
+      this._onSave();
     }
   }
 
@@ -2121,17 +2119,6 @@ export class JanusScheduler extends LitElement {
               `}
       </div>
     `;
-  }
-
-  private _formatConfirmDate(dateStr: string): string {
-    if (!dateStr) return "";
-    const d = new Date(dateStr + "T00:00:00");
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
   }
 
   private _renderConfirmDialog(draft: EventDraft) {
