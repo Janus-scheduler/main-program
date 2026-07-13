@@ -98,6 +98,7 @@ export interface SchedulerProps {
   allDay?: boolean;
   recurrenceRule?: string;
   preventConflicts?: boolean;
+  showConfirmOnCreate?: boolean;
   onClose?: () => void;
   onSave?: (detail: SchedulerSaveData) => void;
   onDelete?: (detail: SchedulerDeleteData) => void;
@@ -125,6 +126,8 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
         el.recurrenceRule = props.recurrenceRule;
       if (props.preventConflicts !== undefined)
         el.preventConflicts = props.preventConflicts;
+      if (props.showConfirmOnCreate !== undefined)
+        el.showConfirmOnCreate = props.showConfirmOnCreate;
     }
   });
 

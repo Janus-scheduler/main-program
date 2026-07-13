@@ -5,3 +5,4 @@ export * from "./janus-topbar";
 export * from "./month-grid-types";
 export * from "./janus-month-grid";
 export * from "./janus-ai-bar";
+export * from "./janus-confirm-dialog";
