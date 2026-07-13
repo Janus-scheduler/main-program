@@ -1,4 +1,5 @@
 import { Event } from "../models/events/event";
+import { EventData } from "../types/event.types";
 import { expandEvents } from "./recurrence";
 import { isoToZonedDisplay, zonedInputToISO } from "./time";
 
@@ -139,7 +140,7 @@ export function checkDraftConflict(
     endRange = maxRecurrenceEnd;
   }
 
-  let draftOccurrences: any[];
+  let draftOccurrences: EventData[];
   try {
     const draftStartIso = zonedInputToISO(
       draft.startDate,

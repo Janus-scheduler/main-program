@@ -61,6 +61,7 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly allDay = input<boolean | undefined>(undefined);
   readonly recurrenceRule = input<string | undefined>(undefined);
   readonly preventConflicts = input<boolean | undefined>(undefined);
+  readonly showConfirmOnCreate = input<boolean | undefined>(undefined);
 
   /** Emitted when the user closes the scheduler modal */
   readonly close = output<void>();
@@ -123,6 +124,8 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
         el.recurrenceRule = this.recurrenceRule();
       if (this.preventConflicts() !== undefined)
         el.preventConflicts = this.preventConflicts();
+      if (this.showConfirmOnCreate() !== undefined)
+        el.showConfirmOnCreate = this.showConfirmOnCreate();
     }
   }
 }
