@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { Timeline, MonthGrid, Scheduler, AiBar } from "@janus-scheduler/react";
+import { useRef, useState } from "react";
+import {
+  Timeline,
+  MonthGrid,
+  Scheduler,
+  AiBar,
+  Topbar,
+} from "@janus-scheduler/react";
 import type { ViewType } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
 import {
@@ -86,10 +92,73 @@ export function SchedulerView({
   const startParts = storeEvent ? splitISO(storeEvent.startTime) : null;
   const endParts = storeEvent ? splitISO(storeEvent.endTime) : null;
 
+  const timelineRef = useRef<
+    HTMLElement & {
+      goToPrev: () => void;
+      goToNext: () => void;
+      goToToday: () => void;
+      toggleCreate: () => void;
+    }
+  >(null);
+  const monthGridRef = useRef<
+    HTMLElement & {
+      goToPrev: () => void;
+      goToNext: () => void;
+      goToToday: () => void;
+    }
+  >(null);
+
+  const [navData, setNavData] = useState({
+    navLabel: "",
+    dayName: "",
+    shortDate: "",
+    zoomPercent: 100,
+    zoomUnit: "",
+  });
+  const [allowCreate, setAllowCreate] = useState(false);
+
+  const handleNavChange = (detail: Record<string, unknown>) => {
+    setNavData({
+      navLabel: (detail.navLabel as string) || "",
+      dayName: (detail.dayName as string) || "",
+      shortDate: (detail.shortDate as string) || "",
+      zoomPercent: (detail.zoomPercent as number) || 100,
+      zoomUnit: (detail.zoomUnit as string) || "",
+    });
+  };
+
   return (
-    <>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <Topbar
+        navLabel={navData.navLabel}
+        dayName={navData.dayName}
+        shortDate={navData.shortDate}
+        view={currentView}
+        allowCreate={allowCreate}
+        zoomPercent={navData.zoomPercent}
+        zoomUnit={navData.zoomUnit}
+        onPrevClick={() => {
+          if (currentView === "Timeline") timelineRef.current?.goToPrev();
+          else monthGridRef.current?.goToPrev();
+        }}
+        onNextClick={() => {
+          if (currentView === "Timeline") timelineRef.current?.goToNext();
+          else monthGridRef.current?.goToNext();
+        }}
+        onTodayClick={() => {
+          if (currentView === "Timeline") timelineRef.current?.goToToday();
+          else monthGridRef.current?.goToToday();
+        }}
+        onViewSwitch={(detail) => onViewChange(detail.view)}
+        onToggleCreate={() => {
+          if (currentView === "Timeline") timelineRef.current?.toggleCreate();
+          setAllowCreate(!allowCreate);
+        }}
+      />
       {currentView === "Timeline" && (
         <Timeline
+          ref={timelineRef}
+          allowCreate={allowCreate}
           preventConflicts={preventConflicts}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
@@ -131,6 +200,7 @@ export function SchedulerView({
             onOpenScheduler();
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
+          onNavChange={handleNavChange}
         />
       )}
 
@@ -139,6 +209,8 @@ export function SchedulerView({
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
           onViewChange={(detail) => onViewChange(detail.view)}
+          onNavChange={handleNavChange}
+          ref={monthGridRef}
         />
       )}
 
@@ -237,6 +309,6 @@ export function SchedulerView({
           // TODO: hook into your NLP integration here
         }}
       />
-    </>
+    </div>
   );
 }

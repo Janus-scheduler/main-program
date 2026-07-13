@@ -4,6 +4,7 @@ import { timelineStyles } from "./timeline-styles";
 import {
   schedulerStore,
   isoToZonedDisplay,
+  getBrowserTimezone,
   expandEvents,
   computeTimelineConflicts,
   checkSlotConflict,
@@ -251,6 +252,8 @@ export class JanusTimeline extends LitElement {
       this.gridScrollRef.scrollLeft = CONTENT_HALF_WIDTH - containerWidth / 2;
       this._suppressScroll = false;
     });
+
+    this._emitNavChange();
   }
 
   /** Total content width in px — always fixed at 2 * CONTENT_HALF_WIDTH */
@@ -295,23 +298,52 @@ export class JanusTimeline extends LitElement {
         this._initializeView(currentCenterMs);
       }
     }
+    this._emitNavChange();
+  }
+
+  private _emitNavChange() {
+    const visibleCenter = this._getVisibleCenterMs();
+    const level = getActiveZoomLevel(this._pxPerMs);
+    const tz = getBrowserTimezone();
+    const navLabel = formatNavDate(visibleCenter, level, tz);
+
+    const d = new Date(visibleCenter);
+    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+    const shortDate = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
+    this.dispatchEvent(
+      new CustomEvent("nav-change", {
+        detail: {
+          navLabel,
+          dayName,
+          shortDate,
+          zoomPercent: this._zoomPercent(),
+          zoomUnit: level.unit,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   // ── Navigation ────────────────────────────────────────────────────
 
-  private _goToPrev() {
+  public goToPrev() {
     const level = getActiveZoomLevel(this._pxPerMs);
     const currentCenter = this._getVisibleCenterMs();
     this._initializeView(currentCenter - getNavStepMs(level));
   }
 
-  private _goToNext() {
+  public goToNext() {
     const level = getActiveZoomLevel(this._pxPerMs);
     const currentCenter = this._getVisibleCenterMs();
     this._initializeView(currentCenter + getNavStepMs(level));
   }
 
-  private _goToToday() {
+  public goToToday() {
     this._pxPerMs = DEFAULT_PX_PER_MS; // reset zoom to default
     this._initializeView(Date.now());
   }
@@ -338,8 +370,9 @@ export class JanusTimeline extends LitElement {
     );
   }
 
-  private _handleViewSwitch(v: "Timeline" | "Month") {
+  public setView(v: "Timeline" | "Month") {
     this.view = v;
+    // Let the parent app know so it can swap components if needed
     this.dispatchEvent(
       new CustomEvent("view-change", {
         detail: { view: v },
@@ -349,7 +382,7 @@ export class JanusTimeline extends LitElement {
     );
   }
 
-  private _toggleCreate() {
+  public toggleCreate() {
     this.allowCreate = !this.allowCreate;
     this.dispatchEvent(
       new CustomEvent("allow-create-change", {
@@ -778,45 +811,12 @@ export class JanusTimeline extends LitElement {
       viewStartMs,
     );
 
-    // Nav label (timezone-aware)
-    const visibleCenter = this._getVisibleCenterMs();
-    const navLabel = formatNavDate(visibleCenter, level, tz);
-
-    // Mobile short date format (e.g. THURSDAY \n Oct 26)
-    const d = new Date(visibleCenter); // Approximation for simple parsing without full timezone logic here
-    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
-    const shortDate = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-
     return html`
       <div
         class="tl-component-shell ${this.allowCreate
           ? "tl-component-shell--draw-mode"
           : ""}"
       >
-        <janus-topbar
-          nav-label="${navLabel}"
-          day-name="${dayName}"
-          short-date="${shortDate}"
-          .view=${this.view}
-          ?allow-create=${this.allowCreate}
-          .zoomPercent=${this._zoomPercent()}
-          zoom-unit="${level.unit}"
-          ?has-conflict=${conflicts.hasConflict}
-          .conflict-count=${conflicts.messages.length}
-          ?is-conflicts-banner-dismissed=${this._isConflictsBannerDismissed}
-          @prev-click=${this._goToPrev}
-          @next-click=${this._goToNext}
-          @today-click=${this._goToToday}
-          @view-switch=${(e: CustomEvent) =>
-            this._handleViewSwitch(e.detail.view)}
-          @toggle-create=${this._toggleCreate}
-          @restore-conflicts-banner=${() =>
-            (this._isConflictsBannerDismissed = false)}
-        ></janus-topbar>
-
         <!-- Conflict warning banner -->
         ${conflicts.hasConflict && !this._isConflictsBannerDismissed
           ? html`
@@ -865,7 +865,6 @@ export class JanusTimeline extends LitElement {
               </div>
             `
           : nothing}
-
         <div class="tl-panel">
           <div class="tl-grid-wrap">
             <div class="tl-res-col" @scroll=${(e: Event) => e.preventDefault()}>

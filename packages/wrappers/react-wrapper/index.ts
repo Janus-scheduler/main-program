@@ -5,6 +5,7 @@ import {
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
   JanusAiBar as JanusAiBarWC,
+  JanusTopbar as JanusTopbarWC,
 } from "@janus-scheduler/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -129,6 +130,7 @@ const _Timeline = createComponent({
     onEventCreate: "event-create",
     onAddEvent: "add-event",
     onViewChange: "view-change",
+    onNavChange: "nav-change",
     onConflictDetected: "conflict-detected",
   },
 });
@@ -138,6 +140,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   view?: "Timeline" | "Month";
   currentDate?: Date;
   aiPrompt?: string;
+  allowCreate?: boolean;
   preventConflicts?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onEventMove?: (detail: EventMoveDetail) => void;
@@ -145,6 +148,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   onEventCreate?: (detail: EventCreateDetail) => void;
   onAddEvent?: () => void;
   onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
   onConflictDetected?: (detail: {
     message: string;
     action: string;
@@ -166,9 +170,11 @@ function withConflictBypass<T>(
   };
 }
 
-export function Timeline(props: TimelineProps): React.JSX.Element {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Timeline = React.forwardRef<any, TimelineProps>((props, ref) => {
   return React.createElement(_Timeline, {
     ...props,
+    ref,
     onConflictDetected: props.onConflictDetected
       ? (e: Event) => props.onConflictDetected!((e as CustomEvent).detail)
       : undefined,
@@ -192,8 +198,12 @@ export function Timeline(props: TimelineProps): React.JSX.Element {
             (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
           )
       : undefined,
+    onNavChange: props.onNavChange
+      ? (e: Event) =>
+          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
+      : undefined,
   });
-}
+});
 
 const _MonthGrid = createComponent({
   tagName: "janus-month-grid",
@@ -204,6 +214,7 @@ const _MonthGrid = createComponent({
     onDayClick: "day-click",
     onAddEvent: "add-event",
     onViewChange: "view-change",
+    onNavChange: "nav-change",
   },
 });
 
@@ -212,11 +223,14 @@ export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;
   onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
 }
 
-export function MonthGrid(props: MonthGridProps): React.JSX.Element {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const MonthGrid = React.forwardRef<any, MonthGridProps>((props, ref) => {
   return React.createElement(_MonthGrid, {
     ...props,
+    ref,
     onEventClick: props.onEventClick
       ? (e: Event) =>
           props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
@@ -232,8 +246,12 @@ export function MonthGrid(props: MonthGridProps): React.JSX.Element {
             (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
           )
       : undefined,
+    onNavChange: props.onNavChange
+      ? (e: Event) =>
+          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
+      : undefined,
   });
-}
+});
 
 const _AiBar = createComponent({
   tagName: "janus-ai-bar",
@@ -263,6 +281,56 @@ export function AiBar(props: AiBarProps): React.JSX.Element {
     onAiInput: props.onAiInput
       ? (e: Event) =>
           props.onAiInput!((e as CustomEvent<{ prompt: string }>).detail)
+      : undefined,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Topbar Wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _Topbar = createComponent({
+  tagName: "janus-topbar",
+  elementClass: JanusTopbarWC,
+  react: React,
+  events: {
+    onPrevClick: "prev-click",
+    onNextClick: "next-click",
+    onTodayClick: "today-click",
+    onViewSwitch: "view-switch",
+    onToggleCreate: "toggle-create",
+  },
+});
+
+export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
+  navLabel?: string;
+  dayName?: string;
+  shortDate?: string;
+  view?: "Timeline" | "Month";
+  allowCreate?: boolean;
+  zoomPercent?: number;
+  zoomUnit?: string;
+  onPrevClick?: () => void;
+  onNextClick?: () => void;
+  onTodayClick?: () => void;
+  onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
+  onToggleCreate?: () => void;
+}
+
+export function Topbar(props: TopbarProps): React.JSX.Element {
+  return React.createElement(_Topbar, {
+    ...props,
+    onPrevClick: props.onPrevClick ? () => props.onPrevClick!() : undefined,
+    onNextClick: props.onNextClick ? () => props.onNextClick!() : undefined,
+    onTodayClick: props.onTodayClick ? () => props.onTodayClick!() : undefined,
+    onViewSwitch: props.onViewSwitch
+      ? (e: Event) =>
+          props.onViewSwitch!(
+            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+          )
+      : undefined,
+    onToggleCreate: props.onToggleCreate
+      ? () => props.onToggleCreate!()
       : undefined,
   });
 }

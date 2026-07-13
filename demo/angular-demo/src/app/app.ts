@@ -4,12 +4,14 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   signal,
   computed,
+  viewChild,
 } from '@angular/core';
 import {
   SchedulerComponent,
   TimelineComponent,
   MonthGridComponent,
   AiBarComponent,
+  TopbarComponent,
   type TimelineEvent,
   type SchedulerSaveData,
   type EventMoveDetail,
@@ -23,10 +25,24 @@ import {
   schedulerStore,
 } from '@janus-scheduler/angular';
 
+export interface NavData {
+  navLabel: string;
+  dayName: string;
+  shortDate: string;
+  zoomPercent: number;
+  zoomUnit: string;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [SchedulerComponent, TimelineComponent, MonthGridComponent, AiBarComponent],
+  imports: [
+    SchedulerComponent,
+    TimelineComponent,
+    MonthGridComponent,
+    AiBarComponent,
+    TopbarComponent,
+  ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './app.html',
   styleUrl: './app.css',
@@ -36,6 +52,17 @@ export class App {
   currentView: ViewType = 'Month';
   showScheduler = false;
   selectedEventId = signal<string | null>(null);
+
+  navData = signal<NavData>({
+    navLabel: '',
+    dayName: '',
+    shortDate: '',
+    zoomPercent: 100,
+    zoomUnit: '',
+  });
+
+  timelineEl = viewChild<TimelineComponent>('timelineEl');
+  monthGridEl = viewChild<MonthGridComponent>('monthGridEl');
 
   storeEvent = computed(() => {
     const id = this.selectedEventId();
@@ -165,6 +192,46 @@ export class App {
 
   handleViewChange(data: { view: 'Timeline' | 'Month' }): void {
     this.currentView = data.view;
+  }
+
+  handleNavChange(detail: Partial<NavData>): void {
+    this.navData.set({
+      navLabel: detail.navLabel || '',
+      dayName: detail.dayName || '',
+      shortDate: detail.shortDate || '',
+      zoomPercent: detail.zoomPercent || 100,
+      zoomUnit: detail.zoomUnit || '',
+    });
+  }
+
+  handlePrevClick(): void {
+    if (this.currentView === 'Timeline') {
+      this.timelineEl()?.goToPrev();
+    } else {
+      this.monthGridEl()?.goToPrev();
+    }
+  }
+
+  handleNextClick(): void {
+    if (this.currentView === 'Timeline') {
+      this.timelineEl()?.goToNext();
+    } else {
+      this.monthGridEl()?.goToNext();
+    }
+  }
+
+  handleTodayClick(): void {
+    if (this.currentView === 'Timeline') {
+      this.timelineEl()?.goToToday();
+    } else {
+      this.monthGridEl()?.goToToday();
+    }
+  }
+
+  handleToggleCreate(): void {
+    if (this.currentView === 'Timeline') {
+      this.timelineEl()?.toggleCreate();
+    }
   }
 
   toggleCreate(): void {

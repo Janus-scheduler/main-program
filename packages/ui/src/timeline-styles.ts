@@ -99,6 +99,8 @@ export const timelineStyles = css`
   /* Resource names column */
   .tl-res-col {
     width: var(--res-col-w);
+    min-width: var(--res-col-w);
+    max-width: var(--res-col-w);
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     overflow-y: scroll;
@@ -114,6 +116,7 @@ export const timelineStyles = css`
 
   .tl-res-col__header {
     height: calc(var(--hour-hdr-h) + var(--super-hdr-h));
+    min-height: calc(var(--hour-hdr-h) + var(--super-hdr-h));
     display: flex;
     align-items: center;
     padding: 0 4px;
@@ -126,11 +129,13 @@ export const timelineStyles = css`
     top: 0;
     background: var(--white);
     z-index: 5;
+    flex-shrink: 0;
   }
 
   /* Group label row */
   .tl-res-group-label {
     height: var(--grp-label-h);
+    min-height: var(--grp-label-h);
     display: flex;
     align-items: center;
     padding: 0 4px;
@@ -140,6 +145,7 @@ export const timelineStyles = css`
     letter-spacing: 0.7px;
     border-bottom: 1px solid var(--border);
     background: #fafafa;
+    flex-shrink: 0;
   }
 
   /* Resource row */
@@ -148,9 +154,10 @@ export const timelineStyles = css`
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 16px;
+    padding: 0 12px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    overflow: hidden;
   }
 
   .tl-res-info {
@@ -249,6 +256,8 @@ export const timelineStyles = css`
   /* Super header (parent-level labels: day name, month, year) */
   .tl-super-header {
     height: var(--super-hdr-h);
+    min-height: var(--super-hdr-h);
+    flex-shrink: 0;
     position: sticky;
     top: 0;
     background: var(--white);
@@ -279,6 +288,8 @@ export const timelineStyles = css`
   /* Hour header (column labels) */
   .tl-hour-header {
     height: var(--hour-hdr-h);
+    min-height: var(--hour-hdr-h);
+    flex-shrink: 0;
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: var(--super-hdr-h);
@@ -708,16 +719,7 @@ export const timelineStyles = css`
   /* ══════════════════════════════════════════════════════════════════════════════
      RESPONSIVE
   ══════════════════════════════════════════════════════════════════════════════ */
-  @media (max-width: 1100px) {
-  }
-
-  @media (max-width: 900px) {
-    :host {
-      --res-col-w: 180px;
-    }
-  }
-
-  @media (max-width: 768px) {
+  @media (max-width: 700px) {
     /* Main Layout */
     :host {
       --res-col-w: 72px;
