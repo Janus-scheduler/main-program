@@ -151,7 +151,7 @@ export class JanusTimeline extends LitElement {
           } as TimelineEvent;
         });
 
-      let avatarType: "initials" | "icon" = "initials";
+      let avatarType: "initials" | "icon" | "image" = "initials";
       let avatarIcon: "room" | "equipment" | undefined = undefined;
       let groupLabel: string | undefined = undefined;
 
@@ -163,8 +163,9 @@ export class JanusTimeline extends LitElement {
         else if (type === "room") groupLabel = "ROOMS";
         else if (type === "equipment") groupLabel = "EQUIPMENT";
       }
-
-      if (type === "room") {
+      if (res.avatar) {
+        avatarType = "image";
+      } else if (type === "room") {
         avatarType = "icon";
         avatarIcon = "room";
       } else if (type === "equipment") {
@@ -185,6 +186,7 @@ export class JanusTimeline extends LitElement {
         avatarIcon,
         groupLabel,
         events: resEvents,
+        avatar: res.avatar,
       });
     }
 
@@ -620,6 +622,13 @@ export class JanusTimeline extends LitElement {
   // ── Rendering helpers ─────────────────────────────────────────────
 
   private renderAvatar(r: TimelineResource) {
+    if (r.avatarType === "image" && r.avatar) {
+      return html`<img
+        class="tl-avatar tl-avatar--image"
+        src="${r.avatar}"
+        alt="${r.name}"
+      />`;
+    }
     if (r.avatarType === "initials") {
       return html`<span
         class="tl-avatar tl-avatar--initials"

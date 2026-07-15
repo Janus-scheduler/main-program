@@ -39,7 +39,8 @@ export interface TimelineResource {
   id: string;
   name: string;
   subtitle: string;
-  avatarType: "initials" | "icon";
+  avatarType: "initials" | "icon" | "image";
+  avatar?: string;
   avatarIcon?: "room" | "equipment";
   groupLabel?: string;
   events: TimelineEvent[];

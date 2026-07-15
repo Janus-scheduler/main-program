@@ -212,6 +212,9 @@ export const timelineStyles = css`
     background: #fef3c7;
     color: #92400e;
   }
+  .tl-avatar--image {
+    object-fit: cover;
+  }
 
   /* ══════════════════════════════════════════════════════════════════════════════
      SCROLLABLE TIME GRID
