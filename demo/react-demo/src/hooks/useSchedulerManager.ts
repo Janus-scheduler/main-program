@@ -4,11 +4,18 @@ import {
   getBrowserTimezone,
   zonedInputToISO,
 } from "@janus-scheduler/react";
+import {
+  GoogleSyncManager,
+  GoogleCalendarClient,
+  GoogleEventMapper,
+} from "@janus-scheduler/integrations";
 
 export interface HookError {
   operation: string;
   message: string;
 }
+
+const BACKEND_URL = "http://localhost:3001";
 
 /**
  * useSchedulerManager
@@ -22,19 +29,26 @@ export interface HookError {
  */
 export function useSchedulerManager(onError: (err: HookError) => void) {
   const manager = useMemo(() => {
+    // Set up Google sync infrastructure
+    const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
+    const mapper = new GoogleEventMapper();
+    const syncManager = new GoogleSyncManager(client, mapper);
+
     const mgr = new SchedulerManager({
       // ── onEventAdd ────────────────────────────────────────────────────
       // Fires AFTER the store is updated (optimistic). If this throws,
       // SchedulerManager automatically rolls back the store and calls onError.
       //
+      ...syncManager.getHooks(),
+
       // Replace with a real fetch() in production:
       //   await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) })
-      onEventAdd: async (_event) => {
-        await new Promise((r) => setTimeout(r, 400)); // simulate network latency
-        console.log(_event);
-        return; // ← success path
-        // throw new Error("HTTP 500 (simulated)"); // ← uncomment to test rollback
-      },
+      // onEventAdd: async (_event) => {
+      //   await new Promise((r) => setTimeout(r, 400)); // simulate network latency
+      //   console.log(_event);
+      //   return; // ← success path
+      //   // throw new Error("HTTP 500 (simulated)"); // ← uncomment to test rollback
+      // },
 
       // onEventUpdate: async (event) => {
       //   const res = await fetch(`/api/events/${event.id}`, {
@@ -91,6 +105,8 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         status: "confirmed",
       });
     }
+
+    window.__janusSyncManager = syncManager;
 
     return mgr;
     // eslint-disable-next-line react-hooks/exhaustive-deps

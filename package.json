@@ -13,6 +13,9 @@
     "dev:angular-demo": "npm run dev -w angular-demo",
     "dev:solid-demo": "npm run dev -w solid-demo",
     "dev:vue-demo": "npm run dev -w vue-demo",
+    "dev:integrations": "npm run dev -w @janus-scheduler/integrations",
+    "build:integrations": "npm run build -w @janus-scheduler/integrations",
+    "start:backend": "node --loader ts-node/esm packages/integrations/src/server/server.ts",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test -w @janus-scheduler/core",
     "clean": "rm -rf packages/*/dist demo/dist",
@@ -41,7 +44,8 @@
     "typescript": "^5.5.0",
     "vscode-uri": "^3.1.0",
     "zod": "^4.4.3",
-    "zod-validation-error": "^5.0.0"
+    "zod-validation-error": "^5.0.0",
+    "ts-node": "^10.9.2"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

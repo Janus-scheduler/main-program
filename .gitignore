@@ -8,3 +8,6 @@ lint_output.txt
 *.timestamp-*
 *.log
 .agents
+.env
+janus-tokens.json
+janus-calendar-state.json

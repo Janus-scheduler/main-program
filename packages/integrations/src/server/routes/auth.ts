@@ -1,0 +1,139 @@
+import { Router, type Request, type Response } from "express";
+import { google } from "googleapis";
+import {
+  saveTokens,
+  isConnected,
+  clearTokens,
+} from "../services/tokenService.js";
+import {
+  getOrCreateJanusCalendar,
+  getInitialSyncToken,
+  saveCalendarState,
+  clearCalendarState,
+  getCalendarState,
+} from "../services/calendarService.js";
+import { registerWebhook, fetchAllEvents } from "../services/googleService.js";
+
+export function createAuthRouter(config: {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  frontendUrl: string;
+  webhookUrl: string;
+  channelToken: string;
+}) {
+  const router = Router();
+
+  function buildOAuthClient() {
+    return new google.auth.OAuth2(
+      config.clientId,
+      config.clientSecret,
+      config.redirectUri,
+    );
+  }
+
+  // Redirect to Google consent screen
+  router.get("/google", (_req: Request, res: Response) => {
+    const url = buildOAuthClient().generateAuthUrl({
+      access_type: "offline",
+      prompt: "consent", // always get refresh_token
+      scope: [
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/calendar",
+      ],
+    });
+    res.redirect(url);
+  });
+
+  // Google redirects back with auth code
+  router.get("/google/callback", async (req: Request, res: Response) => {
+    const code = req.query.code as string;
+    if (!code) {
+      res.redirect(`${config.frontendUrl}?google_connected=false`);
+      return;
+    }
+
+    try {
+      const { tokens } = await buildOAuthClient().getToken(code);
+
+      saveTokens({
+        access_token: tokens.access_token!,
+        refresh_token: tokens.refresh_token!,
+        expiry_date: tokens.expiry_date!,
+      });
+
+      // Get or create "Janus Scheduler" calendar
+      const calendarId = await getOrCreateJanusCalendar(
+        config.clientId,
+        config.clientSecret,
+        config.redirectUri,
+      );
+
+      // Get sync token baseline
+      const syncToken = await getInitialSyncToken(
+        calendarId,
+        config.clientId,
+        config.clientSecret,
+        config.redirectUri,
+      );
+
+      // Register webhook with Google
+      const webhook = await registerWebhook(
+        calendarId,
+        config.webhookUrl,
+        config.channelToken,
+        config.clientId,
+        config.clientSecret,
+        config.redirectUri,
+      );
+
+      saveCalendarState({
+        janusCalendarId: calendarId,
+        syncToken,
+        webhookChannelId: webhook.channelId,
+        webhookResourceId: webhook.resourceId,
+        webhookExpiration: webhook.expiration,
+      });
+
+      res.redirect(`${config.frontendUrl}?google_connected=true`);
+    } catch (err) {
+      console.error("[Auth] OAuth callback error:", err);
+      res.redirect(`${config.frontendUrl}?google_connected=false`);
+    }
+  });
+
+  // Check if connected
+  router.get("/status", (_req: Request, res: Response) => {
+    res.json({ connected: isConnected() });
+  });
+
+  // Fetch all current events (called after first connect)
+  router.get("/initial-events", async (_req: Request, res: Response) => {
+    try {
+      const state = getCalendarState();
+      if (!state) {
+        res.status(400).json({ error: "Not connected" });
+        return;
+      }
+      const events = await fetchAllEvents(
+        state.janusCalendarId,
+        config.clientId,
+        config.clientSecret,
+        config.redirectUri,
+      );
+      res.json({ events });
+    } catch (err) {
+      console.error("[Auth] Initial events error:", err);
+      res.status(500).json({ error: "Failed to fetch initial events " });
+    }
+  });
+
+  // Disconnect
+  router.post("/disconnect", (_req: Request, res: Response) => {
+    clearTokens();
+    clearCalendarState();
+    res.json({ disconnected: true });
+  });
+
+  return router;
+}
