@@ -9,13 +9,13 @@ export const timelineStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: #f97316;
-    --orange-lt: #fff7ed;
+    --orange: var(--janus-primary-color, #f97316);
+    --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours */
-    --c-orange-bg: #fff7ed;
-    --c-orange-bd: #f97316;
-    --c-orange-tx: #c2410c;
+    --c-orange-bg: var(--janus-primary-bg, #fff7ed);
+    --c-orange-bd: var(--janus-primary-color, #f97316);
+    --c-orange-tx: var(--janus-primary-text, #c2410c);
     --c-blue-bg: #eff6ff;
     --c-blue-bd: #3b82f6;
     --c-blue-tx: #1d4ed8;
@@ -683,16 +683,17 @@ export const timelineStyles = css`
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 18px rgba(249, 115, 22, 0.45);
+    box-shadow: 0 4px 18px var(--janus-primary-glow, rgba(249, 115, 22, 0.45));
     transition:
       background 0.18s,
       transform 0.14s,
+      filter 0.18s;
       box-shadow 0.18s;
     z-index: 200;
   }
 
   .tl-fab:hover {
-    background: #ea6c0a;
+    filter: brightness(0.95);
     transform: scale(1.07);
   }
 
@@ -1053,19 +1054,21 @@ export const timelineStyles = css`
     border: none;
     border-radius: 6px;
     font-size: 13px;
+    padding: 7px 16px;
+    border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(249, 115, 22, 0.2);
+    box-shadow: 0 2px 6px var(--janus-primary-glow, rgba(249, 115, 22, 0.2));
     transition:
       background 0.15s,
-      transform 0.1s;
+      transform 0.1s,
+      filter 0.15s;
   }
 
   .tl-alert-dialog__btn:hover {
-    background: #ea6c0a;
-  }
-
-  .tl-alert-dialog__btn:active {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+  }.tl-alert-dialog__btn:active {
     transform: scale(0.97);
   }
 

@@ -42,9 +42,14 @@ function toUtcTimeStr(d: Date): string {
 export class JanusMonthGrid extends LitElement {
   static readonly styles = monthGridStyles;
 
+  /** When true, renders a + Floating Action Button to add an event. Default: false */
+  @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
+
   // ── Internal state ────────────────────────────────────────────────────
   @property({ type: Array }) events: MonthEvent[] = [];
+  @state() private _gridHeight = 0;
   private _unsubStore?: () => void;
+  private _resizeObserver?: ResizeObserver;
 
   connectedCallback() {
     super.connectedCallback();
@@ -57,6 +62,7 @@ export class JanusMonthGrid extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
+    if (this._resizeObserver) this._resizeObserver.disconnect();
   }
 
   private _syncFromStore(state: SchedulerState) {
@@ -203,6 +209,18 @@ export class JanusMonthGrid extends LitElement {
     const grid = buildCalendarGrid(this._year, this._month, this.events);
     const todayCell = grid.flat().find((d) => d.isToday) ?? grid[0][0];
     this._selectedDateStr = todayCell.dateStr;
+
+    const gridEl = this.shadowRoot?.querySelector(".mg-grid");
+    if (gridEl) {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (this._gridHeight !== entry.contentRect.height) {
+            this._gridHeight = entry.contentRect.height;
+          }
+        }
+      });
+      this._resizeObserver.observe(gridEl);
+    }
 
     requestAnimationFrame(() => {
       this.requestUpdate();
@@ -418,12 +436,35 @@ export class JanusMonthGrid extends LitElement {
               }
 
               const numTracks = trackFills.length;
-              const spanRows = numTracks + 2;
+
+              // Dynamically calculate how many events can fit in the row
+              let maxEventsPerDay = 2; // fallback
+              if (this._gridHeight > 0) {
+                const weekRowHeight = this._gridHeight / rowCount;
+                // row height - 46px(header) - 4px(padding bottom). Each track is 26px
+                maxEventsPerDay = Math.max(
+                  0,
+                  Math.floor((weekRowHeight - 50) / 26),
+                );
+              }
+
+              const visibleTracks = Math.min(numTracks, maxEventsPerDay);
+              const spanRows = visibleTracks + 2;
+
+              // Compute hidden events per day
+              const hiddenPerDay = new Array(7).fill(0);
+              for (const bar of weekEvents) {
+                if (bar.track >= maxEventsPerDay) {
+                  for (let i = bar.startIdx; i <= bar.endIdx; i++) {
+                    hiddenPerDay[i]++;
+                  }
+                }
+              }
 
               return html`
                 <div
                   class="mg-week-row"
-                  style="grid-template-rows: 28px repeat(${numTracks}, 26px) 1fr; padding-bottom: 4px;"
+                  style="grid-template-rows: 46px repeat(${visibleTracks}, 26px) 1fr; padding-bottom: 4px;"
                 >
                   <!-- Background Day Cells -->
                   ${week.map((day, colIdx) => {
@@ -462,49 +503,69 @@ export class JanusMonthGrid extends LitElement {
                   })}
 
                   <!-- Overlay Event Bars -->
-                  ${weekEvents.map((bar) => {
-                    const timeLabel = bar.startTime
-                      ? `${fmt12(bar.startTime)} · `
-                      : "";
-                    const clipLeft =
-                      bar.startDate && bar.startDate < week[0].dateStr;
-                    const clipRight =
-                      bar.endDate && bar.endDate > week[6].dateStr;
-                    const isHovered = this._hoveredEventId === bar.id;
+                  ${weekEvents
+                    .filter((bar) => bar.track < maxEventsPerDay)
+                    .map((bar) => {
+                      const timeLabel = bar.startTime
+                        ? `${fmt12(bar.startTime)} · `
+                        : "";
+                      const clipLeft =
+                        bar.startDate && bar.startDate < week[0].dateStr;
+                      const clipRight =
+                        bar.endDate && bar.endDate > week[6].dateStr;
+                      const isHovered = this._hoveredEventId === bar.id;
 
-                    const barClasses = [
-                      "mg-event",
-                      `mg-event--${bar.color}`,
-                      clipLeft ? "mg-event--clip-left" : "",
-                      clipRight ? "mg-event--clip-right" : "",
-                      isHovered ? "mg-event--hovered" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ");
+                      const barClasses = [
+                        "mg-event",
+                        `mg-event--${bar.color}`,
+                        clipLeft ? "mg-event--clip-left" : "",
+                        clipRight ? "mg-event--clip-right" : "",
+                        isHovered ? "mg-event--hovered" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
 
-                    return html`
-                      <button
-                        class=${barClasses}
-                        style="
+                      return html`
+                        <button
+                          class=${barClasses}
+                          style="
                             grid-column: ${bar.startIdx +
-                        1} / span ${bar.endIdx - bar.startIdx + 1}; 
+                          1} / span ${bar.endIdx - bar.startIdx + 1}; 
                             grid-row: ${bar.track + 2}; 
                             margin: 1px 4px; 
                             width: calc(100% - 8px);
                           "
+                          @click=${(e: Event) => {
+                            e.stopPropagation();
+                            this._handleEventClick(bar);
+                          }}
+                          @mouseenter=${() => {
+                            this._hoveredEventId = bar.id;
+                          }}
+                          @mouseleave=${() => {
+                            this._hoveredEventId = null;
+                          }}
+                          title="${timeLabel}${bar.title}"
+                        >
+                          <span class="mg-event__title">${bar.title}</span>
+                        </button>
+                      `;
+                    })}
+
+                  <!-- +X more indicators -->
+                  ${hiddenPerDay.map((count, colIdx) => {
+                    if (count === 0) return nothing;
+                    return html`
+                      <button
+                        class="mg-more-btn"
+                        style="grid-column: ${colIdx +
+                        1}; grid-row: ${visibleTracks + 2};"
                         @click=${(e: Event) => {
                           e.stopPropagation();
-                          this._handleEventClick(bar);
+                          this._handleDayClick(week[colIdx]);
                         }}
-                        @mouseenter=${() => {
-                          this._hoveredEventId = bar.id;
-                        }}
-                        @mouseleave=${() => {
-                          this._hoveredEventId = null;
-                        }}
-                        title="${timeLabel}${bar.title}"
                       >
-                        <span class="mg-event__title">${bar.title}</span>
+                        +${count} more
                       </button>
                     `;
                   })}
@@ -518,13 +579,17 @@ export class JanusMonthGrid extends LitElement {
         ${this._renderDayPanel(selectedDay)}
 
         <!-- ── FAB ── -->
-        <button
-          class="mg-fab"
-          @click=${this._handleAddEvent}
-          aria-label="Add event"
-        >
-          ${PlusIcon()}
-        </button>
+        ${this.showFab
+          ? html`
+              <button
+                class="mg-fab"
+                @click=${this._handleAddEvent}
+                aria-label="Add event"
+              >
+                ${PlusIcon()}
+              </button>
+            `
+          : nothing}
       </div>
     `;
   }

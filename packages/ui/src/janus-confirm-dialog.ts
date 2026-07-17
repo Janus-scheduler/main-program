@@ -83,8 +83,8 @@ export class JanusConfirmDialog extends LitElement {
     }
 
     .confirm-card.accent-orange {
-      border-top: 5px solid var(--orange, #f97316);
-      --confirm-accent: var(--orange, #f97316);
+      border-top: 5px solid var(--janus-primary-color, #f97316);
+      --confirm-accent: var(--janus-primary-color, #f97316);
       --confirm-accent-text: #ffffff;
     }
 

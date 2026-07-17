@@ -11,6 +11,18 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Change the primary accent color from orange to blue */
+  --janus-primary-color: #3b82f6;
+  
+  /* Optionally override the lighter background tints used for badges/hover states */
+  --janus-primary-bg: #eff6ff;
+  
+  /* Optionally override the glow effect color */
+  --janus-primary-glow: rgba(59, 130, 246, 0.15);
+  
+  /* Optionally override the text color used against primary backgrounds */
+  --janus-primary-text: #1d4ed8;
 }
 
 a {
@@ -66,3 +78,4 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+

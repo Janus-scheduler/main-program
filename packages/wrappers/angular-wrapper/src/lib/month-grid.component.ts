@@ -41,6 +41,9 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   readonly events = input<TimelineEvent[] | undefined>(undefined);
 
+  /** When true, renders a + Floating Action Button */
+  readonly showFab = input<boolean>(false);
+
   readonly eventClick = output<TimelineEvent>();
   readonly dayClick = output<{ date: string }>();
   readonly addEvent = output<void>();
@@ -109,10 +112,21 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     } else {
       this._subscribeToStore();
     }
+    this._syncProps();
   }
 
   ngOnChanges(): void {
     this._syncEvents();
+    this._syncProps();
+  }
+
+  private _syncProps(): void {
+    const el = this._elRef()?.nativeElement as
+      | (HTMLElement & { showFab: boolean })
+      | undefined;
+    if (el) {
+      el.showFab = this.showFab();
+    }
   }
 
   ngOnDestroy(): void {
