@@ -184,7 +184,7 @@ export interface TimelineProps {
   onConflictDetected?: (detail: {
     message: string;
     action: string;
-    detail: any;
+    detail: EventMoveDetail | EventResizeDetail | EventCreateDetail;
   }) => void;
 }
 
@@ -213,17 +213,19 @@ export const Timeline: Component<TimelineProps> = (props) => {
       }
     };
 
-    const attachMoveResizeCreate = <T,>(
+    const attachMoveResizeCreate = <
+      T extends EventMoveDetail | EventResizeDetail | EventCreateDetail,
+    >(
       eventName: string,
       handler?: (detail: T) => void,
     ) => {
       if (handler) {
         const listener = (e: Event) => {
-          const detail = (e as CustomEvent).detail;
-          if (props.preventConflicts && (detail as any).hasConflict) {
+          const detail = (e as CustomEvent).detail as T;
+          if (props.preventConflicts && detail.hasConflict) {
             return;
           }
-          handler(detail as T);
+          handler(detail);
         };
         ref?.addEventListener(eventName, listener);
         onCleanup(() => ref?.removeEventListener(eventName, listener));

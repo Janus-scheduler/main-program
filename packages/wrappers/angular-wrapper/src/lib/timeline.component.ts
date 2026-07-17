@@ -90,7 +90,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly conflictDetected = output<{
     message: string;
     action: string;
-    detail: any;
+    detail: EventMoveDetail | EventResizeDetail | EventCreateDetail;
   }>();
 
   private _unsubStore?: () => void;
