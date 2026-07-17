@@ -51,7 +51,18 @@ export interface SchedulerHooks {
     error: unknown;
     reverted: boolean;
   }) => void;
+
+  // ── Undo handler ──────────────────────────────────────────────────────────
+  /**
+   * Called whenever the undo stack's availability changes.
+   */
+  onUndoStateChange?: (canUndo: boolean) => void;
 }
+
+type UndoAction =
+  | { type: "addEvent"; id: string }
+  | { type: "updateEvent"; id: string; previous: Partial<EventData> }
+  | { type: "deleteEvent"; previous: EventData };
 
 /**
  * SchedulerManager
@@ -86,9 +97,45 @@ export interface SchedulerHooks {
  */
 export class SchedulerManager {
   private readonly _hooks: SchedulerHooks;
+  private _undoStack: UndoAction[] = [];
+  private _isUndoing = false;
 
   constructor(hooks: SchedulerHooks = {}) {
     this._hooks = hooks;
+  }
+
+  // ── Undo API ─────────────────────────────────────────────────────────────
+
+  canUndo(): boolean {
+    return this._undoStack.length > 0;
+  }
+
+  undo(): void {
+    if (!this.canUndo()) return;
+    this._isUndoing = true;
+    try {
+      const action = this._undoStack.pop()!;
+      switch (action.type) {
+        case "addEvent":
+          this.deleteEvent(action.id);
+          break;
+        case "updateEvent":
+          this.updateEvent(action.id, action.previous);
+          break;
+        case "deleteEvent":
+          this.addEvent(action.previous);
+          break;
+      }
+    } finally {
+      this._isUndoing = false;
+      this._hooks.onUndoStateChange?.(this.canUndo());
+    }
+  }
+
+  private _pushUndo(action: UndoAction) {
+    if (this._isUndoing) return;
+    this._undoStack.push(action);
+    this._hooks.onUndoStateChange?.(this.canUndo());
   }
 
   // ── Private helper ─────────────────────────────────────────────────────────
@@ -137,6 +184,8 @@ export class SchedulerManager {
    */
   addEvent(data: EventData): Event {
     const event = schedulerStore.getState().addEvent(data);
+
+    this._pushUndo({ type: "addEvent", id: event.id });
 
     this._fireHook(
       "addEvent",
@@ -204,6 +253,25 @@ export class SchedulerManager {
 
     const event = schedulerStore.getState().updateEvent(baseId, updates);
 
+    if (snapshot) {
+      this._pushUndo({
+        type: "updateEvent",
+        id: baseId,
+        previous: {
+          title: snapshot.title,
+          startTime: snapshot.startTime,
+          endTime: snapshot.endTime,
+          status: snapshot.status,
+          description: snapshot.description,
+          resourceId: snapshot.resourceId,
+          resourceIds: snapshot.resourceIds,
+          color: snapshot.color,
+          allDay: snapshot.allDay,
+          recurrenceRule: snapshot.recurrenceRule,
+        },
+      });
+    }
+
     this._fireHook(
       "updateEvent",
       () => this._hooks.onEventUpdate?.(event),
@@ -241,7 +309,24 @@ export class SchedulerManager {
     const snapshot = schedulerStore.getState().events[baseId];
     const deleted = schedulerStore.getState().deleteEvent(baseId);
 
-    if (deleted) {
+    if (deleted && snapshot) {
+      this._pushUndo({
+        type: "deleteEvent",
+        previous: {
+          id: snapshot.id,
+          title: snapshot.title,
+          startTime: snapshot.startTime,
+          endTime: snapshot.endTime,
+          status: snapshot.status,
+          description: snapshot.description,
+          resourceId: snapshot.resourceId,
+          resourceIds: snapshot.resourceIds,
+          color: snapshot.color,
+          allDay: snapshot.allDay,
+          recurrenceRule: snapshot.recurrenceRule,
+        },
+      });
+
       this._fireHook(
         "deleteEvent",
         () => this._hooks.onEventDelete?.(baseId),
@@ -467,6 +552,8 @@ export class SchedulerManager {
    */
   clearAll(): void {
     schedulerStore.getState().clearAll();
+    this._undoStack = [];
+    this._hooks.onUndoStateChange?.(this.canUndo());
   }
 }
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import "./App.css";
 
 import { Sidebar } from "./components/Sidebar";
@@ -37,11 +37,23 @@ function App() {
   }, []);
 
   // SchedulerManager is stable (created once via useMemo inside the hook)
-  const manager = useSchedulerManager(handleHookError);
+  const { manager, syncBulkEvents, canUndo } =
+    useSchedulerManager(handleHookError);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        e.preventDefault();
+        manager.undo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [manager]);
 
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar onSync={syncBulkEvents} />
 
       <main className="app-main">
         <SchedulerView
@@ -60,6 +72,8 @@ function App() {
             setShowScheduler(false);
             setSelectedEventId(null);
           }}
+          canUndo={canUndo}
+          onUndo={() => manager.undo()}
         />
 
         {hookError && (

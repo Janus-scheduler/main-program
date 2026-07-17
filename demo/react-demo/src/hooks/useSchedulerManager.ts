@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   SchedulerManager,
   getBrowserTimezone,
@@ -21,6 +21,8 @@ export interface HookError {
  * @returns the configured SchedulerManager instance (stable across renders)
  */
 export function useSchedulerManager(onError: (err: HookError) => void) {
+  const [canUndo, setCanUndo] = useState(false);
+
   const manager = useMemo(() => {
     const mgr = new SchedulerManager({
       // ── onEventAdd ────────────────────────────────────────────────────
@@ -58,6 +60,8 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
             : "An unexpected error occurred";
         onError({ operation, message });
       },
+
+      onUndoStateChange: (can) => setCanUndo(can),
     });
 
     // ── Seed initial demo data ─────────────────────────────────────────
@@ -96,5 +100,37 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // manager is intentionally created once
 
-  return manager;
+  const syncBulkEvents = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const tz = getBrowserTimezone();
+    const bulkEvents = [
+      {
+        id: "bulk-1",
+        title: "Emergency Surgery",
+        startTime: zonedInputToISO(today, "08:00", tz),
+        endTime: zonedInputToISO(today, "10:00", tz),
+        resourceIds: ["r1"],
+        status: "confirmed" as const,
+      },
+      {
+        id: "bulk-2",
+        title: "X-Ray Session",
+        startTime: zonedInputToISO(today, "10:30", tz),
+        endTime: zonedInputToISO(today, "12:00", tz),
+        resourceIds: ["r4"],
+        status: "confirmed" as const,
+      },
+      {
+        id: "bulk-3",
+        title: "Staff Training",
+        startTime: zonedInputToISO(today, "14:00", tz),
+        endTime: zonedInputToISO(today, "16:00", tz),
+        resourceIds: ["r2", "r3"],
+        status: "draft" as const,
+      },
+    ];
+    bulkEvents.forEach((evt) => manager.addEvent(evt));
+  };
+
+  return { manager, syncBulkEvents, canUndo };
 }

@@ -299,6 +299,7 @@ const _Topbar = createComponent({
     onTodayClick: "today-click",
     onViewSwitch: "view-switch",
     onToggleCreate: "toggle-create",
+    onUndoClick: "undo-click",
   },
 });
 
@@ -308,6 +309,7 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   shortDate?: string;
   view?: "Timeline" | "Month";
   allowCreate?: boolean;
+  canUndo?: boolean;
   zoomPercent?: number;
   zoomUnit?: string;
   onPrevClick?: () => void;
@@ -315,6 +317,7 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   onTodayClick?: () => void;
   onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
   onToggleCreate?: () => void;
+  onUndoClick?: () => void;
 }
 
 export function Topbar(props: TopbarProps): React.JSX.Element {
@@ -332,5 +335,6 @@ export function Topbar(props: TopbarProps): React.JSX.Element {
     onToggleCreate: props.onToggleCreate
       ? () => props.onToggleCreate!()
       : undefined,
+    onUndoClick: props.onUndoClick ? () => props.onUndoClick!() : undefined,
   });
 }

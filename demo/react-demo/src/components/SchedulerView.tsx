@@ -37,6 +37,8 @@ interface SchedulerViewProps {
   onViewChange: (view: ViewType) => void;
   onOpenScheduler: (eventId?: string) => void;
   onCloseScheduler: () => void;
+  canUndo?: boolean;
+  onUndo?: () => void;
 }
 
 /**
@@ -70,6 +72,8 @@ export function SchedulerView({
   onViewChange,
   onOpenScheduler,
   onCloseScheduler,
+  canUndo,
+  onUndo,
 }: SchedulerViewProps) {
   const [tempEventData, setTempEventData] = useState<{
     startDate?: string;
@@ -135,6 +139,7 @@ export function SchedulerView({
         shortDate={navData.shortDate}
         view={currentView}
         allowCreate={allowCreate}
+        canUndo={canUndo}
         zoomPercent={navData.zoomPercent}
         zoomUnit={navData.zoomUnit}
         onPrevClick={() => {
@@ -153,6 +158,9 @@ export function SchedulerView({
         onToggleCreate={() => {
           if (currentView === "Timeline") timelineRef.current?.toggleCreate();
           setAllowCreate(!allowCreate);
+        }}
+        onUndoClick={() => {
+          if (onUndo) onUndo();
         }}
       />
       {currentView === "Timeline" && (

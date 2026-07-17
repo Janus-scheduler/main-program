@@ -6,13 +6,17 @@ import {
   SettingsIcon,
 } from "../icons";
 
+interface SidebarProps {
+  onSync: () => void;
+}
+
 /**
  * Sidebar
  *
  * The fixed left navigation panel.
  * Static in this demo — nav items do not route anywhere yet.
  */
-export function Sidebar() {
+export function Sidebar({ onSync }: SidebarProps) {
   return (
     <aside className="app-sidebar">
       <div className="app-sidebar-brand">
@@ -33,8 +37,8 @@ export function Sidebar() {
         <button className="nav-item">
           <EquipmentIcon /> <span>Equipment</span>
         </button>
-        <button className="nav-item">
-          <SettingsIcon /> <span>Settings</span>
+        <button className="nav-item" onClick={onSync}>
+          <SettingsIcon /> <span>Sync Data</span>
         </button>
       </nav>
 

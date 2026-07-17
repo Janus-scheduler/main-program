@@ -7,6 +7,7 @@ import {
   SearchIcon,
   BellIcon,
   PencilRulerIcon,
+  UndoIcon,
 } from "./timeline-icons";
 
 /**
@@ -42,6 +43,9 @@ export class JanusTopbar extends LitElement {
 
   /** Whether draw-to-create mode is active. */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
+
+  /** Whether undo is available. */
+  @property({ type: Boolean, attribute: "can-undo" }) canUndo = false;
 
   /** Current zoom percentage (100 = default). If not 100, a badge is shown. */
   @property({ type: Number, attribute: "zoom-percent" }) zoomPercent = 100;
@@ -98,6 +102,12 @@ export class JanusTopbar extends LitElement {
   private _emitToggleCreate() {
     this.dispatchEvent(
       new CustomEvent("toggle-create", { bubbles: true, composed: true }),
+    );
+  }
+
+  private _emitUndo() {
+    this.dispatchEvent(
+      new CustomEvent("undo-click", { bubbles: true, composed: true }),
     );
   }
 
@@ -164,6 +174,20 @@ export class JanusTopbar extends LitElement {
               `,
             )}
           </div>
+
+          ${this.canUndo
+            ? html`
+                <button
+                  class="tl-icon-btn"
+                  aria-label="Undo"
+                  data-tooltip="Undo last action (Cmd+Z)"
+                  @click=${this._emitUndo}
+                >
+                  ${UndoIcon()}
+                </button>
+              `
+            : nothing}
+
           <button
             class="tl-icon-btn tl-draw-toggle ${this.allowCreate
               ? "tl-draw-toggle--active"
