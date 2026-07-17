@@ -102,6 +102,7 @@ export function SchedulerView({
       goToNext: () => void;
       goToToday: () => void;
       toggleCreate: () => void;
+      goToDate: (date: string | number | Date) => void;
     }
   >(null);
   const monthGridRef = useRef<
@@ -167,6 +168,7 @@ export function SchedulerView({
         <Timeline
           ref={timelineRef}
           allowCreate={allowCreate}
+          showFab={true}
           preventConflicts={preventConflicts}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
@@ -214,8 +216,17 @@ export function SchedulerView({
 
       {currentView === "Month" && (
         <MonthGrid
+          showFab={false}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
+          onDayClick={(detail) => {
+            onViewChange("Timeline");
+            setTimeout(() => {
+              if (timelineRef.current && timelineRef.current.goToDate) {
+                timelineRef.current.goToDate(detail.date);
+              }
+            }, 100);
+          }}
           onViewChange={(detail) => onViewChange(detail.view)}
           onNavChange={handleNavChange}
           ref={monthGridRef}

@@ -141,6 +141,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   currentDate?: Date;
   aiPrompt?: string;
   allowCreate?: boolean;
+  showFab?: boolean;
   preventConflicts?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onEventMove?: (detail: EventMoveDetail) => void;
@@ -219,6 +220,7 @@ const _MonthGrid = createComponent({
 });
 
 export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
+  showFab?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;

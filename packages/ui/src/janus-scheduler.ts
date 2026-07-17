@@ -388,6 +388,7 @@ export class JanusScheduler extends LitElement {
   @property({ type: Array }) participants: string[] = [];
   @property({ type: String }) description = "";
   @property({ type: String }) activeColor = "orange";
+  @property({ type: String }) brandColor?: string;
   @property({ type: String }) error: string | null = null;
   @property({ type: Boolean }) allDay = false;
   @property({ type: String }) recurrenceRule = "";
@@ -1388,6 +1389,13 @@ export class JanusScheduler extends LitElement {
         : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
 
     return html`
+      ${this.brandColor
+        ? html`<style>
+            :host {
+              --janus-primary-color: ${this.brandColor};
+            }
+          </style>`
+        : nothing}
       <div
         class="overlay"
         @click=${(e: Event) =>

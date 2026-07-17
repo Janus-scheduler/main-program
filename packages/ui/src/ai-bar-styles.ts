@@ -7,7 +7,7 @@ export const aiBarStyles = css`
     --border: #e4e4e7;
     --text-1: #18181b;
     --text-3: #a1a1aa;
-    --orange: #f97316;
+    --orange: var(--janus-primary-color, #f97316);
     --aicard-area-h: 60px;
 
     display: flex;
@@ -45,8 +45,8 @@ export const aiBarStyles = css`
   .ai-card:focus-within {
     border-color: var(--orange);
     box-shadow:
-      0 4px 20px rgba(249, 115, 22, 0.12),
-      0 0 0 3px rgba(249, 115, 22, 0.08);
+      0 4px 20px var(--janus-primary-glow, rgba(249, 115, 22, 0.12)),
+      0 0 0 3px var(--janus-primary-glow, rgba(249, 115, 22, 0.08));
   }
 
   .ai-card__input {
@@ -75,14 +75,15 @@ export const aiBarStyles = css`
     font-weight: 600;
     cursor: pointer;
     flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+    box-shadow: 0 2px 8px var(--janus-primary-glow, rgba(249, 115, 22, 0.3));
     transition:
       background 0.15s,
-      transform 0.12s;
+      transform 0.12s,
+      filter 0.15s;
   }
 
   .ai-card__btn:hover {
-    background: #ea6c0a;
+    filter: brightness(0.95);
   }
 
   .ai-card__btn:active {

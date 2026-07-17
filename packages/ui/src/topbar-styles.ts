@@ -9,8 +9,8 @@ export const topbarStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: #f97316;
-    --orange-lt: #fff7ed;
+    --orange: var(--janus-primary-color, #f97316);
+    --orange-lt: var(--janus-primary-bg, #fff7ed);
     --topbar-h: 56px;
 
     display: block;
@@ -273,7 +273,7 @@ export const topbarStyles = css`
   }
 
   .tl-draw-toggle--active:hover {
-    background: #ea6c0a;
+    filter: brightness(0.95);
     color: #fff;
   }
 

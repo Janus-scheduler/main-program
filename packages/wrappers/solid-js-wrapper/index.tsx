@@ -172,6 +172,7 @@ export interface TimelineProps {
   currentDate?: Date;
   aiPrompt?: string;
   allowCreate?: boolean;
+  showFab?: boolean;
   preventConflicts?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onAddEvent?: () => void;
@@ -199,6 +200,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
       if (props.currentDate !== undefined) el.currentDate = props.currentDate;
       if (props.aiPrompt !== undefined) el.aiPrompt = props.aiPrompt;
       if (props.allowCreate !== undefined) el.allowCreate = props.allowCreate;
+      if (props.showFab !== undefined) el.showFab = props.showFab;
       if (props.preventConflicts !== undefined)
         el.preventConflicts = props.preventConflicts;
     }
@@ -262,6 +264,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
  * The component reads directly from the Zustand store.
  */
 export interface MonthGridProps {
+  showFab?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;
@@ -272,6 +275,13 @@ export interface MonthGridProps {
 
 export const MonthGrid: Component<MonthGridProps> = (props) => {
   let ref!: HTMLElement;
+
+  createEffect(() => {
+    if (ref) {
+      const el = ref as unknown as Record<string, unknown>;
+      if (props.showFab !== undefined) el.showFab = props.showFab;
+    }
+  });
 
   onMount(() => {
     const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
