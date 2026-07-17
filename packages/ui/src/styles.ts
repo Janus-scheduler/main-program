@@ -15,9 +15,9 @@ export const schedulerStyles = css`
   }
 
   :host {
-    --orange: #f97316;
-    --orange-light: #fff7ed;
-    --orange-glow: rgba(249, 115, 22, 0.15);
+    --orange: var(--janus-primary-color, #f97316);
+    --orange-light: var(--janus-primary-bg, #fff7ed);
+    --orange-glow: var(--janus-primary-glow, rgba(249, 115, 22, 0.15));
 
     --border: #e4e4e7;
     --text-primary: #18181b;
@@ -35,7 +35,7 @@ export const schedulerStyles = css`
 
     --red: #ef4444;
 
-    --c-orange: #f97316;
+    --c-orange: var(--janus-primary-color, #f97316);
     --c-blue: #3b82f6;
     --c-green: #10b981;
     --c-yellow: #f59e0b;
@@ -1617,16 +1617,17 @@ export const schedulerStyles = css`
     font-weight: 600;
     padding: 8px 20px;
     border-radius: 9px;
-    box-shadow: 0 2px 10px rgba(249, 115, 22, 0.3);
+    box-shadow: 0 2px 10px var(--orange-glow);
     transition:
       background 0.15s,
       box-shadow 0.15s,
-      transform 0.1s;
+      transform 0.1s,
+      filter 0.15s;
     white-space: nowrap;
   }
   .btn-save:hover {
-    background: #ea6c0a;
-    box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
+    filter: brightness(0.95);
+    box-shadow: 0 4px 16px var(--orange-glow);
   }
   .btn-save:active {
     transform: scale(0.97);

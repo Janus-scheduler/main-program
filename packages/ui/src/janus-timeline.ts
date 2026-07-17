@@ -48,6 +48,8 @@ export class JanusTimeline extends LitElement {
   @property({ type: Array }) resources: TimelineResource[] = [];
   /** When true, dragging on empty row space creates a new event. Default: false */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
+  /** When true, renders a + Floating Action Button to add an event. Default: false */
+  @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
   @property({ type: Boolean, attribute: "prevent-conflicts" })
   preventConflicts = true;
 
@@ -346,6 +348,19 @@ export class JanusTimeline extends LitElement {
   public goToToday() {
     this._pxPerMs = DEFAULT_PX_PER_MS; // reset zoom to default
     this._initializeView(Date.now());
+  }
+
+  public goToDate(date: string | number | Date) {
+    this._pxPerMs = DEFAULT_PX_PER_MS;
+    let targetTime: number;
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [y, m, d] = date.split("-").map(Number);
+      // Center on noon local time on the target day
+      targetTime = new Date(y, m - 1, d, 12, 0, 0).getTime();
+    } else {
+      targetTime = new Date(date).getTime();
+    }
+    this._initializeView(targetTime);
   }
 
   private _handleEventClick(e: Event, ev: TimelineEvent) {
@@ -1095,13 +1110,18 @@ export class JanusTimeline extends LitElement {
           </div>
         </div>
 
-        <button
-          class="tl-fab"
-          @click=${this._handleAddEvent}
-          aria-label="Add event"
-        >
-          ${PlusIcon()}
-        </button>
+        <!-- FAB -->
+        ${this.showFab
+          ? html`
+              <button
+                class="tl-fab"
+                @click=${this._handleAddEvent}
+                aria-label="Add event"
+              >
+                ${PlusIcon()}
+              </button>
+            `
+          : nothing}
 
         <!-- Blocked Conflict Alert Dialog -->
         ${this._showBlockedConflictDialog

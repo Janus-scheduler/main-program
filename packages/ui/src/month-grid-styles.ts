@@ -9,13 +9,13 @@ export const monthGridStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: #f97316;
-    --orange-lt: #fff7ed;
+    --orange: var(--janus-primary-color, #f97316);
+    --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours — same vars as timeline */
-    --c-orange-bg: #fff7ed;
-    --c-orange-bd: #f97316;
-    --c-orange-tx: #c2410c;
+    --c-orange-bg: var(--janus-primary-bg, #fff7ed);
+    --c-orange-bd: var(--janus-primary-color, #f97316);
+    --c-orange-tx: var(--janus-primary-text, #c2410c);
     --c-blue-bg: #eff6ff;
     --c-blue-bd: #3b82f6;
     --c-blue-tx: #1d4ed8;
@@ -48,7 +48,10 @@ export const monthGridStyles = css`
     --topbar-h: 56px;
     --aicard-area-h: 60px;
     --day-hdr-h: 40px; /* weekday label row height */
-    --today-bg: #fff7ed; /* highlight for today's cell */
+    --today-bg: var(
+      --janus-primary-bg,
+      #fff7ed
+    ); /* highlight for today's cell */
 
     display: flex;
     flex-direction: column;
@@ -281,6 +284,31 @@ export const monthGridStyles = css`
     min-width: 0;
   }
 
+  /* "+X more" button */
+  .mg-more-btn {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 2px 6px;
+    margin: 1px 4px;
+    border-radius: 4px;
+    transition:
+      background 0.1s,
+      color 0.1s;
+    width: max-content;
+  }
+
+  .mg-more-btn:hover {
+    background: var(--bg-hover, #f0f0f0);
+    color: var(--text-1);
+  }
+
   /* Colour variants — identical mapping as timeline */
   .mg-event--orange {
     background: var(--c-orange-bg);
@@ -368,16 +396,17 @@ export const monthGridStyles = css`
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 18px rgba(249, 115, 22, 0.45);
+    box-shadow: 0 4px 18px var(--janus-primary-glow, rgba(249, 115, 22, 0.45));
     transition:
       background 0.18s,
       transform 0.14s,
+      filter 0.18s,
       box-shadow 0.18s;
     z-index: 200;
   }
 
   .mg-fab:hover {
-    background: #ea6c0a;
+    filter: brightness(0.95);
     transform: scale(1.07);
   }
 

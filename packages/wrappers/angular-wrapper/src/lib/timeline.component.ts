@@ -63,6 +63,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** When true, dragging on empty row space creates a new event */
   readonly allowCreate = input<boolean>(false);
 
+  /** When true, renders a + Floating Action Button */
+  readonly showFab = input<boolean>(false);
+
   /** When true, resource conflicts/double-bookings are strictly blocked */
   readonly preventConflicts = input<boolean>(false);
 
@@ -330,10 +333,15 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private _applyAllowCreate(): void {
     const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { allowCreate: boolean; preventConflicts: boolean })
+      | (HTMLElement & {
+          allowCreate: boolean;
+          showFab: boolean;
+          preventConflicts: boolean;
+        })
       | undefined;
     if (el) {
       el.allowCreate = this.allowCreate();
+      el.showFab = this.showFab();
       el.preventConflicts = this.preventConflicts();
     }
   }
