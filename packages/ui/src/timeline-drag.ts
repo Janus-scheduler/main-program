@@ -5,7 +5,12 @@
  * Uses absolute timestamps (ms) for all positioning.
  */
 
-import { TimelineEvent } from "./timeline-types";
+import {
+  TimelineEvent,
+  type EventCreateDetail,
+  type EventMoveDetail,
+  type EventResizeDetail,
+} from "./timeline-types";
 import {
   ROW_HEIGHT,
   DRAG_THRESHOLD,
@@ -245,8 +250,11 @@ export class TimelineDragController {
   /**
    * Complete the drag and return the event detail to dispatch.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  completeAndGetResult(): { type: string; detail: any } | null {
+  completeAndGetResult():
+    | { type: "event-move"; detail: EventMoveDetail }
+    | { type: "event-resize"; detail: EventResizeDetail }
+    | { type: "event-create"; detail: EventCreateDetail }
+    | null {
     this._removeMoveListener();
     document.body.style.userSelect = "";
     document.body.style.cursor = "";
@@ -409,8 +417,11 @@ export class TimelineDragController {
 
   // ── Result computation ──────────────────────────────────────────────
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _computeResult(): { type: string; detail: any } | null {
+  private _computeResult():
+    | { type: "event-move"; detail: EventMoveDetail }
+    | { type: "event-resize"; detail: EventResizeDetail }
+    | { type: "event-create"; detail: EventCreateDetail }
+    | null {
     const snapMs = this._getSnapMs();
 
     switch (this.mode) {

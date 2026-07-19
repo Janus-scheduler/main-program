@@ -5,7 +5,7 @@ import {
   type ConflictResource,
   type ConflictEvent,
 } from "../src/utils/conflict";
-import { type EventDraft } from "../src/index";
+import { type EventDraft, Event } from "../src/index";
 
 describe("Conflict Utilities", () => {
   describe("checkSlotConflict", () => {
@@ -48,15 +48,17 @@ describe("Conflict Utilities", () => {
   });
 
   describe("checkDraftConflict", () => {
-    const existingEvents = [
-      {
+    const existingEvents: Event[] = [
+      new Event({
         id: "existing_1",
         title: "Team Meeting",
         startTime: "2026-06-02T10:00:00Z",
         endTime: "2026-06-02T11:00:00Z",
         resourceIds: ["res_1"],
+        status: "confirmed",
+        description: "",
         allDay: false,
-      },
+      }),
     ];
 
     it("should return no conflict for empty/incomplete draft properties", () => {
@@ -87,7 +89,7 @@ describe("Conflict Utilities", () => {
         recurrenceRule: "",
       };
 
-      const result = checkDraftConflict(draft, existingEvents as any, "UTC");
+      const result = checkDraftConflict(draft, existingEvents, "UTC");
       expect(result.hasConflict).toBe(true);
       expect(result.resourceIds).toContain("res_1");
       expect(result.message).toContain("Team Meeting");
@@ -109,7 +111,7 @@ describe("Conflict Utilities", () => {
         recurrenceRule: "",
       };
 
-      const result = checkDraftConflict(draft, existingEvents as any, "UTC");
+      const result = checkDraftConflict(draft, existingEvents, "UTC");
       expect(result.hasConflict).toBe(false);
     });
 
@@ -131,7 +133,7 @@ describe("Conflict Utilities", () => {
       // Forcing error via invalid timezone
       const result = checkDraftConflict(
         draft,
-        existingEvents as any,
+        existingEvents,
         "Invalid/TimeZone",
       );
       expect(result.hasConflict).toBe(false);

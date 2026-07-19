@@ -1520,14 +1520,18 @@ export class JanusScheduler extends LitElement {
                               </div>
                             </div>
                           </div>
-                          <div class="sidebar-footer">
-                            <button
-                              class="btn-delete"
-                              @click=${this._onDeleteClick}
-                            >
-                              ${TrashIcon()} Delete Event
-                            </button>
-                          </div>
+                          ${this.eventId
+                            ? html`
+                                <div class="sidebar-footer">
+                                  <button
+                                    class="btn-delete"
+                                    @click=${this._onDeleteClick}
+                                  >
+                                    ${TrashIcon()} Delete Event
+                                  </button>
+                                </div>
+                              `
+                            : nothing}
                         </aside>
 
                         <!-- ── Panel ───────────────────────────────────────────────────── -->
@@ -2097,12 +2101,14 @@ export class JanusScheduler extends LitElement {
                           </div>
 
                           <div class="panel-footer">
-                            <button
-                              class="btn-delete btn-delete--footer"
-                              @click=${this._onDeleteClick}
-                            >
-                              ${TrashIcon()} Delete
-                            </button>
+                            ${this.eventId
+                              ? html`<button
+                                  class="btn-delete btn-delete--footer"
+                                  @click=${this._onDeleteClick}
+                                >
+                                  ${TrashIcon()} Delete
+                                </button>`
+                              : nothing}
                             <div class="footer-right">
                               <button
                                 class="btn-cancel"
