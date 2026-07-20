@@ -9,8 +9,10 @@ export const topbarStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: var(--janus-primary-color, #f97316);
-    --orange-lt: var(--janus-primary-bg, #fff7ed);
+    --primary: var(--janus-primary-color, #3b82f6);
+    --primary: #f97316;
+    --primary-lt: var(--janus-primary-bg, #eff6ff);
+    --primary-lt: #fff7ed;
     --topbar-h: 56px;
 
     display: block;
@@ -95,7 +97,7 @@ export const topbarStyles = css`
   }
 
   .tl-nav__today:hover {
-    border-color: var(--orange);
+    border-color: var(--primary);
   }
 
   .tl-nav__date {
@@ -189,7 +191,7 @@ export const topbarStyles = css`
     right: 6px;
     width: 7px;
     height: 7px;
-    background: var(--orange);
+    background: var(--primary);
     border-radius: 50%;
     border: 1.5px solid var(--white);
   }
@@ -252,8 +254,8 @@ export const topbarStyles = css`
     justify-content: center;
     padding: 3px 10px;
     border-radius: 6px;
-    background: var(--orange-lt);
-    color: var(--orange);
+    background: var(--primary-lt);
+    color: var(--primary);
     font-size: 12px;
     font-weight: 600;
     font-family: "DM Mono", monospace;
@@ -268,7 +270,7 @@ export const topbarStyles = css`
   }
 
   .tl-draw-toggle--active {
-    background: var(--orange);
+    background: var(--primary);
     color: #fff;
   }
 

@@ -15,6 +15,7 @@ import { schedulerStyles } from "./styles";
 import "./janus-confirm-dialog";
 
 const COLORS = [
+  "primary",
   "orange",
   "blue",
   "green",
@@ -248,7 +249,7 @@ function avatarHtml(name: string) {
     .slice(0, 2);
   const cls = avatarPalette[name]
     ? `avatar-${avatarPalette[name]}`
-    : "avatar-orange";
+    : "avatar-primary";
   return html`<span class="avatar ${cls}">${initials}</span>`;
 }
 
@@ -387,7 +388,7 @@ export class JanusScheduler extends LitElement {
   @property({ type: String }) endTime = "";
   @property({ type: Array }) participants: string[] = [];
   @property({ type: String }) description = "";
-  @property({ type: String }) activeColor = "orange";
+  @property({ type: String }) activeColor = "primary";
   @property({ type: String }) brandColor?: string;
   @property({ type: String }) error: string | null = null;
   @property({ type: Boolean }) allDay = false;
@@ -546,7 +547,7 @@ export class JanusScheduler extends LitElement {
         endTime: this.endTime || "10:00",
         participants: this._participants,
         description: this.description,
-        activeColor: this.activeColor || "orange",
+        activeColor: this.activeColor || "primary",
         timezone: schedulerStore.getState().timezone,
         allDay: this.allDay,
         recurrenceRule: this.recurrenceRule,
@@ -639,7 +640,7 @@ export class JanusScheduler extends LitElement {
         endTime: this.endTime,
         participants: this._participants,
         description: this.description,
-        activeColor: this.activeColor || "orange",
+        activeColor: this.activeColor || "primary",
         timezone: this._selectedTz,
       };
       schedulerStore.getState().startDraft(this.eventId, defaults);
@@ -1219,7 +1220,7 @@ export class JanusScheduler extends LitElement {
       ? "All-day event"
       : `${formatTime(startTimeVal)} – ${formatTime(endTimeVal)}`;
 
-    const color = draft.activeColor || "orange";
+    const color = draft.activeColor || "primary";
 
     return html`
       <div class="view-panel">
@@ -2144,7 +2145,7 @@ export class JanusScheduler extends LitElement {
         subtitle="Review the details before creating this event."
         confirmText="Confirm and create"
         cancelText="Back to edit"
-        accentColor="orange"
+        accentColor="primary"
         @confirm=${this._onConfirmCreate}
         @cancel=${() => (this._showCreateConfirm = false)}
       ></janus-confirm-dialog>

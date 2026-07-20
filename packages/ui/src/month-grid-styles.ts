@@ -9,13 +9,18 @@ export const monthGridStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: var(--janus-primary-color, #f97316);
-    --orange-lt: var(--janus-primary-bg, #fff7ed);
+    --primary: var(--janus-primary-color, #3b82f6);
+    --primary: #f97316;
+    --primary-lt: var(--janus-primary-bg, #eff6ff);
+    --primary-lt: #fff7ed;
 
     /* Event colours — same vars as timeline */
-    --c-orange-bg: var(--janus-primary-bg, #fff7ed);
-    --c-orange-bd: var(--janus-primary-color, #f97316);
-    --c-orange-tx: var(--janus-primary-text, #c2410c);
+    --c-primary-bg: var(--janus-primary-bg, #eff6ff);
+    --c-primary-bg: #fff7ed;
+    --c-primary-bd: var(--janus-primary-color, #3b82f6);
+    --c-primary-bd: #f97316;
+    --c-primary-tx: var(--janus-primary-text, #1d4ed8);
+    --c-primary-tx: #c2410c;
     --c-blue-bg: #eff6ff;
     --c-blue-bd: #3b82f6;
     --c-blue-tx: #1d4ed8;
@@ -195,9 +200,9 @@ export const monthGridStyles = css`
     line-height: 1;
   }
 
-  /* Selected day — orange outline */
+  /* Selected day — primary outline */
   .mg-day-cell--selected {
-    outline: 2px solid var(--orange);
+    outline: 2px solid var(--primary);
     outline-offset: -2px;
   }
 
@@ -209,7 +214,7 @@ export const monthGridStyles = css`
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: var(--orange);
+    background: var(--primary);
     color: #fff;
     font-size: 12px;
     font-weight: 700;
@@ -221,7 +226,7 @@ export const monthGridStyles = css`
   .mg-today-label {
     font-size: 10px;
     font-weight: 600;
-    color: var(--orange);
+    color: var(--primary);
     letter-spacing: 0.4px;
   }
 
@@ -310,10 +315,10 @@ export const monthGridStyles = css`
   }
 
   /* Colour variants — identical mapping as timeline */
-  .mg-event--orange {
-    background: var(--c-orange-bg);
-    border-color: var(--c-orange-bd);
-    color: var(--c-orange-tx);
+  .mg-event--primary {
+    background: var(--c-primary-bg);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
   }
 
   .mg-event--blue {
@@ -389,7 +394,7 @@ export const monthGridStyles = css`
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: var(--orange);
+    background: var(--primary);
     color: #fff;
     border: none;
     cursor: pointer;
@@ -464,8 +469,8 @@ export const monthGridStyles = css`
   .mg-day-panel__today-badge {
     font-size: 11px;
     font-weight: 600;
-    color: var(--orange);
-    background: var(--orange-lt);
+    color: var(--primary);
+    background: var(--primary-lt);
     padding: 2px 8px;
     border-radius: 99px;
     letter-spacing: 0.4px;
@@ -501,8 +506,8 @@ export const monthGridStyles = css`
     align-self: center;
   }
 
-  .mg-day-panel__color-bar--orange {
-    background: var(--c-orange-bd);
+  .mg-day-panel__color-bar--primary {
+    background: var(--c-primary-bd);
   }
   .mg-day-panel__color-bar--blue {
     background: var(--c-blue-bd);
@@ -655,9 +660,9 @@ export const monthGridStyles = css`
     }
 
     /* Override the border-left from colour variants */
-    .mg-event--orange {
+    .mg-event--primary {
       border-left: none;
-      background: var(--c-orange-bd);
+      background: var(--c-primary-bd);
     }
     .mg-event--blue {
       border-left: none;

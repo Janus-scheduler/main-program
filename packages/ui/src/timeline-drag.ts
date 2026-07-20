@@ -64,7 +64,7 @@ export class TimelineDragController {
     left: 0,
     top: 0,
     width: 0,
-    color: "orange",
+    color: "primary",
     timeLabel: "",
     title: "",
   };

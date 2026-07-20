@@ -9,13 +9,18 @@ export const timelineStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: var(--janus-primary-color, #f97316);
-    --orange-lt: var(--janus-primary-bg, #fff7ed);
+    --primary: var(--janus-primary-color, #3b82f6);
+    --primary: #f97316;
+    --primary-lt: var(--janus-primary-bg, #eff6ff);
+    --primary-lt: #fff7ed;
 
     /* Event colours */
-    --c-orange-bg: var(--janus-primary-bg, #fff7ed);
-    --c-orange-bd: var(--janus-primary-color, #f97316);
-    --c-orange-tx: var(--janus-primary-text, #c2410c);
+    --c-primary-bg: var(--janus-primary-bg, #eff6ff);
+    --c-primary-bg: #fff7ed;
+    --c-primary-bd: var(--janus-primary-color, #3b82f6);
+    --c-primary-bd: #f97316;
+    --c-primary-tx: var(--janus-primary-text, #1d4ed8);
+    --c-primary-tx: #c2410c;
     --c-blue-bg: #eff6ff;
     --c-blue-bd: #3b82f6;
     --c-blue-tx: #1d4ed8;
@@ -204,8 +209,8 @@ export const timelineStyles = css`
 
   .tl-avatar--icon {
     border-radius: 10px;
-    background: var(--orange-lt);
-    color: var(--orange);
+    background: var(--primary-lt);
+    color: var(--primary);
   }
 
   .tl-avatar--equipment {
@@ -350,7 +355,7 @@ export const timelineStyles = css`
     top: calc(var(--hour-hdr-h) + var(--super-hdr-h));
     bottom: 0;
     width: 2px;
-    background: var(--orange);
+    background: var(--primary);
     z-index: 20;
     pointer-events: none;
   }
@@ -363,7 +368,7 @@ export const timelineStyles = css`
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: var(--orange);
+    background: var(--primary);
   }
 
   /* ══════════════════════════════════════════════════════════════════════════════
@@ -462,13 +467,13 @@ export const timelineStyles = css`
     opacity: 0.85;
   }
 
-  .tl-event--orange {
-    background: color-mix(in srgb, var(--c-orange-bg) 32%, transparent);
-    border-color: var(--c-orange-bd);
-    color: var(--c-orange-tx);
+  .tl-event--primary {
+    background: color-mix(in srgb, var(--c-primary-bg) 32%, transparent);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
   }
-  .tl-event--orange:hover {
-    background: color-mix(in srgb, var(--c-orange-bg) 55%, transparent);
+  .tl-event--primary:hover {
+    background: color-mix(in srgb, var(--c-primary-bg) 55%, transparent);
   }
 
   .tl-event--blue {
@@ -627,10 +632,10 @@ export const timelineStyles = css`
     opacity: 0.85;
   }
 
-  .tl-drag-ghost--orange {
-    background: var(--c-orange-bg);
-    border-color: var(--c-orange-bd);
-    color: var(--c-orange-tx);
+  .tl-drag-ghost--primary {
+    background: var(--c-primary-bg);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
   }
 
   .tl-drag-ghost--blue {
@@ -712,7 +717,7 @@ export const timelineStyles = css`
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: var(--orange);
+    background: var(--primary);
     color: #fff;
     border: none;
     cursor: pointer;
@@ -1085,7 +1090,7 @@ export const timelineStyles = css`
 
   .tl-alert-dialog__btn {
     padding: 6px 16px;
-    background: var(--orange);
+    background: var(--primary);
     color: #fff;
     border: none;
     border-radius: 6px;

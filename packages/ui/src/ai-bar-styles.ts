@@ -7,7 +7,8 @@ export const aiBarStyles = css`
     --border: #e4e4e7;
     --text-1: #18181b;
     --text-3: #a1a1aa;
-    --orange: var(--janus-primary-color, #f97316);
+    --primary: var(--janus-primary-color, #3b82f6);
+    --primary: #f97316;
     --aicard-area-h: 60px;
 
     display: flex;
@@ -43,7 +44,7 @@ export const aiBarStyles = css`
   }
 
   .ai-card:focus-within {
-    border-color: var(--orange);
+    border-color: var(--primary);
     box-shadow:
       0 4px 20px var(--janus-primary-glow, rgba(249, 115, 22, 0.12)),
       0 0 0 3px var(--janus-primary-glow, rgba(249, 115, 22, 0.08));
@@ -66,7 +67,7 @@ export const aiBarStyles = css`
 
   .ai-card__btn {
     padding: 6px 18px;
-    background: var(--orange);
+    background: var(--primary);
     color: #fff;
     border: none;
     border-radius: 9px;
@@ -93,7 +94,7 @@ export const aiBarStyles = css`
   .ai-card__icon-desktop {
     display: flex;
     align-items: center;
-    color: var(--orange);
+    color: var(--primary);
   }
 
   .ai-card__icon-mobile {

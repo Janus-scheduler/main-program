@@ -4,11 +4,7 @@ import "./App.css";
 import { Sidebar } from "./components/Sidebar";
 import { SchedulerView } from "./components/SchedulerView";
 import type { ViewType, UndoAction, EventDraft } from "@janus-scheduler/react";
-import {
-  ConfirmDialog,
-  schedulerStore,
-  isoToZonedDisplay,
-} from "@janus-scheduler/react";
+import { ConfirmDialog, isoToZonedDisplay } from "@janus-scheduler/react";
 import { ErrorToast } from "./components/ErrorToast";
 import { useSchedulerManager } from "./hooks/useSchedulerManager";
 import type { HookError } from "./hooks/useSchedulerManager";
@@ -69,22 +65,21 @@ function App() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const eventToEventDraft = (e: any): EventDraft => {
-    const tz = schedulerStore.getState().timezone;
-    // Use isoToZonedDisplay so times match what the user sees in the calendar
-    // (raw ISO split gives UTC, but the user is in a different timezone)
-    const { date: startDate, time: startTime } = e.startTime
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const startObj = e.startTime
       ? isoToZonedDisplay(e.startTime, tz)
       : { date: "", time: "" };
-    const { date: endDate, time: endTime } = e.endTime
+    const endObj = e.endTime
       ? isoToZonedDisplay(e.endTime, tz)
       : { date: "", time: "" };
+
     return {
       id: e.id || null,
       title: e.title || "",
-      startDate,
-      startTime,
-      endDate,
-      endTime,
+      startDate: startObj.date,
+      startTime: startObj.time,
+      endDate: endObj.date,
+      endTime: endObj.time,
       participants: e.resourceIds || (e.resourceId ? [e.resourceId] : []),
       activeColor: e.color || "orange",
       allDay: e.allDay || false,
