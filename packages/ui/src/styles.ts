@@ -15,12 +15,9 @@ export const schedulerStyles = css`
   }
 
   :host {
-    --primary: var(--janus-primary-color, #3b82f6);
-    --primary: #f97316;
-    --primary-light: var(--janus-primary-bg, #eff6ff);
-    --primary-light: #fff7ed;
-    --primary-glow: var(--janus-primary-glow, rgba(59, 130, 246, 0.15));
-    --primary-glow: rgba(249, 115, 22, 0.15);
+    --orange: var(--janus-primary-color, #f97316);
+    --orange-light: var(--janus-primary-bg, #fff7ed);
+    --orange-glow: var(--janus-primary-glow, rgba(249, 115, 22, 0.15));
 
     --border: #e4e4e7;
     --text-primary: #18181b;
@@ -38,8 +35,7 @@ export const schedulerStyles = css`
 
     --red: #ef4444;
 
-    --c-primary: var(--janus-primary-color, #3b82f6);
-    --c-primary: #f97316;
+    --c-orange: var(--janus-primary-color, #f97316);
     --c-blue: #3b82f6;
     --c-green: #10b981;
     --c-yellow: #f59e0b;
@@ -124,8 +120,8 @@ export const schedulerStyles = css`
     width: 100%;
     flex-shrink: 0;
   }
-  .sidebar-accent.color-primary {
-    background: var(--c-primary);
+  .sidebar-accent.color-orange {
+    background: var(--c-orange);
   }
   .sidebar-accent.color-blue {
     background: var(--c-blue);
@@ -166,8 +162,8 @@ export const schedulerStyles = css`
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--primary);
-    background: var(--primary-light);
+    color: var(--orange);
+    background: var(--orange-light);
     border-radius: 4px;
     padding: 2px 7px;
     margin-bottom: 8px;
@@ -264,9 +260,9 @@ export const schedulerStyles = css`
       0 0 0 4px currentColor;
   }
 
-  .swatch-primary {
-    background: var(--c-primary);
-    color: var(--c-primary);
+  .swatch-orange {
+    background: var(--c-orange);
+    color: var(--c-orange);
   }
   .swatch-blue {
     background: var(--c-blue);
@@ -325,7 +321,7 @@ export const schedulerStyles = css`
     margin-right: -5px;
     border: 2px solid var(--sidebar-bg);
   }
-  .avatar-primary {
+  .avatar-orange {
     background: linear-gradient(135deg, #f97316, #fb923c);
   }
   .avatar-blue {
@@ -442,8 +438,8 @@ export const schedulerStyles = css`
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .dot-primary {
-    background: var(--c-primary);
+  .dot-orange {
+    background: var(--c-orange);
   }
   .dot-blue {
     background: var(--c-blue);
@@ -511,8 +507,8 @@ export const schedulerStyles = css`
   }
 
   .time-trigger--open {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-glow);
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-glow);
   }
 
   .time-trigger--overnight {
@@ -637,18 +633,18 @@ export const schedulerStyles = css`
   }
 
   .time-cell:hover {
-    background: var(--primary-light);
-    color: var(--primary);
+    background: var(--orange-light);
+    color: var(--orange);
   }
 
   .time-cell--active {
-    background: var(--primary);
+    background: var(--orange);
     color: #ffffff;
     font-weight: 600;
   }
 
   .time-cell--active:hover {
-    background: var(--primary);
+    background: var(--orange);
     color: #ffffff;
   }
 
@@ -666,9 +662,9 @@ export const schedulerStyles = css`
     text-align: center;
     font-size: 15px;
     font-weight: 600;
-    color: var(--primary);
+    color: var(--orange);
     letter-spacing: 0.02em;
-    background: var(--primary-light);
+    background: var(--orange-light);
   }
 
   /* ── Overnight indicators ────────────────────────────────────────────────── */
@@ -802,7 +798,7 @@ export const schedulerStyles = css`
 }
 
 .switch-btn--active {
-  background: var(--primary);
+  background: var(--orange);
 }
 
 .switch-slider {
@@ -872,7 +868,7 @@ export const schedulerStyles = css`
 
 .freq-pill--active {
   background: #ffffff;
-  color: var(--primary);
+  color: var(--orange);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -924,8 +920,8 @@ export const schedulerStyles = css`
 }
  
 .time-trigger--open {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-glow);
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px var(--orange-glow);
 }
  
 .time-trigger--invalid {
@@ -1028,8 +1024,8 @@ export const schedulerStyles = css`
 }
  
 .cal-nav-btn:hover {
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--orange-light);
+  color: var(--orange);
 }
  
 .cal-weekdays {
@@ -1075,17 +1071,17 @@ export const schedulerStyles = css`
 }
  
 .cal-day:hover {
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--orange-light);
+  color: var(--orange);
 }
  
 .cal-day--today {
   font-weight: 700;
-  color: var(--primary);
+  color: var(--orange);
 }
  
 .cal-day--selected {
-  background: var(--primary) !important;
+  background: var(--orange) !important;
   color: #ffffff !important;
   font-weight: 600;
 }
@@ -1096,8 +1092,8 @@ export const schedulerStyles = css`
   text-align: center;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--primary);
-  background: var(--primary-light);
+  color: var(--orange);
+  background: var(--orange-light);
 }
  
 /* ── Time picker dropdown ────────────────────────────────────────────────── */
@@ -1165,18 +1161,18 @@ export const schedulerStyles = css`
 }
  
 .time-cell:hover {
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--orange-light);
+  color: var(--orange);
 }
  
 .time-cell--active {
-  background: var(--primary);
+  background: var(--orange);
   color: #ffffff;
   font-weight: 600;
 }
  
 .time-cell--active:hover {
-  background: var(--primary);
+  background: var(--orange);
   color: #ffffff;
 }
  
@@ -1194,8 +1190,8 @@ export const schedulerStyles = css`
   text-align: center;
   font-size: 15px;
   font-weight: 600;
-  color: var(--primary);
-  background: var(--primary-light);
+  color: var(--orange);
+  background: var(--orange-light);
 }
  
 /* ── Save button disabled state ──────────────────────────────────────────── */
@@ -1330,9 +1326,9 @@ export const schedulerStyles = css`
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--primary);
+    color: var(--orange);
     padding-bottom: 6px;
-    border-bottom: 3px solid var(--primary-light);
+    border-bottom: 3px solid var(--orange-light);
   }
 
   .form-group {
@@ -1401,8 +1397,8 @@ export const schedulerStyles = css`
 
   input[type="text"]:focus,
   .date-time-input:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-glow);
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-glow);
   }
 
   .date-time-input::-webkit-calendar-picker-indicator {
@@ -1432,8 +1428,8 @@ export const schedulerStyles = css`
       box-shadow 0.18s;
   }
   textarea:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-glow);
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-glow);
   }
 
   /* Participants */
@@ -1455,8 +1451,8 @@ export const schedulerStyles = css`
     width: 100%;
   }
   .participants-box:focus-within {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-glow);
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-glow);
   }
 
   .chip {
@@ -1612,7 +1608,7 @@ export const schedulerStyles = css`
   }
 
   .btn-save {
-    background: var(--primary);
+    background: var(--orange);
     color: #fff;
     border: none;
     cursor: pointer;
@@ -1621,7 +1617,7 @@ export const schedulerStyles = css`
     font-weight: 600;
     padding: 8px 20px;
     border-radius: 9px;
-    box-shadow: 0 2px 10px var(--primary-glow);
+    box-shadow: 0 2px 10px var(--orange-glow);
     transition:
       background 0.15s,
       box-shadow 0.15s,
@@ -1631,7 +1627,7 @@ export const schedulerStyles = css`
   }
   .btn-save:hover {
     filter: brightness(0.95);
-    box-shadow: 0 4px 16px var(--primary-glow);
+    box-shadow: 0 4px 16px var(--orange-glow);
   }
   .btn-save:active {
     transform: scale(0.97);
@@ -1777,8 +1773,8 @@ export const schedulerStyles = css`
   }
 
   .tz-search-input:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-glow);
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-glow);
   }
 
   .tz-list {
@@ -1811,18 +1807,18 @@ export const schedulerStyles = css`
   }
 
   .tz-item:hover {
-    background: var(--primary-light);
-    color: var(--primary);
+    background: var(--orange-light);
+    color: var(--orange);
   }
 
   .tz-item--active {
-    background: var(--primary);
+    background: var(--orange);
     color: #ffffff;
     font-weight: 600;
   }
 
   .tz-item--active:hover {
-    background: var(--primary);
+    background: var(--orange);
     color: #ffffff;
   }
 
@@ -1857,7 +1853,7 @@ export const schedulerStyles = css`
     transition: background 0.2s, border-color 0.2s;
   }
 
-  .view-header.color-primary {
+  .view-header.color-orange {
     background: linear-gradient(135deg, #fff7ed, #ffedd5);
     border-bottom-color: #fed7aa;
   }
@@ -1915,7 +1911,7 @@ export const schedulerStyles = css`
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     border: 1px solid rgba(0, 0, 0, 0.05);
   }
-  .view-header.color-primary .view-header-icon-box { color: var(--c-primary); }
+  .view-header.color-orange .view-header-icon-box { color: var(--c-orange); }
   .view-header.color-blue .view-header-icon-box { color: var(--c-blue); }
   .view-header.color-green .view-header-icon-box { color: var(--c-green); }
   .view-header.color-yellow .view-header-icon-box { color: var(--c-yellow); }
@@ -2124,7 +2120,7 @@ export const schedulerStyles = css`
     font-size: 13.5px;
     font-weight: 600;
     cursor: pointer;
-    background: var(--primary);
+    background: var(--orange);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     transition: transform 0.15s, filter 0.15s;
   }
@@ -2136,7 +2132,7 @@ export const schedulerStyles = css`
     transform: translateY(0);
   }
 
-  .btn-edit-event.color-primary { background-color: var(--c-primary); color: white; }
+  .btn-edit-event.color-orange { background-color: var(--c-orange); color: white; }
   .btn-edit-event.color-blue { background-color: var(--c-blue); color: white; }
   .btn-edit-event.color-green { background-color: var(--c-green); color: white; }
   .btn-edit-event.color-yellow { background-color: var(--c-yellow); color: var(--text-primary); }
@@ -2166,7 +2162,7 @@ export const schedulerStyles = css`
   width: 100%;
 }
 
-.color-primary .view-hero-bar  { background: var(--primary); }
+.color-orange .view-hero-bar  { background: var(--orange); }
 .color-blue .view-hero-bar    { background: #3b82f6; }
 .color-green .view-hero-bar   { background: #22c55e; }
 .color-yellow .view-hero-bar  { background: var(--c-yellow); }
@@ -2190,7 +2186,7 @@ export const schedulerStyles = css`
   margin-bottom: 10px;
 }
 
-.swatch-bg-primary { background: #fff7ed; color: #c2410c; }
+.swatch-bg-orange { background: #fff7ed; color: #c2410c; }
 .swatch-bg-blue   { background: #eff6ff; color: #1d4ed8; }
 .swatch-bg-green  { background: #f0fdf4; color: #15803d; }
 .swatch-bg-yellow { background: #fefce8; color: #a16207; }
@@ -2232,8 +2228,8 @@ export const schedulerStyles = css`
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--orange-light);
+  color: var(--orange);
   border-radius: 20px;
 }
 
@@ -2382,7 +2378,7 @@ export const schedulerStyles = css`
 
 .btn-edit-event:hover { opacity: 0.88; }
 
-.color-btn-primary { background: var(--primary);  color: #fff; }
+.color-btn-orange { background: var(--orange);  color: #fff; }
 .color-btn-blue   { background: #3b82f6;         color: #fff; }
 .color-btn-green  { background: #22c55e;          color: #fff; }
 .color-btn-yellow { background: var(--c-yellow); color: #fff; }
