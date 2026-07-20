@@ -59,7 +59,7 @@ export interface SchedulerHooks {
   onUndoStateChange?: (canUndo: boolean) => void;
 }
 
-type UndoAction =
+export type UndoAction =
   | { type: "addEvent"; id: string }
   | { type: "updateEvent"; id: string; previous: Partial<EventData> }
   | { type: "deleteEvent"; previous: EventData };
@@ -110,6 +110,10 @@ export class SchedulerManager {
     return this._undoStack.length > 0;
   }
 
+  peekUndo(): UndoAction | undefined {
+    return this._undoStack[this._undoStack.length - 1];
+  }
+
   undo(): void {
     if (!this.canUndo()) return;
     this._isUndoing = true;
@@ -135,6 +139,10 @@ export class SchedulerManager {
   private _pushUndo(action: UndoAction) {
     if (this._isUndoing) return;
     this._undoStack.push(action);
+
+    if (this._undoStack.length > 5) {
+      this._undoStack.shift();
+    }
     this._hooks.onUndoStateChange?.(this.canUndo());
   }
 

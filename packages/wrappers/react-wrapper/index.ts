@@ -6,6 +6,7 @@ import {
   JanusMonthGrid as JanusMonthGridWC,
   JanusAiBar as JanusAiBarWC,
   JanusTopbar as JanusTopbarWC,
+  JanusConfirmDialog as JanusConfirmDialogWC,
 } from "@janus-scheduler/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,10 +35,13 @@ import type {
   EventData,
   ResourceData,
   AssignmentData,
+  EventDraft,
+  UndoAction,
 } from "@janus-scheduler/core";
 
 export type {
   SchedulerHooks,
+  UndoAction,
   TimelineEvent,
   TimelineResource,
   EventMoveDetail,
@@ -50,6 +54,7 @@ export type {
   EventData,
   ResourceData,
   AssignmentData,
+  EventDraft,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -338,5 +343,39 @@ export function Topbar(props: TopbarProps): React.JSX.Element {
       ? () => props.onToggleCreate!()
       : undefined,
     onUndoClick: props.onUndoClick ? () => props.onUndoClick!() : undefined,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ConfirmDialog Wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _ConfirmDialog = createComponent({
+  tagName: "janus-confirm-dialog",
+  elementClass: JanusConfirmDialogWC,
+  react: React,
+  events: {
+    onConfirm: "confirm",
+    onCancel: "cancel",
+  },
+});
+
+export interface ConfirmDialogProps extends React.HTMLAttributes<HTMLElement> {
+  title?: string;
+  subtitle?: string;
+  confirmText?: string;
+  cancelText?: string;
+  accentColor?: string;
+  draft?: EventDraft | null;
+  resolveResourceName?: (id: string) => string;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+}
+
+export function ConfirmDialog(props: ConfirmDialogProps): React.JSX.Element {
+  return React.createElement(_ConfirmDialog, {
+    ...props,
+    onConfirm: props.onConfirm ? () => props.onConfirm!() : undefined,
+    onCancel: props.onCancel ? () => props.onCancel!() : undefined,
   });
 }

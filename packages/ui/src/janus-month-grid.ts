@@ -46,7 +46,7 @@ export class JanusMonthGrid extends LitElement {
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
 
   // ── Internal state ────────────────────────────────────────────────────
-  @property({ type: Array }) events: MonthEvent[] = [];
+  @state() private _events: MonthEvent[] = [];
   @state() private _gridHeight = 0;
   private _unsubStore?: () => void;
   private _resizeObserver?: ResizeObserver;
@@ -78,6 +78,12 @@ export class JanusMonthGrid extends LitElement {
       999,
     ).getTime();
     const coreEvents = expandEvents(rawEvents, startRange, endRange);
+    console.log("MonthGrid sync:", {
+      rawEvents: rawEvents.length,
+      coreEvents: coreEvents.length,
+      startRange: new Date(startRange),
+      endRange: new Date(endRange),
+    });
 
     const newEvents: MonthEvent[] = [];
 
@@ -151,7 +157,8 @@ export class JanusMonthGrid extends LitElement {
       }
     }
 
-    this.events = newEvents;
+    console.log("MonthGrid newEvents length:", newEvents.length);
+    this._events = newEvents;
   }
 
   // ── Internal state ────────────────────────────────────────────────────
@@ -206,7 +213,7 @@ export class JanusMonthGrid extends LitElement {
   }
 
   override firstUpdated() {
-    const grid = buildCalendarGrid(this._year, this._month, this.events);
+    const grid = buildCalendarGrid(this._year, this._month, this._events);
     const todayCell = grid.flat().find((d) => d.isToday) ?? grid[0][0];
     this._selectedDateStr = todayCell.dateStr;
 
@@ -335,7 +342,7 @@ export class JanusMonthGrid extends LitElement {
 
   // ── Main render ───────────────────────────────────────────────────────
   render() {
-    const grid = buildCalendarGrid(this._year, this._month, this.events);
+    const grid = buildCalendarGrid(this._year, this._month, this._events);
     const rowCount = grid.length;
     const selectedDay =
       grid.flat().find((d) => d.dateStr === this._selectedDateStr) ?? null;

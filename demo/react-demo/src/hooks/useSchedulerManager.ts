@@ -25,30 +25,57 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
 
   const manager = useMemo(() => {
     const mgr = new SchedulerManager({
-      // ── onEventAdd ────────────────────────────────────────────────────
-      // Fires AFTER the store is updated (optimistic). If this throws,
-      // SchedulerManager automatically rolls back the store and calls onError.
-      //
-      // Replace with a real fetch() in production:
-      //   await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) })
-      onEventAdd: async (_event) => {
-        await new Promise((r) => setTimeout(r, 400)); // simulate network latency
-        console.log(_event);
-        return; // ← success path
-        // throw new Error("HTTP 500 (simulated)"); // ← uncomment to test rollback
+      onEventAdd: async (event) => {
+        // Example of the actual fetch you would do in production:
+        // const res = await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) });
+        // if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+        // Simulated network latency for demo
+        await new Promise((r) => setTimeout(r, 400));
+        console.log("onEventAdd:", event);
       },
 
-      // onEventUpdate: async (event) => {
-      //   const res = await fetch(`/api/events/${event.id}`, {
-      //     method: 'PATCH',
-      //     body: JSON.stringify(event),
-      //   });
-      //   if (!res.ok) throw new Error(`Server error ${res.status}`);
-      // },
+      onEventUpdate: async (event) => {
+        // Example of the actual fetch you would do in production:
+        // const res = await fetch(`/api/events/${event.id}`, { method: 'PATCH', body: JSON.stringify(event) });
+        // if (!res.ok) throw new Error(`Server error ${res.status}`);
 
-      // onEventDelete: async (id) => {
-      //   await fetch(`/api/events/${id}`, { method: 'DELETE' });
-      // },
+        await new Promise((r) => setTimeout(r, 400));
+        console.log("onEventUpdate:", event);
+      },
+
+      onEventDelete: async (id) => {
+        // Example of the actual fetch you would do in production:
+        // const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+        // if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+        await new Promise((r) => setTimeout(r, 400));
+        console.log("onEventDelete:", id);
+      },
+
+      onResourceAdd: async (resource) => {
+        // const res = await fetch('/api/resources', { method: 'POST', body: JSON.stringify(resource) });
+        // if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+        await new Promise((r) => setTimeout(r, 400));
+        console.log("onResourceAdd:", resource);
+      },
+
+      onResourceUpdate: async (resource) => {
+        // const res = await fetch(`/api/resources/${resource.id}`, { method: 'PATCH', body: JSON.stringify(resource) });
+        // if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+        await new Promise((r) => setTimeout(r, 400));
+        console.log("onResourceUpdate:", resource);
+      },
+
+      onResourceDelete: async (id) => {
+        // const res = await fetch(`/api/resources/${id}`, { method: 'DELETE' });
+        // if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+        await new Promise((r) => setTimeout(r, 400));
+        console.log("onResourceDelete:", id);
+      },
 
       // ── onError ───────────────────────────────────────────────────────
       // The store has already been rolled back before this fires.
@@ -100,36 +127,70 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // manager is intentionally created once
 
-  const syncBulkEvents = () => {
-    const today = new Date().toISOString().split("T")[0];
-    const tz = getBrowserTimezone();
-    const bulkEvents = [
-      {
-        id: "bulk-1",
-        title: "Emergency Surgery",
-        startTime: zonedInputToISO(today, "08:00", tz),
-        endTime: zonedInputToISO(today, "10:00", tz),
-        resourceIds: ["r1"],
-        status: "confirmed" as const,
-      },
-      {
-        id: "bulk-2",
-        title: "X-Ray Session",
-        startTime: zonedInputToISO(today, "10:30", tz),
-        endTime: zonedInputToISO(today, "12:00", tz),
-        resourceIds: ["r4"],
-        status: "confirmed" as const,
-      },
-      {
-        id: "bulk-3",
-        title: "Staff Training",
-        startTime: zonedInputToISO(today, "14:00", tz),
-        endTime: zonedInputToISO(today, "16:00", tz),
-        resourceIds: ["r2", "r3"],
-        status: "draft" as const,
-      },
-    ];
-    bulkEvents.forEach((evt) => manager.addEvent(evt));
+  const syncBulkEvents = async () => {
+    try {
+      // 1. Authenticate and fetch from the external API
+      // We mock the fetch response here since https://api.theirlms.com is a placeholder.
+      // In production you would do: const response = await fetch('https://api.theirlms.com/v1/courses', { ... })
+      console.log("Fetching from LMS...");
+      await new Promise((r) => setTimeout(r, 800)); // Simulate API latency
+
+      // Mocked LMS Response Data
+      const lmsData = {
+        courses: [
+          {
+            id: "course_101",
+            courseName: "Advanced Physiology",
+            teacherId: "lms_t1",
+            teacherName: "Dr. Gregory House",
+            startDate: new Date(new Date().setHours(9, 0, 0, 0)).toISOString(),
+            endDate: new Date(new Date().setHours(12, 0, 0, 0)).toISOString(),
+          },
+          {
+            id: "course_102",
+            courseName: "Neurology Seminar",
+            teacherId: "lms_t2",
+            teacherName: "Dr. Eric Foreman",
+            startDate: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(),
+            endDate: new Date(new Date().setHours(16, 30, 0, 0)).toISOString(),
+          },
+        ],
+      };
+
+      // 2. Loop through the external payload and map it to Janus Scheduler format
+      let importedEvents = 0;
+
+      lmsData.courses.forEach((course) => {
+        // Ensure the teacher (resource) exists before adding the event
+        if (!manager.getResource(course.teacherId)) {
+          manager.addResource({
+            id: course.teacherId,
+            name: course.teacherName,
+            type: "person",
+          });
+        }
+
+        // Check if event already exists
+        if (!manager.getEvent(course.id)) {
+          // Add the course as an event
+          manager.addEvent({
+            id: course.id,
+            title: course.courseName,
+            // Convert external dates to Javascript Epoch Timestamps (or ISO strings)
+            startTime: course.startDate,
+            endTime: course.endDate,
+            resourceIds: [course.teacherId],
+            status: "confirmed" as const,
+          });
+          importedEvents++;
+        }
+      });
+
+      console.log(`Successfully synced ${importedEvents} events from LMS!`);
+    } catch (error) {
+      console.error("Failed to sync from LMS:", error);
+      alert("Synchronization failed. Please check the logs.");
+    }
   };
 
   return { manager, syncBulkEvents, canUndo };
