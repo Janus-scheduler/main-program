@@ -122,7 +122,7 @@ export class SchedulerManager {
   }
 
   peekUndo(): UndoAction | undefined {
-    return this._undoStack[this._undoStack.length - 1];
+    return this._undoStack.at(-1);
   }
 
   undo(): void {
@@ -242,7 +242,7 @@ export class SchedulerManager {
    * @returns The updated Event instance (already visible in the UI)
    */
   updateEvent(id: string, updates: Partial<EventData>): Event {
-    const occMatch = id.match(/^(.+)_occ_(\d+)$/);
+    const occMatch = /^(.+)_occ_(\d+)$/.exec(id);
     const baseId = occMatch ? occMatch[1] : id;
 
     if (occMatch && updates.startTime) {
@@ -317,21 +317,22 @@ export class SchedulerManager {
     const snapshot = schedulerStore.getState().events[baseId];
     const deleted = schedulerStore.getState().deleteEvent(baseId);
 
-    if (deleted && snapshot) {
+    if (deleted) {
+      const prev = snapshot!;
       this._pushUndo({
         type: OP_DELETE_EVENT,
         previous: {
-          id: snapshot.id,
-          title: snapshot.title,
-          startTime: snapshot.startTime,
-          endTime: snapshot.endTime,
-          status: snapshot.status,
-          description: snapshot.description,
-          resourceId: snapshot.resourceId,
-          resourceIds: snapshot.resourceIds,
-          color: snapshot.color,
-          allDay: snapshot.allDay,
-          recurrenceRule: snapshot.recurrenceRule,
+          id: prev.id,
+          title: prev.title,
+          startTime: prev.startTime,
+          endTime: prev.endTime,
+          status: prev.status,
+          description: prev.description,
+          resourceId: prev.resourceId,
+          resourceIds: prev.resourceIds,
+          color: prev.color,
+          allDay: prev.allDay,
+          recurrenceRule: prev.recurrenceRule,
         },
       });
 
@@ -339,7 +340,7 @@ export class SchedulerManager {
         OP_DELETE_EVENT,
         () => this._hooks.onEventDelete?.(baseId),
         () => {
-          if (snapshot) schedulerStore.getState().addEvent(snapshot);
+          schedulerStore.getState().addEvent(prev);
         },
       );
     }
@@ -354,9 +355,7 @@ export class SchedulerManager {
    */
   getEventsByResource(resourceId: string): Event[] {
     return this.getAllEvents().filter(
-      (e) =>
-        (e.resourceIds && e.resourceIds.includes(resourceId)) ||
-        e.resourceId === resourceId,
+      (e) => e.resourceIds?.includes(resourceId) || e.resourceId === resourceId,
     );
   }
 
@@ -463,7 +462,7 @@ export class SchedulerManager {
         OP_DELETE_RESOURCE,
         () => this._hooks.onResourceDelete?.(id),
         () => {
-          if (snapshot) schedulerStore.getState().addResource(snapshot);
+          schedulerStore.getState().addResource(snapshot!);
         },
       );
     }
@@ -530,7 +529,7 @@ export class SchedulerManager {
         OP_DELETE_ASSIGNMENT,
         () => this._hooks.onAssignmentDelete?.(id),
         () => {
-          if (snapshot) schedulerStore.getState().addAssignment(snapshot);
+          schedulerStore.getState().addAssignment(snapshot!);
         },
       );
     }

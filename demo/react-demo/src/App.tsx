@@ -9,6 +9,28 @@ import { ErrorToast } from "./components/ErrorToast";
 import { useSchedulerManager } from "./hooks/useSchedulerManager";
 import type { HookError } from "./hooks/useSchedulerManager";
 
+const getUndoTitle = (type: string) => {
+  switch (type) {
+    case "addEvent":
+      return "Undo: Remove Event";
+    case "deleteEvent":
+      return "Undo: Restore Event";
+    default:
+      return "Undo: Revert Changes";
+  }
+};
+
+const getUndoSubtitle = (type: string) => {
+  switch (type) {
+    case "addEvent":
+      return "This event will be permanently deleted.";
+    case "deleteEvent":
+      return "This deleted event will be restored to the calendar.";
+    default:
+      return "The event will revert to its previous state.";
+  }
+};
+
 /**
  * App — root component and state coordinator.
  *
@@ -158,20 +180,8 @@ function App() {
 
         {undoConfirmAction && (undoFromDraft || undoToDraft) && (
           <ConfirmDialog
-            title={
-              undoConfirmAction.type === "addEvent"
-                ? "Undo: Remove Event"
-                : undoConfirmAction.type === "deleteEvent"
-                  ? "Undo: Restore Event"
-                  : "Undo: Revert Changes"
-            }
-            subtitle={
-              undoConfirmAction.type === "addEvent"
-                ? "This event will be permanently deleted."
-                : undoConfirmAction.type === "deleteEvent"
-                  ? "This deleted event will be restored to the calendar."
-                  : "The event will revert to its previous state."
-            }
+            title={getUndoTitle(undoConfirmAction.type)}
+            subtitle={getUndoSubtitle(undoConfirmAction.type)}
             confirmText="Undo"
             cancelText="Cancel"
             accentColor="orange"
