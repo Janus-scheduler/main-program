@@ -4,7 +4,11 @@ import "./App.css";
 import { Sidebar } from "./components/Sidebar";
 import { SchedulerView } from "./components/SchedulerView";
 import type { ViewType, UndoAction, EventDraft } from "@janus-scheduler/react";
-import { ConfirmDialog } from "@janus-scheduler/react";
+import {
+  ConfirmDialog,
+  schedulerStore,
+  isoToZonedDisplay,
+} from "@janus-scheduler/react";
 import { ErrorToast } from "./components/ErrorToast";
 import { useSchedulerManager } from "./hooks/useSchedulerManager";
 import type { HookError } from "./hooks/useSchedulerManager";
@@ -65,20 +69,27 @@ function App() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const eventToEventDraft = (e: any): EventDraft => {
-    const startParts = e.startTime ? e.startTime.split("T") : ["", ""];
-    const endParts = e.endTime ? e.endTime.split("T") : ["", ""];
+    const tz = schedulerStore.getState().timezone;
+    // Use isoToZonedDisplay so times match what the user sees in the calendar
+    // (raw ISO split gives UTC, but the user is in a different timezone)
+    const { date: startDate, time: startTime } = e.startTime
+      ? isoToZonedDisplay(e.startTime, tz)
+      : { date: "", time: "" };
+    const { date: endDate, time: endTime } = e.endTime
+      ? isoToZonedDisplay(e.endTime, tz)
+      : { date: "", time: "" };
     return {
       id: e.id || null,
       title: e.title || "",
-      startDate: startParts[0] || "",
-      startTime: startParts[1] ? startParts[1].slice(0, 5) : "",
-      endDate: endParts[0] || "",
-      endTime: endParts[1] ? endParts[1].slice(0, 5) : "",
+      startDate,
+      startTime,
+      endDate,
+      endTime,
       participants: e.resourceIds || (e.resourceId ? [e.resourceId] : []),
       activeColor: e.color || "orange",
       allDay: e.allDay || false,
       description: e.description || "",
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: tz,
     };
   };
 

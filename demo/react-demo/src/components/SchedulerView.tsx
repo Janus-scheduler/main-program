@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   Timeline,
   MonthGrid,
@@ -113,6 +113,30 @@ export function SchedulerView({
     }
   >(null);
 
+  /**
+   * Tracks a date set by onDayClick so the useEffect below knows
+   * whether to navigate to that date or fall back to today.
+   * Using a ref avoids stale-closure issues with setTimeout.
+   */
+  const pendingTimelineDate = useRef<string | null>(null);
+
+  // Whenever the view switches TO Timeline, navigate to the pending date
+  // (set by a day-click in Month view) or fall back to today.
+  useEffect(() => {
+    if (currentView === "Timeline") {
+      const target = pendingTimelineDate.current;
+      pendingTimelineDate.current = null; // consume it
+      const timer = setTimeout(() => {
+        if (target) {
+          timelineRef.current?.goToDate(target);
+        } else {
+          timelineRef.current?.goToToday();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [currentView]);
+
   const [navData, setNavData] = useState({
     navLabel: "",
     dayName: "",
@@ -220,12 +244,8 @@ export function SchedulerView({
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
           onDayClick={(detail) => {
+            pendingTimelineDate.current = detail.date; // store, don't use a floating setTimeout
             onViewChange("Timeline");
-            setTimeout(() => {
-              if (timelineRef.current && timelineRef.current.goToDate) {
-                timelineRef.current.goToDate(detail.date);
-              }
-            }, 100);
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
           onNavChange={handleNavChange}
