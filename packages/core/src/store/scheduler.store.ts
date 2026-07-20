@@ -164,6 +164,7 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     if (updates.name) resource.name = updates.name;
     if (updates.type) resource.type = updates.type;
     if (updates.email !== undefined) resource.email = updates.email;
+    if (updates.avatar !== undefined) resource.avatar = updates.avatar;
 
     set((state) => ({
       resources: { ...state.resources, [id]: resource },

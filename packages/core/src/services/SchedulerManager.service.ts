@@ -437,6 +437,7 @@ export class SchedulerManager {
             name: snapshot.name,
             type: snapshot.type,
             email: snapshot.email,
+            avatar: snapshot.avatar,
           });
         }
       },
