@@ -63,43 +63,59 @@ function App() {
     if (action) setUndoConfirmAction(action);
   };
 
-  const getUndoDraft = (action: UndoAction | null): EventDraft | null => {
-    if (!action) return null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let baseData: any = null;
-
-    if (action.type === "addEvent") {
-      baseData = manager.getEvent(action.id);
-    } else if (action.type === "deleteEvent") {
-      baseData = action.previous;
-    } else if (action.type === "updateEvent") {
-      const current = manager.getEvent(action.id);
-      baseData = { ...current, ...action.previous };
-    }
-
-    if (!baseData) return null;
-
-    const startParts = baseData.startTime
-      ? baseData.startTime.split("T")
-      : ["", ""];
-    const endParts = baseData.endTime ? baseData.endTime.split("T") : ["", ""];
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const eventToEventDraft = (e: any): EventDraft => {
+    const startParts = e.startTime ? e.startTime.split("T") : ["", ""];
+    const endParts = e.endTime ? e.endTime.split("T") : ["", ""];
     return {
-      title: baseData.title || "",
+      id: e.id || null,
+      title: e.title || "",
       startDate: startParts[0] || "",
       startTime: startParts[1] ? startParts[1].slice(0, 5) : "",
       endDate: endParts[0] || "",
       endTime: endParts[1] ? endParts[1].slice(0, 5) : "",
-      participants:
-        baseData.resourceIds ||
-        (baseData.resourceId ? [baseData.resourceId] : []),
-      activeColor: baseData.color,
-      allDay: baseData.allDay,
-      description: baseData.description,
+      participants: e.resourceIds || (e.resourceId ? [e.resourceId] : []),
+      activeColor: e.color || "orange",
+      allDay: e.allDay || false,
+      description: e.description || "",
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
   };
 
-  const undoDraft = getUndoDraft(undoConfirmAction);
+  const getUndoFromTo = (
+    action: UndoAction | null,
+  ): { fromDraft: EventDraft | null; toDraft: EventDraft | null } => {
+    if (!action) return { fromDraft: null, toDraft: null };
+
+    if (action.type === "addEvent") {
+      // The event currently EXISTS → it will be DELETED after undo
+      const current = manager.getEvent(action.id);
+      return {
+        fromDraft: current ? eventToEventDraft(current) : null,
+        toDraft: null,
+      };
+    }
+
+    if (action.type === "deleteEvent") {
+      // The event currently DOESN'T EXIST → it will be RESTORED after undo
+      return {
+        fromDraft: null,
+        toDraft: eventToEventDraft(action.previous),
+      };
+    }
+
+    // updateEvent — show the current state vs. what it will revert to
+    const current = manager.getEvent(action.id);
+    return {
+      fromDraft: current ? eventToEventDraft(current) : null,
+      toDraft: current
+        ? eventToEventDraft({ ...current, ...action.previous })
+        : null,
+    };
+  };
+
+  const { fromDraft: undoFromDraft, toDraft: undoToDraft } =
+    getUndoFromTo(undoConfirmAction);
 
   return (
     <div className="app-shell">
@@ -134,20 +150,27 @@ function App() {
           />
         )}
 
-        {undoConfirmAction && undoDraft && (
+        {undoConfirmAction && (undoFromDraft || undoToDraft) && (
           <ConfirmDialog
-            title="Undo Action"
+            title={
+              undoConfirmAction.type === "addEvent"
+                ? "Undo: Remove Event"
+                : undoConfirmAction.type === "deleteEvent"
+                  ? "Undo: Restore Event"
+                  : "Undo: Revert Changes"
+            }
             subtitle={
               undoConfirmAction.type === "addEvent"
-                ? "Are you sure you want to undo creating this event? It will be deleted."
+                ? "This event will be permanently deleted."
                 : undoConfirmAction.type === "deleteEvent"
-                  ? "Are you sure you want to undo deleting this event? It will be restored."
-                  : "Are you sure you want to undo updating this event? It will be reverted to its previous state."
+                  ? "This deleted event will be restored to the calendar."
+                  : "The event will revert to its previous state."
             }
             confirmText="Undo"
             cancelText="Cancel"
             accentColor="orange"
-            draft={undoDraft}
+            fromDraft={undoFromDraft}
+            toDraft={undoToDraft}
             onConfirm={() => {
               manager.undo();
               setUndoConfirmAction(null);

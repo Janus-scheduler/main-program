@@ -366,7 +366,12 @@ export interface ConfirmDialogProps extends React.HTMLAttributes<HTMLElement> {
   confirmText?: string;
   cancelText?: string;
   accentColor?: string;
+  /** Single draft — used for event-creation confirmation (legacy) */
   draft?: EventDraft | null;
+  /** Before-state for undo comparison */
+  fromDraft?: EventDraft | null;
+  /** After-state for undo comparison */
+  toDraft?: EventDraft | null;
   resolveResourceName?: (id: string) => string;
   onConfirm?: () => void;
   onCancel?: () => void;
