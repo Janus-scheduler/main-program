@@ -261,7 +261,7 @@ export const timelineStyles = css`
     position: sticky;
     top: 0;
     background: var(--white);
-    z-index: 11;
+    z-index: 30;
     border-bottom: 1px solid var(--border);
     display: block;
     overflow: hidden;
@@ -294,7 +294,7 @@ export const timelineStyles = css`
     position: sticky;
     top: var(--super-hdr-h);
     background: var(--white);
-    z-index: 10;
+    z-index: 29;
     display: block;
     overflow: hidden;
   }
@@ -815,6 +815,7 @@ export const timelineStyles = css`
   }
   /* ── Time Conflict Banner & Indicators ───────────────────────────────────── */
   .tl-conflict-banner {
+    position: relative;
     background: #fffbeb;
     border-bottom: 1px solid #fef3c7;
     color: #b45309;

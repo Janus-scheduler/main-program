@@ -69,6 +69,9 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       mgr.addResource({ id: "r3", name: "Operating Room 1", type: "room" });
       mgr.addResource({ id: "r4", name: "MRI Scanner A", type: "equipment" });
       mgr.addResource({ id: "r5", name: "MRI Scanner B", type: undefined });
+      mgr.addResource({ id: "r6", name: "Dr. Alan Turing", type: "person" });
+      mgr.addResource({ id: "r7", name: "Dr. Max Dev", type: "person" });
+      mgr.addResource({ id: "r8", name: "Operating Room 2", type: "room" });
 
       console.log("Assignments", mgr.getAssignmentsByEvent("e1"));
 
