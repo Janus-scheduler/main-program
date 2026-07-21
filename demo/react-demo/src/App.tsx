@@ -9,28 +9,6 @@ import { ErrorToast } from "./components/ErrorToast";
 import { useSchedulerManager } from "./hooks/useSchedulerManager";
 import type { HookError } from "./hooks/useSchedulerManager";
 
-const getUndoTitle = (type: string) => {
-  switch (type) {
-    case "addEvent":
-      return "Undo: Remove Event";
-    case "deleteEvent":
-      return "Undo: Restore Event";
-    default:
-      return "Undo: Revert Changes";
-  }
-};
-
-const getUndoSubtitle = (type: string) => {
-  switch (type) {
-    case "addEvent":
-      return "This event will be permanently deleted.";
-    case "deleteEvent":
-      return "This deleted event will be restored to the calendar.";
-    default:
-      return "The event will revert to its previous state.";
-  }
-};
-
 /**
  * App — root component and state coordinator.
  *
@@ -145,6 +123,27 @@ function App() {
   const { fromDraft: undoFromDraft, toDraft: undoToDraft } =
     getUndoFromTo(undoConfirmAction);
 
+  const getUndoDialogText = (
+    type: string,
+  ): { title: string; subtitle: string } => {
+    if (type === "addEvent") {
+      return {
+        title: "Undo: Remove Event",
+        subtitle: "This event will be permanently deleted.",
+      };
+    }
+    if (type === "deleteEvent") {
+      return {
+        title: "Undo: Restore Event",
+        subtitle: "This deleted event will be restored to the calendar.",
+      };
+    }
+    return {
+      title: "Undo: Revert Changes",
+      subtitle: "The event will revert to its previous state.",
+    };
+  };
+
   return (
     <div className="app-shell">
       <Sidebar onSync={syncBulkEvents} />
@@ -180,8 +179,8 @@ function App() {
 
         {undoConfirmAction && (undoFromDraft || undoToDraft) && (
           <ConfirmDialog
-            title={getUndoTitle(undoConfirmAction.type)}
-            subtitle={getUndoSubtitle(undoConfirmAction.type)}
+            title={getUndoDialogText(undoConfirmAction.type).title}
+            subtitle={getUndoDialogText(undoConfirmAction.type).subtitle}
             confirmText="Undo"
             cancelText="Cancel"
             accentColor="orange"

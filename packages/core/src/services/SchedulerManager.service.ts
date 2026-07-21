@@ -4,17 +4,6 @@ import { Assignment, AssignmentData } from "../models/assignments/assignments";
 import { EventData } from "../types/event.types";
 import { schedulerStore } from "../store/scheduler.store";
 
-const OP_ADD_EVENT = "addEvent";
-const OP_UPDATE_EVENT = "updateEvent";
-const OP_DELETE_EVENT = "deleteEvent";
-
-const OP_ADD_RESOURCE = "addResource";
-const OP_UPDATE_RESOURCE = "updateResource";
-const OP_DELETE_RESOURCE = "deleteResource";
-
-const OP_ADD_ASSIGNMENT = "addAssignment";
-const OP_DELETE_ASSIGNMENT = "deleteAssignment";
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Lifecycle hooks — provided by the host application.
 //
@@ -53,7 +42,7 @@ export interface SchedulerHooks {
    * Use this hook to show an error notification to your user, e.g.:
    *   onError: ({ operation, error }) => toast.error(`${operation} failed: ${error.message}`)
    *
-   * @param ctx.operation  - Name of the method that failed, e.g. OP_ADD_EVENT
+   * @param ctx.operation  - Name of the method that failed, e.g. "addEvent"
    * @param ctx.error      - The raw thrown/rejected value from your hook
    * @param ctx.reverted   - Always true — the store was rolled back automatically
    */
@@ -131,13 +120,13 @@ export class SchedulerManager {
     try {
       const action = this._undoStack.pop()!;
       switch (action.type) {
-        case OP_ADD_EVENT:
+        case "addEvent":
           this.deleteEvent(action.id);
           break;
-        case OP_UPDATE_EVENT:
+        case "updateEvent":
           this.updateEvent(action.id, action.previous);
           break;
-        case OP_DELETE_EVENT:
+        case "deleteEvent":
           this.addEvent(action.previous);
           break;
       }
@@ -167,7 +156,7 @@ export class SchedulerManager {
    * happens inside the try block. Without this, a synchronous throw would
    * escape at the call site before _fireHook was entered, bypassing rollback.
    *
-   * @param operation   - Method name shown in the error context, e.g. OP_ADD_EVENT
+   * @param operation   - Method name shown in the error context, e.g. "addEvent"
    * @param invokeHook  - Zero-arg function that calls the hook and returns its result
    * @param rollback    - Undoes the optimistic store write
    */
@@ -204,10 +193,10 @@ export class SchedulerManager {
   addEvent(data: EventData): Event {
     const event = schedulerStore.getState().addEvent(data);
 
-    this._pushUndo({ type: OP_ADD_EVENT, id: event.id });
+    this._pushUndo({ type: "addEvent", id: event.id });
 
     this._fireHook(
-      OP_ADD_EVENT,
+      "addEvent",
       () => this._hooks.onEventAdd?.(event),
       () => schedulerStore.getState().deleteEvent(event.id),
     );
@@ -246,7 +235,18 @@ export class SchedulerManager {
     const baseId = occMatch ? occMatch[1] : id;
 
     if (occMatch && updates.startTime) {
-      this._shiftRecurrenceTimes(baseId, Number(occMatch[2]), updates);
+      const originalOccStartMs = Number(occMatch[2]);
+      const newStartMs = new Date(updates.startTime).getTime();
+      const deltaMs = newStartMs - originalOccStartMs;
+
+      const parentEvent = schedulerStore.getState().events[baseId];
+      if (parentEvent) {
+        const parentStartMs = new Date(parentEvent.startTime).getTime();
+        const parentEndMs = new Date(parentEvent.endTime).getTime();
+
+        updates.startTime = new Date(parentStartMs + deltaMs).toISOString();
+        updates.endTime = new Date(parentEndMs + deltaMs).toISOString();
+      }
     }
 
     const existing = schedulerStore.getState().events[baseId];
@@ -263,7 +263,7 @@ export class SchedulerManager {
 
     if (snapshot) {
       this._pushUndo({
-        type: OP_UPDATE_EVENT,
+        type: "updateEvent",
         id: baseId,
         previous: {
           title: snapshot.title,
@@ -281,7 +281,7 @@ export class SchedulerManager {
     }
 
     this._fireHook(
-      OP_UPDATE_EVENT,
+      "updateEvent",
       () => this._hooks.onEventUpdate?.(event),
       () => {
         if (snapshot) {
@@ -317,30 +317,29 @@ export class SchedulerManager {
     const snapshot = schedulerStore.getState().events[baseId];
     const deleted = schedulerStore.getState().deleteEvent(baseId);
 
-    if (deleted) {
-      const prev = snapshot!;
+    if (deleted && snapshot) {
       this._pushUndo({
-        type: OP_DELETE_EVENT,
+        type: "deleteEvent",
         previous: {
-          id: prev.id,
-          title: prev.title,
-          startTime: prev.startTime,
-          endTime: prev.endTime,
-          status: prev.status,
-          description: prev.description,
-          resourceId: prev.resourceId,
-          resourceIds: prev.resourceIds,
-          color: prev.color,
-          allDay: prev.allDay,
-          recurrenceRule: prev.recurrenceRule,
+          id: snapshot.id,
+          title: snapshot.title,
+          startTime: snapshot.startTime,
+          endTime: snapshot.endTime,
+          status: snapshot.status,
+          description: snapshot.description,
+          resourceId: snapshot.resourceId,
+          resourceIds: snapshot.resourceIds,
+          color: snapshot.color,
+          allDay: snapshot.allDay,
+          recurrenceRule: snapshot.recurrenceRule,
         },
       });
 
       this._fireHook(
-        OP_DELETE_EVENT,
+        "deleteEvent",
         () => this._hooks.onEventDelete?.(baseId),
         () => {
-          schedulerStore.getState().addEvent(prev);
+          schedulerStore.getState().addEvent(snapshot);
         },
       );
     }
@@ -385,7 +384,7 @@ export class SchedulerManager {
     const resource = schedulerStore.getState().addResource(data);
 
     this._fireHook(
-      OP_ADD_RESOURCE,
+      "addResource",
       () => this._hooks.onResourceAdd?.(resource),
       () => schedulerStore.getState().deleteResource(resource.id),
     );
@@ -428,7 +427,7 @@ export class SchedulerManager {
     const resource = schedulerStore.getState().updateResource(id, updates);
 
     this._fireHook(
-      OP_UPDATE_RESOURCE,
+      "updateResource",
       () => this._hooks.onResourceUpdate?.(resource),
       () => {
         if (snapshot) {
@@ -459,10 +458,10 @@ export class SchedulerManager {
 
     if (deleted) {
       this._fireHook(
-        OP_DELETE_RESOURCE,
+        "deleteResource",
         () => this._hooks.onResourceDelete?.(id),
         () => {
-          schedulerStore.getState().addResource(snapshot!);
+          if (snapshot) schedulerStore.getState().addResource(snapshot);
         },
       );
     }
@@ -483,7 +482,7 @@ export class SchedulerManager {
     const assignment = schedulerStore.getState().addAssignment(data);
 
     this._fireHook(
-      OP_ADD_ASSIGNMENT,
+      "addAssignment",
       () => this._hooks.onAssignmentAdd?.(assignment),
       () => schedulerStore.getState().deleteAssignment(assignment.id),
     );
@@ -526,10 +525,10 @@ export class SchedulerManager {
 
     if (deleted) {
       this._fireHook(
-        OP_DELETE_ASSIGNMENT,
+        "deleteAssignment",
         () => this._hooks.onAssignmentDelete?.(id),
         () => {
-          schedulerStore.getState().addAssignment(snapshot!);
+          if (snapshot) schedulerStore.getState().addAssignment(snapshot);
         },
       );
     }
@@ -562,25 +561,6 @@ export class SchedulerManager {
     schedulerStore.getState().clearAll();
     this._undoStack = [];
     this._hooks.onUndoStateChange?.(this.canUndo());
-  }
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  private _shiftRecurrenceTimes(
-    baseId: string,
-    originalOccStartMs: number,
-    updates: Partial<EventData>,
-  ) {
-    if (!updates.startTime) return;
-    const newStartMs = new Date(updates.startTime).getTime();
-    const deltaMs = newStartMs - originalOccStartMs;
-
-    const parentEvent = schedulerStore.getState().events[baseId];
-    if (parentEvent) {
-      const parentStartMs = new Date(parentEvent.startTime).getTime();
-      const parentEndMs = new Date(parentEvent.endTime).getTime();
-      updates.startTime = new Date(parentStartMs + deltaMs).toISOString();
-      updates.endTime = new Date(parentEndMs + deltaMs).toISOString();
-    }
   }
 }
 
