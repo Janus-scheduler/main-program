@@ -300,5 +300,388 @@ describe("SchedulerManager", () => {
       manager.clearAll();
       expect(manager.getResourceCount()).toBe(0);
     });
+
+    it("should reset the undo stack when clearAll is called", () => {
+      const onUndoStateChange = jest.fn();
+      const manager = new SchedulerManager({ onUndoStateChange });
+
+      manager.addEvent({
+        id: "evt-1",
+        title: "Event 1",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      expect(manager.canUndo()).toBe(true);
+
+      manager.clearAll();
+
+      expect(manager.canUndo()).toBe(false);
+      expect(manager.peekUndo()).toBeUndefined();
+      // onUndoStateChange is called with false after clearAll
+      expect(onUndoStateChange).toHaveBeenLastCalledWith(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Undo System
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("Undo", () => {
+    it("canUndo() returns false on a fresh manager", () => {
+      const manager = new SchedulerManager();
+      expect(manager.canUndo()).toBe(false);
+    });
+
+    it("peekUndo() returns undefined on a fresh manager", () => {
+      const manager = new SchedulerManager();
+      expect(manager.peekUndo()).toBeUndefined();
+    });
+
+    it("canUndo() returns true after adding an event", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-1",
+        title: "Test",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+      expect(manager.canUndo()).toBe(true);
+    });
+
+    it("peekUndo() returns the last undo action without consuming it", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-1",
+        title: "Test",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      const peeked = manager.peekUndo();
+      expect(peeked).toEqual({ type: "addEvent", id: "evt-1" });
+
+      // Peeking again should return the same action (not consumed)
+      expect(manager.peekUndo()).toEqual(peeked);
+      expect(manager.canUndo()).toBe(true);
+    });
+
+    it("undo addEvent — removes the event from the store", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-1",
+        title: "Test",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      expect(manager.getEvent("evt-1")).toBeDefined();
+
+      manager.undo();
+
+      expect(manager.getEvent("evt-1")).toBeUndefined();
+      expect(manager.canUndo()).toBe(false);
+    });
+
+    it("undo deleteEvent — restores the event to the store", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-1",
+        title: "Restored Event",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      manager.deleteEvent("evt-1");
+      expect(manager.getEvent("evt-1")).toBeUndefined();
+
+      // The undo stack now has: [addEvent(evt-1), deleteEvent(evt-1)]
+      // The top is deleteEvent, so undoing restores it
+      manager.undo();
+      expect(manager.getEvent("evt-1")).toBeDefined();
+      expect(manager.getEvent("evt-1")?.title).toBe("Restored Event");
+    });
+
+    it("undo updateEvent — reverts the event to its previous state", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-1",
+        title: "Original Title",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      manager.updateEvent("evt-1", { title: "Updated Title" });
+      expect(manager.getEvent("evt-1")?.title).toBe("Updated Title");
+
+      manager.undo();
+      expect(manager.getEvent("evt-1")?.title).toBe("Original Title");
+    });
+
+    it("undo does nothing when the stack is empty", () => {
+      const manager = new SchedulerManager();
+      // Should not throw
+      manager.undo();
+      expect(manager.canUndo()).toBe(false);
+    });
+
+    it("enforces a maximum undo stack size of 5", () => {
+      const manager = new SchedulerManager();
+
+      // Add 7 events — only the last 5 should be undoable
+      for (let i = 1; i <= 7; i++) {
+        manager.addEvent({
+          id: `evt-${i}`,
+          title: `Event ${i}`,
+          startTime: "2026-06-02T10:00:00Z",
+          endTime: "2026-06-02T11:00:00Z",
+          resourceId: "r1",
+        });
+      }
+
+      // Undo 5 times — should all succeed
+      for (let i = 0; i < 5; i++) {
+        expect(manager.canUndo()).toBe(true);
+        manager.undo();
+      }
+
+      // 6th undo — stack is empty
+      expect(manager.canUndo()).toBe(false);
+
+      // Events 1 and 2 should still exist (they were pushed off the stack)
+      expect(manager.getEvent("evt-1")).toBeDefined();
+      expect(manager.getEvent("evt-2")).toBeDefined();
+    });
+
+    it("undo does not push new actions onto the undo stack (no infinite loop)", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-1",
+        title: "Test",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      manager.updateEvent("evt-1", { title: "Changed" });
+
+      // Stack has 2 items: [addEvent, updateEvent]
+      manager.undo(); // undoes updateEvent → calls updateEvent internally, but should NOT push
+
+      // Stack should have 1 item (addEvent), not 2
+      expect(manager.canUndo()).toBe(true);
+      manager.undo(); // undoes addEvent
+      expect(manager.canUndo()).toBe(false);
+    });
+
+    it("fires onUndoStateChange hook when undo state changes", () => {
+      const onUndoStateChange = jest.fn();
+      const manager = new SchedulerManager({ onUndoStateChange });
+
+      manager.addEvent({
+        id: "evt-1",
+        title: "Test",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      // Called with true after adding event (stack went from empty → non-empty)
+      expect(onUndoStateChange).toHaveBeenCalledWith(true);
+
+      manager.undo();
+
+      // Called with false after undo (stack is now empty)
+      expect(onUndoStateChange).toHaveBeenCalledWith(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Async hook rejection rollback
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("Async hook rejection rollback", () => {
+    it("should rollback event addition if async hook rejects", async () => {
+      const onError = jest.fn();
+      const manager = new SchedulerManager({
+        onEventAdd: () => Promise.reject(new Error("Network error")),
+        onError,
+      });
+
+      manager.addEvent({
+        id: "evt-async-1",
+        title: "Async Event",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      // Wait for the microtask (Promise rejection) to flush
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(schedulerStore.getState().events["evt-async-1"]).toBeUndefined();
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: "addEvent",
+          reverted: true,
+        }),
+      );
+    });
+
+    it("should rollback event update if async hook rejects", async () => {
+      const onError = jest.fn();
+      const setupManager = new SchedulerManager();
+      setupManager.addEvent({
+        id: "evt-async-2",
+        title: "Original",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      const failManager = new SchedulerManager({
+        onEventUpdate: () => Promise.reject(new Error("Update fail")),
+        onError,
+      });
+
+      failManager.updateEvent("evt-async-2", { title: "Will Fail" });
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(schedulerStore.getState().events["evt-async-2"].title).toBe(
+        "Original",
+      );
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: "updateEvent",
+          reverted: true,
+        }),
+      );
+    });
+
+    it("should rollback event deletion if async hook rejects", async () => {
+      const onError = jest.fn();
+      const setupManager = new SchedulerManager();
+      setupManager.addEvent({
+        id: "evt-async-3",
+        title: "To Delete",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      const failManager = new SchedulerManager({
+        onEventDelete: () => Promise.reject(new Error("Delete fail")),
+        onError,
+      });
+
+      failManager.deleteEvent("evt-async-3");
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(schedulerStore.getState().events["evt-async-3"]).toBeDefined();
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: "deleteEvent",
+          reverted: true,
+        }),
+      );
+    });
+
+    it("should rollback resource addition if async hook rejects", async () => {
+      const onError = jest.fn();
+      const manager = new SchedulerManager({
+        onResourceAdd: () => Promise.reject(new Error("Add fail")),
+        onError,
+      });
+
+      manager.addResource({ id: "r-async-1", name: "Async Resource" });
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(schedulerStore.getState().resources["r-async-1"]).toBeUndefined();
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: "addResource",
+          reverted: true,
+        }),
+      );
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Edge cases
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("Edge cases", () => {
+    it("getEventsByResource handles events with only resourceId (no resourceIds)", () => {
+      const manager = new SchedulerManager();
+      const evt = manager.addEvent({
+        id: "evt-edge-1",
+        title: "Legacy Event",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r-legacy",
+      });
+
+      expect(manager.getEventsByResource("r-legacy")).toEqual([evt]);
+      expect(manager.getEventsByResource("r-nonexistent")).toEqual([]);
+    });
+
+    it("deleteEvent returns false for a non-existent event", () => {
+      const manager = new SchedulerManager();
+      expect(manager.deleteEvent("non-existent-id")).toBe(false);
+    });
+
+    it("updateEvent with occurrence ID that has no parent event still works", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-occ-test",
+        title: "Parent",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      // Update via base ID (non-occurrence) — simple path
+      const updated = manager.updateEvent("evt-occ-test", {
+        title: "Updated Parent",
+      });
+      expect(updated.title).toBe("Updated Parent");
+    });
+
+    it("deleteEvent strips occurrence suffix before deleting", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-del-occ",
+        title: "Delete Me",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      // Delete using an occurrence ID — should resolve to base ID
+      const result = manager.deleteEvent("evt-del-occ_occ_1234567890");
+      expect(result).toBe(true);
+      expect(manager.getEvent("evt-del-occ")).toBeUndefined();
+    });
+
+    it("constructor works with no hooks argument", () => {
+      const manager = new SchedulerManager();
+      // Should not throw on any operation
+      manager.addEvent({
+        id: "evt-no-hooks",
+        title: "No Hooks",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+      manager.updateEvent("evt-no-hooks", { title: "Still Fine" });
+      manager.deleteEvent("evt-no-hooks");
+      expect(manager.getEventCount()).toBe(0);
+    });
   });
 });
