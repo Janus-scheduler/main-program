@@ -9,6 +9,7 @@ import {
   computeTimelineConflicts,
   checkSlotConflict,
   type ConflictResource,
+  type SchedulerStore,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";
 import "./janus-topbar";
@@ -100,20 +101,17 @@ export class JanusTimeline extends LitElement {
     if (this._unsubStore) this._unsubStore();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _syncFromStore(state: any) {
+  private _syncFromStore(state: SchedulerStore) {
     const tz =
       (state.timezone as string) ||
       Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newResources: TimelineResource[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawEvents = Object.values(state.events) as any[];
+    const rawEvents = Object.values(state.events);
     const centerMs = this._viewStartMs || Date.now();
     const startRange = centerMs - 365 * 24 * 60 * 60 * 1000;
     const endRange = centerMs + 365 * 24 * 60 * 60 * 1000;
     const coreEvents = expandEvents(rawEvents, startRange, endRange);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const coreResources = Object.values(state.resources) as any[];
+    const coreResources = Object.values(state.resources);
 
     const typeOrder: Record<string, number> = {
       person: 1,
@@ -147,13 +145,13 @@ export class JanusTimeline extends LitElement {
             endTime,
             startMs: startD.getTime(),
             endMs: endD.getTime(),
-            color: e.color || "blue",
+            color: e.color || "primary",
             date,
             resourceId: res.id,
           } as TimelineEvent;
         });
 
-      let avatarType: "initials" | "icon" = "initials";
+      let avatarType: "initials" | "icon" | "image" = "initials";
       let avatarIcon: "room" | "equipment" | undefined = undefined;
       let groupLabel: string | undefined = undefined;
 
@@ -165,8 +163,9 @@ export class JanusTimeline extends LitElement {
         else if (type === "room") groupLabel = "ROOMS";
         else if (type === "equipment") groupLabel = "EQUIPMENT";
       }
-
-      if (type === "room") {
+      if (res.avatar) {
+        avatarType = "image";
+      } else if (type === "room") {
         avatarType = "icon";
         avatarIcon = "room";
       } else if (type === "equipment") {
@@ -187,6 +186,7 @@ export class JanusTimeline extends LitElement {
         avatarIcon,
         groupLabel,
         events: resEvents,
+        avatar: res.avatar,
       });
     }
 
@@ -531,7 +531,7 @@ export class JanusTimeline extends LitElement {
           const resource = this.resources.find((r) => r.id === newResourceId);
           if (resource) {
             hasConflict = checkSlotConflict(
-              resource.events as unknown as any[],
+              resource.events,
               startMs,
               endMs,
               event.id,
@@ -547,7 +547,7 @@ export class JanusTimeline extends LitElement {
           const resource = this.resources.find((r) => r.id === resourceId);
           if (resource) {
             hasConflict = checkSlotConflict(
-              resource.events as unknown as any[],
+              resource.events,
               startMs,
               endMs,
               event.id,
@@ -562,11 +562,7 @@ export class JanusTimeline extends LitElement {
 
           const resource = this.resources.find((r) => r.id === resourceId);
           if (resource) {
-            hasConflict = checkSlotConflict(
-              resource.events as unknown as any[],
-              startMs,
-              endMs,
-            );
+            hasConflict = checkSlotConflict(resource.events, startMs, endMs);
           }
         }
 
@@ -645,6 +641,13 @@ export class JanusTimeline extends LitElement {
   // ── Rendering helpers ─────────────────────────────────────────────
 
   private renderAvatar(r: TimelineResource) {
+    if (r.avatarType === "image" && r.avatar) {
+      return html`<img
+        class="tl-avatar tl-avatar--image"
+        src="${r.avatar}"
+        alt="${r.name}"
+      />`;
+    }
     if (r.avatarType === "initials") {
       return html`<span
         class="tl-avatar tl-avatar--initials"
@@ -704,12 +707,7 @@ export class JanusTimeline extends LitElement {
       ? this.resources.find((r) => r.id === targetResourceId)
       : null;
     const hasDragConflict = resource
-      ? checkSlotConflict(
-          resource.events as unknown as any[],
-          ghostStartMs,
-          ghostEndMs,
-          eventId,
-        )
+      ? checkSlotConflict(resource.events, ghostStartMs, ghostEndMs, eventId)
       : false;
 
     return html`

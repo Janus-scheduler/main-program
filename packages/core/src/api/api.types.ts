@@ -3,6 +3,7 @@
  * Used in both TimelineEvent and MonthEvent.
  */
 export type EventColor =
+  | "primary"
   | "orange"
   | "blue"
   | "yellow"
@@ -39,7 +40,8 @@ export interface TimelineResource {
   id: string;
   name: string;
   subtitle: string;
-  avatarType: "initials" | "icon";
+  avatarType: "initials" | "icon" | "image";
+  avatar?: string;
   avatarIcon?: "room" | "equipment";
   groupLabel?: string;
   events: TimelineEvent[];
@@ -51,6 +53,8 @@ export interface EventMoveDetail {
   newResourceId: string;
   newStartTime: string;
   newEndTime: string;
+  hasConflict?: boolean;
+  conflictMessage?: string;
 }
 
 export interface EventResizeDetail {
@@ -58,6 +62,8 @@ export interface EventResizeDetail {
   resourceId: string;
   newStartTime: string;
   newEndTime: string;
+  hasConflict?: boolean;
+  conflictMessage?: string;
 }
 
 export interface EventCreateDetail {
@@ -65,6 +71,8 @@ export interface EventCreateDetail {
   startTime: string;
   endTime: string;
   date: string;
+  hasConflict?: boolean;
+  conflictMessage?: string;
 }
 
 export interface MonthEvent {

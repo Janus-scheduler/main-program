@@ -153,7 +153,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   onConflictDetected?: (detail: {
     message: string;
     action: string;
-    detail: any;
+    detail: EventMoveDetail | EventResizeDetail | EventCreateDetail;
   }) => void;
 }
 

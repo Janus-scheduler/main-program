@@ -13,12 +13,15 @@ export const timelineStyles = css`
     --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours */
-    --c-orange-bg: var(--janus-primary-bg, #fff7ed);
-    --c-orange-bd: var(--janus-primary-color, #f97316);
-    --c-orange-tx: var(--janus-primary-text, #c2410c);
-    --c-blue-bg: #eff6ff;
-    --c-blue-bd: #3b82f6;
-    --c-blue-tx: #1d4ed8;
+    --c-primary-bg: var(--janus-primary-bg, #fff7ed);
+    --c-primary-bd: var(--janus-primary-color, #f97316);
+    --c-primary-tx: var(--janus-primary-text, #c2410c);
+    --c-orange-bg: #fff7ed;
+    --c-orange-bd: #f97316;
+    --c-orange-tx: #c2410c;
+    --c-blue-bg: #f0f9ff;
+    --c-blue-bd: #0ea5e9;
+    --c-blue-tx: #0369a1;
     --c-yellow-bg: #fefce8;
     --c-yellow-bd: #f59e0b;
     --c-yellow-tx: #b45309;
@@ -212,6 +215,9 @@ export const timelineStyles = css`
     background: #fef3c7;
     color: #92400e;
   }
+  .tl-avatar--image {
+    object-fit: cover;
+  }
 
   /* ══════════════════════════════════════════════════════════════════════════════
      SCROLLABLE TIME GRID
@@ -383,12 +389,15 @@ export const timelineStyles = css`
     text-align: left;
     font-family: inherit;
     overflow: hidden;
+    backdrop-filter: blur(2px) saturate(1.1);
+    -webkit-backdrop-filter: blur(2px) saturate(1.1);
     box-shadow:
       0 3px 8px rgba(0, 0, 0, 0.12),
       0 1px 3px rgba(0, 0, 0, 0.08);
     transition:
       filter 0.15s,
       transform 0.12s,
+      background-color 0.15s,
       box-shadow 0.15s;
   }
 
@@ -456,64 +465,103 @@ export const timelineStyles = css`
     opacity: 0.85;
   }
 
+  .tl-event--primary {
+    background: color-mix(in srgb, var(--c-primary-bg) 32%, transparent);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
+  }
+  .tl-event--primary:hover {
+    background: color-mix(in srgb, var(--c-primary-bg) 55%, transparent);
+  }
+
   .tl-event--orange {
-    background: var(--c-orange-bg);
+    background: color-mix(in srgb, var(--c-orange-bg) 32%, transparent);
     border-color: var(--c-orange-bd);
     color: var(--c-orange-tx);
   }
+  .tl-event--orange:hover {
+    background: color-mix(in srgb, var(--c-orange-bg) 55%, transparent);
+  }
 
   .tl-event--blue {
-    background: var(--c-blue-bg);
+    background: color-mix(in srgb, var(--c-blue-bg) 32%, transparent);
     border-color: var(--c-blue-bd);
     color: var(--c-blue-tx);
   }
+  .tl-event--blue:hover {
+    background: color-mix(in srgb, var(--c-blue-bg) 55%, transparent);
+  }
 
   .tl-event--yellow {
-    background: var(--c-yellow-bg);
+    background: color-mix(in srgb, var(--c-yellow-bg) 32%, transparent);
     border-color: var(--c-yellow-bd);
     color: var(--c-yellow-tx);
   }
+  .tl-event--yellow:hover {
+    background: color-mix(in srgb, var(--c-yellow-bg) 55%, transparent);
+  }
 
   .tl-event--purple {
-    background: var(--c-purple-bg);
+    background: color-mix(in srgb, var(--c-purple-bg) 32%, transparent);
     border-color: var(--c-purple-bd);
     color: var(--c-purple-tx);
   }
+  .tl-event--purple:hover {
+    background: color-mix(in srgb, var(--c-purple-bg) 55%, transparent);
+  }
 
   .tl-event--green {
-    background: var(--c-green-bg);
+    background: color-mix(in srgb, var(--c-green-bg) 32%, transparent);
     border-color: var(--c-green-bd);
     color: var(--c-green-tx);
   }
+  .tl-event--green:hover {
+    background: color-mix(in srgb, var(--c-green-bg) 55%, transparent);
+  }
 
   .tl-event--red {
-    background: var(--c-red-bg);
+    background: color-mix(in srgb, var(--c-red-bg) 32%, transparent);
     border-color: var(--c-red-bd);
     color: var(--c-red-tx);
   }
+  .tl-event--red:hover {
+    background: color-mix(in srgb, var(--c-red-bg) 55%, transparent);
+  }
 
   .tl-event--pink {
-    background: var(--c-pink-bg);
+    background: color-mix(in srgb, var(--c-pink-bg) 32%, transparent);
     border-color: var(--c-pink-bd);
     color: var(--c-pink-tx);
   }
+  .tl-event--pink:hover {
+    background: color-mix(in srgb, var(--c-pink-bg) 55%, transparent);
+  }
 
   .tl-event--indigo {
-    background: var(--c-indigo-bg);
+    background: color-mix(in srgb, var(--c-indigo-bg) 32%, transparent);
     border-color: var(--c-indigo-bd);
     color: var(--c-indigo-tx);
   }
+  .tl-event--indigo:hover {
+    background: color-mix(in srgb, var(--c-indigo-bg) 55%, transparent);
+  }
 
   .tl-event--cyan {
-    background: var(--c-cyan-bg);
+    background: color-mix(in srgb, var(--c-cyan-bg) 32%, transparent);
     border-color: var(--c-cyan-bd);
     color: var(--c-cyan-tx);
   }
+  .tl-event--cyan:hover {
+    background: color-mix(in srgb, var(--c-cyan-bg) 55%, transparent);
+  }
 
   .tl-event--teal {
-    background: var(--c-teal-bg);
+    background: color-mix(in srgb, var(--c-teal-bg) 32%, transparent);
     border-color: var(--c-teal-bd);
     color: var(--c-teal-tx);
+  }
+  .tl-event--teal:hover {
+    background: color-mix(in srgb, var(--c-teal-bg) 55%, transparent);
   }
 
   /* ══════════════════════════════════════════════════════════════════════════════
@@ -589,6 +637,12 @@ export const timelineStyles = css`
     font-family: "DM Mono", monospace;
     white-space: nowrap;
     opacity: 0.85;
+  }
+
+  .tl-drag-ghost--primary {
+    background: var(--c-primary-bg);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
   }
 
   .tl-drag-ghost--orange {

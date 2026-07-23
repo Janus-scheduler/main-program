@@ -15,6 +15,7 @@ import { schedulerStyles } from "./styles";
 import "./janus-confirm-dialog";
 
 const COLORS = [
+  "primary",
   "orange",
   "blue",
   "green",
@@ -236,11 +237,19 @@ const ChevronRightIcon = () =>
 // ─── Avatar helpers ───────────────────────────────────────────────────────────
 
 const avatarPalette: Record<string, string> = {
-  "John Doe": "orange",
+  "John Doe": "primary",
   "Sarah Chen": "blue",
 };
 
-function avatarHtml(name: string) {
+function avatarHtml(name: string, avatarUrl?: string) {
+  if (avatarUrl) {
+    return html`<img
+      class="avatar"
+      src="${avatarUrl}"
+      alt="${name}"
+      style="object-fit: cover;"
+    />`;
+  }
   const initials = name
     .split(" ")
     .map((n) => n[0])
@@ -248,7 +257,7 @@ function avatarHtml(name: string) {
     .slice(0, 2);
   const cls = avatarPalette[name]
     ? `avatar-${avatarPalette[name]}`
-    : "avatar-orange";
+    : "avatar-primary";
   return html`<span class="avatar ${cls}">${initials}</span>`;
 }
 
@@ -387,7 +396,7 @@ export class JanusScheduler extends LitElement {
   @property({ type: String }) endTime = "";
   @property({ type: Array }) participants: string[] = [];
   @property({ type: String }) description = "";
-  @property({ type: String }) activeColor = "orange";
+  @property({ type: String }) activeColor = "primary";
   @property({ type: String }) brandColor?: string;
   @property({ type: String }) error: string | null = null;
   @property({ type: Boolean }) allDay = false;
@@ -546,7 +555,7 @@ export class JanusScheduler extends LitElement {
         endTime: this.endTime || "10:00",
         participants: this._participants,
         description: this.description,
-        activeColor: this.activeColor || "orange",
+        activeColor: this.activeColor || "primary",
         timezone: schedulerStore.getState().timezone,
         allDay: this.allDay,
         recurrenceRule: this.recurrenceRule,
@@ -639,7 +648,7 @@ export class JanusScheduler extends LitElement {
         endTime: this.endTime,
         participants: this._participants,
         description: this.description,
-        activeColor: this.activeColor || "orange",
+        activeColor: this.activeColor || "primary",
         timezone: this._selectedTz,
       };
       schedulerStore.getState().startDraft(this.eventId, defaults);
@@ -1219,7 +1228,7 @@ export class JanusScheduler extends LitElement {
       ? "All-day event"
       : `${formatTime(startTimeVal)} – ${formatTime(endTimeVal)}`;
 
-    const color = draft.activeColor || "orange";
+    const color = draft.activeColor || "primary";
 
     return html`
       <div class="view-panel">
@@ -1281,10 +1290,11 @@ export class JanusScheduler extends LitElement {
             <div class="view-participants-list">
               ${draft.participants.map((p: string, idx: number) => {
                 const name = this._resolveResourceName(p);
+                const res = schedulerStore.getState().resources[p];
                 const isLead = idx === 0;
                 return html`
                   <div class="view-participant-item">
-                    ${avatarHtml(name)}
+                    ${avatarHtml(name, res?.avatar)}
                     <div class="view-participant-info">
                       <span class="view-participant-name">${name}</span>
                       ${isLead
@@ -1480,7 +1490,11 @@ export class JanusScheduler extends LitElement {
                                   ${draft.participants
                                     .slice(0, 4)
                                     .map((n) =>
-                                      avatarHtml(this._resolveResourceName(n)),
+                                      avatarHtml(
+                                        this._resolveResourceName(n),
+                                        schedulerStore.getState().resources[n]
+                                          ?.avatar,
+                                      ),
                                     )}
                                   ${draft.participants.length > 4
                                     ? html`<span class="avatar avatar-more"
@@ -1520,14 +1534,18 @@ export class JanusScheduler extends LitElement {
                               </div>
                             </div>
                           </div>
-                          <div class="sidebar-footer">
-                            <button
-                              class="btn-delete"
-                              @click=${this._onDeleteClick}
-                            >
-                              ${TrashIcon()} Delete Event
-                            </button>
-                          </div>
+                          ${this.eventId
+                            ? html`
+                                <div class="sidebar-footer">
+                                  <button
+                                    class="btn-delete"
+                                    @click=${this._onDeleteClick}
+                                  >
+                                    ${TrashIcon()} Delete Event
+                                  </button>
+                                </div>
+                              `
+                            : nothing}
                         </aside>
 
                         <!-- ── Panel ───────────────────────────────────────────────────── -->
@@ -1971,8 +1989,10 @@ export class JanusScheduler extends LitElement {
                                 >
                                   ${draft.participants.map((id) => {
                                     const name = this._resolveResourceName(id);
+                                    const res =
+                                      schedulerStore.getState().resources[id];
                                     return html` <span class="chip">
-                                      ${avatarHtml(name)} ${name}
+                                      ${avatarHtml(name, res?.avatar)} ${name}
                                       <button
                                         class="chip-remove"
                                         @click=${(e: Event) => {
@@ -2030,7 +2050,10 @@ export class JanusScheduler extends LitElement {
                                                           index;
                                                       }}
                                                     >
-                                                      ${avatarHtml(res.name)}
+                                                      ${avatarHtml(
+                                                        res.name,
+                                                        res.avatar,
+                                                      )}
                                                       <div
                                                         class="suggestion-info"
                                                       >
@@ -2097,12 +2120,14 @@ export class JanusScheduler extends LitElement {
                           </div>
 
                           <div class="panel-footer">
-                            <button
-                              class="btn-delete btn-delete--footer"
-                              @click=${this._onDeleteClick}
-                            >
-                              ${TrashIcon()} Delete
-                            </button>
+                            ${this.eventId
+                              ? html`<button
+                                  class="btn-delete btn-delete--footer"
+                                  @click=${this._onDeleteClick}
+                                >
+                                  ${TrashIcon()} Delete
+                                </button>`
+                              : nothing}
                             <div class="footer-right">
                               <button
                                 class="btn-cancel"
@@ -2138,7 +2163,7 @@ export class JanusScheduler extends LitElement {
         subtitle="Review the details before creating this event."
         confirmText="Confirm and create"
         cancelText="Back to edit"
-        accentColor="orange"
+        accentColor="primary"
         @confirm=${this._onConfirmCreate}
         @cancel=${() => (this._showCreateConfirm = false)}
       ></janus-confirm-dialog>

@@ -28,7 +28,7 @@ export class JanusConfirmDialog extends LitElement {
   @property({ type: String }) subtitle = "";
   @property({ type: String }) confirmText = "Confirm";
   @property({ type: String }) cancelText = "Cancel";
-  @property({ type: String }) accentColor = ""; // "red" or "orange"
+  @property({ type: String }) accentColor = ""; // "red" or "primary"
   @property({ type: Object }) draft: EventDraft | null = null;
   @property({ attribute: false }) resolveResourceName: (id: string) => string =
     (id) => id;
@@ -82,7 +82,7 @@ export class JanusConfirmDialog extends LitElement {
       --confirm-accent-text: #ffffff;
     }
 
-    .confirm-card.accent-orange {
+    .confirm-card.accent-primary {
       border-top: 5px solid var(--janus-primary-color, #f97316);
       --confirm-accent: var(--janus-primary-color, #f97316);
       --confirm-accent-text: #ffffff;
