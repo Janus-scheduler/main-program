@@ -13,12 +13,15 @@ export const timelineStyles = css`
     --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours */
-    --c-orange-bg: var(--janus-primary-bg, #fff7ed);
-    --c-orange-bd: var(--janus-primary-color, #f97316);
-    --c-orange-tx: var(--janus-primary-text, #c2410c);
-    --c-blue-bg: #eff6ff;
-    --c-blue-bd: #3b82f6;
-    --c-blue-tx: #1d4ed8;
+    --c-primary-bg: var(--janus-primary-bg, #fff7ed);
+    --c-primary-bd: var(--janus-primary-color, #f97316);
+    --c-primary-tx: var(--janus-primary-text, #c2410c);
+    --c-orange-bg: #fff7ed;
+    --c-orange-bd: #f97316;
+    --c-orange-tx: #c2410c;
+    --c-blue-bg: #f0f9ff;
+    --c-blue-bd: #0ea5e9;
+    --c-blue-tx: #0369a1;
     --c-yellow-bg: #fefce8;
     --c-yellow-bd: #f59e0b;
     --c-yellow-tx: #b45309;
@@ -264,7 +267,7 @@ export const timelineStyles = css`
     position: sticky;
     top: 0;
     background: var(--white);
-    z-index: 11;
+    z-index: 30;
     border-bottom: 1px solid var(--border);
     display: block;
     overflow: hidden;
@@ -297,7 +300,7 @@ export const timelineStyles = css`
     position: sticky;
     top: var(--super-hdr-h);
     background: var(--white);
-    z-index: 10;
+    z-index: 29;
     display: block;
     overflow: hidden;
   }
@@ -460,6 +463,15 @@ export const timelineStyles = css`
     font-family: "DM Mono", monospace;
     white-space: nowrap;
     opacity: 0.85;
+  }
+
+  .tl-event--primary {
+    background: color-mix(in srgb, var(--c-primary-bg) 32%, transparent);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
+  }
+  .tl-event--primary:hover {
+    background: color-mix(in srgb, var(--c-primary-bg) 55%, transparent);
   }
 
   .tl-event--orange {
@@ -625,6 +637,12 @@ export const timelineStyles = css`
     font-family: "DM Mono", monospace;
     white-space: nowrap;
     opacity: 0.85;
+  }
+
+  .tl-drag-ghost--primary {
+    background: var(--c-primary-bg);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
   }
 
   .tl-drag-ghost--orange {
@@ -851,6 +869,7 @@ export const timelineStyles = css`
   }
   /* ── Time Conflict Banner & Indicators ───────────────────────────────────── */
   .tl-conflict-banner {
+    position: relative;
     background: #fffbeb;
     border-bottom: 1px solid #fef3c7;
     color: #b45309;

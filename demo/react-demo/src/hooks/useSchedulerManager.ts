@@ -125,6 +125,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         endTime: zonedInputToISO(today, "11:30", tz),
         resourceIds: ["r1", "r3"],
         status: "confirmed",
+        color: "primary",
       });
       mgr.addEvent({
         id: "e2",
@@ -133,6 +134,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         endTime: zonedInputToISO(today, "14:00", tz),
         resourceIds: ["r2"],
         status: "confirmed",
+        color: "primary",
       });
     }
 
