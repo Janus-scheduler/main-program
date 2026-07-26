@@ -13,12 +13,15 @@ export const monthGridStyles = css`
     --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours — same vars as timeline */
-    --c-orange-bg: var(--janus-primary-bg, #fff7ed);
-    --c-orange-bd: var(--janus-primary-color, #f97316);
-    --c-orange-tx: var(--janus-primary-text, #c2410c);
-    --c-blue-bg: #eff6ff;
-    --c-blue-bd: #3b82f6;
-    --c-blue-tx: #1d4ed8;
+    --c-primary-bg: var(--janus-primary-bg, #fff7ed);
+    --c-primary-bd: var(--janus-primary-color, #f97316);
+    --c-primary-tx: var(--janus-primary-text, #c2410c);
+    --c-orange-bg: #fff7ed;
+    --c-orange-bd: #f97316;
+    --c-orange-tx: #c2410c;
+    --c-blue-bg: #f0f9ff;
+    --c-blue-bd: #0ea5e9;
+    --c-blue-tx: #0369a1;
     --c-yellow-bg: #fefce8;
     --c-yellow-bd: #f59e0b;
     --c-yellow-tx: #b45309;
@@ -310,6 +313,12 @@ export const monthGridStyles = css`
   }
 
   /* Colour variants — identical mapping as timeline */
+  .mg-event--primary {
+    background: var(--c-primary-bg);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
+  }
+
   .mg-event--orange {
     background: var(--c-orange-bg);
     border-color: var(--c-orange-bd);
@@ -501,6 +510,9 @@ export const monthGridStyles = css`
     align-self: center;
   }
 
+  .mg-day-panel__color-bar--primary {
+    background: var(--c-primary-bd);
+  }
   .mg-day-panel__color-bar--orange {
     background: var(--c-orange-bd);
   }
@@ -655,6 +667,10 @@ export const monthGridStyles = css`
     }
 
     /* Override the border-left from colour variants */
+    .mg-event--primary {
+      border-left: none;
+      background: var(--c-primary-bd);
+    }
     .mg-event--orange {
       border-left: none;
       background: var(--c-orange-bd);

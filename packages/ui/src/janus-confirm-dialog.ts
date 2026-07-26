@@ -6,7 +6,7 @@ import { type EventDraft } from "@janus-scheduler/core";
 function formatDate(iso: string): string {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");
-  if (isNaN(d.getTime())) return iso;
+  if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -28,8 +28,7 @@ export class JanusConfirmDialog extends LitElement {
   @property({ type: String }) subtitle = "";
   @property({ type: String }) confirmText = "Confirm";
   @property({ type: String }) cancelText = "Cancel";
-  @property({ type: String }) accentColor = ""; // "red" or "orange"
-  /** Single draft for creation confirmation (legacy / create flow) */
+  @property({ type: String }) accentColor = ""; // "red" or "primary"
   @property({ type: Object }) draft: EventDraft | null = null;
   /** Before-state for undo comparison */
   @property({ type: Object }) fromDraft: EventDraft | null = null;
@@ -87,7 +86,7 @@ export class JanusConfirmDialog extends LitElement {
       --confirm-accent-text: #ffffff;
     }
 
-    .confirm-card.accent-orange {
+    .confirm-card.accent-primary {
       border-top: 5px solid var(--janus-primary-color, #f97316);
       --confirm-accent: var(--janus-primary-color, #f97316);
       --confirm-accent-text: #ffffff;

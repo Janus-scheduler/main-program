@@ -27,6 +27,7 @@ export const topbarStyles = css`
      TOP BAR
   ══════════════════════════════════════════════════════════════════════════════ */
   .tl-topbar {
+    position: relative;
     height: var(--topbar-h);
     min-height: var(--topbar-h);
     flex-shrink: 0;

@@ -64,7 +64,7 @@ export class TimelineDragController {
     left: 0,
     top: 0,
     width: 0,
-    color: "orange",
+    color: "primary",
     timeLabel: "",
     title: "",
   };
@@ -409,7 +409,7 @@ export class TimelineDragController {
       width:
         timestampToPx(endMs, this._viewStartMs, this._pxPerMs) -
         timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
-      color: "blue",
+      color: "primary",
       timeLabel: `${fmt12(startLabel)} – ${fmt12(endLabel)}`,
       title: "New Event",
     };

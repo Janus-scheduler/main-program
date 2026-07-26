@@ -145,7 +145,7 @@ export class JanusTimeline extends LitElement {
             endTime,
             startMs: startD.getTime(),
             endMs: endD.getTime(),
-            color: e.color || "blue",
+            color: e.color || "primary",
             date,
             resourceId: res.id,
           } as TimelineEvent;
@@ -281,7 +281,9 @@ export class JanusTimeline extends LitElement {
   private _onGridScroll() {
     // Sync vertical scroll between resource column and time grid
     if (this.resColRef && this.gridScrollRef) {
-      this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      if (this.resColRef.scrollTop !== this.gridScrollRef.scrollTop) {
+        this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      }
     }
 
     // Skip re-centering during programmatic scroll adjustments
@@ -301,6 +303,14 @@ export class JanusTimeline extends LitElement {
       }
     }
     this._emitNavChange();
+  }
+
+  private _onResScroll() {
+    if (this.resColRef && this.gridScrollRef) {
+      if (this.gridScrollRef.scrollTop !== this.resColRef.scrollTop) {
+        this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
+      }
+    }
   }
 
   private _emitNavChange() {
@@ -880,7 +890,7 @@ export class JanusTimeline extends LitElement {
           : nothing}
         <div class="tl-panel">
           <div class="tl-grid-wrap">
-            <div class="tl-res-col" @scroll=${(e: Event) => e.preventDefault()}>
+            <div class="tl-res-col" @scroll=${this._onResScroll}>
               <div
                 class="tl-res-col__header"
                 style="height: ${HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT}px"

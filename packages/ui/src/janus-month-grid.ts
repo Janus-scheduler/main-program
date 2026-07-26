@@ -150,7 +150,7 @@ export class JanusMonthGrid extends LitElement {
         newEvents.push({
           id: e.id,
           title: e.title,
-          color: (e.color || "blue") as EventColor,
+          color: (e.color || "primary") as EventColor,
           date: currentDateStr,
           startTime: e.allDay ? undefined : startTimeStr,
           endTime: e.allDay ? undefined : endTimeStr,

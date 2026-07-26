@@ -3,6 +3,7 @@
  * Used in both TimelineEvent and MonthEvent.
  */
 export type EventColor =
+  | "primary"
   | "orange"
   | "blue"
   | "yellow"

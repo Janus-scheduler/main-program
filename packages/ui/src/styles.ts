@@ -35,8 +35,9 @@ export const schedulerStyles = css`
 
     --red: #ef4444;
 
-    --c-orange: var(--janus-primary-color, #f97316);
-    --c-blue: #3b82f6;
+    --c-primary: var(--janus-primary-color, #f97316);
+    --c-orange: #f97316;
+    --c-blue: #0ea5e9;
     --c-green: #10b981;
     --c-yellow: #f59e0b;
     --c-purple: #8b5cf6;
@@ -119,6 +120,9 @@ export const schedulerStyles = css`
     height: 5px;
     width: 100%;
     flex-shrink: 0;
+  }
+  .sidebar-accent.color-primary {
+    background: var(--c-primary);
   }
   .sidebar-accent.color-orange {
     background: var(--c-orange);
@@ -260,6 +264,10 @@ export const schedulerStyles = css`
       0 0 0 4px currentColor;
   }
 
+  .swatch-primary {
+    background: var(--c-primary);
+    color: var(--c-primary);
+  }
   .swatch-orange {
     background: var(--c-orange);
     color: var(--c-orange);
@@ -321,11 +329,15 @@ export const schedulerStyles = css`
     margin-right: -5px;
     border: 2px solid var(--sidebar-bg);
   }
+  .avatar-primary {
+    background: linear-gradient(135deg, var(--c-primary), var(--orange-glow));
+    color: white;
+  }
   .avatar-orange {
-    background: linear-gradient(135deg, #f97316, #fb923c);
+    background: linear-gradient(135deg, var(--c-orange), #fb923c);
   }
   .avatar-blue {
-    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    background: linear-gradient(135deg, var(--c-blue), #38bdf8);
   }
   .avatar-more {
     background: #e4e4e7;
@@ -437,6 +449,9 @@ export const schedulerStyles = css`
     min-width: 10px;
     border-radius: 50%;
     flex-shrink: 0;
+  }
+  .dot-primary {
+    background: var(--c-primary);
   }
   .dot-orange {
     background: var(--c-orange);
@@ -2162,16 +2177,17 @@ export const schedulerStyles = css`
   width: 100%;
 }
 
-.color-orange .view-hero-bar  { background: var(--orange); }
-.color-blue .view-hero-bar    { background: #3b82f6; }
-.color-green .view-hero-bar   { background: #22c55e; }
+.color-primary .view-hero-bar { background: var(--c-primary); }
+.color-orange .view-hero-bar  { background: var(--c-orange); }
+.color-blue .view-hero-bar    { background: var(--c-blue); }
+.color-green .view-hero-bar   { background: var(--c-green); }
 .color-yellow .view-hero-bar  { background: var(--c-yellow); }
 .color-purple .view-hero-bar  { background: var(--c-purple); }
-.color-red .view-hero-bar     { background: #ef4444; }
-.color-pink .view-hero-bar    { background: #ec4899; }
-.color-indigo .view-hero-bar  { background: #6366f1; }
-.color-cyan .view-hero-bar    { background: #06b6d4; }
-.color-teal .view-hero-bar    { background: #14b8a6; }
+.color-red .view-hero-bar     { background: var(--c-red); }
+.color-pink .view-hero-bar    { background: var(--c-pink); }
+.color-indigo .view-hero-bar  { background: var(--c-indigo); }
+.color-cyan .view-hero-bar    { background: var(--c-cyan); }
+.color-teal .view-hero-bar    { background: var(--c-teal); }
 
 .view-hero-body {
   padding: 18px 20px 16px;
@@ -2378,16 +2394,17 @@ export const schedulerStyles = css`
 
 .btn-edit-event:hover { opacity: 0.88; }
 
-.color-btn-orange { background: var(--orange);  color: #fff; }
-.color-btn-blue   { background: #3b82f6;         color: #fff; }
-.color-btn-green  { background: #22c55e;          color: #fff; }
-.color-btn-yellow { background: var(--c-yellow); color: #fff; }
+.color-btn-primary { background: var(--c-primary); color: #fff; }
+.color-btn-orange { background: var(--c-orange); color: #fff; }
+.color-btn-blue   { background: var(--c-blue); color: #fff; }
+.color-btn-green  { background: var(--c-green); color: #fff; }
+.color-btn-yellow { background: var(--c-yellow); color: var(--text-primary); }
 .color-btn-purple { background: var(--c-purple); color: #fff; }
-.color-btn-red    { background: #ef4444;          color: #fff; }
-.color-btn-pink   { background: #ec4899;          color: #fff; }
-.color-btn-indigo { background: #6366f1;          color: #fff; }
-.color-btn-cyan   { background: #06b6d4;          color: #fff; }
-.color-btn-teal   { background: #14b8a6;          color: #fff; }
+.color-btn-red    { background: var(--c-red); color: #fff; }
+.color-btn-pink   { background: var(--c-pink); color: #fff; }
+.color-btn-indigo { background: var(--c-indigo); color: #fff; }
+.color-btn-cyan   { background: var(--c-cyan); color: #fff; }
+.color-btn-teal   { background: var(--c-teal); color: #fff; }
 
 .capitalize { text-transform: capitalize; }
 `;
