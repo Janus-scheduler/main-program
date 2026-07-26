@@ -37,7 +37,7 @@ export class JanusConfirmDialog extends LitElement {
   @property({ attribute: false }) resolveResourceName: (id: string) => string =
     (id) => id;
 
-  static styles = css`
+  static readonly styles = css`
     :host {
       position: absolute;
       inset: 0;
@@ -357,7 +357,15 @@ export class JanusConfirmDialog extends LitElement {
 
   // ── Calendar icon SVG ────────────────────────────────────────────────────
   private _calIcon() {
-    return html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    return html`<svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
       <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
       <line x1="16" y1="2" x2="16" y2="6"></line>
       <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -366,19 +374,51 @@ export class JanusConfirmDialog extends LitElement {
   }
 
   private _clockIcon() {
-    return html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    return html`<svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
       <circle cx="12" cy="12" r="10"></circle>
       <polyline points="12 6 12 12 16 14"></polyline>
     </svg>`;
   }
 
   private _usersIcon() {
-    return html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    return html`<svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
       <circle cx="9" cy="7" r="4"></circle>
       <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
       <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
     </svg>`;
+  }
+
+  private _renderStateField(
+    icon: unknown,
+    valStr: string,
+    hasChanged: boolean,
+    isAfter: boolean,
+  ) {
+    if (!valStr) return nothing;
+    const changedClass = hasChanged && isAfter ? "changed" : "";
+    return html`
+      <div class="confirm-state-field">
+        ${icon}
+        <span class="confirm-field-val ${changedClass}">${valStr}</span>
+      </div>
+    `;
   }
 
   // ── Render a mini state card for before/after ────────────────────────────
@@ -390,11 +430,12 @@ export class JanusConfirmDialog extends LitElement {
     isEmpty: boolean,
     emptyMsg: string,
   ) {
-    const stateClass = isEmpty
-      ? "confirm-state-card is-deleted"
-      : isAfter
-        ? "confirm-state-card is-after"
-        : "confirm-state-card";
+    let stateClass = "confirm-state-card";
+    if (isEmpty) {
+      stateClass += " is-deleted";
+    } else if (isAfter) {
+      stateClass += " is-after";
+    }
 
     const labelClass = isAfter
       ? "confirm-state-label label-after"
@@ -424,53 +465,36 @@ export class JanusConfirmDialog extends LitElement {
         ? d.participants.map((id) => this.resolveResourceName(id)).join(", ")
         : "";
 
+    const titleChangedClass = titleChanged && isAfter ? "changed" : "";
+
     return html`
       <div class="${stateClass}">
         <div class="${labelClass}">${label}</div>
-        <div
-          class="confirm-event-title ${titleChanged && isAfter
-            ? "changed"
-            : ""}"
-        >
+        <div class="confirm-event-title ${titleChangedClass}">
           <span
             class="confirm-color-dot"
             style="background-color: var(--c-${d.activeColor}, #f97316);"
           ></span>
           ${d.title || "Untitled Event"}
         </div>
-        ${dateStr
-          ? html`<div class="confirm-state-field">
-              ${this._calIcon()}
-              <span
-                class="confirm-field-val ${dateChanged && isAfter
-                  ? "changed"
-                  : ""}"
-                >${dateStr}</span
-              >
-            </div>`
-          : nothing}
-        ${timeStr
-          ? html`<div class="confirm-state-field">
-              ${this._clockIcon()}
-              <span
-                class="confirm-field-val ${timeChanged && isAfter
-                  ? "changed"
-                  : ""}"
-                >${timeStr}</span
-              >
-            </div>`
-          : nothing}
-        ${participantsStr
-          ? html`<div class="confirm-state-field">
-              ${this._usersIcon()}
-              <span
-                class="confirm-field-val ${participantsChanged && isAfter
-                  ? "changed"
-                  : ""}"
-                >${participantsStr}</span
-              >
-            </div>`
-          : nothing}
+        ${this._renderStateField(
+          this._calIcon(),
+          dateStr,
+          dateChanged,
+          isAfter,
+        )}
+        ${this._renderStateField(
+          this._clockIcon(),
+          timeStr,
+          timeChanged,
+          isAfter,
+        )}
+        ${this._renderStateField(
+          this._usersIcon(),
+          participantsStr,
+          participantsChanged,
+          isAfter,
+        )}
       </div>
     `;
   }
@@ -494,8 +518,12 @@ export class JanusConfirmDialog extends LitElement {
         changedFields.add("time");
       // Use JSON.stringify for a safe deep comparison — avoids false
       // positives when resource IDs contain commas (e.g. "resource,123").
-      const fromP = JSON.stringify((from.participants ?? []).slice().sort());
-      const toP = JSON.stringify((to.participants ?? []).slice().sort());
+      const fromP = JSON.stringify(
+        (from.participants ?? []).slice().sort((a, b) => a.localeCompare(b)),
+      );
+      const toP = JSON.stringify(
+        (to.participants ?? []).slice().sort((a, b) => a.localeCompare(b)),
+      );
       if (fromP !== toP) changedFields.add("participants");
     }
 
@@ -546,20 +574,7 @@ export class JanusConfirmDialog extends LitElement {
           </div>
 
           <div class="confirm-summary-item">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
+            ${this._calIcon()}
             <div class="confirm-summary-item-val">
               ${formatDate(draft.startDate)}
             </div>
@@ -568,18 +583,7 @@ export class JanusConfirmDialog extends LitElement {
           ${!draft.allDay
             ? html`
                 <div class="confirm-summary-item">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                  </svg>
+                  ${this._clockIcon()}
                   <div class="confirm-summary-item-val">
                     ${formatTime(draft.startTime)} –
                     ${formatTime(draft.endTime)}
@@ -588,38 +592,14 @@ export class JanusConfirmDialog extends LitElement {
               `
             : html`
                 <div class="confirm-summary-item">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                  </svg>
+                  ${this._clockIcon()}
                   <div class="confirm-summary-item-val">All Day</div>
                 </div>
               `}
           ${draft.participants && draft.participants.length > 0
             ? html`
                 <div class="confirm-summary-item">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                  </svg>
+                  ${this._usersIcon()}
                   <div class="confirm-summary-item-val">
                     ${draft.participants
                       .map((pId: string) => this.resolveResourceName(pId))
