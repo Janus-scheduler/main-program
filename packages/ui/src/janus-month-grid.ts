@@ -45,6 +45,14 @@ export class JanusMonthGrid extends LitElement {
   /** When true, renders a + Floating Action Button to add an event. Default: false */
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
 
+  /**
+   * Optional externally supplied events. When set (non-null), these take
+   * precedence over events derived from the shared scheduler store, letting
+   * consumers drive the grid directly via the `events` property. Leave unset
+   * (null) to use the default store-subscription behavior.
+   */
+  @property({ attribute: false }) events: MonthEvent[] | null = null;
+
   // ── Internal state ────────────────────────────────────────────────────
   @state() private _events: MonthEvent[] = [];
   @state() private _gridHeight = 0;
@@ -161,6 +169,11 @@ export class JanusMonthGrid extends LitElement {
     this._events = newEvents;
   }
 
+  /** External `events` property wins over store-derived events when set. */
+  private get _effectiveEvents(): MonthEvent[] {
+    return this.events ?? this._events;
+  }
+
   // ── Internal state ────────────────────────────────────────────────────
   @state() private _year = new Date().getFullYear();
   @state() private _month = new Date().getMonth(); // 0-based
@@ -213,7 +226,11 @@ export class JanusMonthGrid extends LitElement {
   }
 
   override firstUpdated() {
-    const grid = buildCalendarGrid(this._year, this._month, this._events);
+    const grid = buildCalendarGrid(
+      this._year,
+      this._month,
+      this._effectiveEvents,
+    );
     const todayCell = grid.flat().find((d) => d.isToday) ?? grid[0][0];
     this._selectedDateStr = todayCell.dateStr;
 
@@ -342,7 +359,11 @@ export class JanusMonthGrid extends LitElement {
 
   // ── Main render ───────────────────────────────────────────────────────
   render() {
-    const grid = buildCalendarGrid(this._year, this._month, this._events);
+    const grid = buildCalendarGrid(
+      this._year,
+      this._month,
+      this._effectiveEvents,
+    );
     const rowCount = grid.length;
     const selectedDay =
       grid.flat().find((d) => d.dateStr === this._selectedDateStr) ?? null;

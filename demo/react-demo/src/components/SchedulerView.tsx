@@ -126,11 +126,15 @@ export function SchedulerView({
     if (currentView === "Timeline") {
       const target = pendingTimelineDate.current;
       pendingTimelineDate.current = null; // consume it
+      // Capture the ref now — it may become null if the component unmounts
+      // or the ref changes during the 50ms delay.
+      const timeline = timelineRef.current;
       const timer = setTimeout(() => {
+        if (!timeline) return;
         if (target) {
-          timelineRef.current?.goToDate(target);
+          timeline.goToDate(target);
         } else {
-          timelineRef.current?.goToToday();
+          timeline.goToToday();
         }
       }, 50);
       return () => clearTimeout(timer);

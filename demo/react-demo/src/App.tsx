@@ -46,6 +46,17 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept Ctrl+Z when the user is typing in a form control
+      // or contentEditable element — let the browser handle standard text undo.
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      const isEditable =
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        document.activeElement?.getAttribute("contenteditable") === "true";
+
+      if (isEditable) return;
+
       if ((e.metaKey || e.ctrlKey) && e.key === "z") {
         e.preventDefault();
         const action = manager.peekUndo();
@@ -64,8 +75,11 @@ function App() {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const eventToEventDraft = (e: any): EventDraft => {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const eventToEventDraft = (e: any, overrideTz?: string): EventDraft => {
+    // Use the provided timezone, or fall back to the scheduler's configured
+    // display timezone so the undo dialog matches what the calendar shows
+    // (getTimezone defaults to the browser timezone if none was forced).
+    const tz = overrideTz || manager.getTimezone();
     const startObj = e.startTime
       ? isoToZonedDisplay(e.startTime, tz)
       : { date: "", time: "" };
@@ -110,6 +124,28 @@ function App() {
       };
     }
 
+    if (action.type === "batchAddEvents") {
+      // Batch undo — show count of events that will be removed.
+      // fromDraft shows a summary placeholder, toDraft is null (all deleted).
+      const count = action.ids.length;
+      return {
+        fromDraft: {
+          id: null,
+          title: `${count} imported event${count !== 1 ? "s" : ""}`,
+          startDate: "",
+          startTime: "",
+          endDate: "",
+          endTime: "",
+          participants: [],
+          activeColor: "orange",
+          allDay: false,
+          description: "All events from this bulk import will be removed.",
+          timezone: manager.getTimezone(),
+        },
+        toDraft: null,
+      };
+    }
+
     // updateEvent — show the current state vs. what it will revert to
     const current = manager.getEvent(action.id);
     return {
@@ -136,6 +172,13 @@ function App() {
       return {
         title: "Undo: Restore Event",
         subtitle: "This deleted event will be restored to the calendar.",
+      };
+    }
+    if (type === "batchAddEvents") {
+      return {
+        title: "Undo: Remove Imported Events",
+        subtitle:
+          "All events from this bulk import will be removed from the calendar.",
       };
     }
     return {

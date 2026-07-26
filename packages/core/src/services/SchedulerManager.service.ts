@@ -23,6 +23,13 @@ export interface SchedulerHooks {
   onEventUpdate?: (event: Event) => void | Promise<void>;
   onEventDelete?: (id: string) => void | Promise<void>;
 
+  // ── Bulk event lifecycle ─────────────────────────────────────────────────
+  /**
+   * Called once after a batch of events is added via `batchAddEvents()`.
+   * If omitted, individual `onEventAdd` hooks are fired for each event instead.
+   */
+  onBulkEventAdd?: (events: Event[]) => void | Promise<void>;
+
   // ── Resource lifecycle ─────────────────────────────────────────────────────
   onResourceAdd?: (resource: Resource) => void | Promise<void>;
   onResourceUpdate?: (resource: Resource) => void | Promise<void>;
@@ -59,10 +66,27 @@ export interface SchedulerHooks {
   onUndoStateChange?: (canUndo: boolean) => void;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Configuration — optional settings for the SchedulerManager.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface SchedulerConfig {
+  /**
+   * Maximum number of undo actions retained in the stack.
+   * Older actions are discarded when this limit is exceeded.
+   * @default 20
+   */
+  maxUndoStackSize?: number;
+}
+
+const DEFAULT_CONFIG: Required<SchedulerConfig> = {
+  maxUndoStackSize: 20,
+};
+
 export type UndoAction =
   | { type: "addEvent"; id: string }
   | { type: "updateEvent"; id: string; previous: Partial<EventData> }
-  | { type: "deleteEvent"; previous: EventData };
+  | { type: "deleteEvent"; previous: EventData }
+  | { type: "batchAddEvents"; ids: string[] };
 
 /**
  * SchedulerManager
@@ -77,31 +101,38 @@ export type UndoAction =
  *
  * @example
  * ```ts
- * const manager = new SchedulerManager({
- *   onEventAdd: async (event) => {
- *     await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) });
+ * const manager = new SchedulerManager(
+ *   {
+ *     onEventAdd: async (event) => {
+ *       await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) });
+ *     },
+ *     onEventUpdate: async (event) => {
+ *       await fetch(`/api/events/${event.id}`, { method: 'PATCH', body: JSON.stringify(event) });
+ *     },
+ *     onEventDelete: async (id) => {
+ *       await fetch(`/api/events/${id}`, { method: 'DELETE' });
+ *     },
+ *     onError: ({ operation, error }) => {
+ *       // The UI has already reverted — just show a notification
+ *       toast.error(`"${operation}" failed. Your change has been undone.`);
+ *       console.error(error);
+ *     },
  *   },
- *   onEventUpdate: async (event) => {
- *     await fetch(`/api/events/${event.id}`, { method: 'PATCH', body: JSON.stringify(event) });
- *   },
- *   onEventDelete: async (id) => {
- *     await fetch(`/api/events/${id}`, { method: 'DELETE' });
- *   },
- *   onError: ({ operation, error }) => {
- *     // The UI has already reverted — just show a notification
- *     toast.error(`"${operation}" failed. Your change has been undone.`);
- *     console.error(error);
- *   },
- * });
+ *   { maxUndoStackSize: 50 },
+ * );
  * ```
  */
 export class SchedulerManager {
   private readonly _hooks: SchedulerHooks;
+  private readonly _config: Required<SchedulerConfig>;
   private _undoStack: UndoAction[] = [];
   private _isUndoing = false;
+  private _isBatchOperation = false;
+  private readonly _undoListeners = new Set<() => void>();
 
-  constructor(hooks: SchedulerHooks = {}) {
+  constructor(hooks: SchedulerHooks = {}, config: SchedulerConfig = {}) {
     this._hooks = hooks;
+    this._config = { ...DEFAULT_CONFIG, ...config };
   }
 
   // ── Undo API ─────────────────────────────────────────────────────────────
@@ -114,11 +145,40 @@ export class SchedulerManager {
     return this._undoStack.at(-1);
   }
 
+  /**
+   * Subscribe to undo-stack changes. The listener fires whenever the stack
+   * grows or shrinks, letting UI frameworks derive `canUndo()` reactively
+   * (e.g. via React's `useSyncExternalStore`) instead of wiring a manual
+   * `onUndoStateChange` callback.
+   *
+   * @returns An unsubscribe function.
+   */
+  subscribeUndo(listener: () => void): () => void {
+    this._undoListeners.add(listener);
+    return () => {
+      this._undoListeners.delete(listener);
+    };
+  }
+
+  private _notifyUndoChanged() {
+    this._hooks.onUndoStateChange?.(this.canUndo());
+    for (const listener of this._undoListeners) listener();
+  }
+
   undo(): void {
     if (!this.canUndo()) return;
     this._isUndoing = true;
+    const action = this._undoStack.pop()!;
+
+    // Helper: reset _isUndoing only after all async hooks have settled.
+    // This prevents rollback handlers from erroneously pushing to the undo
+    // stack when an async hook fails after undo() returns synchronously.
+    const finalize = () => {
+      this._isUndoing = false;
+      this._notifyUndoChanged();
+    };
+
     try {
-      const action = this._undoStack.pop()!;
       switch (action.type) {
         case "addEvent":
           this.deleteEvent(action.id);
@@ -129,21 +189,31 @@ export class SchedulerManager {
         case "deleteEvent":
           this.addEvent(action.previous);
           break;
+        case "batchAddEvents":
+          for (const id of action.ids) {
+            this.deleteEvent(id);
+          }
+          break;
       }
-    } finally {
-      this._isUndoing = false;
-      this._hooks.onUndoStateChange?.(this.canUndo());
+    } catch {
+      // If the synchronous part of an undo action throws, still finalize.
+      finalize();
+      return;
     }
+
+    // Defer finalize to the microtask queue so that any async hook
+    // rejections (which call rollback → _pushUndo) still see _isUndoing=true.
+    Promise.resolve().then(finalize);
   }
 
   private _pushUndo(action: UndoAction) {
-    if (this._isUndoing) return;
+    if (this._isUndoing || this._isBatchOperation) return;
     this._undoStack.push(action);
 
-    if (this._undoStack.length > 5) {
+    if (this._undoStack.length > this._config.maxUndoStackSize) {
       this._undoStack.shift();
     }
-    this._hooks.onUndoStateChange?.(this.canUndo());
+    this._notifyUndoChanged();
   }
 
   // ── Private helper ─────────────────────────────────────────────────────────
@@ -195,13 +265,78 @@ export class SchedulerManager {
 
     this._pushUndo({ type: "addEvent", id: event.id });
 
-    this._fireHook(
-      "addEvent",
-      () => this._hooks.onEventAdd?.(event),
-      () => schedulerStore.getState().deleteEvent(event.id),
-    );
+    if (!this._isBatchOperation) {
+      this._fireHook(
+        "addEvent",
+        () => this._hooks.onEventAdd?.(event),
+        () => schedulerStore.getState().deleteEvent(event.id),
+      );
+    }
 
     return event;
+  }
+
+  /**
+   * Optimistically adds multiple events to the store in a single batch.
+   * Fires a single `onBulkEventAdd` hook (or falls back to individual
+   * `onEventAdd` hooks) and pushes a single compound undo action.
+   *
+   * This avoids the N-request / N-undo-push problem when importing
+   * external data.
+   *
+   * @param dataArray - Array of raw event data to add
+   * @returns Array of created Event instances
+   */
+  batchAddEvents(dataArray: EventData[]): Event[] {
+    this._isBatchOperation = true;
+    const events: Event[] = [];
+    const addedIds: string[] = [];
+
+    try {
+      for (const data of dataArray) {
+        const event = this.addEvent(data);
+        events.push(event);
+        addedIds.push(event.id);
+      }
+    } finally {
+      this._isBatchOperation = false;
+    }
+
+    // Push a single compound undo action for the entire batch
+    if (addedIds.length > 0) {
+      this._undoStack.push({ type: "batchAddEvents", ids: addedIds });
+      if (this._undoStack.length > this._config.maxUndoStackSize) {
+        this._undoStack.shift();
+      }
+      this._notifyUndoChanged();
+    }
+
+    // Fire a single hook for the entire batch
+    const rollbackAll = () => {
+      for (const id of addedIds) {
+        schedulerStore.getState().deleteEvent(id);
+      }
+    };
+
+    if (this._hooks.onBulkEventAdd) {
+      this._fireHook(
+        "batchAddEvents",
+        () => this._hooks.onBulkEventAdd!(events),
+        rollbackAll,
+      );
+    } else if (this._hooks.onEventAdd) {
+      // Fallback: fire individual hooks but with a single rollback
+      this._fireHook(
+        "batchAddEvents",
+        () =>
+          Promise.all(events.map((e) => this._hooks.onEventAdd!(e))).then(
+            () => {},
+          ),
+        rollbackAll,
+      );
+    }
+
+    return events;
   }
 
   /**
@@ -220,6 +355,17 @@ export class SchedulerManager {
    */
   getAllEvents(): Event[] {
     return Object.values(schedulerStore.getState().events);
+  }
+
+  /**
+   * The IANA timezone the scheduler is currently displaying in.
+   * Defaults to the browser's local timezone unless changed via the store's
+   * `setTimezone`. Use this (not `Intl.DateTimeFormat()`) when formatting
+   * event times outside the scheduler components, so external UI (dialogs,
+   * toasts) matches the calendar display.
+   */
+  getTimezone(): string {
+    return schedulerStore.getState().timezone;
   }
 
   /**
@@ -261,23 +407,49 @@ export class SchedulerManager {
 
     const event = schedulerStore.getState().updateEvent(baseId, updates);
 
+    // Store only the fields that actually changed (delta), not the full snapshot.
+    // This reduces memory usage for undo entries while preserving correctness.
     if (snapshot) {
-      this._pushUndo({
-        type: "updateEvent",
-        id: baseId,
-        previous: {
-          title: snapshot.title,
-          startTime: snapshot.startTime,
-          endTime: snapshot.endTime,
-          status: snapshot.status,
-          description: snapshot.description,
-          resourceId: snapshot.resourceId,
-          resourceIds: snapshot.resourceIds,
-          color: snapshot.color,
-          allDay: snapshot.allDay,
-          recurrenceRule: snapshot.recurrenceRule,
-        },
-      });
+      const delta: Partial<EventData> = {};
+      const fields: (keyof EventData)[] = [
+        "title",
+        "startTime",
+        "endTime",
+        "status",
+        "description",
+        "resourceId",
+        "color",
+        "allDay",
+        "recurrenceRule",
+      ];
+
+      for (const key of fields) {
+        if (
+          key in updates &&
+          snapshot[key as keyof typeof snapshot] !== undefined
+        ) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (delta as any)[key] = snapshot[key as keyof typeof snapshot];
+        }
+      }
+
+      // Special handling for resourceIds (array comparison)
+      if (
+        "resourceIds" in updates &&
+        JSON.stringify(snapshot.resourceIds) !==
+          JSON.stringify(updates.resourceIds)
+      ) {
+        delta.resourceIds = snapshot.resourceIds;
+      }
+
+      // Only push undo if something actually changed
+      if (Object.keys(delta).length > 0) {
+        this._pushUndo({
+          type: "updateEvent",
+          id: baseId,
+          previous: delta,
+        });
+      }
     }
 
     this._fireHook(

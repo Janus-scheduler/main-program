@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import {
   SchedulerManager,
   getBrowserTimezone,
@@ -21,8 +21,6 @@ export interface HookError {
  * @returns the configured SchedulerManager instance (stable across renders)
  */
 export function useSchedulerManager(onError: (err: HookError) => void) {
-  const [canUndo, setCanUndo] = useState(false);
-
   const manager = useMemo(() => {
     const mgr = new SchedulerManager({
       onEventAdd: async (event) => {
@@ -87,8 +85,6 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
             : "An unexpected error occurred";
         onError({ operation, message });
       },
-
-      onUndoStateChange: (can) => setCanUndo(can),
     });
 
     // ── Seed initial demo data ─────────────────────────────────────────
@@ -171,6 +167,13 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // manager is intentionally created once
 
+  // Derived reactively from the manager's undo stack — no manual callback
+  // wiring needed. Re-renders whenever the stack grows or shrinks.
+  const canUndo = useSyncExternalStore(
+    (onStoreChange) => manager.subscribeUndo(onStoreChange),
+    () => manager.canUndo(),
+  );
+
   const syncBulkEvents = async () => {
     try {
       // 1. Authenticate and fetch from the external API
@@ -201,8 +204,15 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         ],
       };
 
-      // 2. Loop through the external payload and map it to Janus Scheduler format
-      let importedEvents = 0;
+      // 2. Ensure resources exist, then collect new events for batch import
+      const eventsToAdd: {
+        id: string;
+        title: string;
+        startTime: string;
+        endTime: string;
+        resourceIds: string[];
+        status: "confirmed";
+      }[] = [];
 
       lmsData.courses.forEach((course) => {
         // Ensure the teacher (resource) exists before adding the event
@@ -214,23 +224,25 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
           });
         }
 
-        // Check if event already exists
+        // Collect new events (skip duplicates)
         if (!manager.getEvent(course.id)) {
-          // Add the course as an event
-          manager.addEvent({
+          eventsToAdd.push({
             id: course.id,
             title: course.courseName,
-            // Convert external dates to Javascript Epoch Timestamps (or ISO strings)
             startTime: course.startDate,
             endTime: course.endDate,
             resourceIds: [course.teacherId],
             status: "confirmed" as const,
           });
-          importedEvents++;
         }
       });
 
-      console.log(`Successfully synced ${importedEvents} events from LMS!`);
+      // 3. Batch-add all new events in one transactional call
+      if (eventsToAdd.length > 0) {
+        manager.batchAddEvents(eventsToAdd);
+      }
+
+      console.log(`Successfully synced ${eventsToAdd.length} events from LMS!`);
     } catch (error) {
       console.error("Failed to sync from LMS:", error);
       alert("Synchronization failed. Please check the logs.");

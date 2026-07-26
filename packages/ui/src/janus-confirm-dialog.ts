@@ -493,8 +493,10 @@ export class JanusConfirmDialog extends LitElement {
         from.allDay !== to.allDay
       )
         changedFields.add("time");
-      const fromP = (from.participants ?? []).slice().sort().join(",");
-      const toP = (to.participants ?? []).slice().sort().join(",");
+      // Use JSON.stringify for a safe deep comparison — avoids false
+      // positives when resource IDs contain commas (e.g. "resource,123").
+      const fromP = JSON.stringify((from.participants ?? []).slice().sort());
+      const toP = JSON.stringify((to.participants ?? []).slice().sort());
       if (fromP !== toP) changedFields.add("participants");
     }
 
@@ -502,7 +504,7 @@ export class JanusConfirmDialog extends LitElement {
       <div class="confirm-comparison">
         ${this._renderStateCard(
           from,
-          "Before",
+          "Current State",
           false,
           changedFields,
           !from,
@@ -516,7 +518,7 @@ export class JanusConfirmDialog extends LitElement {
         </div>
         ${this._renderStateCard(
           to,
-          "After",
+          "After Undo",
           true,
           changedFields,
           !to,

@@ -28,7 +28,7 @@ export {
   zonedInputToISO,
   schedulerStore,
 } from "@janus-scheduler/core";
-export type { SchedulerHooks } from "@janus-scheduler/core";
+export type { SchedulerHooks, SchedulerConfig } from "@janus-scheduler/core";
 
 export type {
   TimelineEvent,

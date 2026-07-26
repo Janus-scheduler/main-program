@@ -23,6 +23,7 @@ export {
 
 import type {
   SchedulerHooks,
+  SchedulerConfig,
   TimelineEvent,
   TimelineResource,
   EventMoveDetail,
@@ -41,6 +42,7 @@ import type {
 
 export type {
   SchedulerHooks,
+  SchedulerConfig,
   UndoAction,
   TimelineEvent,
   TimelineResource,

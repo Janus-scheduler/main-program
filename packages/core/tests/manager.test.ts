@@ -430,11 +430,11 @@ describe("SchedulerManager", () => {
       expect(manager.canUndo()).toBe(false);
     });
 
-    it("enforces a maximum undo stack size of 5", () => {
+    it("enforces a configurable maximum undo stack size (default 20)", () => {
       const manager = new SchedulerManager();
 
-      // Add 7 events — only the last 5 should be undoable
-      for (let i = 1; i <= 7; i++) {
+      // Add 22 events — only the last 20 should be undoable
+      for (let i = 1; i <= 22; i++) {
         manager.addEvent({
           id: `evt-${i}`,
           title: `Event ${i}`,
@@ -444,16 +444,44 @@ describe("SchedulerManager", () => {
         });
       }
 
-      // Undo 5 times — should all succeed
-      for (let i = 0; i < 5; i++) {
+      // Undo 20 times — should all succeed
+      for (let i = 0; i < 20; i++) {
         expect(manager.canUndo()).toBe(true);
         manager.undo();
       }
 
-      // 6th undo — stack is empty
+      // 21st undo — stack is empty
       expect(manager.canUndo()).toBe(false);
 
       // Events 1 and 2 should still exist (they were pushed off the stack)
+      expect(manager.getEvent("evt-1")).toBeDefined();
+      expect(manager.getEvent("evt-2")).toBeDefined();
+    });
+
+    it("respects a custom maxUndoStackSize from config", () => {
+      const manager = new SchedulerManager({}, { maxUndoStackSize: 3 });
+
+      // Add 5 events — only the last 3 should be undoable
+      for (let i = 1; i <= 5; i++) {
+        manager.addEvent({
+          id: `evt-${i}`,
+          title: `Event ${i}`,
+          startTime: "2026-06-02T10:00:00Z",
+          endTime: "2026-06-02T11:00:00Z",
+          resourceId: "r1",
+        });
+      }
+
+      // Undo 3 times — should all succeed
+      for (let i = 0; i < 3; i++) {
+        expect(manager.canUndo()).toBe(true);
+        manager.undo();
+      }
+
+      // 4th undo — stack is empty
+      expect(manager.canUndo()).toBe(false);
+
+      // Events 1 and 2 should still exist (pushed off the stack)
       expect(manager.getEvent("evt-1")).toBeDefined();
       expect(manager.getEvent("evt-2")).toBeDefined();
     });
@@ -479,7 +507,7 @@ describe("SchedulerManager", () => {
       expect(manager.canUndo()).toBe(false);
     });
 
-    it("fires onUndoStateChange hook when undo state changes", () => {
+    it("fires onUndoStateChange hook when undo state changes", async () => {
       const onUndoStateChange = jest.fn();
       const manager = new SchedulerManager({ onUndoStateChange });
 
@@ -495,6 +523,10 @@ describe("SchedulerManager", () => {
       expect(onUndoStateChange).toHaveBeenCalledWith(true);
 
       manager.undo();
+
+      // The undo finalize is deferred to a microtask to prevent async
+      // rollback corruption — wait for it to settle.
+      await Promise.resolve();
 
       // Called with false after undo (stack is now empty)
       expect(onUndoStateChange).toHaveBeenCalledWith(false);

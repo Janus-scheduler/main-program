@@ -1,6 +1,7 @@
 export { SchedulerManager } from "./services/SchedulerManager.service";
 export type {
   SchedulerHooks,
+  SchedulerConfig,
   UndoAction,
 } from "./services/SchedulerManager.service";
 export * from "./store";

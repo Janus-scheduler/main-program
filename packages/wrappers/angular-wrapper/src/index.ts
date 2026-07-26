@@ -28,7 +28,7 @@ export {
   zonedInputToISO,
   schedulerStore,
 } from "@janus-scheduler/core";
-export type { SchedulerHooks } from "@janus-scheduler/core";
+export type { SchedulerHooks, SchedulerConfig } from "@janus-scheduler/core";
 
 // Types — re-exported so consumers don't need to import from @janus-scheduler/core directly
 export type {
