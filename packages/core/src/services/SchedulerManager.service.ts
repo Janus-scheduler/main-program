@@ -328,10 +328,15 @@ export class SchedulerManager {
       // Fallback: fire individual hooks but with a single rollback
       this._fireHook(
         "batchAddEvents",
-        () =>
-          Promise.all(events.map((e) => this._hooks.onEventAdd!(e))).then(
-            () => {},
-          ),
+        () => {
+          const results = events.map((e) => this._hooks.onEventAdd!(e));
+          const promises = results.filter(
+            (r): r is Promise<void> => r instanceof Promise,
+          );
+          return promises.length > 0
+            ? Promise.all(promises).then(() => {})
+            : undefined;
+        },
         rollbackAll,
       );
     }
@@ -368,6 +373,65 @@ export class SchedulerManager {
     return schedulerStore.getState().timezone;
   }
 
+  private _shiftParentEventTimes(
+    baseId: string,
+    updates: Partial<EventData>,
+    occMatch: RegExpExecArray,
+  ) {
+    if (!updates.startTime) return;
+    const originalOccStartMs = Number(occMatch[2]);
+    const newStartMs = new Date(updates.startTime).getTime();
+    const deltaMs = newStartMs - originalOccStartMs;
+
+    const parentEvent = schedulerStore.getState().events[baseId];
+    if (parentEvent) {
+      const parentStartMs = new Date(parentEvent.startTime).getTime();
+      const parentEndMs = new Date(parentEvent.endTime).getTime();
+
+      updates.startTime = new Date(parentStartMs + deltaMs).toISOString();
+      updates.endTime = new Date(parentEndMs + deltaMs).toISOString();
+    }
+  }
+
+  private _computeEventDelta(
+    updates: Partial<EventData>,
+    snapshot: Partial<EventData>,
+  ): Partial<EventData> {
+    const delta: Partial<EventData> = {};
+    const fields: (keyof EventData)[] = [
+      "title",
+      "startTime",
+      "endTime",
+      "status",
+      "description",
+      "resourceId",
+      "color",
+      "allDay",
+      "recurrenceRule",
+    ];
+
+    for (const key of fields) {
+      if (
+        key in updates &&
+        snapshot[key as keyof typeof snapshot] !== undefined
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (delta as any)[key] = snapshot[key as keyof typeof snapshot];
+      }
+    }
+
+    // Special handling for resourceIds (array comparison)
+    if (
+      "resourceIds" in updates &&
+      JSON.stringify(snapshot.resourceIds) !==
+        JSON.stringify(updates.resourceIds)
+    ) {
+      delta.resourceIds = snapshot.resourceIds;
+    }
+
+    return delta;
+  }
+
   /**
    * Optimistically updates an event in the store, then fires `onEventUpdate`.
    * If the hook rejects, the event is restored to its previous state and `onError` fires.
@@ -380,19 +444,8 @@ export class SchedulerManager {
     const occMatch = /^(.+)_occ_(\d+)$/.exec(id);
     const baseId = occMatch ? occMatch[1] : id;
 
-    if (occMatch && updates.startTime) {
-      const originalOccStartMs = Number(occMatch[2]);
-      const newStartMs = new Date(updates.startTime).getTime();
-      const deltaMs = newStartMs - originalOccStartMs;
-
-      const parentEvent = schedulerStore.getState().events[baseId];
-      if (parentEvent) {
-        const parentStartMs = new Date(parentEvent.startTime).getTime();
-        const parentEndMs = new Date(parentEvent.endTime).getTime();
-
-        updates.startTime = new Date(parentStartMs + deltaMs).toISOString();
-        updates.endTime = new Date(parentEndMs + deltaMs).toISOString();
-      }
+    if (occMatch) {
+      this._shiftParentEventTimes(baseId, updates, occMatch);
     }
 
     const existing = schedulerStore.getState().events[baseId];
@@ -410,37 +463,7 @@ export class SchedulerManager {
     // Store only the fields that actually changed (delta), not the full snapshot.
     // This reduces memory usage for undo entries while preserving correctness.
     if (snapshot) {
-      const delta: Partial<EventData> = {};
-      const fields: (keyof EventData)[] = [
-        "title",
-        "startTime",
-        "endTime",
-        "status",
-        "description",
-        "resourceId",
-        "color",
-        "allDay",
-        "recurrenceRule",
-      ];
-
-      for (const key of fields) {
-        if (
-          key in updates &&
-          snapshot[key as keyof typeof snapshot] !== undefined
-        ) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (delta as any)[key] = snapshot[key as keyof typeof snapshot];
-        }
-      }
-
-      // Special handling for resourceIds (array comparison)
-      if (
-        "resourceIds" in updates &&
-        JSON.stringify(snapshot.resourceIds) !==
-          JSON.stringify(updates.resourceIds)
-      ) {
-        delta.resourceIds = snapshot.resourceIds;
-      }
+      const delta = this._computeEventDelta(updates, snapshot);
 
       // Only push undo if something actually changed
       if (Object.keys(delta).length > 0) {
