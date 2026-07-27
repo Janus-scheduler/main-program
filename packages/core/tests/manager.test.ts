@@ -716,4 +716,250 @@ describe("SchedulerManager", () => {
       expect(manager.getEventCount()).toBe(0);
     });
   });
+
+  describe("subscribeUndo", () => {
+    const eventData = (id: string) => ({
+      id,
+      title: `Event ${id}`,
+      startTime: "2026-06-02T10:00:00Z",
+      endTime: "2026-06-02T11:00:00Z",
+      resourceId: "r1",
+    });
+
+    it("notifies subscribers when the undo stack grows", () => {
+      const manager = new SchedulerManager();
+      const listener = jest.fn();
+      manager.subscribeUndo(listener);
+
+      manager.addEvent(eventData("evt-sub-1"));
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      manager.updateEvent("evt-sub-1", { title: "Changed" });
+      expect(listener).toHaveBeenCalledTimes(2);
+    });
+
+    it("notifies subscribers after an undo completes", async () => {
+      const manager = new SchedulerManager();
+      const listener = jest.fn();
+      manager.subscribeUndo(listener);
+
+      manager.addEvent(eventData("evt-sub-2"));
+      listener.mockClear();
+
+      manager.undo();
+      // finalize (and its notification) is deferred to a microtask
+      await Promise.resolve();
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(manager.canUndo()).toBe(false);
+    });
+
+    it("still finalizes (and notifies) when the undo reversal throws synchronously", () => {
+      const manager = new SchedulerManager();
+      const listener = jest.fn();
+      manager.subscribeUndo(listener);
+
+      manager.addEvent(eventData("evt-sub-throw"));
+      listener.mockClear();
+
+      jest.spyOn(manager, "deleteEvent").mockImplementation(() => {
+        throw new Error("reversal failed");
+      });
+
+      // Must not throw outward, and must still notify via finalize()
+      expect(() => manager.undo()).not.toThrow();
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(manager.canUndo()).toBe(false);
+    });
+
+    it("stops notifying after unsubscribe", () => {
+      const manager = new SchedulerManager();
+      const listener = jest.fn();
+      const unsubscribe = manager.subscribeUndo(listener);
+
+      manager.addEvent(eventData("evt-sub-3"));
+      expect(listener).toHaveBeenCalledTimes(1);
+
+      unsubscribe();
+      manager.addEvent(eventData("evt-sub-4"));
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("getTimezone", () => {
+    it("returns the store's configured display timezone", () => {
+      const manager = new SchedulerManager();
+      schedulerStore.getState().setTimezone("America/New_York");
+      expect(manager.getTimezone()).toBe("America/New_York");
+
+      schedulerStore.getState().setTimezone("Asia/Colombo");
+      expect(manager.getTimezone()).toBe("Asia/Colombo");
+    });
+  });
+
+  describe("batchAddEvents", () => {
+    const batchData = [
+      {
+        id: "batch-1",
+        title: "Course A",
+        startTime: "2026-06-02T09:00:00Z",
+        endTime: "2026-06-02T10:00:00Z",
+        resourceIds: ["r1"],
+      },
+      {
+        id: "batch-2",
+        title: "Course B",
+        startTime: "2026-06-02T11:00:00Z",
+        endTime: "2026-06-02T12:00:00Z",
+        resourceIds: ["r2"],
+      },
+    ];
+
+    it("adds all events and pushes a single compound undo action", () => {
+      const manager = new SchedulerManager();
+      const events = manager.batchAddEvents(batchData);
+
+      expect(events).toHaveLength(2);
+      expect(manager.getEvent("batch-1")).toBeDefined();
+      expect(manager.getEvent("batch-2")).toBeDefined();
+      expect(manager.peekUndo()).toEqual({
+        type: "batchAddEvents",
+        ids: ["batch-1", "batch-2"],
+      });
+    });
+
+    it("fires onBulkEventAdd once with all created events", () => {
+      const onBulkEventAdd = jest.fn();
+      const onEventAdd = jest.fn();
+      const manager = new SchedulerManager({ onBulkEventAdd, onEventAdd });
+
+      const events = manager.batchAddEvents(batchData);
+
+      expect(onBulkEventAdd).toHaveBeenCalledTimes(1);
+      expect(onBulkEventAdd).toHaveBeenCalledWith(events);
+      // Individual add hooks must NOT fire during a batch
+      expect(onEventAdd).not.toHaveBeenCalled();
+    });
+
+    it("falls back to individual onEventAdd hooks when onBulkEventAdd is absent", () => {
+      const onEventAdd = jest.fn();
+      const manager = new SchedulerManager({ onEventAdd });
+
+      manager.batchAddEvents(batchData);
+
+      expect(onEventAdd).toHaveBeenCalledTimes(2);
+    });
+
+    it("rolls back ALL events when the async bulk hook rejects", async () => {
+      const onError = jest.fn();
+      const manager = new SchedulerManager({
+        onBulkEventAdd: async () => {
+          throw new Error("Bulk sync failed");
+        },
+        onError,
+      });
+
+      manager.batchAddEvents(batchData);
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(manager.getEvent("batch-1")).toBeUndefined();
+      expect(manager.getEvent("batch-2")).toBeUndefined();
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: "batchAddEvents",
+          reverted: true,
+        }),
+      );
+    });
+
+    it("rolls back ALL events when a fallback async onEventAdd rejects", async () => {
+      const onError = jest.fn();
+      const manager = new SchedulerManager({
+        onEventAdd: async (event) => {
+          if (event.id === "batch-2") throw new Error("Second insert failed");
+        },
+        onError,
+      });
+
+      manager.batchAddEvents(batchData);
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(manager.getEvent("batch-1")).toBeUndefined();
+      expect(manager.getEvent("batch-2")).toBeUndefined();
+      expect(onError).toHaveBeenCalled();
+    });
+
+    it("trims the oldest entry when a batch push exceeds maxUndoStackSize", () => {
+      const manager = new SchedulerManager({}, { maxUndoStackSize: 1 });
+      manager.addEvent({
+        id: "batch-pre",
+        title: "Earlier",
+        startTime: "2026-06-02T08:00:00Z",
+        endTime: "2026-06-02T09:00:00Z",
+        resourceId: "r1",
+      });
+
+      manager.batchAddEvents(batchData);
+
+      // The single-slot stack should now hold only the batch action
+      expect(manager.peekUndo()).toEqual({
+        type: "batchAddEvents",
+        ids: ["batch-1", "batch-2"],
+      });
+      manager.undo();
+      expect(manager.canUndo()).toBe(false);
+    });
+
+    it("does not push an undo action for an empty batch", () => {
+      const manager = new SchedulerManager();
+      const events = manager.batchAddEvents([]);
+
+      expect(events).toEqual([]);
+      expect(manager.canUndo()).toBe(false);
+    });
+
+    it("undo of a batch removes every event added by it", async () => {
+      const onEventDelete = jest.fn();
+      const manager = new SchedulerManager({ onEventDelete });
+
+      manager.batchAddEvents(batchData);
+      manager.undo();
+      await Promise.resolve();
+
+      expect(manager.getEvent("batch-1")).toBeUndefined();
+      expect(manager.getEvent("batch-2")).toBeUndefined();
+      expect(manager.canUndo()).toBe(false);
+      // Undoing the batch deletes each event through the normal delete path
+      expect(onEventDelete).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("updateEvent resourceIds delta", () => {
+    it("stores the previous resourceIds in the undo delta and restores them on undo", async () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-rids",
+        title: "Multi-resource",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceIds: ["r1", "r2"],
+      });
+
+      manager.updateEvent("evt-rids", { resourceIds: ["r3"] });
+      expect(schedulerStore.getState().events["evt-rids"].resourceIds).toEqual([
+        "r3",
+      ]);
+      expect(manager.peekUndo()).toEqual({
+        type: "updateEvent",
+        id: "evt-rids",
+        previous: expect.objectContaining({ resourceIds: ["r1", "r2"] }),
+      });
+
+      manager.undo();
+      await Promise.resolve();
+      expect(schedulerStore.getState().events["evt-rids"].resourceIds).toEqual([
+        "r1",
+        "r2",
+      ]);
+    });
+  });
 });
