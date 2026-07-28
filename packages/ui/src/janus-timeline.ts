@@ -87,6 +87,8 @@ export class JanusTimeline extends LitElement {
   private _unsubStore?: () => void;
   /** Suppress scroll handler during programmatic scroll adjustments */
   private _suppressScroll = false;
+  private _isScrollingGrid = false;
+  private _isScrollingRes = false;
 
   connectedCallback() {
     super.connectedCallback();
@@ -281,8 +283,15 @@ export class JanusTimeline extends LitElement {
   private _onGridScroll() {
     // Sync vertical scroll between resource column and time grid
     if (this.resColRef && this.gridScrollRef) {
-      if (this.resColRef.scrollTop !== this.gridScrollRef.scrollTop) {
-        this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      if (!this._isScrollingRes) {
+        this._isScrollingGrid = true;
+        if (this.resColRef.scrollTop !== this.gridScrollRef.scrollTop) {
+          this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+        }
+        // Use a microtask/setTimeout to reset flag after the browser fires the synchronized event
+        setTimeout(() => {
+          this._isScrollingGrid = false;
+        }, 10);
       }
     }
 
@@ -307,8 +316,14 @@ export class JanusTimeline extends LitElement {
 
   private _onResScroll() {
     if (this.resColRef && this.gridScrollRef) {
-      if (this.gridScrollRef.scrollTop !== this.resColRef.scrollTop) {
-        this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
+      if (!this._isScrollingGrid) {
+        this._isScrollingRes = true;
+        if (this.gridScrollRef.scrollTop !== this.resColRef.scrollTop) {
+          this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
+        }
+        setTimeout(() => {
+          this._isScrollingRes = false;
+        }, 10);
       }
     }
   }

@@ -111,6 +111,7 @@ export const timelineStyles = css`
     display: flex;
     flex-direction: column;
     scrollbar-width: none;
+    padding-bottom: 8px; /* Offset for timeline's horizontal scrollbar */
   }
 
   .tl-res-col::-webkit-scrollbar {
@@ -326,6 +327,7 @@ export const timelineStyles = css`
 
   .tl-group-spacer {
     height: var(--grp-label-h);
+    min-height: var(--grp-label-h);
     border-bottom: 1px solid var(--border);
     background: #fafafa;
     flex-shrink: 0;
