@@ -102,9 +102,16 @@ export function createAuthRouter(config: {
     }
   });
 
-  // Check if connected
+  // Check if connected.
+  // "Connected" means fully ready to sync — a token alone isn't enough:
+  // the calendar bootstrap (create calendar / sync token / webhook) runs as
+  // a separate sequence of steps right after the token is saved, so there's
+  // a window where a token exists but calendar state doesn't yet. Callers
+  // (GoogleSyncManager's push hooks) use this check to decide whether to
+  // push — if it reports "connected" too early, the push 400s and
+  // SchedulerManager rolls back the local event.
   router.get("/status", (_req: Request, res: Response) => {
-    res.json({ connected: isConnected() });
+    res.json({ connected: isConnected() && getCalendarState() !== null });
   });
 
   // Fetch all current events (called after first connect)

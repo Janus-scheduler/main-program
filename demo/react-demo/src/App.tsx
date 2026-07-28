@@ -74,12 +74,13 @@ function App() {
 
     const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
 
-    // Load existing Google events into store
+    // Load existing Google events into store, then push any local events
+    // that were created before this connection existed (e.g. seed data) and
+    // so never got a chance to sync.
     client
       .fetchInitialEvents()
-      .then((events) => {
-        syncManager.loadInitialEvents(events);
-      })
+      .then((events) => syncManager.loadInitialEvents(events))
+      .then(() => syncManager.pushUnsyncedLocalEvents())
       .catch((err) => {
         console.error("[Janus] Failed to load initial Google events:", err);
       });

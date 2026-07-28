@@ -1,12 +1,11 @@
-import {
-  schedulerStore,
-  type SchedulerManager,
-  type EventData,
-} from "@janus-scheduler/core";
-//import type { EventData } from '@janus-scheduler/core'
+import { schedulerStore, type EventData } from "@janus-scheduler/core";
 import { GoogleCalendarClient } from "../client/GoogleCalendarClient.js";
 import { GoogleEventMapper } from "../mapper/GoogleEventMapper.js";
-import type { WebSocketMessage, GoogleCalendarEvent } from "../types/index.js";
+import type {
+  WebSocketMessage,
+  GoogleCalendarEvent,
+  GoogleAttendee,
+} from "../types/index.js";
 
 export class GoogleSyncManager {
   private readonly client: GoogleCalendarClient;
@@ -81,6 +80,77 @@ export class GoogleSyncManager {
   }
 
   /**
+   * Resolve a Janus event's assigned resourceIds into Google Calendar attendees.
+   * Only "person" resources with an email are included — room/equipment
+   * resources (and people with no email on file) are silently skipped.
+   *
+   * NOTE: we don't set responseStatus here. For personal Gmail attendees,
+   * Google ignores an organizer-set responseStatus on anyone but themselves —
+   * only the attendee's own account can actually RSVP. The backend sends a
+   * real invite (sendUpdates:"all" in googleService.ts) so the attendee gets
+   * a normal, functioning invite email to accept.
+   */
+  private resolveAttendees(resourceIds: string[]): GoogleAttendee[] {
+    const { resources } = schedulerStore.getState();
+    const attendees: GoogleAttendee[] = [];
+
+    for (const resourceId of resourceIds) {
+      const resource = resources[resourceId];
+      if (!resource) continue;
+      if (resource.type !== "person") continue;
+      if (!resource.email) continue;
+
+      attendees.push({ email: resource.email });
+    }
+
+    return attendees;
+  }
+
+  /**
+   * Reverse-map a Google event's attendee emails back to known Janus
+   * resourceIds (for events that originated on the Google side). Returns
+   * undefined when there are no attendees or none match a known resource —
+   * the caller falls back to the default placeholder resource in that case.
+   */
+  private resolveResourceIdsFromAttendees(
+    attendees?: GoogleAttendee[],
+  ): string[] | undefined {
+    if (!attendees || attendees.length === 0) return undefined;
+
+    const { resources } = schedulerStore.getState();
+    const emailToResourceId = new Map<string, string>();
+    for (const resource of Object.values(resources)) {
+      if (resource.type === "person" && resource.email) {
+        emailToResourceId.set(resource.email.toLowerCase(), resource.id);
+      }
+    }
+
+    const resourceIds = attendees
+      .map((a) => emailToResourceId.get(a.email.toLowerCase()))
+      .filter((id): id is string => !!id);
+
+    return resourceIds.length > 0 ? resourceIds : undefined;
+  }
+
+  /**
+   * Creates the "Google Calendar" placeholder resource, but only the first
+   * time it's actually needed by an event whose attendees didn't resolve to
+   * any known resource — not eagerly on every connect.
+   */
+  private ensurePlaceholderResourceIfNeeded(resourceIds?: string[]): void {
+    if (!resourceIds?.includes(GoogleEventMapper.defaultResourceId)) return;
+
+    const state = schedulerStore.getState();
+    if (!state.resources[GoogleEventMapper.defaultResourceId]) {
+      state.addResource({
+        id: GoogleEventMapper.defaultResourceId,
+        name: "Google Calendar",
+        type: "person",
+      });
+    }
+  }
+
+  /**
    * Returns SchedulerManager hooks to be passed into new SchedulerManager().
    * These intercept every Janus mutation and sync it to Google Calendar.
    *
@@ -104,24 +174,36 @@ export class GoogleSyncManager {
   /**
    * Load all existing Google Calendar events into the Janus store.
    * Called once after OAuth completes.
-   * Also ensures the "google-calendar" resource exists in the store.
    */
   async loadInitialEvents(googleEvents: GoogleCalendarEvent[]): Promise<void> {
-    // Ensure the google-calendar resource exists
     const state = schedulerStore.getState();
-    if (!state.resources[GoogleEventMapper.defaultResourceId]) {
-      state.addResource({
-        id: GoogleEventMapper.defaultResourceId,
-        name: "Google Calendar",
-        type: "person",
-      });
-    }
 
     for (const ge of googleEvents) {
       if (!ge.id) continue;
 
       const existingJanusId = this.reverseTable.get(ge.id);
-      const janusData = this.mapper.toJanus(ge, existingJanusId);
+
+      // If this Google event already maps to an event that's present in the
+      // local store, don't overwrite it — the local copy is canonical here.
+      // (This is a one-time "bring in what Google has that Janus doesn't"
+      // import, not an ongoing reconciliation; live updates already flow
+      // through handleGoogleChange via the webhook/WebSocket.) Overwriting
+      // unconditionally was clobbering freshly-created local events with
+      // whatever — possibly stale/duplicate — copy Google returned.
+      if (existingJanusId && state.events[existingJanusId]) {
+        this.mappingTable.set(existingJanusId, ge.id);
+        this.reverseTable.set(ge.id, existingJanusId);
+        continue;
+      }
+
+      const resolvedFromAttendees = this.resolveResourceIdsFromAttendees(
+        ge.attendees,
+      );
+      const janusData = this.mapper.toJanus(
+        ge,
+        existingJanusId,
+        resolvedFromAttendees,
+      );
 
       if (existingJanusId) {
         const originalResourceIds = this.resourceIdsTable.get(existingJanusId);
@@ -131,6 +213,7 @@ export class GoogleSyncManager {
         }
       }
 
+      this.ensurePlaceholderResourceIfNeeded(janusData.resourceIds);
       this.googleSourceIds.add(janusData.id);
 
       try {
@@ -178,7 +261,14 @@ export class GoogleSyncManager {
 
     // upserted — create or update
     const existingJanusId = this.reverseTable.get(event.id);
-    const janusData = this.mapper.toJanus(event, existingJanusId);
+    const resolvedFromAttendees = this.resolveResourceIdsFromAttendees(
+      event.attendees,
+    );
+    const janusData = this.mapper.toJanus(
+      event,
+      existingJanusId,
+      resolvedFromAttendees,
+    );
 
     this.googleSourceIds.add(janusData.id);
 
@@ -192,14 +282,7 @@ export class GoogleSyncManager {
         existingJanusId,
       );
     } else {
-      // Ensure resource exists
-      if (!storeState.resources[GoogleEventMapper.defaultResourceId]) {
-        storeState.addResource({
-          id: GoogleEventMapper.defaultResourceId,
-          name: "Google Calendar",
-          type: "person",
-        });
-      }
+      this.ensurePlaceholderResourceIfNeeded(janusData.resourceIds);
 
       try {
         storeState.addEvent(janusData);
@@ -236,8 +319,31 @@ export class GoogleSyncManager {
       return;
     }
 
+    // If this Janus id already has a Google mapping (restored from
+    // localStorage on a previous session), this "add" is really a re-seed of
+    // an event that was already pushed before — update it in place instead
+    // of inserting a duplicate. Without this check, reloading the demo app
+    // (which re-seeds fixed event ids on every page load) creates a new
+    // Google event on every reload while connected.
+    const existingGoogleId = this.mappingTable.get(event.id);
+    if (existingGoogleId) {
+      await this.pushUpdateToGoogle(event, existingGoogleId);
+      return;
+    }
+
+    await this.pushCreateToGoogle(event);
+  }
+
+  /** Shared by onJanusEventAdd (new events) and pushUnsyncedLocalEvents (catch-up). */
+  private async pushCreateToGoogle(
+    event: import("@janus-scheduler/core").Event,
+  ): Promise<void> {
     try {
-      const googleEvent = this.mapper.toGoogle(event as unknown as EventData);
+      const attendees = this.resolveAttendees(event.resourceIds);
+      const googleEvent = this.mapper.toGoogle(
+        event as unknown as EventData,
+        attendees,
+      );
       const googleId = await this.client.pushEvent(googleEvent);
       this.mappingTable.set(event.id, googleId);
       this.reverseTable.set(googleId, event.id);
@@ -245,13 +351,40 @@ export class GoogleSyncManager {
       this.persistMapping();
       console.log(`[Janus Integrations] Pushed to Google: ${event.title}`);
     } catch (err) {
+      // Deliberately NOT re-thrown. A failed push to Google shouldn't delete
+      // an event the user just created in Janus — that's the harshest
+      // possible outcome for what's meant to be a best-effort external sync.
+      // The event just stays local with no mapping; it'll be retried on the
+      // next pushUnsyncedLocalEvents() call (e.g. next reconnect/reload).
       console.error(
-        "[Janus Integrations] Failed to push event to Google:",
+        "[Janus Integrations] Failed to push event to Google (event kept locally, will retry later):",
         err,
       );
-      // Re-throw so SchedulerManager rolls back the store
-      throw err;
     }
+  }
+
+  /**
+   * Push any local events that don't yet have a Google mapping.
+   * Needed because events created BEFORE the user connects Google (e.g. the
+   * demo's seed data, added while `isConnected()` was still false) are never
+   * retried automatically — onEventAdd only fires once, at creation time.
+   * Call this once, right after OAuth completes / connection is confirmed.
+   */
+  async pushUnsyncedLocalEvents(): Promise<void> {
+    const { events } = schedulerStore.getState();
+    const unsynced = Object.values(events).filter(
+      (event) => !this.mappingTable.has(event.id),
+    );
+
+    for (const event of unsynced) {
+      // pushCreateToGoogle logs its own failures and never throws — a
+      // failure here just leaves that one event unsynced for next time.
+      await this.pushCreateToGoogle(event);
+    }
+
+    console.log(
+      `[Janus Integrations] Pushed ${unsynced.length} previously-unsynced local event(s) to Google`,
+    );
   }
 
   private async onJanusEventUpdate(
@@ -268,8 +401,20 @@ export class GoogleSyncManager {
     const googleId = this.mappingTable.get(event.id);
     if (!googleId) return; // event not synced to Google yet
 
+    await this.pushUpdateToGoogle(event, googleId);
+  }
+
+  /** Shared by onJanusEventAdd (when a mapping already exists) and onJanusEventUpdate. */
+  private async pushUpdateToGoogle(
+    event: import("@janus-scheduler/core").Event,
+    googleId: string,
+  ): Promise<void> {
     try {
-      const googleEvent = this.mapper.toGoogle(event as unknown as EventData);
+      const attendees = this.resolveAttendees(event.resourceIds);
+      const googleEvent = this.mapper.toGoogle(
+        event as unknown as EventData,
+        attendees,
+      );
       await this.client.updateEvent(googleId, googleEvent);
       this.resourceIdsTable.set(event.id, event.resourceIds);
       this.persistMapping();

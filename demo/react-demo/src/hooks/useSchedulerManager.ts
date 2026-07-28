@@ -78,8 +78,21 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     // Zustand store is a module singleton — this block only runs once
     // even across React hot-reloads.
     if (mgr.getResourceCount() === 0) {
-      mgr.addResource({ id: "r1", name: "Dr. Sarah Chen", type: "person" });
-      mgr.addResource({ id: "r2", name: "Dr. Michael Ross", type: "person" });
+      // NOTE: email is required for a "person" resource to be synced to Google
+      // Calendar as an attendee — replace these with real test Gmail addresses
+      // to actually validate the Google Calendar integration end-to-end.
+      mgr.addResource({
+        id: "r1",
+        name: "Dr. Sarah Chen",
+        type: "person",
+        email: "viduminisudeepa221@gmail.com",
+      });
+      mgr.addResource({
+        id: "r2",
+        name: "Dr. Michael Ross",
+        type: "person",
+        email: "michael.ross@example.com",
+      });
       mgr.addResource({ id: "r3", name: "Operating Room 1", type: "room" });
       mgr.addResource({ id: "r4", name: "MRI Scanner A", type: "equipment" });
       mgr.addResource({ id: "r5", name: "MRI Scanner B", type: undefined });

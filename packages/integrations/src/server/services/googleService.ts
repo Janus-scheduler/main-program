@@ -25,9 +25,14 @@ export async function createGoogleEvent(
   redirectUri: string,
 ): Promise<string> {
   const calendar = await getCalendar(clientId, clientSecret, redirectUri);
+  // sendUpdates:"all" — for personal Gmail attendees, Google does not honor
+  // an organizer-set responseStatus and ignores silent (sendUpdates:"none")
+  // invites entirely: the attendee never even sees a pending invite. Sending
+  // the real notification is the only way they actually get the event.
   const response = await calendar.events.insert({
     calendarId,
     requestBody: event,
+    sendUpdates: "all",
   });
   return response.data.id!;
 }
@@ -45,6 +50,7 @@ export async function updateGoogleEvent(
     calendarId,
     eventId: googleEventId,
     requestBody: event,
+    sendUpdates: "all",
   });
 }
 
