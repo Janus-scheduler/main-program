@@ -11,6 +11,8 @@ export interface GoogleCalendarEvent {
   description?: string;
   status?: string;
   attendees?: GoogleAttendee[];
+  /** iCalendar RRULE/EXRULE/RDATE/EXDATE lines, e.g. ["RRULE:FREQ=WEEKLY;COUNT=5"]. */
+  recurrence?: string[];
   start: {
     dateTime?: string;
     date?: string;

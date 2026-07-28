@@ -327,17 +327,48 @@ export class GoogleSyncManager {
     // Google event on every reload while connected.
     const existingGoogleId = this.mappingTable.get(event.id);
     if (existingGoogleId) {
-      await this.pushUpdateToGoogle(event, existingGoogleId);
+      await this.pushUpdateOrRecreate(event, existingGoogleId);
       return;
     }
 
     await this.pushCreateToGoogle(event);
   }
 
+  /**
+   * janusId → in-flight create push promise. De-dupes concurrent create
+   * attempts for the same event — e.g. right after connecting, the seed-time
+   * onEventAdd hook and pushUnsyncedLocalEvents's catch-up sweep can both see
+   * the same not-yet-mapped event and race to create it, producing a
+   * duplicate Google event before either one's mapping is recorded.
+   */
+  private readonly inFlightCreates = new Map<string, Promise<void>>();
+
   /** Shared by onJanusEventAdd (new events) and pushUnsyncedLocalEvents (catch-up). */
   private async pushCreateToGoogle(
     event: import("@janus-scheduler/core").Event,
   ): Promise<void> {
+    const inFlight = this.inFlightCreates.get(event.id);
+    if (inFlight) {
+      await inFlight;
+      return;
+    }
+
+    const promise = this.doPushCreateToGoogle(event);
+    this.inFlightCreates.set(event.id, promise);
+    try {
+      await promise;
+    } finally {
+      this.inFlightCreates.delete(event.id);
+    }
+  }
+
+  private async doPushCreateToGoogle(
+    event: import("@janus-scheduler/core").Event,
+  ): Promise<void> {
+    // Re-check after acquiring: if a concurrent call already completed the
+    // push while this one was queued, don't create a second copy.
+    if (this.mappingTable.has(event.id)) return;
+
     try {
       const attendees = this.resolveAttendees(event.resourceIds);
       const googleEvent = this.mapper.toGoogle(
@@ -401,14 +432,34 @@ export class GoogleSyncManager {
     const googleId = this.mappingTable.get(event.id);
     if (!googleId) return; // event not synced to Google yet
 
-    await this.pushUpdateToGoogle(event, googleId);
+    await this.pushUpdateOrRecreate(event, googleId);
   }
 
-  /** Shared by onJanusEventAdd (when a mapping already exists) and onJanusEventUpdate. */
-  private async pushUpdateToGoogle(
+  /**
+   * Updates the mapped Google event; if that fails — most commonly because
+   * the remembered Google event (or its calendar) no longer exists, e.g. a
+   * stale mapping left over from a deleted/recreated "Janus Scheduler"
+   * calendar in an earlier session — clears the stale mapping and creates a
+   * fresh Google event instead of leaving this event permanently stuck.
+   */
+  private async pushUpdateOrRecreate(
     event: import("@janus-scheduler/core").Event,
     googleId: string,
   ): Promise<void> {
+    const updated = await this.pushUpdateToGoogle(event, googleId);
+    if (updated) return;
+
+    this.mappingTable.delete(event.id);
+    this.reverseTable.delete(googleId);
+    this.persistMapping();
+    await this.pushCreateToGoogle(event);
+  }
+
+  /** Shared by pushUpdateOrRecreate and onJanusEventUpdate. Returns success. */
+  private async pushUpdateToGoogle(
+    event: import("@janus-scheduler/core").Event,
+    googleId: string,
+  ): Promise<boolean> {
     try {
       const attendees = this.resolveAttendees(event.resourceIds);
       const googleEvent = this.mapper.toGoogle(
@@ -419,12 +470,13 @@ export class GoogleSyncManager {
       this.resourceIdsTable.set(event.id, event.resourceIds);
       this.persistMapping();
       console.log(`[Janus Integrations] Updated in Google: ${event.title}`);
+      return true;
     } catch (err) {
       console.error(
         "[Janus Integrations] Failed to update event in Google:",
         err,
       );
-      throw err;
+      return false;
     }
   }
 

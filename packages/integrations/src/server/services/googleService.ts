@@ -75,10 +75,16 @@ export async function fetchAllEvents(
   redirectUri: string,
 ): Promise<GoogleCalendarEvent[]> {
   const calendar = await getCalendar(clientId, clientSecret, redirectUri);
+  // singleEvents intentionally omitted (defaults to false): with it true,
+  // Google expands every recurring event into one item per occurrence, each
+  // under a different id than the parent series — loadInitialEvents would
+  // then see every occurrence as "unmapped" (only the parent id is in our
+  // mapping table) and import each one as a separate duplicate Janus event.
+  // Leaving it false returns the series as a single item with a `recurrence`
+  // array, matching Janus's own recurring-event model.
+  // (orderBy:"startTime" requires singleEvents:true, so it's dropped too.)
   const response = await calendar.events.list({
     calendarId,
-    singleEvents: true,
-    orderBy: "startTime",
     maxResults: 250,
   });
   return (response.data.items || []) as GoogleCalendarEvent[];
