@@ -18,7 +18,7 @@ export type EventColor =
 /**
  * The two supported calendar views.
  */
-export type ViewType = "Timeline" | "Month";
+export type ViewType = "Timeline" | "Month" | "Year";
 
 export interface TimelineEvent {
   id: string;

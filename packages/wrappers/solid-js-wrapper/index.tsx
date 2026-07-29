@@ -168,7 +168,7 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
  */
 export interface TimelineProps {
   resources?: TimelineResource[];
-  view?: "Timeline" | "Month";
+  view?: ViewType;
   currentDate?: Date;
   aiPrompt?: string;
   allowCreate?: boolean;
@@ -179,7 +179,7 @@ export interface TimelineProps {
   onEventMove?: (detail: EventMoveDetail) => void;
   onEventResize?: (detail: EventResizeDetail) => void;
   onEventCreate?: (detail: EventCreateDetail) => void;
-  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   ref?: (el: HTMLElement) => void;
   onConflictDetected?: (detail: {
@@ -261,7 +261,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
  *  - onEventClick → CustomEvent<TimelineEvent>                  — user clicked an event chip
  *  - onDayClick   → CustomEvent<{ date: string }>               — user clicked an empty day cell
  *  - onAddEvent   → CustomEvent<void>                           — user clicked the + FAB
- *  - onViewChange → CustomEvent<{ view: "Timeline" | "Month" }> — user switched views
+ *  - onViewChange → CustomEvent<{ view: ViewType }> — user switched views
  *
  * The component reads directly from the Zustand store.
  */
@@ -270,7 +270,7 @@ export interface MonthGridProps {
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;
-  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   ref?: (el: HTMLElement) => void;
 }
@@ -347,14 +347,14 @@ export interface TopbarProps {
   navLabel?: string;
   dayName?: string;
   shortDate?: string;
-  view?: "Timeline" | "Month";
+  view?: ViewType;
   allowCreate?: boolean;
   zoomPercent?: number;
   zoomUnit?: string;
   onPrevClick?: () => void;
   onNextClick?: () => void;
   onTodayClick?: () => void;
-  onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewSwitch?: (detail: { view: ViewType }) => void;
   onToggleCreate?: () => void;
 }
 

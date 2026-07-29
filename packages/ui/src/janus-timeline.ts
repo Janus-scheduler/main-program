@@ -10,6 +10,9 @@ import {
   checkSlotConflict,
   type ConflictResource,
   type SchedulerStore,
+  type EventColor,
+  type SchedulerState,
+  type ViewType,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";
 import "./janus-topbar";
@@ -67,7 +70,7 @@ export class JanusTimeline extends LitElement {
   @state() private _showBlockedConflictDialog = false;
   @state() private _blockedConflictMessage = "";
 
-  @state() view: "Timeline" | "Month" = "Timeline";
+  @state() view: ViewType = "Timeline";
   @state() private _dragVersion = 0; // bumped to trigger re-render during drag
   @state() private _showConflictDetails = false;
   @state() private _isConflictsBannerDismissed = false;
@@ -867,7 +870,7 @@ export class JanusTimeline extends LitElement {
     );
   }
 
-  public setView(v: "Timeline" | "Month") {
+  public setView(v: ViewType) {
     this.view = v;
     // Let the parent app know so it can swap components if needed
     this.dispatchEvent(

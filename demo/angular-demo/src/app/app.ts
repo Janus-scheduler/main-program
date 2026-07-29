@@ -190,7 +190,7 @@ export class App {
     this.selectedEventId.set(null);
   }
 
-  handleViewChange(data: { view: 'Timeline' | 'Month' }): void {
+  handleViewChange(data: { view: ViewType }): void {
     this.currentView = data.view;
   }
 
