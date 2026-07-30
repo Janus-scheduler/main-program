@@ -88,6 +88,20 @@ export class JanusTimeline extends LitElement {
   /** Suppress scroll handler during programmatic scroll adjustments */
   private _suppressScroll = false;
 
+  @state() private _scrollLeft = 0;
+  @state() private _scrollTop = 0;
+  @state() private _viewportWidth = 1200;
+  @state() private _viewportHeight = 600;
+
+  private _cachedTrackMap = new Map<
+    string,
+    { trackCount: number; eventTracks: Map<string, number> }
+  >();
+
+  private _zoomRafId: number | null = null;
+  private _pendingZoomFactor = 1;
+  private _pendingPointerX = 0;
+
   connectedCallback() {
     super.connectedCallback();
     this._unsubStore = schedulerStore.subscribe((state) => {
@@ -99,6 +113,10 @@ export class JanusTimeline extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
+    if (this._zoomRafId !== null) {
+      cancelAnimationFrame(this._zoomRafId);
+      this._zoomRafId = null;
+    }
   }
 
   private _syncFromStore(state: SchedulerStore) {
@@ -126,6 +144,11 @@ export class JanusTimeline extends LitElement {
 
     let currentGroupType = "";
 
+    const newTrackMap = new Map<
+      string,
+      { trackCount: number; eventTracks: Map<string, number> }
+    >();
+
     for (const res of coreResources) {
       const resEvents = coreEvents
         .filter(
@@ -150,6 +173,23 @@ export class JanusTimeline extends LitElement {
             resourceId: res.id,
           } as TimelineEvent;
         });
+
+      // Calculate tracks for resource
+      const sortedEvents = [...resEvents].sort((a, b) => a.startMs - b.startMs);
+      const tracks: number[] = [];
+      const eventTracks = new Map<string, number>();
+      for (const ev of sortedEvents) {
+        let t = 0;
+        while (t < tracks.length && tracks[t] > ev.startMs) {
+          t++;
+        }
+        tracks[t] = ev.endMs;
+        eventTracks.set(ev.id, t);
+      }
+      newTrackMap.set(res.id, {
+        trackCount: Math.max(1, tracks.length),
+        eventTracks,
+      });
 
       let avatarType: "initials" | "icon" | "image" = "initials";
       let avatarIcon: "room" | "equipment" | undefined = undefined;
@@ -189,6 +229,8 @@ export class JanusTimeline extends LitElement {
         avatar: res.avatar,
       });
     }
+
+    this._cachedTrackMap = newTrackMap;
 
     if (newResources.length > 0) {
       this.resources = newResources;
@@ -283,6 +325,27 @@ export class JanusTimeline extends LitElement {
     if (this.resColRef && this.gridScrollRef) {
       if (this.resColRef.scrollTop !== this.gridScrollRef.scrollTop) {
         this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      }
+    }
+
+    if (this.gridScrollRef) {
+      if (this._scrollLeft !== this.gridScrollRef.scrollLeft) {
+        this._scrollLeft = this.gridScrollRef.scrollLeft;
+      }
+      if (this._scrollTop !== this.gridScrollRef.scrollTop) {
+        this._scrollTop = this.gridScrollRef.scrollTop;
+      }
+      if (
+        this.gridScrollRef.clientWidth &&
+        this._viewportWidth !== this.gridScrollRef.clientWidth
+      ) {
+        this._viewportWidth = this.gridScrollRef.clientWidth;
+      }
+      if (
+        this.gridScrollRef.clientHeight &&
+        this._viewportHeight !== this.gridScrollRef.clientHeight
+      ) {
+        this._viewportHeight = this.gridScrollRef.clientHeight;
       }
     }
 
@@ -430,38 +493,44 @@ export class JanusTimeline extends LitElement {
     if (!container) return;
 
     const rect = container.getBoundingClientRect();
-    const pointerX = e.clientX - rect.left;
+    const direction = e.deltaY < 0 ? 1 : -1; // scroll up = zoom in
 
-    // 1. What timestamp is currently under the pointer?
-    const pointerPx = container.scrollLeft + pointerX;
+    // Accumulate zoom factor & capture latest pointer X
+    this._pendingZoomFactor *= 1 + direction * ZOOM_SCALE_FACTOR;
+    this._pendingPointerX = e.clientX - rect.left;
+
+    if (this._zoomRafId === null) {
+      this._zoomRafId = requestAnimationFrame(() => this._commitZoom());
+    }
+  }
+
+  private _commitZoom() {
+    this._zoomRafId = null;
+
+    const container = this.gridScrollRef;
+    if (!container) {
+      this._pendingZoomFactor = 1;
+      return;
+    }
+
+    const pointerPx = container.scrollLeft + this._pendingPointerX;
     const timeUnderCursorMs = this._viewStartMs + pointerPx / this._pxPerMs;
 
-    // 2. Compute new pxPerMs (smooth clamping)
-    const direction = e.deltaY < 0 ? 1 : -1; // scroll up = zoom in
     const newPxPerMs = Math.min(
       MAX_PX_PER_MS,
-      Math.max(
-        MIN_PX_PER_MS,
-        this._pxPerMs * (1 + direction * ZOOM_SCALE_FACTOR),
-      ),
+      Math.max(MIN_PX_PER_MS, this._pxPerMs * this._pendingZoomFactor),
     );
-
-    // 3. Adjust viewStartMs so the time under cursor stays at the same pixel
-    //    timeUnderCursorMs = newViewStartMs + pointerPx / newPxPerMs
-    //    But pointerPx changes because scrollLeft stays the same, so:
-    //    We want: after zoom, the cursor still points to timeUnderCursorMs
-    //    newViewStartMs = timeUnderCursorMs - pointerPx_new / newPxPerMs
-    //    We need to find what pointerPx_new should be. For cursor anchoring:
-    //    newViewStartMs = timeUnderCursorMs - (scrollLeft + pointerX) / newPxPerMs
-    //    But we can simplify: keep scrollLeft + pointerX pointing to the same time
     const newViewStartMs = timeUnderCursorMs - pointerPx / newPxPerMs;
 
-    // 4. Apply
+    this._scrollLeft = container.scrollLeft;
+    this._scrollTop = container.scrollTop;
+    if (container.clientWidth) this._viewportWidth = container.clientWidth;
+    if (container.clientHeight) this._viewportHeight = container.clientHeight;
+
     this._pxPerMs = newPxPerMs;
     this._viewStartMs = newViewStartMs;
 
-    // No need to adjust scrollLeft — the content re-renders around the new viewStartMs
-    // and the scroll position naturally keeps the cursor pointing to the same time
+    this._pendingZoomFactor = 1;
 
     this.dispatchEvent(
       new CustomEvent("zoom-change", {
@@ -742,6 +811,23 @@ export class JanusTimeline extends LitElement {
 
     const tz = schedulerStore.getState().timezone;
 
+    // Total width of the rendered content (fixed)
+    const totalW = this._totalWidth;
+
+    // ── Horizontal Culling Bounds ───────────────────────────────────────────
+    const scrollLeft = this.gridScrollRef
+      ? this.gridScrollRef.scrollLeft
+      : this._scrollLeft;
+    const clientWidth = this.gridScrollRef
+      ? this.gridScrollRef.clientWidth
+      : this._viewportWidth;
+    const OVERSCAN_PX = 800;
+    const visMinPx = Math.max(0, scrollLeft - OVERSCAN_PX);
+    const visMaxPx = Math.min(totalW, scrollLeft + clientWidth + OVERSCAN_PX);
+
+    const visMinMs = pxToTimestamp(visMinPx, viewStartMs, pxPerMs);
+    const visMaxMs = pxToTimestamp(visMaxPx, viewStartMs, pxPerMs);
+
     // Generate columns and super-labels (timezone-aware)
     const columns = generateColumns(viewStartMs, viewEndMs, pxPerMs, level, tz);
     const superLabels = generateSuperLabels(
@@ -752,37 +838,20 @@ export class JanusTimeline extends LitElement {
       tz,
     );
 
-    // Total width of the rendered content (fixed)
-    const totalW = this._totalWidth;
+    const visColumns = columns.filter(
+      (col) => col.px + col.width >= visMinPx && col.px <= visMaxPx,
+    );
+    const visSuperLabels = superLabels.filter(
+      (sl) => sl.px + sl.width >= visMinPx && sl.px <= visMaxPx,
+    );
 
     // Current-time indicator
     const nowMs = Date.now();
     const nowPx = timestampToPx(nowMs, viewStartMs, pxPerMs);
 
-    // Collect all events from all resources
+    // Collect all resources & memoized track map
     const allResources = this.resources;
-
-    const resourceTrackMap = new Map<
-      string,
-      { trackCount: number; eventTracks: Map<string, number> }
-    >();
-    for (const r of allResources) {
-      const sorted = [...r.events].sort((a, b) => a.startMs - b.startMs);
-      const tracks: number[] = [];
-      const eventTracks = new Map<string, number>();
-      for (const ev of sorted) {
-        let t = 0;
-        while (t < tracks.length && tracks[t] > ev.startMs) {
-          t++;
-        }
-        tracks[t] = ev.endMs;
-        eventTracks.set(ev.id, t);
-      }
-      resourceTrackMap.set(r.id, {
-        trackCount: Math.max(1, tracks.length),
-        eventTracks,
-      });
-    }
+    const resourceTrackMap = this._cachedTrackMap;
 
     // Grouping
     const groups: { label: string; items: TimelineResource[] }[] = [];
@@ -799,30 +868,6 @@ export class JanusTimeline extends LitElement {
       }
     }
 
-    // Filter events to those visible in the current viewport (with margin)
-    const visibleResources = allResources.map((r) => ({
-      ...r,
-      events: r.events.filter(
-        (ev) => ev.endMs > viewStartMs && ev.startMs < viewEndMs,
-      ),
-    }));
-
-    // Re-group with visible events
-    const visGroups: { label: string; items: TimelineResource[] }[] = [];
-    let visCur: (typeof visGroups)[0] | null = null;
-    for (const r of visibleResources) {
-      const orig = allResources.find((o) => o.id === r.id);
-      if (orig?.groupLabel) {
-        visCur = { label: orig.groupLabel, items: [r] };
-        visGroups.push(visCur);
-      } else if (visCur) {
-        visCur.items.push(r);
-      } else {
-        visCur = { label: "", items: [r] };
-        visGroups.push(visCur);
-      }
-    }
-
     const resourceLayout = this._computeResourceLayout(
       groups,
       resourceTrackMap,
@@ -833,6 +878,19 @@ export class JanusTimeline extends LitElement {
       pxPerMs,
       viewStartMs,
     );
+
+    // ── Vertical Culling Bounds ─────────────────────────────────────────────
+    const scrollTop = this.gridScrollRef
+      ? this.gridScrollRef.scrollTop
+      : this._scrollTop;
+    const clientHeight = this.gridScrollRef
+      ? this.gridScrollRef.clientHeight
+      : this._viewportHeight;
+    const OVERSCAN_ROW_PX = 200;
+    const visMinRowPx = Math.max(0, scrollTop - OVERSCAN_ROW_PX);
+    const visMaxRowPx = scrollTop + clientHeight + OVERSCAN_ROW_PX;
+
+    const GROUP_LABEL_HEIGHT = 28;
 
     return html`
       <div
@@ -897,32 +955,43 @@ export class JanusTimeline extends LitElement {
               >
                 RESOURCE
               </div>
-              ${groups.map(
-                (g) => html`
-                  <div>
-                    ${g.label
-                      ? html`<div class="tl-res-group-label">${g.label}</div>`
-                      : nothing}
-                    ${g.items.map((r) => {
-                      const tracksCount =
-                        resourceTrackMap.get(r.id)?.trackCount || 1;
-                      const rowHeightPx = tracksCount * ROW_HEIGHT;
-                      return html`
-                        <div
-                          class="tl-res-row"
-                          style="height: ${rowHeightPx}px"
-                        >
-                          ${this.renderAvatar(r)}
-                          <div class="tl-res-info">
-                            <span class="tl-res-name">${r.name}</span>
-                            <span class="tl-res-sub">${r.subtitle}</span>
-                          </div>
+              ${(() => {
+                let resY = 0;
+                return groups.map((g) => {
+                  const labelHtml = g.label
+                    ? html`<div class="tl-res-group-label">${g.label}</div>`
+                    : nothing;
+                  if (g.label) resY += GROUP_LABEL_HEIGHT;
+
+                  const itemsHtml = g.items.map((r) => {
+                    const tracksCount =
+                      resourceTrackMap.get(r.id)?.trackCount || 1;
+                    const rowHeightPx = tracksCount * ROW_HEIGHT;
+                    const isVisible =
+                      resY + rowHeightPx >= visMinRowPx && resY <= visMaxRowPx;
+                    resY += rowHeightPx;
+
+                    if (!isVisible) {
+                      return html`<div
+                        class="tl-res-row"
+                        style="height: ${rowHeightPx}px"
+                      ></div>`;
+                    }
+
+                    return html`
+                      <div class="tl-res-row" style="height: ${rowHeightPx}px">
+                        ${this.renderAvatar(r)}
+                        <div class="tl-res-info">
+                          <span class="tl-res-name">${r.name}</span>
+                          <span class="tl-res-sub">${r.subtitle}</span>
                         </div>
-                      `;
-                    })}
-                  </div>
-                `,
-              )}
+                      </div>
+                    `;
+                  });
+
+                  return html`<div>${labelHtml}${itemsHtml}</div>`;
+                });
+              })()}
             </div>
 
             <div
@@ -932,10 +1001,10 @@ export class JanusTimeline extends LitElement {
             >
               <div class="tl-time-inner" style="width: ${totalW}px">
                 <!-- Super header row -->
-                ${superLabels.length > 0
+                ${visSuperLabels.length > 0
                   ? html`
                       <div class="tl-super-header">
-                        ${superLabels.map(
+                        ${visSuperLabels.map(
                           (sl) => html`
                             <div
                               class="tl-super-cell"
@@ -951,7 +1020,7 @@ export class JanusTimeline extends LitElement {
 
                 <!-- Column headers -->
                 <div class="tl-hour-header">
-                  ${columns.map(
+                  ${visColumns.map(
                     (col) => html`
                       <div
                         class="tl-hour-cell"
@@ -963,8 +1032,19 @@ export class JanusTimeline extends LitElement {
                   )}
                 </div>
 
+                <!-- Shared vertical grid lines layer -->
+                <div class="tl-vlines-layer">
+                  ${visColumns.map(
+                    (col) =>
+                      html`<div
+                        class="tl-vline"
+                        style="left: ${col.px}px"
+                      ></div>`,
+                  )}
+                </div>
+
                 <!-- Now line -->
-                ${nowPx > 0 && nowPx < totalW
+                ${nowPx >= visMinPx && nowPx <= visMaxPx
                   ? html`
                       <div class="tl-now-line" style="left: ${nowPx}px">
                         <span class="tl-now-dot"></span>
@@ -973,145 +1053,146 @@ export class JanusTimeline extends LitElement {
                   : nothing}
 
                 <!-- Resource rows with events -->
-                ${visGroups.map(
-                  (g) => html`
-                    <div>
-                      ${g.label
-                        ? html`<div class="tl-group-spacer"></div>`
-                        : nothing}
-                      ${g.items.map((r) => {
-                        const trackInfo = resourceTrackMap.get(r.id);
-                        const tracksCount = trackInfo?.trackCount || 1;
-                        const evTracks = trackInfo?.eventTracks;
-                        const rowHeightPx = tracksCount * ROW_HEIGHT;
-                        return html`
-                          <div
-                            class="tl-event-row"
-                            style="height: ${rowHeightPx}px"
-                            data-resource-id=${r.id}
-                            @pointerdown=${(e: PointerEvent) =>
-                              this._onRowPointerDown(e, r.id)}
-                          >
-                            <!-- Column grid lines -->
-                            ${columns.map(
-                              (col) =>
-                                html`<div
-                                  class="tl-vline"
-                                  style="left: ${col.px}px"
-                                ></div>`,
-                            )}
-                            <!-- Events -->
-                            ${(() => {
-                              const sortedEvents = [...r.events].sort(
-                                (a, b) => a.startMs - b.startMs,
-                              );
+                ${(() => {
+                  let rowY = 0;
+                  return groups.map((g) => {
+                    const spacerHtml = g.label
+                      ? html`<div class="tl-group-spacer"></div>`
+                      : nothing;
+                    if (g.label) rowY += GROUP_LABEL_HEIGHT;
 
-                              return sortedEvents.map((ev, index) => {
-                                const trackIndex = evTracks?.get(ev.id) || 0;
-                                const evTop = trackIndex * ROW_HEIGHT + 8;
+                    const itemsHtml = g.items.map((r) => {
+                      const trackInfo = resourceTrackMap.get(r.id);
+                      const tracksCount = trackInfo?.trackCount || 1;
+                      const evTracks = trackInfo?.eventTracks;
+                      const rowHeightPx = tracksCount * ROW_HEIGHT;
 
-                                const evLeft = timestampToPx(
-                                  ev.startMs,
-                                  viewStartMs,
-                                  pxPerMs,
-                                );
-                                const evWidth =
-                                  timestampToPx(
-                                    ev.endMs,
-                                    viewStartMs,
-                                    pxPerMs,
-                                  ) - evLeft; // width based on time
-                                // Don't render events that are too small to see
-                                if (evWidth < 1) return nothing;
+                      const isVisible =
+                        rowY + rowHeightPx >= visMinRowPx &&
+                        rowY <= visMaxRowPx;
+                      rowY += rowHeightPx;
 
-                                // Always enforce a minimum visual width so events remain
-                                // visible and clickable at every zoom level.
-                                const MIN_EVENT_PX = 24;
-                                const displayWidth = Math.max(
-                                  evWidth,
-                                  MIN_EVENT_PX,
-                                );
-                                const isTiny = displayWidth < 60;
-                                const showTime = displayWidth >= 120;
-                                const tooltipLabel = `${ev.title} · ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}`;
+                      if (!isVisible) {
+                        return html`<div
+                          class="tl-event-row"
+                          style="height: ${rowHeightPx}px"
+                          data-resource-id=${r.id}
+                        ></div>`;
+                      }
 
-                                const zIndex = 10 + index;
+                      // Horizontally culled events for this visible row
+                      const visibleEvents = r.events.filter(
+                        (ev) => ev.endMs >= visMinMs && ev.startMs <= visMaxMs,
+                      );
+                      const sortedEvents = visibleEvents.sort(
+                        (a, b) => a.startMs - b.startMs,
+                      );
 
-                                return html`
-                                  <div
-                                    class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
+                      return html`
+                        <div
+                          class="tl-event-row"
+                          style="height: ${rowHeightPx}px"
+                          data-resource-id=${r.id}
+                          @pointerdown=${(e: PointerEvent) =>
+                            this._onRowPointerDown(e, r.id)}
+                        >
+                          <!-- Events -->
+                          ${sortedEvents.map((ev, index) => {
+                            const trackIndex = evTracks?.get(ev.id) || 0;
+                            const evTop = trackIndex * ROW_HEIGHT + 8;
+
+                            const evLeft = timestampToPx(
+                              ev.startMs,
+                              viewStartMs,
+                              pxPerMs,
+                            );
+                            const evWidth =
+                              timestampToPx(ev.endMs, viewStartMs, pxPerMs) -
+                              evLeft;
+
+                            if (evWidth < 1) return nothing;
+
+                            const MIN_EVENT_PX = 24;
+                            const displayWidth = Math.max(
+                              evWidth,
+                              MIN_EVENT_PX,
+                            );
+                            const isTiny = displayWidth < 60;
+                            const showTime = displayWidth >= 120;
+                            const tooltipLabel = `${ev.title} · ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}`;
+
+                            const zIndex = 10 + index;
+
+                            return html`
+                              <div
+                                class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
+                                  ev,
+                                )
+                                  ? "tl-event--dragging"
+                                  : ""} ${isTiny
+                                  ? "tl-event--tiny"
+                                  : ""} ${conflicts.conflictingEventIds.has(
+                                  ev.id,
+                                )
+                                  ? "tl-event--conflict"
+                                  : ""}"
+                                style="top: ${evTop}px; bottom: auto; height: ${ROW_HEIGHT -
+                                16}px; left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
+                                data-tooltip="${tooltipLabel}"
+                                @pointerdown=${(e: PointerEvent) =>
+                                  this._onEventPointerDown(e, ev, r.id, evTop)}
+                                @click=${(e: Event) =>
+                                  this._handleEventClick(e, ev)}
+                              >
+                                <div
+                                  class="tl-event-resize-handle tl-event-resize-handle--start"
+                                  @pointerdown=${(e: PointerEvent) =>
+                                    this._onResizePointerDown(
+                                      e,
                                       ev,
-                                    )
-                                      ? "tl-event--dragging"
-                                      : ""} ${isTiny
-                                      ? "tl-event--tiny"
-                                      : ""} ${conflicts.conflictingEventIds.has(
-                                      ev.id,
-                                    )
-                                      ? "tl-event--conflict"
-                                      : ""}"
-                                    style="top: ${evTop}px; bottom: auto; height: ${ROW_HEIGHT -
-                                    16}px; left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
-                                    data-tooltip="${tooltipLabel}"
-                                    @pointerdown=${(e: PointerEvent) =>
-                                      this._onEventPointerDown(
-                                        e,
-                                        ev,
-                                        r.id,
-                                        evTop,
-                                      )}
-                                    @click=${(e: Event) =>
-                                      this._handleEventClick(e, ev)}
-                                  >
-                                    <div
-                                      class="tl-event-resize-handle tl-event-resize-handle--start"
-                                      @pointerdown=${(e: PointerEvent) =>
-                                        this._onResizePointerDown(
-                                          e,
-                                          ev,
-                                          r.id,
-                                          "start",
-                                          evTop,
-                                        )}
-                                    ></div>
-                                    ${!isTiny
-                                      ? html`<span class="tl-event__title"
-                                          >${ev.title}</span
-                                        >`
-                                      : nothing}
-                                    ${conflicts.conflictingEventIds.has(ev.id)
-                                      ? html`<span
-                                          class="tl-event__conflict-dot"
-                                          title="Conflict overlap detected"
-                                        ></span>`
-                                      : nothing}
-                                    ${showTime
-                                      ? html`<span class="tl-event__time"
-                                          >${fmt12(ev.startTime)} –
-                                          ${fmt12(ev.endTime)}</span
-                                        >`
-                                      : nothing}
-                                    <div
-                                      class="tl-event-resize-handle tl-event-resize-handle--end"
-                                      @pointerdown=${(e: PointerEvent) =>
-                                        this._onResizePointerDown(
-                                          e,
-                                          ev,
-                                          r.id,
-                                          "end",
-                                          evTop,
-                                        )}
-                                    ></div>
-                                  </div>
-                                `;
-                              });
-                            })()}
-                          </div>
-                        `;
-                      })}
-                    </div>
-                  `,
-                )}
+                                      r.id,
+                                      "start",
+                                      evTop,
+                                    )}
+                                ></div>
+                                ${!isTiny
+                                  ? html`<span class="tl-event__title"
+                                      >${ev.title}</span
+                                    >`
+                                  : nothing}
+                                ${conflicts.conflictingEventIds.has(ev.id)
+                                  ? html`<span
+                                      class="tl-event__conflict-dot"
+                                      title="Conflict overlap detected"
+                                    ></span>`
+                                  : nothing}
+                                ${showTime
+                                  ? html`<span class="tl-event__time"
+                                      >${fmt12(ev.startTime)} –
+                                      ${fmt12(ev.endTime)}</span
+                                    >`
+                                  : nothing}
+                                <div
+                                  class="tl-event-resize-handle tl-event-resize-handle--end"
+                                  @pointerdown=${(e: PointerEvent) =>
+                                    this._onResizePointerDown(
+                                      e,
+                                      ev,
+                                      r.id,
+                                      "end",
+                                      evTop,
+                                    )}
+                                ></div>
+                              </div>
+                            `;
+                          })}
+                        </div>
+                      `;
+                    });
+
+                    return html`<div>${spacerHtml}${itemsHtml}</div>`;
+                  });
+                })()}
                 ${this._renderDragGhost()}
               </div>
             </div>

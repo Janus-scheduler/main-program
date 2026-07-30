@@ -14,6 +14,11 @@ import {
   schedulerStore,
 } from "@janus-scheduler/react";
 
+import {
+  loadDenseBenchmarkData,
+  loadDefaultDemoData,
+} from "../utils/benchmarkDataGenerator";
+
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
   currentView: ViewType;
@@ -117,6 +122,17 @@ export function SchedulerView({
     zoomUnit: "",
   });
   const [allowCreate, setAllowCreate] = useState(false);
+  const [isBenchmarkLoaded, setIsBenchmarkLoaded] = useState(false);
+
+  const handleToggleBenchmark = () => {
+    if (isBenchmarkLoaded) {
+      loadDefaultDemoData();
+      setIsBenchmarkLoaded(false);
+    } else {
+      loadDenseBenchmarkData();
+      setIsBenchmarkLoaded(true);
+    }
+  };
 
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
@@ -138,6 +154,12 @@ export function SchedulerView({
         allowCreate={allowCreate}
         zoomPercent={navData.zoomPercent}
         zoomUnit={navData.zoomUnit}
+        showBenchmarkBtn={true}
+        isBenchmarkActive={isBenchmarkLoaded}
+        benchmarkLabel={
+          isBenchmarkLoaded ? "Default Data" : "Heavy Dataset (1.5k Evts)"
+        }
+        onBenchmarkClick={handleToggleBenchmark}
         onPrevClick={() => {
           if (currentView === "Timeline") timelineRef.current?.goToPrev();
           else monthGridRef.current?.goToPrev();

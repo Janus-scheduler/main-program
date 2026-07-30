@@ -54,12 +54,25 @@ export class JanusTopbar extends LitElement {
   @property({ type: Boolean, attribute: "is-conflicts-banner-dismissed" })
   isConflictsBannerDismissed = false;
 
+  @property({ type: Boolean, attribute: "show-benchmark-btn" })
+  showBenchmarkBtn = false;
+  @property({ type: Boolean, attribute: "is-benchmark-active" })
+  isBenchmarkActive = false;
+  @property({ type: String, attribute: "benchmark-label" })
+  benchmarkLabel = "Heavy Dataset";
+
   private _emitRestoreConflicts() {
     this.dispatchEvent(
       new CustomEvent("restore-conflicts-banner", {
         bubbles: true,
         composed: true,
       }),
+    );
+  }
+
+  private _emitBenchmarkClick() {
+    this.dispatchEvent(
+      new CustomEvent("benchmark-click", { bubbles: true, composed: true }),
     );
   }
 
@@ -135,6 +148,21 @@ export class JanusTopbar extends LitElement {
           </button>
         </nav>
         <div class="tl-topbar__right">
+          ${this.showBenchmarkBtn
+            ? html`
+                <button
+                  class="tl-benchmark-btn ${this.isBenchmarkActive
+                    ? "tl-benchmark-btn--active"
+                    : ""}"
+                  @click=${this._emitBenchmarkClick}
+                  title="${this.isBenchmarkActive
+                    ? "Click to reset to default demo dataset"
+                    : "Click to load dense synthetic benchmark dataset (500+ events)"}"
+                >
+                  ⚡ ${this.benchmarkLabel}
+                </button>
+              `
+            : nothing}
           ${this.hasConflict && this.isConflictsBannerDismissed
             ? html`
                 <button

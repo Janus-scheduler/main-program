@@ -227,9 +227,7 @@ export const timelineStyles = css`
     min-width: 0;
     overflow-x: auto;
     overflow-y: scroll;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    display: block;
     will-change: scroll-position;
     -webkit-overflow-scrolling: touch;
     scroll-behavior: auto;
@@ -253,7 +251,7 @@ export const timelineStyles = css`
 
   .tl-time-inner {
     position: relative;
-    flex: 1;
+    height: max-content;
     min-height: 100%;
     display: flex;
     flex-direction: column;
@@ -337,6 +335,17 @@ export const timelineStyles = css`
     position: relative;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    contain: layout paint;
+  }
+
+  .tl-vlines-layer {
+    position: absolute;
+    top: calc(var(--hour-hdr-h) + var(--super-hdr-h));
+    bottom: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    z-index: 1;
   }
 
   .tl-vline {
@@ -389,11 +398,7 @@ export const timelineStyles = css`
     text-align: left;
     font-family: inherit;
     overflow: hidden;
-    backdrop-filter: blur(2px) saturate(1.1);
-    -webkit-backdrop-filter: blur(2px) saturate(1.1);
-    box-shadow:
-      0 3px 8px rgba(0, 0, 0, 0.12),
-      0 1px 3px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition:
       filter 0.15s,
       transform 0.12s,
@@ -404,9 +409,7 @@ export const timelineStyles = css`
   .tl-event:hover {
     filter: brightness(0.96);
     transform: scaleY(1.02);
-    box-shadow:
-      0 6px 16px rgba(0, 0, 0, 0.16),
-      0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
   }
 
   .tl-event:active {
