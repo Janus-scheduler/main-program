@@ -53,8 +53,23 @@
   </aside>
 
   <main class="app-main">
+    <janus-topbar-ng
+      [navLabel]="navData().navLabel"
+      [dayName]="navData().dayName"
+      [shortDate]="navData().shortDate"
+      [view]="currentView"
+      [zoomPercent]="navData().zoomPercent"
+      [zoomUnit]="navData().zoomUnit"
+      (prevClick)="handlePrevClick()"
+      (nextClick)="handleNextClick()"
+      (todayClick)="handleTodayClick()"
+      (viewSwitch)="handleViewChange($event)"
+      (toggleCreate)="handleToggleCreate()"
+    />
+
     @if (currentView === 'Timeline') {
       <janus-timeline-ng
+        #timelineEl
         [allowCreate]="allowCreate()"
         (eventClick)="handleEventClick($event)"
         (addEvent)="handleAddEvent()"
@@ -62,14 +77,17 @@
         (eventResize)="handleEventResize($event)"
         (eventCreate)="handleEventCreate($event)"
         (viewChange)="handleViewChange($event)"
+        (navChange)="handleNavChange($event)"
       />
     }
 
     @if (currentView === 'Month') {
       <janus-month-grid-ng
+        #monthGridEl
         (addEvent)="handleAddEvent()"
         (eventClick)="handleEventClick($event)"
         (viewChange)="handleViewChange($event)"
+        (navChange)="handleNavChange($event)"
       />
     }
 

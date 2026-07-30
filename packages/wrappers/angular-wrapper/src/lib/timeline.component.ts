@@ -63,6 +63,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** When true, dragging on empty row space creates a new event */
   readonly allowCreate = input<boolean>(false);
 
+  /** When true, renders a + Floating Action Button */
+  readonly showFab = input<boolean>(false);
+
   /** When true, resource conflicts/double-bookings are strictly blocked */
   readonly preventConflicts = input<boolean>(false);
 
@@ -84,11 +87,13 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Emitted when the user toggles the view */
   readonly viewChange = output<{ view: "Timeline" | "Month" }>();
 
+  /** Emitted when the date/zoom nav state changes */
+  readonly navChange = output<Record<string, unknown>>();
   /** Emitted when a resource conflict is detected */
   readonly conflictDetected = output<{
     message: string;
     action: string;
-    detail: any;
+    detail: EventMoveDetail | EventResizeDetail | EventCreateDetail;
   }>();
 
   private _unsubStore?: () => void;
@@ -128,6 +133,42 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.viewChange.emit((e as CustomEvent).detail);
   };
+  private _navChangeHandler = (e: Event) => {
+    e.stopPropagation();
+    this.navChange.emit((e as CustomEvent).detail);
+  };
+
+  public goToPrev(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToPrev: () => void }
+    ).goToPrev();
+  }
+
+  public goToNext(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToNext: () => void }
+    ).goToNext();
+  }
+
+  public goToToday(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToToday: () => void }
+    ).goToToday();
+  }
+
+  public setView(view: "Timeline" | "Month"): void {
+    (
+      this._elRef().nativeElement as HTMLElement & {
+        setView: (v: string) => void;
+      }
+    ).setView(view);
+  }
+
+  public toggleCreate(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { toggleCreate: () => void }
+    ).toggleCreate();
+  }
   private _conflictDetectedHandler = (e: Event) => {
     e.stopPropagation();
     this.conflictDetected.emit((e as CustomEvent).detail);
@@ -141,6 +182,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("event-resize", this._eventResizeHandler);
     el.addEventListener("event-create", this._eventCreateHandler);
     el.addEventListener("view-change", this._viewChangeHandler);
+    el.addEventListener("nav-change", this._navChangeHandler);
     el.addEventListener("conflict-detected", this._conflictDetectedHandler);
 
     this._applyAllowCreate();
@@ -168,6 +210,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("event-resize", this._eventResizeHandler);
     el?.removeEventListener("event-create", this._eventCreateHandler);
     el?.removeEventListener("view-change", this._viewChangeHandler);
+    el?.removeEventListener("nav-change", this._navChangeHandler);
     el?.removeEventListener("conflict-detected", this._conflictDetectedHandler);
     this._unsubStore?.();
   }
@@ -290,10 +333,15 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private _applyAllowCreate(): void {
     const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { allowCreate: boolean; preventConflicts: boolean })
+      | (HTMLElement & {
+          allowCreate: boolean;
+          showFab: boolean;
+          preventConflicts: boolean;
+        })
       | undefined;
     if (el) {
       el.allowCreate = this.allowCreate();
+      el.showFab = this.showFab();
       el.preventConflicts = this.preventConflicts();
     }
   }

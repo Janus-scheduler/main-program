@@ -9,16 +9,19 @@ export const timelineStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: #f97316;
-    --orange-lt: #fff7ed;
+    --orange: var(--janus-primary-color, #f97316);
+    --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours */
+    --c-primary-bg: var(--janus-primary-bg, #fff7ed);
+    --c-primary-bd: var(--janus-primary-color, #f97316);
+    --c-primary-tx: var(--janus-primary-text, #c2410c);
     --c-orange-bg: #fff7ed;
     --c-orange-bd: #f97316;
     --c-orange-tx: #c2410c;
-    --c-blue-bg: #eff6ff;
-    --c-blue-bd: #3b82f6;
-    --c-blue-tx: #1d4ed8;
+    --c-blue-bg: #f0f9ff;
+    --c-blue-bd: #0ea5e9;
+    --c-blue-tx: #0369a1;
     --c-yellow-bg: #fefce8;
     --c-yellow-bd: #f59e0b;
     --c-yellow-tx: #b45309;
@@ -99,6 +102,8 @@ export const timelineStyles = css`
   /* Resource names column */
   .tl-res-col {
     width: var(--res-col-w);
+    min-width: var(--res-col-w);
+    max-width: var(--res-col-w);
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     overflow-y: scroll;
@@ -114,6 +119,7 @@ export const timelineStyles = css`
 
   .tl-res-col__header {
     height: calc(var(--hour-hdr-h) + var(--super-hdr-h));
+    min-height: calc(var(--hour-hdr-h) + var(--super-hdr-h));
     display: flex;
     align-items: center;
     padding: 0 4px;
@@ -126,11 +132,13 @@ export const timelineStyles = css`
     top: 0;
     background: var(--white);
     z-index: 5;
+    flex-shrink: 0;
   }
 
   /* Group label row */
   .tl-res-group-label {
     height: var(--grp-label-h);
+    min-height: var(--grp-label-h);
     display: flex;
     align-items: center;
     padding: 0 4px;
@@ -140,6 +148,7 @@ export const timelineStyles = css`
     letter-spacing: 0.7px;
     border-bottom: 1px solid var(--border);
     background: #fafafa;
+    flex-shrink: 0;
   }
 
   /* Resource row */
@@ -148,9 +157,10 @@ export const timelineStyles = css`
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 16px;
+    padding: 0 12px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    overflow: hidden;
   }
 
   .tl-res-info {
@@ -205,6 +215,9 @@ export const timelineStyles = css`
     background: #fef3c7;
     color: #92400e;
   }
+  .tl-avatar--image {
+    object-fit: cover;
+  }
 
   /* ══════════════════════════════════════════════════════════════════════════════
      SCROLLABLE TIME GRID
@@ -249,10 +262,12 @@ export const timelineStyles = css`
   /* Super header (parent-level labels: day name, month, year) */
   .tl-super-header {
     height: var(--super-hdr-h);
+    min-height: var(--super-hdr-h);
+    flex-shrink: 0;
     position: sticky;
     top: 0;
     background: var(--white);
-    z-index: 11;
+    z-index: 30;
     border-bottom: 1px solid var(--border);
     display: block;
     overflow: hidden;
@@ -279,11 +294,13 @@ export const timelineStyles = css`
   /* Hour header (column labels) */
   .tl-hour-header {
     height: var(--hour-hdr-h);
+    min-height: var(--hour-hdr-h);
+    flex-shrink: 0;
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: var(--super-hdr-h);
     background: var(--white);
-    z-index: 10;
+    z-index: 29;
     display: block;
     overflow: hidden;
   }
@@ -372,12 +389,15 @@ export const timelineStyles = css`
     text-align: left;
     font-family: inherit;
     overflow: hidden;
+    backdrop-filter: blur(2px) saturate(1.1);
+    -webkit-backdrop-filter: blur(2px) saturate(1.1);
     box-shadow:
       0 3px 8px rgba(0, 0, 0, 0.12),
       0 1px 3px rgba(0, 0, 0, 0.08);
     transition:
       filter 0.15s,
       transform 0.12s,
+      background-color 0.15s,
       box-shadow 0.15s;
   }
 
@@ -445,64 +465,103 @@ export const timelineStyles = css`
     opacity: 0.85;
   }
 
+  .tl-event--primary {
+    background: color-mix(in srgb, var(--c-primary-bg) 32%, transparent);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
+  }
+  .tl-event--primary:hover {
+    background: color-mix(in srgb, var(--c-primary-bg) 55%, transparent);
+  }
+
   .tl-event--orange {
-    background: var(--c-orange-bg);
+    background: color-mix(in srgb, var(--c-orange-bg) 32%, transparent);
     border-color: var(--c-orange-bd);
     color: var(--c-orange-tx);
   }
+  .tl-event--orange:hover {
+    background: color-mix(in srgb, var(--c-orange-bg) 55%, transparent);
+  }
 
   .tl-event--blue {
-    background: var(--c-blue-bg);
+    background: color-mix(in srgb, var(--c-blue-bg) 32%, transparent);
     border-color: var(--c-blue-bd);
     color: var(--c-blue-tx);
   }
+  .tl-event--blue:hover {
+    background: color-mix(in srgb, var(--c-blue-bg) 55%, transparent);
+  }
 
   .tl-event--yellow {
-    background: var(--c-yellow-bg);
+    background: color-mix(in srgb, var(--c-yellow-bg) 32%, transparent);
     border-color: var(--c-yellow-bd);
     color: var(--c-yellow-tx);
   }
+  .tl-event--yellow:hover {
+    background: color-mix(in srgb, var(--c-yellow-bg) 55%, transparent);
+  }
 
   .tl-event--purple {
-    background: var(--c-purple-bg);
+    background: color-mix(in srgb, var(--c-purple-bg) 32%, transparent);
     border-color: var(--c-purple-bd);
     color: var(--c-purple-tx);
   }
+  .tl-event--purple:hover {
+    background: color-mix(in srgb, var(--c-purple-bg) 55%, transparent);
+  }
 
   .tl-event--green {
-    background: var(--c-green-bg);
+    background: color-mix(in srgb, var(--c-green-bg) 32%, transparent);
     border-color: var(--c-green-bd);
     color: var(--c-green-tx);
   }
+  .tl-event--green:hover {
+    background: color-mix(in srgb, var(--c-green-bg) 55%, transparent);
+  }
 
   .tl-event--red {
-    background: var(--c-red-bg);
+    background: color-mix(in srgb, var(--c-red-bg) 32%, transparent);
     border-color: var(--c-red-bd);
     color: var(--c-red-tx);
   }
+  .tl-event--red:hover {
+    background: color-mix(in srgb, var(--c-red-bg) 55%, transparent);
+  }
 
   .tl-event--pink {
-    background: var(--c-pink-bg);
+    background: color-mix(in srgb, var(--c-pink-bg) 32%, transparent);
     border-color: var(--c-pink-bd);
     color: var(--c-pink-tx);
   }
+  .tl-event--pink:hover {
+    background: color-mix(in srgb, var(--c-pink-bg) 55%, transparent);
+  }
 
   .tl-event--indigo {
-    background: var(--c-indigo-bg);
+    background: color-mix(in srgb, var(--c-indigo-bg) 32%, transparent);
     border-color: var(--c-indigo-bd);
     color: var(--c-indigo-tx);
   }
+  .tl-event--indigo:hover {
+    background: color-mix(in srgb, var(--c-indigo-bg) 55%, transparent);
+  }
 
   .tl-event--cyan {
-    background: var(--c-cyan-bg);
+    background: color-mix(in srgb, var(--c-cyan-bg) 32%, transparent);
     border-color: var(--c-cyan-bd);
     color: var(--c-cyan-tx);
   }
+  .tl-event--cyan:hover {
+    background: color-mix(in srgb, var(--c-cyan-bg) 55%, transparent);
+  }
 
   .tl-event--teal {
-    background: var(--c-teal-bg);
+    background: color-mix(in srgb, var(--c-teal-bg) 32%, transparent);
     border-color: var(--c-teal-bd);
     color: var(--c-teal-tx);
+  }
+  .tl-event--teal:hover {
+    background: color-mix(in srgb, var(--c-teal-bg) 55%, transparent);
   }
 
   /* ══════════════════════════════════════════════════════════════════════════════
@@ -578,6 +637,12 @@ export const timelineStyles = css`
     font-family: "DM Mono", monospace;
     white-space: nowrap;
     opacity: 0.85;
+  }
+
+  .tl-drag-ghost--primary {
+    background: var(--c-primary-bg);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
   }
 
   .tl-drag-ghost--orange {
@@ -672,16 +737,17 @@ export const timelineStyles = css`
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 18px rgba(249, 115, 22, 0.45);
+    box-shadow: 0 4px 18px var(--janus-primary-glow, rgba(249, 115, 22, 0.45));
     transition:
       background 0.18s,
       transform 0.14s,
+      filter 0.18s;
       box-shadow 0.18s;
     z-index: 200;
   }
 
   .tl-fab:hover {
-    background: #ea6c0a;
+    filter: brightness(0.95);
     transform: scale(1.07);
   }
 
@@ -708,16 +774,7 @@ export const timelineStyles = css`
   /* ══════════════════════════════════════════════════════════════════════════════
      RESPONSIVE
   ══════════════════════════════════════════════════════════════════════════════ */
-  @media (max-width: 1100px) {
-  }
-
-  @media (max-width: 900px) {
-    :host {
-      --res-col-w: 180px;
-    }
-  }
-
-  @media (max-width: 768px) {
+  @media (max-width: 700px) {
     /* Main Layout */
     :host {
       --res-col-w: 72px;
@@ -812,6 +869,7 @@ export const timelineStyles = css`
   }
   /* ── Time Conflict Banner & Indicators ───────────────────────────────────── */
   .tl-conflict-banner {
+    position: relative;
     background: #fffbeb;
     border-bottom: 1px solid #fef3c7;
     color: #b45309;
@@ -1051,19 +1109,21 @@ export const timelineStyles = css`
     border: none;
     border-radius: 6px;
     font-size: 13px;
+    padding: 7px 16px;
+    border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 2px 6px rgba(249, 115, 22, 0.2);
+    box-shadow: 0 2px 6px var(--janus-primary-glow, rgba(249, 115, 22, 0.2));
     transition:
       background 0.15s,
-      transform 0.1s;
+      transform 0.1s,
+      filter 0.15s;
   }
 
   .tl-alert-dialog__btn:hover {
-    background: #ea6c0a;
-  }
-
-  .tl-alert-dialog__btn:active {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+  }.tl-alert-dialog__btn:active {
     transform: scale(0.97);
   }
 

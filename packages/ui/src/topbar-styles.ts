@@ -9,8 +9,8 @@ export const topbarStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: #f97316;
-    --orange-lt: #fff7ed;
+    --orange: var(--janus-primary-color, #f97316);
+    --orange-lt: var(--janus-primary-bg, #fff7ed);
     --topbar-h: 56px;
 
     display: block;
@@ -27,6 +27,7 @@ export const topbarStyles = css`
      TOP BAR
   ══════════════════════════════════════════════════════════════════════════════ */
   .tl-topbar {
+    position: relative;
     height: var(--topbar-h);
     min-height: var(--topbar-h);
     flex-shrink: 0;
@@ -273,7 +274,7 @@ export const topbarStyles = css`
   }
 
   .tl-draw-toggle--active:hover {
-    background: #ea6c0a;
+    filter: brightness(0.95);
     color: #fff;
   }
 
@@ -331,19 +332,7 @@ export const topbarStyles = css`
   /* ══════════════════════════════════════════════════════════════════════════════
      RESPONSIVE
   ══════════════════════════════════════════════════════════════════════════════ */
-  @media (max-width: 1100px) {
-    .tl-nav__date {
-      font-size: 15px;
-    }
-  }
-
-  @media (max-width: 900px) {
-    .tl-nav__date {
-      font-size: 13px;
-    }
-  }
-
-  @media (max-width: 768px) {
+  @media (max-width: 700px) {
     :host {
       --topbar-h: 64px;
     }

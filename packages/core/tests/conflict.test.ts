@@ -5,13 +5,27 @@ import {
   type ConflictResource,
   type ConflictEvent,
 } from "../src/utils/conflict";
-import { type EventDraft } from "../src/index";
+import { type EventDraft, Event } from "../src/index";
 
 describe("Conflict Utilities", () => {
   describe("checkSlotConflict", () => {
     const events: ConflictEvent[] = [
-      { id: "e1", startMs: 1000, endMs: 2000 },
-      { id: "e2", startMs: 3000, endMs: 4000 },
+      {
+        id: "e1",
+        title: "Event 1",
+        startMs: 1000,
+        endMs: 2000,
+        startTime: "10:00",
+        endTime: "11:00",
+      },
+      {
+        id: "e2",
+        title: "Event 2",
+        startMs: 3000,
+        endMs: 4000,
+        startTime: "12:00",
+        endTime: "13:00",
+      },
     ];
 
     it("should return false when there are no events in the slot", () => {
@@ -34,15 +48,17 @@ describe("Conflict Utilities", () => {
   });
 
   describe("checkDraftConflict", () => {
-    const existingEvents = [
-      {
+    const existingEvents: Event[] = [
+      new Event({
         id: "existing_1",
         title: "Team Meeting",
         startTime: "2026-06-02T10:00:00Z",
         endTime: "2026-06-02T11:00:00Z",
         resourceIds: ["res_1"],
+        status: "confirmed",
+        description: "",
         allDay: false,
-      },
+      }),
     ];
 
     it("should return no conflict for empty/incomplete draft properties", () => {
@@ -59,17 +75,21 @@ describe("Conflict Utilities", () => {
 
     it("should detect conflict when a draft overlaps with an existing event for a shared participant", () => {
       const draft: EventDraft = {
+        id: null,
         title: "1-on-1 Review",
         startDate: "2026-06-02",
         startTime: "10:15",
         endDate: "2026-06-02",
         endTime: "10:45",
         participants: ["res_1"],
+        description: "",
+        activeColor: "blue",
+        timezone: "UTC",
         allDay: false,
         recurrenceRule: "",
       };
 
-      const result = checkDraftConflict(draft, existingEvents as any, "UTC");
+      const result = checkDraftConflict(draft, existingEvents, "UTC");
       expect(result.hasConflict).toBe(true);
       expect(result.resourceIds).toContain("res_1");
       expect(result.message).toContain("Team Meeting");
@@ -77,35 +97,43 @@ describe("Conflict Utilities", () => {
 
     it("should not detect conflict if participants do not overlap", () => {
       const draft: EventDraft = {
+        id: null,
         title: "1-on-1 Review",
         startDate: "2026-06-02",
         startTime: "10:15",
         endDate: "2026-06-02",
         endTime: "10:45",
         participants: ["res_2"],
+        description: "",
+        activeColor: "blue",
+        timezone: "UTC",
         allDay: false,
         recurrenceRule: "",
       };
 
-      const result = checkDraftConflict(draft, existingEvents as any, "UTC");
+      const result = checkDraftConflict(draft, existingEvents, "UTC");
       expect(result.hasConflict).toBe(false);
     });
 
     it("should handle error gracefully and return no conflicts if zoning conversions throw errors", () => {
       const draft: EventDraft = {
+        id: null,
         title: "Invalid Zone Test",
         startDate: "2026-06-02",
         startTime: "10:00",
         endDate: "2026-06-02",
         endTime: "11:00",
         participants: ["res_1"],
+        description: "",
+        activeColor: "blue",
+        timezone: "UTC",
         allDay: false,
         recurrenceRule: "",
       };
       // Forcing error via invalid timezone
       const result = checkDraftConflict(
         draft,
-        existingEvents as any,
+        existingEvents,
         "Invalid/TimeZone",
       );
       expect(result.hasConflict).toBe(false);
@@ -132,12 +160,16 @@ describe("Conflict Utilities", () => {
               title: "Scrum Daily",
               startMs: Date.UTC(2026, 5, 2, 9, 0, 0),
               endMs: Date.UTC(2026, 5, 2, 10, 0, 0),
+              startTime: "09:00:00",
+              endTime: "10:00:00",
             },
             {
               id: "ev_2",
               title: "Product Sync",
               startMs: Date.UTC(2026, 5, 2, 9, 30, 0),
               endMs: Date.UTC(2026, 5, 2, 10, 30, 0),
+              startTime: "09:30:00",
+              endTime: "10:30:00",
             },
           ],
         },

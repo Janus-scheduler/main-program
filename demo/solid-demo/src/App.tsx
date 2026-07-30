@@ -5,6 +5,7 @@ import {
   Scheduler,
   MonthGrid,
   AiBar,
+  Topbar,
   type ViewType,
   SchedulerManager,
   getBrowserTimezone,
@@ -86,6 +87,32 @@ function App() {
   const [selectedEventId, setSelectedEventId] = createSignal<string | null>(
     null,
   );
+  const [navData, setNavData] = createSignal<{
+    navLabel: string;
+    dayName: string;
+    shortDate: string;
+    zoomPercent: number;
+    zoomUnit: string;
+  }>({
+    navLabel: "",
+    dayName: "",
+    shortDate: "",
+    zoomPercent: 100,
+    zoomUnit: "",
+  });
+  const [allowCreate, setAllowCreate] = createSignal(false);
+
+  let timelineRef: HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+    toggleCreate: () => void;
+  };
+  let monthGridRef: HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+  };
 
   // Initialize the core manager once and populate initial data
   const manager = new SchedulerManager();
@@ -184,8 +211,37 @@ function App() {
       </aside>
 
       <main class="app-main">
+        <Topbar
+          navLabel={navData().navLabel}
+          dayName={navData().dayName}
+          shortDate={navData().shortDate}
+          view={currentView()}
+          allowCreate={allowCreate()}
+          zoomPercent={navData().zoomPercent}
+          zoomUnit={navData().zoomUnit}
+          onPrevClick={() => {
+            if (currentView() === "Timeline") timelineRef?.goToPrev();
+            else monthGridRef?.goToPrev();
+          }}
+          onNextClick={() => {
+            if (currentView() === "Timeline") timelineRef?.goToNext();
+            else monthGridRef?.goToNext();
+          }}
+          onTodayClick={() => {
+            if (currentView() === "Timeline") timelineRef?.goToToday();
+            else monthGridRef?.goToToday();
+          }}
+          onViewSwitch={(detail) => setCurrentView(detail.view)}
+          onToggleCreate={() => {
+            if (currentView() === "Timeline") timelineRef?.toggleCreate();
+            setAllowCreate((prev) => !prev);
+          }}
+        />
+
         <Show when={currentView() === "Timeline"}>
           <Timeline
+            ref={(el) => (timelineRef = el as unknown as typeof timelineRef)}
+            allowCreate={allowCreate()}
             onAddEvent={() => {
               setSelectedEventId(null);
               setSchedulerError(null);
@@ -231,10 +287,20 @@ function App() {
               });
             }}
             onViewChange={(detail) => setCurrentView(detail.view)}
+            onNavChange={(detail) => {
+              setNavData({
+                navLabel: (detail.navLabel as string) || "",
+                dayName: (detail.dayName as string) || "",
+                shortDate: (detail.shortDate as string) || "",
+                zoomPercent: (detail.zoomPercent as number) || 100,
+                zoomUnit: (detail.zoomUnit as string) || "",
+              });
+            }}
           />
         </Show>
         <Show when={currentView() === "Month"}>
           <MonthGrid
+            ref={(el) => (monthGridRef = el as unknown as typeof monthGridRef)}
             onAddEvent={() => {
               setSelectedEventId(null);
               setSchedulerError(null);
@@ -246,6 +312,15 @@ function App() {
               setShowScheduler(true);
             }}
             onViewChange={(detail) => setCurrentView(detail.view)}
+            onNavChange={(detail) => {
+              setNavData({
+                navLabel: (detail.navLabel as string) || "",
+                dayName: (detail.dayName as string) || "",
+                shortDate: (detail.shortDate as string) || "",
+                zoomPercent: (detail.zoomPercent as number) || 100,
+                zoomUnit: (detail.zoomUnit as string) || "",
+              });
+            }}
           />
         </Show>
 

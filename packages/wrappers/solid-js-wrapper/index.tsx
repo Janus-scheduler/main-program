@@ -4,6 +4,7 @@ import {
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
   JanusAiBar as JanusAiBarWC,
+  JanusTopbar as JanusTopbarWC,
 } from "@janus-scheduler/ui";
 import type {
   TimelineEvent,
@@ -53,6 +54,7 @@ declare module "solid-js" {
       "janus-timeline": Record<string, unknown>;
       "janus-month-grid": Record<string, unknown>;
       "janus-ai-bar": Record<string, unknown>;
+      "janus-topbar": Record<string, unknown>;
     }
   }
 }
@@ -69,6 +71,9 @@ if (!customElements.get("janus-month-grid")) {
 }
 if (!customElements.get("janus-ai-bar")) {
   customElements.define("janus-ai-bar", JanusAiBarWC);
+}
+if (!customElements.get("janus-topbar")) {
+  customElements.define("janus-topbar", JanusTopbarWC);
 }
 
 /**
@@ -93,6 +98,7 @@ export interface SchedulerProps {
   allDay?: boolean;
   recurrenceRule?: string;
   preventConflicts?: boolean;
+  showConfirmOnCreate?: boolean;
   onClose?: () => void;
   onSave?: (detail: SchedulerSaveData) => void;
   onDelete?: (detail: SchedulerDeleteData) => void;
@@ -120,6 +126,8 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
         el.recurrenceRule = props.recurrenceRule;
       if (props.preventConflicts !== undefined)
         el.preventConflicts = props.preventConflicts;
+      if (props.showConfirmOnCreate !== undefined)
+        el.showConfirmOnCreate = props.showConfirmOnCreate;
     }
   });
 
@@ -163,6 +171,8 @@ export interface TimelineProps {
   view?: "Timeline" | "Month";
   currentDate?: Date;
   aiPrompt?: string;
+  allowCreate?: boolean;
+  showFab?: boolean;
   preventConflicts?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onAddEvent?: () => void;
@@ -170,10 +180,12 @@ export interface TimelineProps {
   onEventResize?: (detail: EventResizeDetail) => void;
   onEventCreate?: (detail: EventCreateDetail) => void;
   onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+  ref?: (el: HTMLElement) => void;
   onConflictDetected?: (detail: {
     message: string;
     action: string;
-    detail: any;
+    detail: EventMoveDetail | EventResizeDetail | EventCreateDetail;
   }) => void;
 }
 
@@ -187,6 +199,8 @@ export const Timeline: Component<TimelineProps> = (props) => {
       if (props.view !== undefined) el.view = props.view;
       if (props.currentDate !== undefined) el.currentDate = props.currentDate;
       if (props.aiPrompt !== undefined) el.aiPrompt = props.aiPrompt;
+      if (props.allowCreate !== undefined) el.allowCreate = props.allowCreate;
+      if (props.showFab !== undefined) el.showFab = props.showFab;
       if (props.preventConflicts !== undefined)
         el.preventConflicts = props.preventConflicts;
     }
@@ -201,17 +215,19 @@ export const Timeline: Component<TimelineProps> = (props) => {
       }
     };
 
-    const attachMoveResizeCreate = <T,>(
+    const attachMoveResizeCreate = <
+      T extends EventMoveDetail | EventResizeDetail | EventCreateDetail,
+    >(
       eventName: string,
       handler?: (detail: T) => void,
     ) => {
       if (handler) {
         const listener = (e: Event) => {
-          const detail = (e as CustomEvent).detail;
-          if (props.preventConflicts && (detail as any).hasConflict) {
+          const detail = (e as CustomEvent).detail as T;
+          if (props.preventConflicts && detail.hasConflict) {
             return;
           }
-          handler(detail as T);
+          handler(detail);
         };
         ref?.addEventListener(eventName, listener);
         onCleanup(() => ref?.removeEventListener(eventName, listener));
@@ -224,6 +240,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
     attachMoveResizeCreate("event-resize", props.onEventResize);
     attachMoveResizeCreate("event-create", props.onEventCreate);
     attach("view-change", props.onViewChange);
+    attach("nav-change", props.onNavChange);
     attach("conflict-detected", props.onConflictDetected);
   });
 
@@ -231,6 +248,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
     <janus-timeline
       ref={(el: HTMLElement) => {
         ref = el;
+        if (props.ref) props.ref(el);
       }}
     />
   );
@@ -248,14 +266,24 @@ export const Timeline: Component<TimelineProps> = (props) => {
  * The component reads directly from the Zustand store.
  */
 export interface MonthGridProps {
+  showFab?: boolean;
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;
   onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+  ref?: (el: HTMLElement) => void;
 }
 
 export const MonthGrid: Component<MonthGridProps> = (props) => {
   let ref!: HTMLElement;
+
+  createEffect(() => {
+    if (ref) {
+      const el = ref as unknown as Record<string, unknown>;
+      if (props.showFab !== undefined) el.showFab = props.showFab;
+    }
+  });
 
   onMount(() => {
     const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
@@ -269,12 +297,14 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
     attach("day-click", props.onDayClick);
     attach("add-event", props.onAddEvent);
     attach("view-change", props.onViewChange);
+    attach("nav-change", props.onNavChange);
   });
 
   return (
     <janus-month-grid
       ref={(el: HTMLElement) => {
         ref = el;
+        if (props.ref) props.ref(el);
       }}
     />
   );
@@ -309,6 +339,61 @@ export const AiBar: Component<AiBarProps> = (props) => {
       }}
       placeholder={props.placeholder}
       button-label={props.buttonLabel}
+    />
+  );
+};
+
+export interface TopbarProps {
+  navLabel?: string;
+  dayName?: string;
+  shortDate?: string;
+  view?: "Timeline" | "Month";
+  allowCreate?: boolean;
+  zoomPercent?: number;
+  zoomUnit?: string;
+  onPrevClick?: () => void;
+  onNextClick?: () => void;
+  onTodayClick?: () => void;
+  onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
+  onToggleCreate?: () => void;
+}
+
+export const Topbar: Component<TopbarProps> = (props) => {
+  let ref!: HTMLElement;
+
+  createEffect(() => {
+    if (ref) {
+      const el = ref as unknown as Record<string, unknown>;
+      if (props.navLabel !== undefined) el.navLabel = props.navLabel;
+      if (props.dayName !== undefined) el.dayName = props.dayName;
+      if (props.shortDate !== undefined) el.shortDate = props.shortDate;
+      if (props.view !== undefined) el.view = props.view;
+      if (props.allowCreate !== undefined) el.allowCreate = props.allowCreate;
+      if (props.zoomPercent !== undefined) el.zoomPercent = props.zoomPercent;
+      if (props.zoomUnit !== undefined) el.zoomUnit = props.zoomUnit;
+    }
+  });
+
+  onMount(() => {
+    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
+      if (handler) {
+        const listener = (e: Event) => handler((e as CustomEvent).detail);
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
+      }
+    };
+    attach("prev-click", props.onPrevClick);
+    attach("next-click", props.onNextClick);
+    attach("today-click", props.onTodayClick);
+    attach("view-switch", props.onViewSwitch);
+    attach("toggle-create", props.onToggleCreate);
+  });
+
+  return (
+    <janus-topbar
+      ref={(el: HTMLElement) => {
+        ref = el;
+      }}
     />
   );
 };

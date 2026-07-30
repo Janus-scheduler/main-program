@@ -41,10 +41,14 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   readonly events = input<TimelineEvent[] | undefined>(undefined);
 
+  /** When true, renders a + Floating Action Button */
+  readonly showFab = input<boolean>(false);
+
   readonly eventClick = output<TimelineEvent>();
   readonly dayClick = output<{ date: string }>();
   readonly addEvent = output<void>();
   readonly viewChange = output<{ view: "Timeline" | "Month" }>();
+  readonly navChange = output<Record<string, unknown>>();
 
   private _unsubStore?: () => void;
 
@@ -64,6 +68,36 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.viewChange.emit((e as CustomEvent).detail);
   };
+  private _navChangeHandler = (e: Event) => {
+    e.stopPropagation();
+    this.navChange.emit((e as CustomEvent).detail);
+  };
+
+  public goToPrev(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToPrev: () => void }
+    ).goToPrev();
+  }
+
+  public goToNext(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToNext: () => void }
+    ).goToNext();
+  }
+
+  public goToToday(): void {
+    (
+      this._elRef().nativeElement as HTMLElement & { goToToday: () => void }
+    ).goToToday();
+  }
+
+  public setView(view: "Timeline" | "Month"): void {
+    (
+      this._elRef().nativeElement as HTMLElement & {
+        setView: (v: string) => void;
+      }
+    ).setView(view);
+  }
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
@@ -71,16 +105,28 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("day-click", this._dayClickHandler);
     el.addEventListener("add-event", this._addEventHandler);
     el.addEventListener("view-change", this._viewChangeHandler);
+    el.addEventListener("nav-change", this._navChangeHandler);
 
     if (this.events() !== undefined) {
       this._syncEvents();
     } else {
       this._subscribeToStore();
     }
+    this._syncProps();
   }
 
   ngOnChanges(): void {
     this._syncEvents();
+    this._syncProps();
+  }
+
+  private _syncProps(): void {
+    const el = this._elRef()?.nativeElement as
+      | (HTMLElement & { showFab: boolean })
+      | undefined;
+    if (el) {
+      el.showFab = this.showFab();
+    }
   }
 
   ngOnDestroy(): void {
@@ -89,6 +135,7 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("day-click", this._dayClickHandler);
     el?.removeEventListener("add-event", this._addEventHandler);
     el?.removeEventListener("view-change", this._viewChangeHandler);
+    el?.removeEventListener("nav-change", this._navChangeHandler);
     this._unsubStore?.();
   }
 

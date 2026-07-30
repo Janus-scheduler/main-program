@@ -4,10 +4,12 @@ import { timelineStyles } from "./timeline-styles";
 import {
   schedulerStore,
   isoToZonedDisplay,
+  getBrowserTimezone,
   expandEvents,
   computeTimelineConflicts,
   checkSlotConflict,
   type ConflictResource,
+  type SchedulerStore,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";
 import "./janus-topbar";
@@ -47,6 +49,8 @@ export class JanusTimeline extends LitElement {
   @property({ type: Array }) resources: TimelineResource[] = [];
   /** When true, dragging on empty row space creates a new event. Default: false */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
+  /** When true, renders a + Floating Action Button to add an event. Default: false */
+  @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
   @property({ type: Boolean, attribute: "prevent-conflicts" })
   preventConflicts = true;
 
@@ -97,20 +101,17 @@ export class JanusTimeline extends LitElement {
     if (this._unsubStore) this._unsubStore();
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _syncFromStore(state: any) {
+  private _syncFromStore(state: SchedulerStore) {
     const tz =
       (state.timezone as string) ||
       Intl.DateTimeFormat().resolvedOptions().timeZone;
     const newResources: TimelineResource[] = [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rawEvents = Object.values(state.events) as any[];
+    const rawEvents = Object.values(state.events);
     const centerMs = this._viewStartMs || Date.now();
     const startRange = centerMs - 365 * 24 * 60 * 60 * 1000;
     const endRange = centerMs + 365 * 24 * 60 * 60 * 1000;
     const coreEvents = expandEvents(rawEvents, startRange, endRange);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const coreResources = Object.values(state.resources) as any[];
+    const coreResources = Object.values(state.resources);
 
     const typeOrder: Record<string, number> = {
       person: 1,
@@ -144,13 +145,13 @@ export class JanusTimeline extends LitElement {
             endTime,
             startMs: startD.getTime(),
             endMs: endD.getTime(),
-            color: e.color || "blue",
+            color: e.color || "primary",
             date,
             resourceId: res.id,
           } as TimelineEvent;
         });
 
-      let avatarType: "initials" | "icon" = "initials";
+      let avatarType: "initials" | "icon" | "image" = "initials";
       let avatarIcon: "room" | "equipment" | undefined = undefined;
       let groupLabel: string | undefined = undefined;
 
@@ -162,8 +163,9 @@ export class JanusTimeline extends LitElement {
         else if (type === "room") groupLabel = "ROOMS";
         else if (type === "equipment") groupLabel = "EQUIPMENT";
       }
-
-      if (type === "room") {
+      if (res.avatar) {
+        avatarType = "image";
+      } else if (type === "room") {
         avatarType = "icon";
         avatarIcon = "room";
       } else if (type === "equipment") {
@@ -184,6 +186,7 @@ export class JanusTimeline extends LitElement {
         avatarIcon,
         groupLabel,
         events: resEvents,
+        avatar: res.avatar,
       });
     }
 
@@ -251,6 +254,8 @@ export class JanusTimeline extends LitElement {
       this.gridScrollRef.scrollLeft = CONTENT_HALF_WIDTH - containerWidth / 2;
       this._suppressScroll = false;
     });
+
+    this._emitNavChange();
   }
 
   /** Total content width in px — always fixed at 2 * CONTENT_HALF_WIDTH */
@@ -276,7 +281,9 @@ export class JanusTimeline extends LitElement {
   private _onGridScroll() {
     // Sync vertical scroll between resource column and time grid
     if (this.resColRef && this.gridScrollRef) {
-      this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      if (this.resColRef.scrollTop !== this.gridScrollRef.scrollTop) {
+        this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      }
     }
 
     // Skip re-centering during programmatic scroll adjustments
@@ -295,25 +302,75 @@ export class JanusTimeline extends LitElement {
         this._initializeView(currentCenterMs);
       }
     }
+    this._emitNavChange();
+  }
+
+  private _onResScroll() {
+    if (this.resColRef && this.gridScrollRef) {
+      if (this.gridScrollRef.scrollTop !== this.resColRef.scrollTop) {
+        this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
+      }
+    }
+  }
+
+  private _emitNavChange() {
+    const visibleCenter = this._getVisibleCenterMs();
+    const level = getActiveZoomLevel(this._pxPerMs);
+    const tz = getBrowserTimezone();
+    const navLabel = formatNavDate(visibleCenter, level, tz);
+
+    const d = new Date(visibleCenter);
+    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+    const shortDate = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
+    this.dispatchEvent(
+      new CustomEvent("nav-change", {
+        detail: {
+          navLabel,
+          dayName,
+          shortDate,
+          zoomPercent: this._zoomPercent(),
+          zoomUnit: level.unit,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   // ── Navigation ────────────────────────────────────────────────────
 
-  private _goToPrev() {
+  public goToPrev() {
     const level = getActiveZoomLevel(this._pxPerMs);
     const currentCenter = this._getVisibleCenterMs();
     this._initializeView(currentCenter - getNavStepMs(level));
   }
 
-  private _goToNext() {
+  public goToNext() {
     const level = getActiveZoomLevel(this._pxPerMs);
     const currentCenter = this._getVisibleCenterMs();
     this._initializeView(currentCenter + getNavStepMs(level));
   }
 
-  private _goToToday() {
+  public goToToday() {
     this._pxPerMs = DEFAULT_PX_PER_MS; // reset zoom to default
     this._initializeView(Date.now());
+  }
+
+  public goToDate(date: string | number | Date) {
+    this._pxPerMs = DEFAULT_PX_PER_MS;
+    let targetTime: number;
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [y, m, d] = date.split("-").map(Number);
+      // Center on noon local time on the target day
+      targetTime = new Date(y, m - 1, d, 12, 0, 0).getTime();
+    } else {
+      targetTime = new Date(date).getTime();
+    }
+    this._initializeView(targetTime);
   }
 
   private _handleEventClick(e: Event, ev: TimelineEvent) {
@@ -338,8 +395,9 @@ export class JanusTimeline extends LitElement {
     );
   }
 
-  private _handleViewSwitch(v: "Timeline" | "Month") {
+  public setView(v: "Timeline" | "Month") {
     this.view = v;
+    // Let the parent app know so it can swap components if needed
     this.dispatchEvent(
       new CustomEvent("view-change", {
         detail: { view: v },
@@ -349,7 +407,7 @@ export class JanusTimeline extends LitElement {
     );
   }
 
-  private _toggleCreate() {
+  public toggleCreate() {
     this.allowCreate = !this.allowCreate;
     this.dispatchEvent(
       new CustomEvent("allow-create-change", {
@@ -473,7 +531,7 @@ export class JanusTimeline extends LitElement {
           const resource = this.resources.find((r) => r.id === newResourceId);
           if (resource) {
             hasConflict = checkSlotConflict(
-              resource.events as unknown as any[],
+              resource.events,
               startMs,
               endMs,
               event.id,
@@ -489,7 +547,7 @@ export class JanusTimeline extends LitElement {
           const resource = this.resources.find((r) => r.id === resourceId);
           if (resource) {
             hasConflict = checkSlotConflict(
-              resource.events as unknown as any[],
+              resource.events,
               startMs,
               endMs,
               event.id,
@@ -504,11 +562,7 @@ export class JanusTimeline extends LitElement {
 
           const resource = this.resources.find((r) => r.id === resourceId);
           if (resource) {
-            hasConflict = checkSlotConflict(
-              resource.events as unknown as any[],
-              startMs,
-              endMs,
-            );
+            hasConflict = checkSlotConflict(resource.events, startMs, endMs);
           }
         }
 
@@ -587,6 +641,13 @@ export class JanusTimeline extends LitElement {
   // ── Rendering helpers ─────────────────────────────────────────────
 
   private renderAvatar(r: TimelineResource) {
+    if (r.avatarType === "image" && r.avatar) {
+      return html`<img
+        class="tl-avatar tl-avatar--image"
+        src="${r.avatar}"
+        alt="${r.name}"
+      />`;
+    }
     if (r.avatarType === "initials") {
       return html`<span
         class="tl-avatar tl-avatar--initials"
@@ -646,12 +707,7 @@ export class JanusTimeline extends LitElement {
       ? this.resources.find((r) => r.id === targetResourceId)
       : null;
     const hasDragConflict = resource
-      ? checkSlotConflict(
-          resource.events as unknown as any[],
-          ghostStartMs,
-          ghostEndMs,
-          eventId,
-        )
+      ? checkSlotConflict(resource.events, ghostStartMs, ghostEndMs, eventId)
       : false;
 
     return html`
@@ -778,45 +834,12 @@ export class JanusTimeline extends LitElement {
       viewStartMs,
     );
 
-    // Nav label (timezone-aware)
-    const visibleCenter = this._getVisibleCenterMs();
-    const navLabel = formatNavDate(visibleCenter, level, tz);
-
-    // Mobile short date format (e.g. THURSDAY \n Oct 26)
-    const d = new Date(visibleCenter); // Approximation for simple parsing without full timezone logic here
-    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
-    const shortDate = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-
     return html`
       <div
         class="tl-component-shell ${this.allowCreate
           ? "tl-component-shell--draw-mode"
           : ""}"
       >
-        <janus-topbar
-          nav-label="${navLabel}"
-          day-name="${dayName}"
-          short-date="${shortDate}"
-          .view=${this.view}
-          ?allow-create=${this.allowCreate}
-          .zoomPercent=${this._zoomPercent()}
-          zoom-unit="${level.unit}"
-          ?has-conflict=${conflicts.hasConflict}
-          .conflict-count=${conflicts.messages.length}
-          ?is-conflicts-banner-dismissed=${this._isConflictsBannerDismissed}
-          @prev-click=${this._goToPrev}
-          @next-click=${this._goToNext}
-          @today-click=${this._goToToday}
-          @view-switch=${(e: CustomEvent) =>
-            this._handleViewSwitch(e.detail.view)}
-          @toggle-create=${this._toggleCreate}
-          @restore-conflicts-banner=${() =>
-            (this._isConflictsBannerDismissed = false)}
-        ></janus-topbar>
-
         <!-- Conflict warning banner -->
         ${conflicts.hasConflict && !this._isConflictsBannerDismissed
           ? html`
@@ -865,10 +888,9 @@ export class JanusTimeline extends LitElement {
               </div>
             `
           : nothing}
-
         <div class="tl-panel">
           <div class="tl-grid-wrap">
-            <div class="tl-res-col" @scroll=${(e: Event) => e.preventDefault()}>
+            <div class="tl-res-col" @scroll=${this._onResScroll}>
               <div
                 class="tl-res-col__header"
                 style="height: ${HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT}px"
@@ -1096,13 +1118,18 @@ export class JanusTimeline extends LitElement {
           </div>
         </div>
 
-        <button
-          class="tl-fab"
-          @click=${this._handleAddEvent}
-          aria-label="Add event"
-        >
-          ${PlusIcon()}
-        </button>
+        <!-- FAB -->
+        ${this.showFab
+          ? html`
+              <button
+                class="tl-fab"
+                @click=${this._handleAddEvent}
+                aria-label="Add event"
+              >
+                ${PlusIcon()}
+              </button>
+            `
+          : nothing}
 
         <!-- Blocked Conflict Alert Dialog -->
         ${this._showBlockedConflictDialog
