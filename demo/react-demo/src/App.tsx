@@ -107,10 +107,6 @@ function App() {
     });
   }, []);
 
-  const handleGoogleConnect = () => {
-    window.location.href = `${BACKEND_URL}/auth/google`;
-  };
-
   const handleGoogleDisconnect = async () => {
     await fetch(`${BACKEND_URL}/auth/disconnect`, { method: "POST" });
     const syncManager = window.__janusSyncManager;
@@ -118,24 +114,19 @@ function App() {
     setGoogleConnected(false);
   };
 
+  const handleConnectCalendar = () => {
+    if (googleConnected) {
+      handleGoogleDisconnect();
+    } else {
+      window.location.href = `${BACKEND_URL}/auth/google`;
+    }
+  };
+
   return (
     <div className="app-shell">
       <Sidebar />
 
       <main className="app-main">
-        {/* Google Calendar connect button */}
-        <div style={{ padding: "8px 16px" }}>
-          {googleConnected ? (
-            <button onClick={handleGoogleDisconnect}>
-              Disconnect Google Calendar
-            </button>
-          ) : (
-            <button onClick={handleGoogleConnect}>
-              Connect Google Calendar
-            </button>
-          )}
-        </div>
-
         <SchedulerView
           currentView={currentView}
           showScheduler={showScheduler}
@@ -143,6 +134,7 @@ function App() {
           selectedEventId={selectedEventId}
           manager={manager}
           preventConflicts={preventConflicts}
+          isGoogleCalendarConnected={googleConnected}
           onViewChange={setCurrentView}
           onOpenScheduler={(eventId) => {
             setSelectedEventId(eventId ?? null);
@@ -152,6 +144,7 @@ function App() {
             setShowScheduler(false);
             setSelectedEventId(null);
           }}
+          onConnectCalendar={handleConnectCalendar}
         />
 
         {hookError && (

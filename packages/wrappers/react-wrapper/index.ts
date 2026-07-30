@@ -301,6 +301,7 @@ const _Topbar = createComponent({
     onTodayClick: "today-click",
     onViewSwitch: "view-switch",
     onToggleCreate: "toggle-create",
+    onConnectCalendar: "connect-calendar",
   },
 });
 
@@ -312,11 +313,15 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   allowCreate?: boolean;
   zoomPercent?: number;
   zoomUnit?: string;
+  /** Whether Google Calendar is currently connected — controls the connect button's label/state. */
+  isGoogleCalendarConnected?: boolean;
   onPrevClick?: () => void;
   onNextClick?: () => void;
   onTodayClick?: () => void;
   onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
   onToggleCreate?: () => void;
+  /** Fired when the user clicks the Google Calendar connect/disconnect button. */
+  onConnectCalendar?: () => void;
 }
 
 export function Topbar(props: TopbarProps): React.JSX.Element {
@@ -333,6 +338,9 @@ export function Topbar(props: TopbarProps): React.JSX.Element {
       : undefined,
     onToggleCreate: props.onToggleCreate
       ? () => props.onToggleCreate!()
+      : undefined,
+    onConnectCalendar: props.onConnectCalendar
+      ? () => props.onConnectCalendar!()
       : undefined,
   });
 }

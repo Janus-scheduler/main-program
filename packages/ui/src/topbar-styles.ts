@@ -124,6 +124,45 @@ export const topbarStyles = css`
     margin-left: auto;
   }
 
+  .tl-gcal-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    background: var(--white);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-1);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      border-color 0.15s,
+      background 0.15s,
+      color 0.15s;
+  }
+
+  .tl-gcal-btn svg {
+    flex-shrink: 0;
+  }
+
+  .tl-gcal-btn:hover {
+    border-color: var(--orange);
+  }
+
+  .tl-gcal-btn--connected {
+    border-color: var(--orange);
+    background: var(--orange-lt);
+    color: var(--orange);
+  }
+
+  .tl-gcal-btn--connected:hover {
+    filter: brightness(0.96);
+  }
+
   .tl-view-toggle {
     display: flex;
     background: var(--bg);

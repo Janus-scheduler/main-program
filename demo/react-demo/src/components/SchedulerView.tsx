@@ -30,6 +30,8 @@ interface SchedulerViewProps {
   /** The SchedulerManager instance — used to mutate store state */
   manager: SchedulerManager;
   preventConflicts: boolean;
+  /** Whether Google Calendar is currently connected — shown on the topbar's connect button. */
+  isGoogleCalendarConnected: boolean;
   /**
    * @param eventId - string when opening in edit mode (event was clicked),
    *                  undefined/null when opening in create mode (FAB was clicked).
@@ -37,6 +39,8 @@ interface SchedulerViewProps {
   onViewChange: (view: ViewType) => void;
   onOpenScheduler: (eventId?: string) => void;
   onCloseScheduler: () => void;
+  /** Fired when the user clicks the topbar's Google Calendar connect/disconnect button. */
+  onConnectCalendar: () => void;
 }
 
 /**
@@ -67,9 +71,11 @@ export function SchedulerView({
   selectedEventId,
   manager,
   preventConflicts,
+  isGoogleCalendarConnected,
   onViewChange,
   onOpenScheduler,
   onCloseScheduler,
+  onConnectCalendar,
 }: SchedulerViewProps) {
   const [tempEventData, setTempEventData] = useState<{
     startDate?: string;
@@ -138,6 +144,8 @@ export function SchedulerView({
         allowCreate={allowCreate}
         zoomPercent={navData.zoomPercent}
         zoomUnit={navData.zoomUnit}
+        isGoogleCalendarConnected={isGoogleCalendarConnected}
+        onConnectCalendar={onConnectCalendar}
         onPrevClick={() => {
           if (currentView === "Timeline") timelineRef.current?.goToPrev();
           else monthGridRef.current?.goToPrev();

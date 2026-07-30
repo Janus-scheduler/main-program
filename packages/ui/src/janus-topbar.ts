@@ -7,13 +7,14 @@ import {
   SearchIcon,
   BellIcon,
   PencilRulerIcon,
+  CalendarIcon,
 } from "./timeline-icons";
 
 /**
  * `<janus-topbar>` — standalone toolbar for the Janus timeline / month views.
  *
  * Renders the date navigation (< Today Date >) and right-side actions
- * (view toggle, draw-to-create, search, notifications).
+ * (connect-calendar, view toggle, draw-to-create, search, notifications).
  *
  * Communicates with its parent via custom events so the parent retains
  * full control over state.
@@ -23,6 +24,7 @@ import {
  * @fires today-click - User clicked the "Today" button.
  * @fires view-switch - User selected a view tab.  `event.detail.view` is "Timeline" | "Month".
  * @fires toggle-create - User toggled draw-to-create mode.
+ * @fires connect-calendar - User clicked the Google Calendar connect/disconnect button.
  */
 @customElement("janus-topbar")
 export class JanusTopbar extends LitElement {
@@ -53,6 +55,10 @@ export class JanusTopbar extends LitElement {
   @property({ type: Number, attribute: "conflict-count" }) conflictCount = 0;
   @property({ type: Boolean, attribute: "is-conflicts-banner-dismissed" })
   isConflictsBannerDismissed = false;
+
+  /** Whether Google Calendar is currently connected. Controls the button's label/state. */
+  @property({ type: Boolean, attribute: "is-google-calendar-connected" })
+  isGoogleCalendarConnected = false;
 
   private _emitRestoreConflicts() {
     this.dispatchEvent(
@@ -98,6 +104,12 @@ export class JanusTopbar extends LitElement {
   private _emitToggleCreate() {
     this.dispatchEvent(
       new CustomEvent("toggle-create", { bubbles: true, composed: true }),
+    );
+  }
+
+  private _emitConnectCalendar() {
+    this.dispatchEvent(
+      new CustomEvent("connect-calendar", { bubbles: true, composed: true }),
     );
   }
 
@@ -152,6 +164,17 @@ export class JanusTopbar extends LitElement {
                 >${this.zoomPercent}% · ${this.zoomUnit}</span
               >`
             : nothing}
+          <button
+            class="tl-gcal-btn ${this.isGoogleCalendarConnected
+              ? "tl-gcal-btn--connected"
+              : ""}"
+            @click=${this._emitConnectCalendar}
+          >
+            ${CalendarIcon()}
+            ${this.isGoogleCalendarConnected
+              ? "Google Calendar Connected"
+              : "Connect Google Calendar"}
+          </button>
           <div class="tl-view-toggle">
             ${(["Timeline", "Month"] as const).map(
               (v) => html`
