@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Timeline,
   MonthGrid,
@@ -13,6 +13,8 @@ import {
   zonedInputToISO,
   schedulerStore,
 } from "@janus-scheduler/react";
+
+import { loadDenseBenchmarkData } from "../utils/benchmarkDataGenerator";
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
@@ -37,6 +39,18 @@ interface SchedulerViewProps {
   onViewChange: (view: ViewType) => void;
   onOpenScheduler: (eventId?: string) => void;
   onCloseScheduler: () => void;
+}
+
+/**
+ * Benchmark dataset size requested on the URL (`?resources=N` / `?count=N`),
+ * or null when the param is absent or not a positive integer.
+ */
+function readBenchmarkCountFromUrl(): number | null {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("resources") ?? params.get("count");
+  if (!raw) return null;
+  const count = parseInt(raw, 10);
+  return Number.isNaN(count) || count <= 0 ? null : count;
 }
 
 /**
@@ -117,6 +131,12 @@ export function SchedulerView({
     zoomUnit: "",
   });
   const [allowCreate, setAllowCreate] = useState(false);
+
+  // Seed the store once for the URL-selected dataset (?resources=N or ?count=N).
+  useEffect(() => {
+    const count = readBenchmarkCountFromUrl();
+    if (count !== null) loadDenseBenchmarkData(count);
+  }, []);
 
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({

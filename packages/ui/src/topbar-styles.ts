@@ -246,6 +246,46 @@ export const topbarStyles = css`
     }
   }
 
+  /* Benchmark button */
+  .tl-benchmark-btn {
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+    transition: all 0.18s ease;
+    white-space: nowrap;
+    margin-right: 4px;
+  }
+
+  .tl-benchmark-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(99, 102, 241, 0.35);
+  }
+
+  .tl-benchmark-btn:active {
+    transform: translateY(0);
+  }
+
+  .tl-benchmark-btn--active {
+    background: linear-gradient(135deg, #10b981, #059669);
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+  }
+
+  .tl-benchmark-btn--active:hover {
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.35);
+  }
+
   /* Zoom badge */
   .tl-zoom-badge {
     display: inline-flex;
