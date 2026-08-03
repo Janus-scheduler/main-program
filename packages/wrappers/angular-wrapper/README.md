@@ -1,52 +1,71 @@
 # @janus-scheduler/angular
 
-Angular wrapper for the Janus Scheduler UI web components.
+The official Angular wrapper for **Janus Scheduler**, a highly customizable, timezone-aware, and performant scheduling timeline for modern web applications.
 
-This package is a **thin framework-agnostic adapter** that wraps the Lit-based web components from `@janus-scheduler/ui`, making them easy to use with Angular bindings and signals.
+## Installation
 
-## Architecture
-
-Following the **DRY (Don't Repeat Yourself)** principle, this wrapper does not contain any UI logic or styles. Instead, it acts as a bridge:
-
-- **Inputs**: Pass data from Angular properties to Web Component properties.
-- **Outputs**: Listen to DOM CustomEvents and re-emit them as Angular `EventEmitter` outputs.
-- **Styles**: The UI is encapsulated within the Web Component's Shadow DOM, ensuring stylistic consistency across all frameworks (React, Angular, etc.).
-
-## Components
-
-### `SchedulerComponent`
-
-Wraps the `<janus-scheduler>` web component.
-
-```html
-<janus-scheduler-ng (close)="onClose()" />
+```bash
+npm install @janus-scheduler/angular
 ```
 
-### `TimelineComponent`
+## Quick Start
 
-Wraps the `<janus-timeline>` web component.
-
-```html
-<janus-timeline-ng
-  [resources]="myResources"
-  (eventClick)="onEventClick($event)"
-  (addEvent)="onAddEvent()"
-/>
-```
-
-## Setup
-
-1. Add the package to your `package.json`.
-2. Ensure you have `CUSTOM_ELEMENTS_SCHEMA` in your Angular module or component `schemas` array.
-3. Import the components directly into your standalone components or NgModules.
+In your `app.component.ts`:
 
 ```typescript
-import { SchedulerComponent, TimelineComponent } from '@janus-scheduler/angular';
+import { Component, CUSTOM_ELEMENTS_SCHEMA } from "@angular/core";
+import {
+  SchedulerComponent,
+  TimelineComponent,
+  SchedulerManager,
+  type EventMoveDetail,
+} from "@janus-scheduler/angular";
 
 @Component({
+  selector: "app-root",
   standalone: true,
   imports: [SchedulerComponent, TimelineComponent],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
-  // ...
+  template: `
+    <div style="height: 100vh;">
+      <janus-timeline (onEventMove)="handleEventMove($event)"></janus-timeline>
+    </div>
+  `,
 })
+export class AppComponent {
+  manager = new SchedulerManager();
+
+  handleEventMove(detail: EventMoveDetail) {
+    this.manager.updateEvent(detail.event.id, {
+      resourceId: detail.newResourceId,
+      startTime: detail.newStartTime,
+      endTime: detail.newEndTime,
+    });
+  }
+}
 ```
+
+## Features
+
+- **Native Angular DX**: Uses Angular Signals internally to map state properties.
+- **No Boilerplate**: Payload events are automatically unwrapped from native DOM CustomEvents.
+- **Timezone Aware**: Built-in support for IANA timezones and local browser time.
+- **Conflict Management & Prevention**: Control warning or strict blocking behaviors using `[preventConflicts]="true"`.
+
+## Conflict Prevention Config
+
+You can pass the binding to `<janus-timeline-ng>` or `<janus-scheduler-ng>` components, and capture conflict callbacks via the `(conflictDetected)` output:
+
+```html
+<!-- Strict double-booking prevention mode with callback -->
+<janus-timeline-ng
+  [preventConflicts]="true"
+  (conflictDetected)="handleConflict($event)"
+  (eventMove)="handleEventMove($event)"
+>
+</janus-timeline-ng>
+```
+
+## Documentation
+
+For full documentation, architecture details, and more framework wrappers, please visit the [main repository](https://github.com/your-repo/janus-scheduler).

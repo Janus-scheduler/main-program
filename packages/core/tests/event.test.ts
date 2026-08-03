@@ -25,9 +25,24 @@ describe("Event", () => {
       expect(event.isValid()).toBe(false);
     });
 
-    it("should return false when resourceId is missing", () => {
-      const event = new Event({ ...validData, resourceId: "" });
+    it("should return false when resourceId and resourceIds are missing", () => {
+      const event = new Event({
+        ...validData,
+        resourceId: "",
+        resourceIds: [],
+      });
       expect(event.isValid()).toBe(false);
+    });
+
+    it("should use resourceIds if provided", () => {
+      const event = new Event({
+        ...validData,
+        resourceId: "",
+        resourceIds: ["room-101", "room-102"],
+      });
+      expect(event.isValid()).toBe(true);
+      expect(event.resourceIds).toEqual(["room-101", "room-102"]);
+      expect(event.resourceId).toBe("room-101");
     });
 
     it("should return false when startTime is after endTime", () => {

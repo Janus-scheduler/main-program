@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, PluginOption } from "vite";
 import dts from "vite-plugin-dts";
 import { resolve } from "path";
 
@@ -11,7 +11,7 @@ export default defineConfig({
       formats: ["es", "umd"],
     },
     rollupOptions: {
-      external: [/^lit/],
+      external: [/^lit/, "@janus-scheduler/core"],
       output: {
         globals: {
           lit: "lit",
@@ -27,7 +27,7 @@ export default defineConfig({
     dts({
       insertTypesEntry: true,
       rollupTypes: true,
-    }) as any,
+    }) as PluginOption,
   ],
 
   resolve: {

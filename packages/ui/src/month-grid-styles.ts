@@ -9,16 +9,19 @@ export const monthGridStyles = css`
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
-    --orange: #f97316;
-    --orange-lt: #fff7ed;
+    --orange: var(--janus-primary-color, #f97316);
+    --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours — same vars as timeline */
+    --c-primary-bg: var(--janus-primary-bg, #fff7ed);
+    --c-primary-bd: var(--janus-primary-color, #f97316);
+    --c-primary-tx: var(--janus-primary-text, #c2410c);
     --c-orange-bg: #fff7ed;
     --c-orange-bd: #f97316;
     --c-orange-tx: #c2410c;
-    --c-blue-bg: #eff6ff;
-    --c-blue-bd: #3b82f6;
-    --c-blue-tx: #1d4ed8;
+    --c-blue-bg: #f0f9ff;
+    --c-blue-bd: #0ea5e9;
+    --c-blue-tx: #0369a1;
     --c-yellow-bg: #fefce8;
     --c-yellow-bd: #f59e0b;
     --c-yellow-tx: #b45309;
@@ -28,12 +31,30 @@ export const monthGridStyles = css`
     --c-green-bg: #f0fdf4;
     --c-green-bd: #10b981;
     --c-green-tx: #047857;
+    --c-red-bg: #fef2f2;
+    --c-red-bd: #ef4444;
+    --c-red-tx: #991b1b;
+    --c-pink-bg: #fdf2f8;
+    --c-pink-bd: #ec4899;
+    --c-pink-tx: #9d174d;
+    --c-indigo-bg: #eef2ff;
+    --c-indigo-bd: #6366f1;
+    --c-indigo-tx: #3730a3;
+    --c-cyan-bg: #ecfeff;
+    --c-cyan-bd: #06b6d4;
+    --c-cyan-tx: #155e75;
+    --c-teal-bg: #f0fdfa;
+    --c-teal-bd: #14b8a6;
+    --c-teal-tx: #115e59;
 
     /* Layout */
     --topbar-h: 56px;
     --aicard-area-h: 60px;
-    --day-hdr-h: 40px;       /* weekday label row height */
-    --today-bg: #fff7ed;     /* highlight for today's cell */
+    --day-hdr-h: 40px; /* weekday label row height */
+    --today-bg: var(
+      --janus-primary-bg,
+      #fff7ed
+    ); /* highlight for today's cell */
 
     display: flex;
     flex-direction: column;
@@ -57,155 +78,7 @@ export const monthGridStyles = css`
     width: 100%;
     height: 100%;
     overflow: hidden;
-  }
-
-  /* ── Top Bar ──────────────────────────────────────────────────────────────── */
-  
-  .mg-topbar {
-    height: var(--topbar-h);
-    min-height: var(--topbar-h);
-    flex-shrink: 0;
-    background: var(--white);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 20px;
-    z-index: 50;
-  }
-
-  .mg-nav {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex: 1;
-  }
-
-  .mg-nav__arrow {
-    width: 30px;
-    height: 30px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-2);
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .mg-nav__arrow svg {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    stroke: currentColor;
-  }
-
-  .mg-nav__arrow:hover {
-    background: var(--bg);
-    color: var(--text-1);
-  }
-
-  .mg-nav__today {
-    padding: 5px 12px;
-    border: 1.5px solid var(--border);
-    border-radius: 7px;
-    background: var(--white);
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-1);
-    cursor: pointer;
-    transition: border-color 0.15s;
-  }
-
-  .mg-nav__today:hover {
-    border-color: var(--orange);
-  }
-
-  .mg-nav__month {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-1);
-    margin-left: 8px;
-    letter-spacing: -0.3px;
-  }
-
-  /* Right side — view toggle + icons */
-  .mg-topbar__right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-left: auto;
-  }
-
-  .mg-view-toggle {
-    display: flex;
-    background: var(--bg);
-    border-radius: 8px;
-    padding: 3px;
-    gap: 2px;
-  }
-
-  .mg-view-toggle__btn {
-    padding: 5px 14px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-2);
-    cursor: pointer;
-    transition: background 0.15s,
-    color: 0.15s;
-  }
-
-  .mg-view-toggle__btn.active {
-    background: var(--white);
-    color: var(--text-1);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  }
-
-  .mg-icon-btn {
-    width: 34px;
-    height: 34px;
-    border: none;
-    background: none;
-    cursor: pointer;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-2);
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .mg-icon-btn svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-  }
-
-  .mg-icon-btn:hover {
-    background: var(--bg);
-    color: var(--text-1);
-  }
-
-  .mg-icon-btn--bell {
     position: relative;
-  }
-
-  .mg-bell-dot {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 7px;
-    height: 7px;
-    background: var(--orange);
-    border-radius: 50%;
-    border: 1.5px solid var(--white);
   }
 
   /* ── Main Panel ──────────────────────────────────────────────────────────────── */
@@ -253,7 +126,7 @@ export const monthGridStyles = css`
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-rows: var(--mg-rows);
+    grid-template-rows: repeat(5, 1fr);
     overflow-y: auto;
   }
 
@@ -271,7 +144,7 @@ export const monthGridStyles = css`
   /* ── Day cell ── */
   .mg-day-cell {
     border-right: 1px solid var(--border);
-    padding: 8px 6px 6px;
+    padding: 6px 6px 4px;
     display: flex;
     flex-direction: column;
     gap: 3px;
@@ -298,6 +171,13 @@ export const monthGridStyles = css`
     color: var(--text-3);
   }
 
+  .mg-day-cell__dots {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+  }
+
   /* Today highlight */
   .mg-day-cell--today {
     background: var(--today-bg);
@@ -309,6 +189,7 @@ export const monthGridStyles = css`
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
+    height: 24px;
   }
 
   .mg-day-cell__num {
@@ -316,6 +197,12 @@ export const monthGridStyles = css`
     font-weight: 500;
     color: var(--text-1);
     line-height: 1;
+  }
+
+  /* Selected day — orange outline */
+  .mg-day-cell--selected {
+    outline: 2px solid var(--orange);
+    outline-offset: -2px;
   }
 
   /* Orange circle badge for today */
@@ -361,12 +248,32 @@ export const monthGridStyles = css`
     text-overflow: ellipsis;
     width: 100%;
     flex-shrink: 0;
-    transition: filter 0.12s, transform 0.1s;
+    transition:
+      filter 0.12s,
+      transform 0.1s;
   }
 
-  .mg-event:hover {
+  .mg-event:hover,
+  .mg-event--hovered {
     filter: brightness(0.95);
     transform: scaleX(0.99);
+  }
+
+  .mg-event--clip-left {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-left: none !important;
+    margin-left: 0 !important;
+    width: calc(100% - 4px) !important;
+  }
+  .mg-event--clip-right {
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    margin-right: 0 !important;
+    width: calc(100% - 4px) !important;
+  }
+  .mg-event--clip-left.mg-event--clip-right {
+    width: 100% !important;
   }
 
   .mg-event:active {
@@ -381,7 +288,48 @@ export const monthGridStyles = css`
     min-width: 0;
   }
 
+  /* "+X more" button */
+  .mg-more-btn {
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-2);
+    cursor: pointer;
+    padding: 2px 6px;
+    margin: 1px 4px 4px 4px;
+    border-radius: 4px;
+    transition:
+      background 0.1s,
+      color 0.1s;
+    width: max-content;
+    max-width: calc(100% - 8px);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    z-index: 2;
+    align-self: flex-start;
+  }
+
+  .mg-more-btn__text::after {
+    content: " more";
+  }
+
+  .mg-more-btn:hover {
+    background: var(--bg-hover, #f0f0f0);
+    color: var(--text-1);
+  }
+
   /* Colour variants — identical mapping as timeline */
+  .mg-event--primary {
+    background: var(--c-primary-bg);
+    border-color: var(--c-primary-bd);
+    color: var(--c-primary-tx);
+  }
+
   .mg-event--orange {
     background: var(--c-orange-bg);
     border-color: var(--c-orange-bd);
@@ -412,6 +360,36 @@ export const monthGridStyles = css`
     color: var(--c-green-tx);
   }
 
+  .mg-event--red {
+    background: var(--c-red-bg);
+    border-color: var(--c-red-bd);
+    color: var(--c-red-tx);
+  }
+
+  .mg-event--pink {
+    background: var(--c-pink-bg);
+    border-color: var(--c-pink-bd);
+    color: var(--c-pink-tx);
+  }
+
+  .mg-event--indigo {
+    background: var(--c-indigo-bg);
+    border-color: var(--c-indigo-bd);
+    color: var(--c-indigo-tx);
+  }
+
+  .mg-event--cyan {
+    background: var(--c-cyan-bg);
+    border-color: var(--c-cyan-bd);
+    color: var(--c-cyan-tx);
+  }
+
+  .mg-event--teal {
+    background: var(--c-teal-bg);
+    border-color: var(--c-teal-bd);
+    color: var(--c-teal-tx);
+  }
+
   /* "+N more" overflow label */
   .mg-event--more {
     background: none;
@@ -426,7 +404,7 @@ export const monthGridStyles = css`
 
   .mg-fab {
     position: absolute;
-    bottom: calc(var(--aicard-area-h) + 16px);
+    bottom: 16px;
     right: 28px;
     width: 52px;
     height: 52px;
@@ -438,87 +416,22 @@ export const monthGridStyles = css`
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 18px rgba(249, 115, 22, 0.45);
-    transition: background 0.18s, transform 0.14s, box-shadow 0.18s;
+    box-shadow: 0 4px 18px var(--janus-primary-glow, rgba(249, 115, 22, 0.45));
+    transition:
+      background 0.18s,
+      transform 0.14s,
+      filter 0.18s,
+      box-shadow 0.18s;
     z-index: 200;
   }
 
   .mg-fab:hover {
-    background: #ea6c0a;
+    filter: brightness(0.95);
     transform: scale(1.07);
   }
 
   .mg-fab:active {
     transform: scale(0.96);
-  }
-
-  /* ── AI Bar ──────────────────────────────────────────────────────────────── */
-
-  .mg-ai-wrap {
-    height: var(--aicard-area-h);
-    min-height: var(--aicard-area-h);
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    padding: 0 24px;
-    background: var(--bg);
-  }
-
-  .mg-ai-card {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--white);
-    border: 1.5px solid var(--border);
-    border-radius: 14px;
-    padding: 6px 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  .mg-ai-card:focus-within {
-    border-color: var(--orange);
-    box-shadow: 0 4px 20px rgba(249, 115, 22, 0.12),
-      0 0 0 3px rgba(249, 115, 22, 0.08);
-  }
-
-  .mg-ai-card__input {
-    flex: 1;
-    min-width: 0;
-    border: none;
-    outline: none;
-    font-family: inherit;
-    font-size: 14px;
-    color: var(--text-1);
-    background: transparent;
-  }
-
-  .mg-ai-card__input::placeholder {
-    color: var(--text-3);
-  }
-
-  .mg-ai-card__btn {
-    padding: 6px 18px;
-    background: var(--orange);
-    color: #fff;
-    border: none;
-    border-radius: 9px;
-    font-family: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
-    transition: background 0.15s, transform 0.12s;
-  }
-
-  .mg-ai-card__btn:hover {
-    background: #ea6c0a;
-  }
-
-  .mg-ai-card__btn:active {
-    transform: scale(0.97);
   }
 
   /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
@@ -539,52 +452,318 @@ export const monthGridStyles = css`
     background: #a1a1aa;
   }
 
-  /* ── Responsive ──────────────────────────────────────────────────────────────── */
-
-  @media (max-width: 900px) {
-    .mg-nav__month {
-      font-size: 14px;
-    }
-    .mg-event {
-      font-size: 10.5px;
-    }
+  /* ══════════════════════════════════════════════════════════════════════════
+   SELECTED DAY PANEL (mobile only)
+  ══════════════════════════════════════════════════════════════════════════ */
+  .mg-day-panel {
+    display: none;
+    flex-direction: column;
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+    flex-shrink: 0;
+    max-height: 280px;
+    overflow-y: auto;
   }
 
-  @media (max-width: 768px) {
-    .mg-topbar {
-      padding: 0 12px;
-      gap: 8px;
-    }
-    .mg-nav__today {
-      padding: 4px 8px;
-      font-size: 12px;
-    }
-    .mg-event {
-      font-size: 10px;
-      padding: 2px 4px;
-    }
+  .mg-day-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
   }
+
+  .mg-day-panel__title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-2);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+
+  .mg-day-panel__today-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--orange);
+    background: var(--orange-lt);
+    padding: 2px 8px;
+    border-radius: 99px;
+    letter-spacing: 0.4px;
+  }
+
+  .mg-day-panel__empty {
+    font-size: 13px;
+    color: var(--text-3);
+    text-align: center;
+    padding: 16px 0;
+  }
+
+  .mg-day-panel__event {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mg-day-panel__event:last-child {
+    border-bottom: none;
+  }
+
+  .mg-day-panel__color-bar {
+    width: 3px;
+    min-width: 3px;
+    height: 32px;
+    border-radius: 99px;
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .mg-day-panel__color-bar--primary {
+    background: var(--c-primary-bd);
+  }
+  .mg-day-panel__color-bar--orange {
+    background: var(--c-orange-bd);
+  }
+  .mg-day-panel__color-bar--blue {
+    background: var(--c-blue-bd);
+  }
+  .mg-day-panel__color-bar--yellow {
+    background: var(--c-yellow-bd);
+  }
+  .mg-day-panel__color-bar--purple {
+    background: var(--c-purple-bd);
+  }
+  .mg-day-panel__color-bar--green {
+    background: var(--c-green-bd);
+  }
+  .mg-day-panel__color-bar--red {
+    background: var(--c-red-bd);
+  }
+  .mg-day-panel__color-bar--pink {
+    background: var(--c-pink-bd);
+  }
+  .mg-day-panel__color-bar--indigo {
+    background: var(--c-indigo-bd);
+  }
+  .mg-day-panel__color-bar--cyan {
+    background: var(--c-cyan-bd);
+  }
+  .mg-day-panel__color-bar--teal {
+    background: var(--c-teal-bd);
+  }
+
+  .mg-day-panel__event-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .mg-day-panel__event-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    width: 100%;
+  }
+
+  .mg-day-panel__event-time {
+    font-size: 12px;
+    color: var(--text-2);
+    display: block;
+    white-space: nowrap;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+    RESPONSIVE
+  ══════════════════════════════════════════════════════════════════════════ */
 
   @media (max-width: 640px) {
-    .mg-view-toggle__btn {
-      padding: 4px 10px;
-      font-size: 12px;
+    :host {
+      --aicard-area-h: 48px;
     }
+
+    /* Shell becomes scrollable column on mobile */
+    .mg-shell {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mg-panel {
+      flex-shrink: 0;
+      flex: 0 0 auto;
+    }
+
+    .mg-grid {
+      overflow-y: visible;
+      min-height: 300px;
+    }
+
+    /* Day panel always visible below grid */
+    .mg-day-panel {
+      display: flex;
+      flex: 1;
+      min-height: 150px;
+      max-height: none;
+      overflow-y: auto;
+    }
+
+    .mg-week-row {
+      min-height: 60px;
+    }
+
+    /* Compact day cells */
+    .mg-day-cell {
+      padding: 4px 3px;
+      gap: 2px;
+    }
+
     .mg-day-cell__num {
       font-size: 11px;
+    }
+
+    /* Make events flow horizontally as dots */
+    .mg-day-cell {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .mg-day-cell__dots {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 2px;
+      padding: 2px 0;
+    }
+
+    .mg-today-badge {
+      width: 20px;
+      height: 20px;
+      font-size: 10px;
+    }
+
+    .mg-today-label {
+      display: none;
+    }
+
+    /* Events become small dots */
+    .mg-event {
+      width: 7px;
+      height: 7px;
+      min-width: 7px;
+      min-height: 7px;
+      border-radius: 50%;
+      padding: 0;
+      border: none;
+      border-left: none;
+      flex-shrink: 0;
+      margin: 1px;
+      display: block;
+    }
+
+    .mg-event__title {
+      display: none;
+    }
+
+    .mg-more-btn {
+      padding: 1px 4px;
+      margin: 1px 0;
+      border-radius: 99px;
+      background: #e4e4e7;
+      color: #18181b;
+      font-size: 9.5px;
+      font-weight: 700;
+      width: auto;
+      max-width: 100%;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .mg-more-btn__text::after {
+      display: none;
+    }
+
+    /* Override the border-left from colour variants */
+    .mg-event--primary {
+      border-left: none;
+      background: var(--c-primary-bd);
+    }
+    .mg-event--orange {
+      border-left: none;
+      background: var(--c-orange-bd);
+    }
+    .mg-event--blue {
+      border-left: none;
+      background: var(--c-blue-bd);
+    }
+    .mg-event--yellow {
+      border-left: none;
+      background: var(--c-yellow-bd);
+    }
+    .mg-event--purple {
+      border-left: none;
+      background: var(--c-purple-bd);
+    }
+    .mg-event--green {
+      border-left: none;
+      background: var(--c-green-bd);
+    }
+    .mg-event--red {
+      border-left: none;
+      background: var(--c-red-bd);
+    }
+    .mg-event--pink {
+      border-left: none;
+      background: var(--c-pink-bd);
+    }
+    .mg-event--indigo {
+      border-left: none;
+      background: var(--c-indigo-bd);
+    }
+    .mg-event--cyan {
+      border-left: none;
+      background: var(--c-cyan-bd);
+    }
+    .mg-event--teal {
+      border-left: none;
+      background: var(--c-teal-bd);
+    }
+
+    .mg-fab {
+      width: 42px;
+      height: 42px;
+      bottom: 12px;
+      right: 16px;
+    }
+
+    .mg-fab svg {
+      width: 18px;
+      height: 18px;
     }
   }
 
   @media (max-width: 480px) {
-    .mg-view-toggle {
-      display: none;
+    .mg-view-toggle__btn {
+      padding: 3px 8px;
+      font-size: 11px;
     }
+
     .mg-icon-btn {
       width: 28px;
       height: 28px;
     }
-    .mg-event__title {
-      display: none; /* only dot visible on very small screens */
+
+    .mg-icon-btn svg {
+      width: 15px;
+      height: 15px;
     }
   }
 `;

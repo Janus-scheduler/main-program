@@ -53,22 +53,66 @@
   </aside>
 
   <main class="app-main">
-    <janus-timeline-ng
-      [resources]="resources"
-      (eventClick)="handleEventClick($event)"
-      (addEvent)="handleAddEvent()"
-      (eventMove)="handleEventMove($event)"
-      (eventResize)="handleEventResize($event)"
-      (eventCreate)="handleEventCreate($event)"
+    <janus-topbar-ng
+      [navLabel]="navData().navLabel"
+      [dayName]="navData().dayName"
+      [shortDate]="navData().shortDate"
+      [view]="currentView"
+      [zoomPercent]="navData().zoomPercent"
+      [zoomUnit]="navData().zoomUnit"
+      (prevClick)="handlePrevClick()"
+      (nextClick)="handleNextClick()"
+      (todayClick)="handleTodayClick()"
+      (viewSwitch)="handleViewChange($event)"
+      (toggleCreate)="handleToggleCreate()"
     />
+
+    @if (currentView === 'Timeline') {
+      <janus-timeline-ng
+        #timelineEl
+        [allowCreate]="allowCreate()"
+        (eventClick)="handleEventClick($event)"
+        (addEvent)="handleAddEvent()"
+        (eventMove)="handleEventMove($event)"
+        (eventResize)="handleEventResize($event)"
+        (eventCreate)="handleEventCreate($event)"
+        (viewChange)="handleViewChange($event)"
+        (navChange)="handleNavChange($event)"
+      />
+    }
+
+    @if (currentView === 'Month') {
+      <janus-month-grid-ng
+        #monthGridEl
+        (addEvent)="handleAddEvent()"
+        (eventClick)="handleEventClick($event)"
+        (viewChange)="handleViewChange($event)"
+        (navChange)="handleNavChange($event)"
+      />
+    }
 
     @if (showScheduler) {
       <janus-scheduler-ng
-        [error]="schedulerError"
+        [eventId]="selectedEventId()"
+        [title]="storeEvent()?.title"
+        [startDate]="startParts().date"
+        [startTime]="startParts().time"
+        [endDate]="endParts().date"
+        [endTime]="endParts().time"
+        [participants]="participants()"
+        [description]="storeEvent()?.description"
+        [activeColor]="storeEvent()?.color"
+        [allDay]="storeEvent()?.allDay"
+        [recurrenceRule]="storeEvent()?.recurrenceRule"
+        [error]="schedulerError()"
         (save)="handleSave($event)"
         (delete)="handleDelete($event)"
         (close)="closeScheduler()"
       />
     }
+
+    <janus-ai-bar-ng
+      (aiSubmit)="handleAiSubmit($event)"
+    />
   </main>
 </div>

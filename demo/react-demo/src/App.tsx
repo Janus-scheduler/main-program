@@ -3,7 +3,7 @@ import "./App.css";
 
 import { Sidebar } from "./components/Sidebar";
 import { SchedulerView } from "./components/SchedulerView";
-import type { ViewType } from "./components/SchedulerView";
+import type { ViewType } from "@janus-scheduler/react";
 import { ErrorToast } from "./components/ErrorToast";
 import { useSchedulerManager } from "./hooks/useSchedulerManager";
 import type { HookError } from "./hooks/useSchedulerManager";
@@ -23,6 +23,10 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>("Month");
   const [showScheduler, setShowScheduler] = useState(false);
   const [hookError, setHookError] = useState<HookError | null>(null);
+
+  // Set to true to strictly block resource scheduling conflicts, or false to allow double-booking with visual warning banners.
+  const preventConflicts = false;
+
   // null = creating a new event; string = editing the event with this ID
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
@@ -46,6 +50,7 @@ function App() {
           schedulerError={null}
           selectedEventId={selectedEventId}
           manager={manager}
+          preventConflicts={preventConflicts}
           onViewChange={setCurrentView}
           onOpenScheduler={(eventId) => {
             setSelectedEventId(eventId ?? null);

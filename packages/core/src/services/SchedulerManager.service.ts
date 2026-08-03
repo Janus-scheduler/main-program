@@ -153,7 +153,8 @@ export class SchedulerManager {
    * @returns Event if found, undefined otherwise
    */
   getEvent(id: string): Event | undefined {
-    return schedulerStore.getState().events[id];
+    const baseId = id.replace(/_occ_\d+$/, "");
+    return schedulerStore.getState().events[baseId];
   }
 
   /**
@@ -173,28 +174,53 @@ export class SchedulerManager {
    * @returns The updated Event instance (already visible in the UI)
    */
   updateEvent(id: string, updates: Partial<EventData>): Event {
-    // Shallow-clone the primitive fields BEFORE the store writes.
-    // Without the spread, `snapshot` would be a reference to the same
-    // object that updateEvent() mutates in-place — meaning the rollback
-    // would read already-updated values and restore nothing.
-    const existing = schedulerStore.getState().events[id];
-    const snapshot = existing ? { ...existing } : null;
+    const occMatch = id.match(/^(.+)_occ_(\d+)$/);
+    const baseId = occMatch ? occMatch[1] : id;
 
-    const event = schedulerStore.getState().updateEvent(id, updates);
+    if (occMatch && updates.startTime) {
+      const originalOccStartMs = Number(occMatch[2]);
+      const newStartMs = new Date(updates.startTime).getTime();
+      const deltaMs = newStartMs - originalOccStartMs;
+
+      const parentEvent = schedulerStore.getState().events[baseId];
+      if (parentEvent) {
+        const parentStartMs = new Date(parentEvent.startTime).getTime();
+        const parentEndMs = new Date(parentEvent.endTime).getTime();
+
+        updates.startTime = new Date(parentStartMs + deltaMs).toISOString();
+        updates.endTime = new Date(parentEndMs + deltaMs).toISOString();
+      }
+    }
+
+    const existing = schedulerStore.getState().events[baseId];
+    const snapshot = existing
+      ? {
+          ...existing,
+          resourceIds: existing.resourceIds
+            ? [...existing.resourceIds]
+            : undefined,
+        }
+      : null;
+
+    const event = schedulerStore.getState().updateEvent(baseId, updates);
 
     this._fireHook(
       "updateEvent",
       () => this._hooks.onEventUpdate?.(event),
       () => {
         if (snapshot) {
-          // All fields are primitive strings — snapshot holds the original values.
-          schedulerStore.getState().updateEvent(id, {
+          // Roll back original values including resourceIds
+          schedulerStore.getState().updateEvent(baseId, {
             title: snapshot.title,
             startTime: snapshot.startTime,
             endTime: snapshot.endTime,
             status: snapshot.status,
             description: snapshot.description,
             resourceId: snapshot.resourceId,
+            resourceIds: snapshot.resourceIds,
+            color: snapshot.color,
+            allDay: snapshot.allDay,
+            recurrenceRule: snapshot.recurrenceRule,
           });
         }
       },
@@ -211,14 +237,14 @@ export class SchedulerManager {
    * @returns true if the event was found and deleted, false otherwise
    */
   deleteEvent(id: string): boolean {
-    // Snapshot before deletion so we can restore it
-    const snapshot = schedulerStore.getState().events[id];
-    const deleted = schedulerStore.getState().deleteEvent(id);
+    const baseId = id.replace(/_occ_\d+$/, "");
+    const snapshot = schedulerStore.getState().events[baseId];
+    const deleted = schedulerStore.getState().deleteEvent(baseId);
 
     if (deleted) {
       this._fireHook(
         "deleteEvent",
-        () => this._hooks.onEventDelete?.(id),
+        () => this._hooks.onEventDelete?.(baseId),
         () => {
           if (snapshot) schedulerStore.getState().addEvent(snapshot);
         },
@@ -234,7 +260,11 @@ export class SchedulerManager {
    * @returns Filtered array of Event instances
    */
   getEventsByResource(resourceId: string): Event[] {
-    return this.getAllEvents().filter((e) => e.resourceId === resourceId);
+    return this.getAllEvents().filter(
+      (e) =>
+        (e.resourceIds && e.resourceIds.includes(resourceId)) ||
+        e.resourceId === resourceId,
+    );
   }
 
   /**
@@ -314,6 +344,7 @@ export class SchedulerManager {
             name: snapshot.name,
             type: snapshot.type,
             email: snapshot.email,
+            avatar: snapshot.avatar,
           });
         }
       },

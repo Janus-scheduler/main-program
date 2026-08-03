@@ -4,42 +4,60 @@ import {
   JanusScheduler as JanusSchedulerWC,
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
+  JanusAiBar as JanusAiBarWC,
+  JanusTopbar as JanusTopbarWC,
 } from "@janus-scheduler/ui";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Re-export core API so React consumers can import everything from one package:
 //   import { Timeline, SchedulerManager, SchedulerHooks } from '@janus-scheduler/react'
 // ─────────────────────────────────────────────────────────────────────────────
-export { SchedulerManager } from "@janus-scheduler/core";
-export type { SchedulerHooks } from "@janus-scheduler/core";
+export {
+  SchedulerManager,
+  getBrowserTimezone,
+  isoToZonedDisplay,
+  zonedInputToISO,
+  schedulerStore,
+} from "@janus-scheduler/core";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Re-export UI event-detail types so the host app can type its callbacks
-// without importing from @janus-scheduler/ui directly.
-//
-// Usage:
-//   const handleMove = (e: CustomEvent<EventMoveDetail>) => { ... }
-// ─────────────────────────────────────────────────────────────────────────────
-export type {
+import type {
+  SchedulerHooks,
   TimelineEvent,
   TimelineResource,
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
-} from "@janus-scheduler/ui";
+  SchedulerSaveData,
+  SchedulerDeleteData,
+  EventColor,
+  ViewType,
+  EventData,
+  ResourceData,
+  AssignmentData,
+} from "@janus-scheduler/core";
 
-// Scheduler modal save-data shape (matches what the <janus-scheduler> "save" event emits)
-export interface SchedulerSaveData {
-  /** Present when editing an existing event; null/undefined when creating a new one. */
-  id: string | null;
-  title: string;
-  date: string;
-  startTime: string; // "HH:MM"
-  endTime: string; // "HH:MM"
-  participants: string[];
-  description: string;
-  activeColor: string;
-}
+export type {
+  SchedulerHooks,
+  TimelineEvent,
+  TimelineResource,
+  EventMoveDetail,
+  EventResizeDetail,
+  EventCreateDetail,
+  SchedulerSaveData,
+  SchedulerDeleteData,
+  EventColor,
+  ViewType,
+  EventData,
+  ResourceData,
+  AssignmentData,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Re-export UI event-detail types so the host app can type its callbacks
+// without importing from @janus-scheduler/ui directly.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { Event, Resource, Assignment } from "@janus-scheduler/core";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Web Component → React bindings
@@ -47,31 +65,13 @@ export interface SchedulerSaveData {
 // The Lit @customElement decorator auto-registers the web components when the
 // module is imported — no manual customElements.define() is needed.
 //
-// Each `events` map converts a Web Component CustomEvent name to its
-// React prop name. The host receives a native CustomEvent; use `.detail`
-// to access the typed payload.
-//
-// Example:
-//   <Timeline
-//     onEventMove={(e: CustomEvent<EventMoveDetail>) => manager.updateEvent(...)}
-//     onEventCreate={(e: CustomEvent<EventCreateDetail>) => manager.addEvent(...)}
-//   />
+// We internally use `@lit/react` to map the custom elements to React, and then
+// we wrap those in functional components to "unwrap" the CustomEvent objects.
+// This allows the React consumer to receive the pure data payload rather than
+// having to access `e.detail`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * <Scheduler> — Modal form for creating or editing a single event.
- *
- * Props:
- *  - eventId  — string | null. Pass the event's ID when opening in edit mode;
- *               omit or pass null for create mode.
- *
- * Events:
- *  - onSave   → CustomEvent<SchedulerSaveData>             — user submitted the form
- *                 detail.id is null (create) or the event ID (edit)
- *  - onDelete → CustomEvent<{ id: string | null; title: string }> — user clicked Delete
- *  - onClose  → CustomEvent<void>                          — user dismissed the modal
- */
-export const Scheduler = createComponent({
+const _Scheduler = createComponent({
   tagName: "janus-scheduler",
   elementClass: JanusSchedulerWC,
   react: React,
@@ -82,44 +82,131 @@ export const Scheduler = createComponent({
   },
 });
 
-/**
- * <Timeline> — Horizontal resource/time-axis view with drag-and-drop.
- *
- * Events:
- *  - onEventClick   → CustomEvent<TimelineEvent>       — user clicked an event chip
- *  - onAddEvent     → CustomEvent<void>                — user clicked the + FAB
- *  - onEventMove    → CustomEvent<EventMoveDetail>     — drag completed (move)
- *  - onEventResize  → CustomEvent<EventResizeDetail>   — drag completed (resize)
- *  - onEventCreate  → CustomEvent<EventCreateDetail>   — drag completed (new event)
- *
- * The component reads directly from the Zustand store, so you only need
- * to call manager.addEvent() / manager.updateEvent() — the UI updates automatically.
- */
-export const Timeline = createComponent({
+export interface SchedulerProps extends React.HTMLAttributes<HTMLElement> {
+  eventId?: string | null;
+  title?: string;
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  participants?: string[];
+  description?: string;
+  activeColor?: string;
+  error?: string | null;
+  allDay?: boolean;
+  recurrenceRule?: string;
+  preventConflicts?: boolean;
+  showConfirmOnCreate?: boolean;
+  onClose?: () => void;
+  onSave?: (detail: SchedulerSaveData) => void;
+  onDelete?: (detail: { id: string | null; title: string }) => void;
+}
+
+export function Scheduler(props: SchedulerProps): React.JSX.Element {
+  return React.createElement(_Scheduler, {
+    ...props,
+    onClose: props.onClose ? () => props.onClose!() : undefined,
+    onSave: props.onSave
+      ? (e: Event) =>
+          props.onSave!((e as CustomEvent<SchedulerSaveData>).detail)
+      : undefined,
+    onDelete: props.onDelete
+      ? (e: Event) =>
+          props.onDelete!(
+            (e as CustomEvent<{ id: string | null; title: string }>).detail,
+          )
+      : undefined,
+  });
+}
+
+const _Timeline = createComponent({
   tagName: "janus-timeline",
   elementClass: JanusTimelineWC,
   react: React,
   events: {
     onEventClick: "event-click",
-    onAddEvent: "add-event",
     onEventMove: "event-move",
     onEventResize: "event-resize",
     onEventCreate: "event-create",
+    onAddEvent: "add-event",
+    onViewChange: "view-change",
+    onNavChange: "nav-change",
+    onConflictDetected: "conflict-detected",
   },
 });
 
-/**
- * <MonthGrid> — Monthly calendar view showing event chips per day.
- *
- * Events:
- *  - onEventClick → CustomEvent<TimelineEvent>        — user clicked an event chip
- *  - onDayClick   → CustomEvent<{ date: string }>     — user clicked an empty day cell
- *  - onAddEvent   → CustomEvent<void>                 — user clicked the + FAB
- *  - onViewChange → CustomEvent<{ view: "Timeline" | "Month" }> — user switched views
- *
- * The component reads directly from the Zustand store.
- */
-export const MonthGrid = createComponent({
+export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
+  resources?: TimelineResource[];
+  view?: "Timeline" | "Month";
+  currentDate?: Date;
+  aiPrompt?: string;
+  allowCreate?: boolean;
+  showFab?: boolean;
+  preventConflicts?: boolean;
+  onEventClick?: (detail: TimelineEvent) => void;
+  onEventMove?: (detail: EventMoveDetail) => void;
+  onEventResize?: (detail: EventResizeDetail) => void;
+  onEventCreate?: (detail: EventCreateDetail) => void;
+  onAddEvent?: () => void;
+  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+  onConflictDetected?: (detail: {
+    message: string;
+    action: string;
+    detail: EventMoveDetail | EventResizeDetail | EventCreateDetail;
+  }) => void;
+}
+
+function withConflictBypass<T>(
+  prevent: boolean | undefined,
+  callback?: (detail: T) => void,
+) {
+  if (!callback) return undefined;
+  return (e: Event) => {
+    const detail = (e as CustomEvent).detail;
+    if (prevent && detail?.hasConflict) {
+      return;
+    }
+    callback(detail);
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const Timeline = React.forwardRef<any, TimelineProps>((props, ref) => {
+  return React.createElement(_Timeline, {
+    ...props,
+    ref,
+    onConflictDetected: props.onConflictDetected
+      ? (e: Event) => props.onConflictDetected!((e as CustomEvent).detail)
+      : undefined,
+    onEventClick: props.onEventClick
+      ? (e: Event) =>
+          props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+      : undefined,
+    onEventMove: withConflictBypass(props.preventConflicts, props.onEventMove),
+    onEventResize: withConflictBypass(
+      props.preventConflicts,
+      props.onEventResize,
+    ),
+    onEventCreate: withConflictBypass(
+      props.preventConflicts,
+      props.onEventCreate,
+    ),
+    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+    onViewChange: props.onViewChange
+      ? (e: Event) =>
+          props.onViewChange!(
+            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+          )
+      : undefined,
+    onNavChange: props.onNavChange
+      ? (e: Event) =>
+          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
+      : undefined,
+  });
+});
+
+const _MonthGrid = createComponent({
   tagName: "janus-month-grid",
   elementClass: JanusMonthGridWC,
   react: React,
@@ -128,5 +215,132 @@ export const MonthGrid = createComponent({
     onDayClick: "day-click",
     onAddEvent: "add-event",
     onViewChange: "view-change",
+    onNavChange: "nav-change",
   },
 });
+
+export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
+  showFab?: boolean;
+  onEventClick?: (detail: TimelineEvent) => void;
+  onDayClick?: (detail: { date: string }) => void;
+  onAddEvent?: () => void;
+  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const MonthGrid = React.forwardRef<any, MonthGridProps>((props, ref) => {
+  return React.createElement(_MonthGrid, {
+    ...props,
+    ref,
+    onEventClick: props.onEventClick
+      ? (e: Event) =>
+          props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+      : undefined,
+    onDayClick: props.onDayClick
+      ? (e: Event) =>
+          props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
+      : undefined,
+    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+    onViewChange: props.onViewChange
+      ? (e: Event) =>
+          props.onViewChange!(
+            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+          )
+      : undefined,
+    onNavChange: props.onNavChange
+      ? (e: Event) =>
+          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
+      : undefined,
+  });
+});
+
+const _AiBar = createComponent({
+  tagName: "janus-ai-bar",
+  elementClass: JanusAiBarWC,
+  react: React,
+  events: {
+    onAiSubmit: "ai-submit",
+    onAiInput: "ai-input",
+  },
+});
+
+export interface AiBarProps extends React.HTMLAttributes<HTMLElement> {
+  placeholder?: string;
+  value?: string;
+  buttonLabel?: string;
+  onAiSubmit?: (detail: { prompt: string }) => void;
+  onAiInput?: (detail: { prompt: string }) => void;
+}
+
+export function AiBar(props: AiBarProps): React.JSX.Element {
+  return React.createElement(_AiBar, {
+    ...props,
+    onAiSubmit: props.onAiSubmit
+      ? (e: Event) =>
+          props.onAiSubmit!((e as CustomEvent<{ prompt: string }>).detail)
+      : undefined,
+    onAiInput: props.onAiInput
+      ? (e: Event) =>
+          props.onAiInput!((e as CustomEvent<{ prompt: string }>).detail)
+      : undefined,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Topbar Wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _Topbar = createComponent({
+  tagName: "janus-topbar",
+  elementClass: JanusTopbarWC,
+  react: React,
+  events: {
+    onPrevClick: "prev-click",
+    onNextClick: "next-click",
+    onTodayClick: "today-click",
+    onViewSwitch: "view-switch",
+    onToggleCreate: "toggle-create",
+    onBenchmarkClick: "benchmark-click",
+  },
+});
+
+export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
+  navLabel?: string;
+  dayName?: string;
+  shortDate?: string;
+  view?: "Timeline" | "Month";
+  allowCreate?: boolean;
+  zoomPercent?: number;
+  zoomUnit?: string;
+  showBenchmarkBtn?: boolean;
+  isBenchmarkActive?: boolean;
+  benchmarkLabel?: string;
+  onPrevClick?: () => void;
+  onNextClick?: () => void;
+  onTodayClick?: () => void;
+  onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
+  onToggleCreate?: () => void;
+  onBenchmarkClick?: () => void;
+}
+
+export function Topbar(props: TopbarProps): React.JSX.Element {
+  return React.createElement(_Topbar, {
+    ...props,
+    onPrevClick: props.onPrevClick ? () => props.onPrevClick!() : undefined,
+    onNextClick: props.onNextClick ? () => props.onNextClick!() : undefined,
+    onTodayClick: props.onTodayClick ? () => props.onTodayClick!() : undefined,
+    onViewSwitch: props.onViewSwitch
+      ? (e: Event) =>
+          props.onViewSwitch!(
+            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+          )
+      : undefined,
+    onToggleCreate: props.onToggleCreate
+      ? () => props.onToggleCreate!()
+      : undefined,
+    onBenchmarkClick: props.onBenchmarkClick
+      ? () => props.onBenchmarkClick!()
+      : undefined,
+  });
+}

@@ -1,56 +1,171 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state, query } from "lit/decorators.js";
 import { timelineStyles } from "./timeline-styles";
-import { schedulerStore } from "@janus-scheduler/core";
+import {
+  schedulerStore,
+  isoToZonedDisplay,
+  getBrowserTimezone,
+  expandEvents,
+  computeTimelineConflicts,
+  checkSlotConflict,
+  type ConflictResource,
+  type SchedulerStore,
+} from "@janus-scheduler/core";
+import "./janus-ai-bar";
+import "./janus-topbar";
 
 import { TimelineEvent, TimelineResource } from "./timeline-types";
+import { RoomIcon, EquipmentIcon, PlusIcon } from "./timeline-icons";
 import {
-  RoomIcon,
-  EquipmentIcon,
-  ChevronLeft,
-  ChevronRight,
-  SearchIcon,
-  BellIcon,
-  SparkleIcon,
-  PlusIcon,
-} from "./timeline-icons";
-import {
-  HOUR_START,
-  HOUR_WIDTH,
-  VISIBLE_HOURS,
   ROW_HEIGHT,
   GROUP_LABEL_HEIGHT,
   HOUR_HEADER_HEIGHT,
+  SUPER_HEADER_HEIGHT,
   fmt12,
   getInitials,
   avatarColor,
-  eventStyle,
-  toDateStr,
-  nowLeft,
-  formatDateFull,
-  formatDateShort,
 } from "./timeline-utils";
+import {
+  DEFAULT_PX_PER_MS,
+  MIN_PX_PER_MS,
+  MAX_PX_PER_MS,
+  ZOOM_SCALE_FACTOR,
+  CONTENT_HALF_WIDTH,
+  getActiveZoomLevel,
+  generateColumns,
+  generateSuperLabels,
+  timestampToPx,
+  formatNavDate,
+  getNavStepMs,
+  pxToTimestamp,
+  snapTimestamp,
+} from "./timeline-zoom";
 import { TimelineDragController, ResourceLayout } from "./timeline-drag";
+
+/** Shared empty result for the no-recurring-events fast path in _syncFromStore. */
+const EMPTY_EVENT_LIST: ReturnType<typeof expandEvents> = [];
+
+/** Nav-label formatters, hoisted so scrolling does not rebuild them per event. */
+const NAV_WEEKDAY_FMT = new Intl.DateTimeFormat("en-US", { weekday: "long" });
+const NAV_SHORT_DATE_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
 
 @customElement("janus-timeline")
 export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
 
   @property({ type: Array }) resources: TimelineResource[] = [];
+  /** When true, dragging on empty row space creates a new event. Default: false */
+  @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
+  /** When true, renders a + Floating Action Button to add an event. Default: false */
+  @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
+  @property({ type: Boolean, attribute: "prevent-conflicts" })
+  preventConflicts = true;
+
+  @state() private _showBlockedConflictDialog = false;
+  @state() private _blockedConflictMessage = "";
 
   @state() view: "Timeline" | "Month" = "Timeline";
-  @state() currentDate = new Date();
-  @state() aiPrompt = "";
   @state() private _dragVersion = 0; // bumped to trigger re-render during drag
+  @state() private _showConflictDetails = false;
+  @state() private _isConflictsBannerDismissed = false;
+  private _lastConflictIdsKey = "";
+  /** Conflict-recompute inputs from the last willUpdate — see the guard there. */
+  private _confLastResources: TimelineResource[] | null = null;
+  private _confLastTz = "";
+  private _confLastPrevent: boolean | null = null;
+  @state() private _cachedConflicts = {
+    hasConflict: false,
+    messages: [] as string[],
+    conflictingEventIds: new Set<string>(),
+  };
+
+  /** Zoom: pixels per millisecond (the single universal scale) */
+  @state() private _pxPerMs = DEFAULT_PX_PER_MS;
+
+  /**
+   * The absolute timestamp (ms) at the LEFT EDGE of the rendered content.
+   * The content always spans from _viewStartMs to _viewStartMs + totalWidth/pxPerMs.
+   */
+  private _viewStartMs = 0;
 
   @query(".tl-res-col") resColRef!: HTMLElement;
   @query(".tl-time-scroll") gridScrollRef!: HTMLElement;
 
-  private _drag = new TimelineDragController(() => {
-    this._dragVersion++;
-  });
+  private _ghostEl: HTMLElement | null = null;
+
+  private _drag = new TimelineDragController(
+    () => {
+      this._dragVersion++;
+      this.requestUpdate();
+    },
+    () => {
+      this._applyGhostStyle();
+    },
+  );
   private _wasDragging = false;
   private _unsubStore?: () => void;
+  /** Suppress scroll handler during programmatic scroll adjustments */
+  private _suppressScroll = false;
+
+  @state() private _scrollLeft = 0;
+  @state() private _scrollTop = 0;
+  @state() private _viewportWidth = 1200;
+  @state() private _viewportHeight = 600;
+
+  private _cachedTrackMap = new Map<
+    string,
+    { trackCount: number; eventTracks: Map<string, number> }
+  >();
+
+  /** Store-slice references from the last sync — see the early-out in _syncFromStore. */
+  private _lastEventsRef: SchedulerStore["events"] | null = null;
+  private _lastResourcesRef: SchedulerStore["resources"] | null = null;
+  private _lastTz = "";
+
+  /**
+   * Derived-view-model caches: `_vmCache` by a length-prefixed
+   * `resourceId + eventId` composite key, `_rowCache` by resource id. `gen` is
+   * the sync pass that last produced the entry; entries from an older pass are
+   * evicted. See _syncFromStore for the change-detection contract — in
+   * particular why source *fields* are compared rather than object identity.
+   */
+  private _vmCache = new Map<
+    string,
+    {
+      st: string;
+      et: string;
+      ti: string;
+      co: string;
+      gen: number;
+      vm: TimelineEvent;
+    }
+  >();
+  private _rowCache = new Map<
+    string,
+    {
+      /** View-models in *grouping* order — the basis for change detection. */
+      raw: TimelineEvent[];
+      /** Presentation inputs, compared field-by-field to detect row changes. */
+      name: string;
+      type: string;
+      avatar: string;
+      groupLabel: string | undefined;
+      resource: TimelineResource;
+      track: { trackCount: number; eventTracks: Map<string, number> };
+      gen: number;
+    }
+  >();
+  private _syncGen = 0;
+
+  private _zoomRafId: number | null = null;
+  private _pendingZoomFactor = 1;
+  private _pendingPointerX = 0;
+  private _navRafId: number | null = null;
+  private _resizeObserver?: ResizeObserver;
+  private _pendingCenterMs: number | null = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -63,16 +178,137 @@ export class JanusTimeline extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+    }
+    if (this._zoomRafId !== null) {
+      cancelAnimationFrame(this._zoomRafId);
+      this._zoomRafId = null;
+    }
+    if (this._navRafId !== null) {
+      cancelAnimationFrame(this._navRafId);
+      this._navRafId = null;
+    }
+    this._ghostEl = null;
   }
 
-  private _syncFromStore(state: any) {
+  private _applyGhostStyle = () => {
+    if (!this._ghostEl) {
+      this._ghostEl = this.renderRoot.querySelector(".tl-drag-ghost");
+    }
+    const el = this._ghostEl;
+    if (!el) return;
+
+    const g = this._drag.ghost;
+    el.style.left = `${g.left}px`;
+    el.style.top = `${g.top}px`;
+    el.style.width = `${g.width}px`;
+
+    // Conflict check scoped ONLY to the target resource (O(events in 1 row))
+    const targetResourceId =
+      this._drag.targetResourceId || this._drag.originResourceId;
+    let ghostStartMs = 0;
+    let ghostEndMs = 0;
+    const eventId = this._drag.activeEvent?.id;
+    const snapMs = this._drag.snapMs;
+
+    if (this._drag.mode === "moving") {
+      const durationMs = this._drag.originalEndMs - this._drag.originalStartMs;
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+      ghostEndMs = ghostStartMs + durationMs;
+    } else if (this._drag.mode === "resize-start") {
+      ghostEndMs = this._drag.originalEndMs;
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+    } else if (this._drag.mode === "resize-end") {
+      ghostStartMs = this._drag.originalStartMs;
+      const rawEnd = pxToTimestamp(
+        g.left + g.width,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
+      ghostEndMs = snapTimestamp(rawEnd, snapMs);
+    } else if (this._drag.mode === "creating") {
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      const rawEnd = pxToTimestamp(
+        g.left + g.width,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+      ghostEndMs = snapTimestamp(rawEnd, snapMs);
+      if (ghostEndMs <= ghostStartMs) ghostEndMs = ghostStartMs + snapMs;
+    }
+
+    const resource = targetResourceId
+      ? this.resources.find((r) => r.id === targetResourceId)
+      : null;
+    const hasDragConflict = resource
+      ? checkSlotConflict(resource.events, ghostStartMs, ghostEndMs, eventId)
+      : false;
+
+    el.classList.toggle("tl-drag-ghost--conflict", hasDragConflict);
+
+    const timeEl = el.querySelector(".tl-drag-ghost__time");
+    if (timeEl) {
+      timeEl.textContent = g.timeLabel;
+    }
+  };
+
+  private _syncFromStore(state: SchedulerStore) {
+    const tz =
+      (state.timezone as string) ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // ── Slice-identity early-out ────────────────────────────────────────────
+    // The store is subscribed without a selector, so every set() lands here —
+    // including `updateDraft`, which fires on each keystroke in the event modal
+    // and only ever replaces `eventDraft`. Zustand shallow-merges, so slices the
+    // timeline does not read keep their object identity across such writes.
+    //
+    // Identity is a valid signal at the *slice* level (both `updateEvent` and
+    // `updateResource` spread a fresh record) but NOT at the per-event level,
+    // because `updateEvent` mutates the Event instance in place — see the
+    // field-level comparison in the per-resource loop below.
+    if (
+      state.events === this._lastEventsRef &&
+      state.resources === this._lastResourcesRef &&
+      tz === this._lastTz
+    ) {
+      return;
+    }
+    const previousTz = this._lastTz;
+    this._lastEventsRef = state.events;
+    this._lastResourcesRef = state.resources;
+    this._lastTz = tz;
+
+    // A timezone change invalidates every derived label.
+    if (tz !== previousTz) {
+      this._vmCache.clear();
+      this._rowCache.clear();
+    }
+    this._syncGen++;
+
     const newResources: TimelineResource[] = [];
-    const coreEvents = Object.values(state.events) as any[];
+    const rawEvents = Object.values(state.events);
+    const centerMs = this._viewStartMs || Date.now();
+    const startRange = centerMs - 365 * 24 * 60 * 60 * 1000;
+    const endRange = centerMs + 365 * 24 * 60 * 60 * 1000;
 
-    // First, convert object values to arrays and sort them by type so groups cluster correctly
-    const coreResources = Object.values(state.resources) as any[];
+    // Only recurring events need expansion. `expandEvents` passes non-recurring
+    // events straight through (unfiltered by range), so splitting the input is
+    // exactly equivalent — and it avoids allocating a throwaway object for
+    // every one of the tens of thousands of plain events on large datasets.
+    let recurring: typeof rawEvents | null = null;
+    for (const e of rawEvents) {
+      if (e.recurrenceRule) (recurring ??= []).push(e);
+    }
+    const occurrences = recurring
+      ? expandEvents(recurring, startRange, endRange)
+      : EMPTY_EVENT_LIST;
+    const coreResources = Object.values(state.resources);
 
-    // Define ordering for types
     const typeOrder: Record<string, number> = {
       person: 1,
       room: 2,
@@ -84,32 +320,112 @@ export class JanusTimeline extends LitElement {
         (typeOrder[b.type || "person"] || 99),
     );
 
-    // Keep track of which group we are currently in so we only set groupLabel on the first item of that group
     let currentGroupType = "";
 
+    const newTrackMap = new Map<
+      string,
+      { trackCount: number; eventTracks: Map<string, number> }
+    >();
+
+    // Pre-group source events by resource ID in a single O(E) pass
+    type SourceEvent = (typeof occurrences)[number];
+    const eventsByResource = new Map<string, SourceEvent[]>();
+    const groupByResource = (e: SourceEvent) => {
+      const rIds =
+        e.resourceIds && e.resourceIds.length > 0
+          ? e.resourceIds
+          : e.resourceId
+            ? [e.resourceId]
+            : [];
+      for (const rId of rIds) {
+        let arr = eventsByResource.get(rId);
+        if (!arr) {
+          arr = [];
+          eventsByResource.set(rId, arr);
+        }
+        arr.push(e);
+      }
+    };
+    for (const e of rawEvents) {
+      if (!e.recurrenceRule) groupByResource(e as unknown as SourceEvent);
+    }
+    for (const e of occurrences) groupByResource(e);
+
+    let vmCount = 0;
+
     for (const res of coreResources) {
-      const resEvents = coreEvents
-        .filter((e) => e.resourceId === res.id)
-        .map((e) => {
-          const startD = new Date(e.startTime);
-          const endD = new Date(e.endTime);
-          const pad = (n: number) => n.toString().padStart(2, "0");
-          return {
+      const resEventsRaw = eventsByResource.get(res.id) || [];
+
+      // ── Derive view-models, reusing unchanged ones ───────────────────────
+      // `updateEvent` mutates the Event instance in place, so neither the
+      // instance reference nor a record diff detects a change. Compare the
+      // source fields the view-model is derived from instead — they are
+      // strings off the same instance, so `===` is a pointer compare with no
+      // allocation (a concatenated signature would allocate one string per
+      // event per sync, which at 63k events is the very cost we are removing).
+      //
+      // IMPORTANT: this comparison set must cover every source field the
+      // view-model reads below. If you start rendering another field, add it
+      // here or the UI will show stale data.
+      const resEvents: TimelineEvent[] = new Array(resEventsRaw.length);
+      let eventsChanged = false;
+      const prevRow = this._rowCache.get(res.id);
+      const prevRaw = prevRow?.raw;
+
+      for (let i = 0; i < resEventsRaw.length; i++) {
+        const e = resEventsRaw[i];
+        const key = `${res.id.length}:${res.id}${e.id}`;
+        const color = e.color || "primary";
+        const cached = this._vmCache.get(key);
+
+        let vm: TimelineEvent;
+        if (
+          cached !== undefined &&
+          cached.st === e.startTime &&
+          cached.et === e.endTime &&
+          cached.ti === e.title &&
+          cached.co === color
+        ) {
+          vm = cached.vm;
+          cached.gen = this._syncGen;
+        } else {
+          const { time: startTime } = isoToZonedDisplay(e.startTime, tz);
+          const { time: endTime, date } = isoToZonedDisplay(e.endTime, tz);
+          vm = {
             id: e.id,
             title: e.title,
-            startTime: `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}`,
-            endTime: `${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`,
-            color: "blue",
-            date: `${startD.getFullYear()}-${pad(startD.getMonth() + 1)}-${pad(startD.getDate())}`,
+            startTime,
+            endTime,
+            startMs: new Date(e.startTime).getTime(),
+            endMs: new Date(e.endTime).getTime(),
+            color,
+            date,
+            resourceId: res.id,
           } as TimelineEvent;
-        });
+          this._vmCache.set(key, {
+            st: e.startTime,
+            et: e.endTime,
+            ti: e.title,
+            co: color,
+            gen: this._syncGen,
+            vm,
+          });
+        }
+        resEvents[i] = vm;
+        vmCount++;
 
-      let avatarType: "initials" | "icon" = "initials";
-      let avatarIcon: "room" | "equipment" | undefined = undefined;
-      let groupLabel: string | undefined = undefined;
+        // Unchanged events keep their object identity, so this is exact.
+        if (!eventsChanged && (!prevRaw || prevRaw[i] !== vm)) {
+          eventsChanged = true;
+        }
+      }
+      if (!eventsChanged && prevRaw && prevRaw.length !== resEvents.length) {
+        eventsChanged = true;
+      }
 
+      // ── Resource presentation metadata ───────────────────────────────────
       const type = res.type || "person";
-
+      let groupLabel: string | undefined = undefined;
       if (type !== currentGroupType) {
         currentGroupType = type;
         if (type === "person") groupLabel = "STAFF";
@@ -117,7 +433,61 @@ export class JanusTimeline extends LitElement {
         else if (type === "equipment") groupLabel = "EQUIPMENT";
       }
 
-      if (type === "room") {
+      const avatarSrc = res.avatar ?? "";
+
+      // ── Reuse the whole row when nothing about it changed ────────────────
+      // Fields are compared individually rather than via a concatenated
+      // signature: no per-resource string allocation, and no separator that
+      // could collide (a name containing the separator would otherwise be able
+      // to masquerade as a different name/type split).
+      //
+      // `groupLabel` is included because it depends on the resource's position
+      // in the type-sorted list, not on the resource alone.
+      if (
+        !eventsChanged &&
+        prevRow &&
+        prevRow.name === res.name &&
+        prevRow.type === type &&
+        prevRow.avatar === avatarSrc &&
+        prevRow.groupLabel === groupLabel
+      ) {
+        prevRow.gen = this._syncGen;
+        newResources.push(prevRow.resource);
+        newTrackMap.set(res.id, prevRow.track);
+        continue;
+      }
+
+      // Sort once, here, so render() does not have to re-sort every frame.
+      // Nothing depends on insertion order: checkSlotConflict is
+      // order-independent and computeTimelineConflicts sorts its own copy.
+      //
+      // This must be a COPY, not an in-place sort: `resEvents` is retained as
+      // `raw`, the grouping-order comparison basis for the next sync. Sorting
+      // it in place would make every subsequent comparison compare grouping
+      // order against sorted order and report a spurious change every time.
+      const sorted = resEvents.slice().sort((a, b) => a.startMs - b.startMs);
+
+      const tracks: number[] = [];
+      const eventTracks = new Map<string, number>();
+      for (const ev of sorted) {
+        let t = 0;
+        while (t < tracks.length && tracks[t] > ev.startMs) {
+          t++;
+        }
+        tracks[t] = ev.endMs;
+        eventTracks.set(ev.id, t);
+      }
+      const track = {
+        trackCount: Math.max(1, tracks.length),
+        eventTracks,
+      };
+      newTrackMap.set(res.id, track);
+
+      let avatarType: "initials" | "icon" | "image" = "initials";
+      let avatarIcon: "room" | "equipment" | undefined = undefined;
+      if (res.avatar) {
+        avatarType = "image";
+      } else if (type === "room") {
         avatarType = "icon";
         avatarIcon = "room";
       } else if (type === "equipment") {
@@ -125,7 +495,7 @@ export class JanusTimeline extends LitElement {
         avatarIcon = "equipment";
       }
 
-      newResources.push({
+      const resource: TimelineResource = {
         id: res.id,
         name: res.name,
         subtitle:
@@ -137,47 +507,307 @@ export class JanusTimeline extends LitElement {
         avatarType,
         avatarIcon,
         groupLabel,
-        events: resEvents,
+        events: sorted,
+        avatar: res.avatar,
+      };
+
+      newResources.push(resource);
+      this._rowCache.set(res.id, {
+        raw: resEvents,
+        name: res.name,
+        type,
+        avatar: avatarSrc,
+        groupLabel,
+        resource,
+        track,
+        gen: this._syncGen,
       });
     }
 
-    // Only overwrite if store has data, otherwise we might wipe initial props
-    if (newResources.length > 0) {
+    // ── Evict entries not produced this pass ──────────────────────────────
+    // In steady state (dragging one event) the counts match and no sweep runs.
+    if (this._vmCache.size !== vmCount) {
+      for (const [k, v] of this._vmCache) {
+        if (v.gen !== this._syncGen) this._vmCache.delete(k);
+      }
+    }
+    if (this._rowCache.size !== coreResources.length) {
+      for (const [k, v] of this._rowCache) {
+        if (v.gen !== this._syncGen) this._rowCache.delete(k);
+      }
+    }
+
+    this._cachedTrackMap = newTrackMap;
+
+    // Reassign `resources` only when something visible actually changed.
+    // Rows reused above keep their object identity, so this comparison is
+    // exact — and it is the contract the conflict guard in willUpdate relies
+    // on: `resources` identity changes if and only if the view changed.
+    let listChanged = newResources.length !== this.resources.length;
+    if (!listChanged) {
+      for (let i = 0; i < newResources.length; i++) {
+        if (newResources[i] !== this.resources[i]) {
+          listChanged = true;
+          break;
+        }
+      }
+    }
+
+    if (listChanged && newResources.length > 0) {
       this.resources = newResources;
     }
   }
 
-  firstUpdated() {
-    // On mount: scroll horizontally so 8:00 AM is the first visible hour
-    if (this.gridScrollRef) {
-      this.gridScrollRef.scrollLeft = 8 * HOUR_WIDTH;
+  willUpdate(changedProperties: Map<string, unknown>) {
+    super.willUpdate(changedProperties);
+
+    // Recompute conflicts only when an actual input changed.
+    //
+    // The previous guard included `conflictingEventIds.size === 0`, which is
+    // true for every conflict-free dataset — the normal case — so this ran over
+    // every event on EVERY update: each scroll tick, each drag-start, each
+    // dialog toggle. Tracking the inputs by reference fixes that.
+    //
+    // `resources` identity is a sound signal because _syncFromStore reassigns it
+    // if and only if something visible changed, and never mutates it in place.
+    const tz = schedulerStore.getState().timezone;
+    if (
+      this.resources === this._confLastResources &&
+      tz === this._confLastTz &&
+      this.preventConflicts === this._confLastPrevent
+    ) {
+      return;
+    }
+    this._confLastResources = this.resources;
+    this._confLastTz = tz;
+    this._confLastPrevent = this.preventConflicts;
+
+    const conflictResources = this.resources as unknown as ConflictResource[];
+    this._cachedConflicts = computeTimelineConflicts(conflictResources, tz);
+
+    const currentIdsKey = Array.from(this._cachedConflicts.conflictingEventIds)
+      .sort()
+      .join(",");
+    if (currentIdsKey !== this._lastConflictIdsKey) {
+      this._isConflictsBannerDismissed = false;
+      this._lastConflictIdsKey = currentIdsKey;
     }
   }
+
+  updated(changedProperties: Map<string, unknown>) {
+    super.updated(changedProperties);
+    if (changedProperties.has("_isConflictsBannerDismissed")) {
+      const scrollEl = this.gridScrollRef;
+      if (scrollEl) {
+        const originalScroll = scrollEl.scrollTop;
+        scrollEl.scrollTop = originalScroll + 1;
+        scrollEl.scrollTop = originalScroll;
+      }
+    }
+
+    if (this._drag.active && !this._ghostEl) {
+      this._ghostEl = this.renderRoot.querySelector(".tl-drag-ghost");
+    } else if (!this._drag.active && this._ghostEl) {
+      this._ghostEl = null;
+    }
+  }
+
+  firstUpdated() {
+    if (this.gridScrollRef) {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          if (w > 0) {
+            if (this._pendingCenterMs !== null) {
+              const target = this._pendingCenterMs;
+              this._pendingCenterMs = null;
+              this._initializeView(target);
+            }
+          }
+        }
+      });
+      this._resizeObserver.observe(this.gridScrollRef);
+    }
+    const now = Date.now();
+    this._initializeView(now);
+  }
+
+  /**
+   * Initialize (or re-center) the timeline around a timestamp.
+   * Sets _viewStartMs so that `centerMs` is at the middle of the container.
+   */
+  private _initializeView(centerMs: number) {
+    // Content spans CONTENT_HALF_WIDTH * 2 pixels = 20000px total
+    this._viewStartMs = centerMs - CONTENT_HALF_WIDTH / this._pxPerMs;
+    this.requestUpdate();
+
+    if (!this.gridScrollRef || this.gridScrollRef.clientWidth === 0) {
+      this._pendingCenterMs = centerMs;
+      this._emitNavChange();
+      return;
+    }
+
+    const containerWidth = this.gridScrollRef.clientWidth;
+    this._suppressScroll = true;
+    this.gridScrollRef.scrollLeft = CONTENT_HALF_WIDTH - containerWidth / 2;
+    this._suppressScroll = false;
+
+    this._emitNavChange();
+  }
+
+  /** Total content width in px — always fixed at 2 * CONTENT_HALF_WIDTH */
+  private get _totalWidth(): number {
+    return CONTENT_HALF_WIDTH * 2;
+  }
+
+  private _getViewEndMs(): number {
+    return this._viewStartMs + this._totalWidth / this._pxPerMs;
+  }
+
+  /** Get the timestamp at the center of the currently visible area */
+  private _getVisibleCenterMs(): number {
+    if (!this.gridScrollRef)
+      return this._viewStartMs + CONTENT_HALF_WIDTH / this._pxPerMs;
+    const containerWidth = this.gridScrollRef.clientWidth;
+    const scrollCenter = this.gridScrollRef.scrollLeft + containerWidth / 2;
+    return this._viewStartMs + scrollCenter / this._pxPerMs;
+  }
+
+  // ── Scroll handling ─────────────────────────────────────────────────
 
   private _onGridScroll() {
+    // Sync vertical scroll between resource column and time grid
     if (this.resColRef && this.gridScrollRef) {
-      this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      if (this.resColRef.scrollTop !== this.gridScrollRef.scrollTop) {
+        this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      }
+    }
+
+    if (this.gridScrollRef) {
+      if (this._scrollLeft !== this.gridScrollRef.scrollLeft) {
+        this._scrollLeft = this.gridScrollRef.scrollLeft;
+      }
+      if (this._scrollTop !== this.gridScrollRef.scrollTop) {
+        this._scrollTop = this.gridScrollRef.scrollTop;
+      }
+      if (
+        this.gridScrollRef.clientWidth &&
+        this._viewportWidth !== this.gridScrollRef.clientWidth
+      ) {
+        this._viewportWidth = this.gridScrollRef.clientWidth;
+      }
+      if (
+        this.gridScrollRef.clientHeight &&
+        this._viewportHeight !== this.gridScrollRef.clientHeight
+      ) {
+        this._viewportHeight = this.gridScrollRef.clientHeight;
+      }
+    }
+
+    // Skip re-centering during programmatic scroll adjustments
+    if (this._suppressScroll) return;
+
+    // Infinite scroll: when user nears the edges, re-center the content
+    if (this.gridScrollRef) {
+      const sl = this.gridScrollRef.scrollLeft;
+      const containerWidth = this.gridScrollRef.clientWidth;
+      const maxScroll = this._totalWidth - containerWidth;
+
+      // If within 15% of either edge, re-center
+      const edgeThreshold = maxScroll * 0.15;
+      if (sl < edgeThreshold || sl > maxScroll - edgeThreshold) {
+        const currentCenterMs = this._getVisibleCenterMs();
+        this._initializeView(currentCenterMs);
+      }
+    }
+    this._scheduleNavChange();
+  }
+
+  /**
+   * Coalesce nav-change emission to one per frame.
+   *
+   * `_emitNavChange` formats three date labels and dispatches an event that the
+   * host re-renders on. Firing it per native scroll event (which on a trackpad
+   * exceeds 60Hz) did that work several times per frame for no visible benefit.
+   * Mirrors the existing rAF-coalesced zoom commit.
+   */
+  private _scheduleNavChange() {
+    if (this._navRafId !== null) return;
+    this._navRafId = requestAnimationFrame(() => {
+      this._navRafId = null;
+      this._emitNavChange();
+    });
+  }
+
+  private _onResScroll() {
+    if (this.resColRef && this.gridScrollRef) {
+      if (this.gridScrollRef.scrollTop !== this.resColRef.scrollTop) {
+        this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
+      }
     }
   }
 
-  private _goToPrevDay() {
-    const d = new Date(this.currentDate);
-    d.setDate(d.getDate() - 1);
-    this.currentDate = d;
+  private _emitNavChange() {
+    const visibleCenter = this._getVisibleCenterMs();
+    const level = getActiveZoomLevel(this._pxPerMs);
+    const tz = getBrowserTimezone();
+    const navLabel = formatNavDate(visibleCenter, level, tz);
+
+    // `toLocaleDateString` constructs a fresh Intl.DateTimeFormat internally on
+    // every call — the memoization in core's time.ts cannot reach it — so hold
+    // the two formatters here instead.
+    const d = new Date(visibleCenter);
+    const dayName = NAV_WEEKDAY_FMT.format(d);
+    const shortDate = NAV_SHORT_DATE_FMT.format(d);
+
+    this.dispatchEvent(
+      new CustomEvent("nav-change", {
+        detail: {
+          navLabel,
+          dayName,
+          shortDate,
+          zoomPercent: this._zoomPercent(),
+          zoomUnit: level.unit,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
-  private _goToNextDay() {
-    const d = new Date(this.currentDate);
-    d.setDate(d.getDate() + 1);
-    this.currentDate = d;
+  // ── Navigation ────────────────────────────────────────────────────
+
+  public goToPrev() {
+    const level = getActiveZoomLevel(this._pxPerMs);
+    const currentCenter = this._getVisibleCenterMs();
+    this._initializeView(currentCenter - getNavStepMs(level));
   }
 
-  private _goToToday() {
-    this.currentDate = new Date();
+  public goToNext() {
+    const level = getActiveZoomLevel(this._pxPerMs);
+    const currentCenter = this._getVisibleCenterMs();
+    this._initializeView(currentCenter + getNavStepMs(level));
+  }
+
+  public goToToday() {
+    this._pxPerMs = DEFAULT_PX_PER_MS; // reset zoom to default
+    this._initializeView(Date.now());
+  }
+
+  public goToDate(date: string | number | Date) {
+    this._pxPerMs = DEFAULT_PX_PER_MS;
+    let targetTime: number;
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [y, m, d] = date.split("-").map(Number);
+      // Center on noon local time on the target day
+      targetTime = new Date(y, m - 1, d, 12, 0, 0).getTime();
+    } else {
+      targetTime = new Date(date).getTime();
+    }
+    this._initializeView(targetTime);
   }
 
   private _handleEventClick(e: Event, ev: TimelineEvent) {
-    // Don't fire click if we just finished a drag
     if (this._wasDragging) {
       this._wasDragging = false;
       e.preventDefault();
@@ -199,16 +829,102 @@ export class JanusTimeline extends LitElement {
     );
   }
 
+  public setView(v: "Timeline" | "Month") {
+    this.view = v;
+    // Let the parent app know so it can swap components if needed
+    this.dispatchEvent(
+      new CustomEvent("view-change", {
+        detail: { view: v },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  public toggleCreate() {
+    this.allowCreate = !this.allowCreate;
+    this.dispatchEvent(
+      new CustomEvent("allow-create-change", {
+        detail: { allowCreate: this.allowCreate },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  // ── Zoom handler (Ctrl/Cmd + Scroll) ──────────────────────────────
+
+  private _handleWheel(e: WheelEvent) {
+    // Only zoom when Ctrl or Meta (Cmd on Mac) is held
+    if (!e.ctrlKey && !e.metaKey) return;
+
+    e.preventDefault();
+
+    const container = this.gridScrollRef;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const direction = e.deltaY < 0 ? 1 : -1; // scroll up = zoom in
+
+    // Accumulate zoom factor & capture latest pointer X
+    this._pendingZoomFactor *= 1 + direction * ZOOM_SCALE_FACTOR;
+    this._pendingPointerX = e.clientX - rect.left;
+
+    if (this._zoomRafId === null) {
+      this._zoomRafId = requestAnimationFrame(() => this._commitZoom());
+    }
+  }
+
+  private _commitZoom() {
+    this._zoomRafId = null;
+
+    const container = this.gridScrollRef;
+    if (!container) {
+      this._pendingZoomFactor = 1;
+      return;
+    }
+
+    const pointerPx = container.scrollLeft + this._pendingPointerX;
+    const timeUnderCursorMs = this._viewStartMs + pointerPx / this._pxPerMs;
+
+    const newPxPerMs = Math.min(
+      MAX_PX_PER_MS,
+      Math.max(MIN_PX_PER_MS, this._pxPerMs * this._pendingZoomFactor),
+    );
+    const newViewStartMs = timeUnderCursorMs - pointerPx / newPxPerMs;
+
+    this._scrollLeft = container.scrollLeft;
+    this._scrollTop = container.scrollTop;
+    if (container.clientWidth) this._viewportWidth = container.clientWidth;
+    if (container.clientHeight) this._viewportHeight = container.clientHeight;
+
+    this._pxPerMs = newPxPerMs;
+    this._viewStartMs = newViewStartMs;
+
+    this._pendingZoomFactor = 1;
+
+    this.dispatchEvent(
+      new CustomEvent("zoom-change", {
+        detail: {
+          pxPerMs: newPxPerMs,
+          level: getActiveZoomLevel(newPxPerMs).unit,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   // ── Drag-and-drop handlers ────────────────────────────────────────
 
   private _onEventPointerDown(
     e: PointerEvent,
     ev: TimelineEvent,
     resourceId: string,
+    evTop: number,
   ) {
-    // Only left mouse button
     if (e.button !== 0) return;
-    this._drag.startMove(e, ev, resourceId);
+    this._drag.startMove(e, ev, resourceId, evTop);
     this._addDragUpListener();
   }
 
@@ -217,14 +933,16 @@ export class JanusTimeline extends LitElement {
     ev: TimelineEvent,
     resourceId: string,
     edge: "start" | "end",
+    evTop: number,
   ) {
     if (e.button !== 0) return;
-    this._drag.startResize(e, ev, resourceId, edge);
+    this._drag.startResize(e, ev, resourceId, edge, evTop);
     this._addDragUpListener();
   }
 
   private _onRowPointerDown(e: PointerEvent, resourceId: string) {
     if (e.button !== 0) return;
+    if (!this.allowCreate) return;
     this._drag.startCreate(e, resourceId);
     if (this._drag.mode === "creating") {
       this._addDragUpListener();
@@ -237,13 +955,89 @@ export class JanusTimeline extends LitElement {
       const result = this._drag.completeAndGetResult();
       if (result) {
         this._wasDragging = true;
-        // Set the current date on create events
-        if (result.type === "event-create") {
-          result.detail.date = toDateStr(this.currentDate);
+
+        let hasConflict = false;
+        let targetResId = "";
+        let actionVerb = "";
+
+        if (result.type === "event-move") {
+          const { event, newResourceId, newStartTime, newEndTime } =
+            result.detail;
+          targetResId = newResourceId;
+          actionVerb = "move";
+          const startMs = new Date(newStartTime).getTime();
+          const endMs = new Date(newEndTime).getTime();
+
+          const resource = this.resources.find((r) => r.id === newResourceId);
+          if (resource) {
+            hasConflict = checkSlotConflict(
+              resource.events,
+              startMs,
+              endMs,
+              event.id,
+            );
+          }
+        } else if (result.type === "event-resize") {
+          const { event, resourceId, newStartTime, newEndTime } = result.detail;
+          targetResId = resourceId;
+          actionVerb = "resize";
+          const startMs = new Date(newStartTime).getTime();
+          const endMs = new Date(newEndTime).getTime();
+
+          const resource = this.resources.find((r) => r.id === resourceId);
+          if (resource) {
+            hasConflict = checkSlotConflict(
+              resource.events,
+              startMs,
+              endMs,
+              event.id,
+            );
+          }
+        } else if (result.type === "event-create") {
+          const { resourceId, startTime, endTime } = result.detail;
+          targetResId = resourceId;
+          actionVerb = "create";
+          const startMs = new Date(startTime).getTime();
+          const endMs = new Date(endTime).getTime();
+
+          const resource = this.resources.find((r) => r.id === resourceId);
+          if (resource) {
+            hasConflict = checkSlotConflict(resource.events, startMs, endMs);
+          }
         }
+
+        const resourceName = this._resolveResourceName(targetResId);
+        const conflictMessage = `Cannot ${actionVerb} event. ${resourceName} is already scheduled during this time. Double-booking is disabled.`;
+
+        if (hasConflict) {
+          // Dispatch a cancelable conflict-detected event
+          const conflictEvent = new CustomEvent("conflict-detected", {
+            detail: {
+              message: conflictMessage,
+              action: actionVerb,
+              detail: result.detail,
+            },
+            bubbles: true,
+            composed: true,
+            cancelable: true,
+          });
+          this.dispatchEvent(conflictEvent);
+
+          if (this.preventConflicts && !conflictEvent.defaultPrevented) {
+            this._blockedConflictMessage = conflictMessage;
+            this._showBlockedConflictDialog = true;
+            return;
+          }
+        }
+
+        // Always dispatch the custom action event (Unidirectional data flow)
         this.dispatchEvent(
           new CustomEvent(result.type, {
-            detail: result.detail,
+            detail: {
+              ...result.detail,
+              hasConflict,
+              conflictMessage: hasConflict ? conflictMessage : "",
+            },
             bubbles: true,
             composed: true,
           }),
@@ -253,19 +1047,72 @@ export class JanusTimeline extends LitElement {
     document.addEventListener("pointerup", handler);
   }
 
+  private _resolveResourceName(id: string): string {
+    const res = this.resources.find((r) => r.id === id);
+    return res ? res.name : id;
+  }
+
+  private _closeBlockedConflictDialog() {
+    this._showBlockedConflictDialog = false;
+    this._blockedConflictMessage = "";
+  }
+
+  // ── Column generation (memoized) ──────────────────────────────────
+
+  /**
+   * Cached `generateColumns` / `generateSuperLabels` pair.
+   *
+   * `viewEndMs` is fully determined by `viewStartMs` and `pxPerMs` (the content
+   * is a fixed pixel width), so it does not need to be part of the key.
+   */
+  private _colMemo: {
+    key: string;
+    columns: ReturnType<typeof generateColumns>;
+    superLabels: ReturnType<typeof generateSuperLabels>;
+  } | null = null;
+
+  private _getColumns(
+    viewStartMs: number,
+    viewEndMs: number,
+    pxPerMs: number,
+    level: ReturnType<typeof getActiveZoomLevel>,
+    tz: string,
+  ) {
+    const key = `${viewStartMs}|${pxPerMs}|${level.unit}|${tz}`;
+    let memo = this._colMemo;
+    if (!memo || memo.key !== key) {
+      memo = {
+        key,
+        columns: generateColumns(viewStartMs, viewEndMs, pxPerMs, level, tz),
+        superLabels: generateSuperLabels(
+          viewStartMs,
+          viewEndMs,
+          pxPerMs,
+          level,
+          tz,
+        ),
+      };
+      this._colMemo = memo;
+    }
+    return memo;
+  }
+
   // ── Resource layout computation ───────────────────────────────────
 
   private _computeResourceLayout(
     groups: { label: string; items: TimelineResource[] }[],
+    resourceTrackMap: Map<string, { trackCount: number }>,
   ): ResourceLayout[] {
     const layout: ResourceLayout[] = [];
-    let y = HOUR_HEADER_HEIGHT;
+    let y = HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT;
     let idx = 0;
     for (const g of groups) {
       if (g.label) y += GROUP_LABEL_HEIGHT;
       for (const r of g.items) {
-        layout.push({ id: r.id, yOffset: y, index: idx });
-        y += ROW_HEIGHT;
+        const tracks = resourceTrackMap.get(r.id)?.trackCount || 1;
+        const height = ROW_HEIGHT * tracks;
+        layout.push({ id: r.id, yOffset: y, index: idx, height });
+        y += height;
         idx++;
       }
     }
@@ -275,6 +1122,13 @@ export class JanusTimeline extends LitElement {
   // ── Rendering helpers ─────────────────────────────────────────────
 
   private renderAvatar(r: TimelineResource) {
+    if (r.avatarType === "image" && r.avatar) {
+      return html`<img
+        class="tl-avatar tl-avatar--image"
+        src="${r.avatar}"
+        alt="${r.name}"
+      />`;
+    }
     if (r.avatarType === "initials") {
       return html`<span
         class="tl-avatar tl-avatar--initials"
@@ -291,33 +1145,134 @@ export class JanusTimeline extends LitElement {
 
   private _renderDragGhost() {
     if (!this._drag.active) return nothing;
-    // Reference _dragVersion to ensure Lit tracks this dependency
     void this._dragVersion;
     const g = this._drag.ghost;
+
+    const targetResourceId =
+      this._drag.targetResourceId || this._drag.originResourceId;
+    let ghostStartMs = 0;
+    let ghostEndMs = 0;
+    const eventId = this._drag.activeEvent?.id;
+    const snapMs = this._drag.snapMs;
+
+    if (this._drag.mode === "moving") {
+      const durationMs = this._drag.originalEndMs - this._drag.originalStartMs;
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+      ghostEndMs = ghostStartMs + durationMs;
+    } else if (this._drag.mode === "resize-start") {
+      ghostEndMs = this._drag.originalEndMs;
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+    } else if (this._drag.mode === "resize-end") {
+      ghostStartMs = this._drag.originalStartMs;
+      const rawEnd = pxToTimestamp(
+        g.left + g.width,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
+      ghostEndMs = snapTimestamp(rawEnd, snapMs);
+    } else if (this._drag.mode === "creating") {
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      const rawEnd = pxToTimestamp(
+        g.left + g.width,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+      ghostEndMs = snapTimestamp(rawEnd, snapMs);
+      if (ghostEndMs <= ghostStartMs) ghostEndMs = ghostStartMs + snapMs;
+    }
+
+    const resource = targetResourceId
+      ? this.resources.find((r) => r.id === targetResourceId)
+      : null;
+    const hasDragConflict = resource
+      ? checkSlotConflict(resource.events, ghostStartMs, ghostEndMs, eventId)
+      : false;
+
     return html`
       <div
-        class="tl-drag-ghost tl-drag-ghost--${g.color}"
+        class="tl-drag-ghost tl-drag-ghost--${g.color} ${hasDragConflict
+          ? "tl-drag-ghost--conflict"
+          : ""}"
         style="left: ${g.left}px; top: ${g.top}px; width: ${g.width}px;"
       >
-        <span class="tl-drag-ghost__title">${g.title}</span>
+        <span class="tl-drag-ghost__title">
+          ${hasDragConflict
+            ? html`<span class="tl-drag-ghost__conflict-icon">⚠</span> `
+            : nothing}
+          ${g.title}
+        </span>
         <span class="tl-drag-ghost__time">${g.timeLabel}</span>
       </div>
     `;
   }
 
-  render() {
-    const activeDateStr = toDateStr(this.currentDate);
+  /** Compute zoom percentage for display */
+  private _zoomPercent(): number {
+    return Math.round((this._pxPerMs / DEFAULT_PX_PER_MS) * 100);
+  }
 
-    // Filter resources conditionally by activeDate
-    const filteredResources = this.resources.map((r) => ({
-      ...r,
-      events: r.events.filter((ev) => !ev.date || ev.date === activeDateStr),
-    }));
+  render() {
+    const conflicts = this._cachedConflicts;
+    const pxPerMs = this._pxPerMs;
+    const viewStartMs = this._viewStartMs;
+    const viewEndMs = this._getViewEndMs();
+    const level = getActiveZoomLevel(pxPerMs);
+
+    const tz = schedulerStore.getState().timezone;
+
+    // Total width of the rendered content (fixed)
+    const totalW = this._totalWidth;
+
+    // ── Horizontal Culling Bounds ───────────────────────────────────────────
+    const scrollLeft = this.gridScrollRef
+      ? this.gridScrollRef.scrollLeft
+      : this._scrollLeft;
+    const clientWidth = this.gridScrollRef
+      ? this.gridScrollRef.clientWidth
+      : this._viewportWidth;
+    const OVERSCAN_PX = 800;
+    const visMinPx = Math.max(0, scrollLeft - OVERSCAN_PX);
+    const visMaxPx = Math.min(totalW, scrollLeft + clientWidth + OVERSCAN_PX);
+
+    const visMinMs = pxToTimestamp(visMinPx, viewStartMs, pxPerMs);
+    const visMaxMs = pxToTimestamp(visMaxPx, viewStartMs, pxPerMs);
+
+    // Generate columns and super-labels (timezone-aware), memoized.
+    //
+    // These walk the entire ~20,000px canvas (up to 2500 iterations each) and
+    // format a label per tick. None of their inputs change while scrolling —
+    // `_viewStartMs` only moves on zoom, nav, or the infinite-scroll re-centre —
+    // so a single-slot memo hits on effectively every scroll render.
+    const { columns, superLabels } = this._getColumns(
+      viewStartMs,
+      viewEndMs,
+      pxPerMs,
+      level,
+      tz,
+    );
+
+    const visColumns = columns.filter(
+      (col) => col.px + col.width >= visMinPx && col.px <= visMaxPx,
+    );
+    const visSuperLabels = superLabels.filter(
+      (sl) => sl.px + sl.width >= visMinPx && sl.px <= visMaxPx,
+    );
+
+    // Current-time indicator
+    const nowMs = Date.now();
+    const nowPx = timestampToPx(nowMs, viewStartMs, pxPerMs);
+
+    // Collect all resources & memoized track map
+    const allResources = this.resources;
+    const resourceTrackMap = this._cachedTrackMap;
 
     // Grouping
     const groups: { label: string; items: TimelineResource[] }[] = [];
     let cur: (typeof groups)[0] | null = null;
-    for (const r of filteredResources) {
+    for (const r of allResources) {
       if (r.groupLabel) {
         cur = { label: r.groupLabel, items: [r] };
         groups.push(cur);
@@ -329,220 +1284,385 @@ export class JanusTimeline extends LitElement {
       }
     }
 
-    // Update drag controller with current layout
-    const resourceLayout = this._computeResourceLayout(groups);
-    this._drag.updateLayout(this.gridScrollRef, resourceLayout);
+    const resourceLayout = this._computeResourceLayout(
+      groups,
+      resourceTrackMap,
+    );
+    this._drag.updateLayout(
+      this.gridScrollRef,
+      resourceLayout,
+      pxPerMs,
+      viewStartMs,
+    );
 
-    const totalW = VISIBLE_HOURS.length * HOUR_WIDTH;
-    const nl = nowLeft();
+    // ── Vertical Culling Bounds ─────────────────────────────────────────────
+    const scrollTop = this.gridScrollRef
+      ? this.gridScrollRef.scrollTop
+      : this._scrollTop;
+    const clientHeight = this.gridScrollRef
+      ? this.gridScrollRef.clientHeight
+      : this._viewportHeight;
+    const OVERSCAN_ROW_PX = 200;
+    const visMinRowPx = Math.max(0, scrollTop - OVERSCAN_ROW_PX);
+    const visMaxRowPx = scrollTop + clientHeight + OVERSCAN_ROW_PX;
+
+    // NOTE: a local `const GROUP_LABEL_HEIGHT = 28` used to shadow the imported
+    // constant here, so the row accumulators below advanced 28px per group
+    // while `_computeResourceLayout` (which the drag controller hit-tests
+    // against) and the CSS `--grp-label-h` both use 32px. That 4px-per-group
+    // drift was masked by the 200px overscan, but it made the culling window
+    // and the true row geometry disagree. Always use the shared constant.
 
     return html`
-      <div class="tl-component-shell">
-        <header class="tl-topbar">
-          <nav class="tl-nav">
-            <button
-              class="tl-nav__arrow"
-              aria-label="Previous"
-              @click=${this._goToPrevDay}
-            >
-              ${ChevronLeft()}
-            </button>
-            <button class="tl-nav__today" @click=${this._goToToday}>
-              Today
-            </button>
-            <button
-              class="tl-nav__arrow"
-              aria-label="Next"
-              @click=${this._goToNextDay}
-            >
-              ${ChevronRight()}
-            </button>
-            <span class="tl-nav__date"
-              >${formatDateFull(this.currentDate)}</span
-            >
-            <span class="tl-nav__date--short"
-              >${formatDateShort(this.currentDate)}</span
-            >
-          </nav>
-          <div class="tl-topbar__right">
-            <div class="tl-view-toggle">
-              ${(["Timeline", "Month"] as const).map(
-                (v) => html`
-                  <button
-                    class="tl-view-toggle__btn ${this.view === v
-                      ? "active"
-                      : ""}"
-                    @click=${() => (this.view = v)}
-                  >
-                    ${v}
-                  </button>
-                `,
-              )}
-            </div>
-            <button class="tl-icon-btn" aria-label="Search">
-              ${SearchIcon()}
-            </button>
-            <button
-              class="tl-icon-btn tl-icon-btn--bell"
-              aria-label="Notifications"
-            >
-              ${BellIcon()}
-              <span class="tl-bell-dot"></span>
-            </button>
-          </div>
-        </header>
-
+      <div
+        class="tl-component-shell ${this.allowCreate
+          ? "tl-component-shell--draw-mode"
+          : ""}"
+      >
+        <!-- Conflict warning banner -->
+        ${conflicts.hasConflict && !this._isConflictsBannerDismissed
+          ? html`
+              <div class="tl-conflict-banner">
+                <span class="tl-conflict-banner__icon">⚠</span>
+                <div class="tl-conflict-banner__content">
+                  ${conflicts.messages.length === 1
+                    ? html`<span class="tl-conflict-banner__message"
+                        >${conflicts.messages[0]}</span
+                      >`
+                    : html`
+                        <div class="tl-conflict-banner__summary">
+                          <span
+                            >Multiple scheduling conflicts detected
+                            (${conflicts.messages.length} conflicts).</span
+                          >
+                          <button
+                            class="tl-conflict-details-toggle"
+                            @click=${() =>
+                              (this._showConflictDetails =
+                                !this._showConflictDetails)}
+                          >
+                            ${this._showConflictDetails
+                              ? "Hide Details"
+                              : "Show Details"}
+                          </button>
+                        </div>
+                        ${this._showConflictDetails
+                          ? html`
+                              <ul class="tl-conflict-details-list">
+                                ${conflicts.messages.map(
+                                  (msg) => html`<li>${msg}</li>`,
+                                )}
+                              </ul>
+                            `
+                          : nothing}
+                      `}
+                </div>
+                <button
+                  class="tl-conflict-banner__close"
+                  @click=${() => (this._isConflictsBannerDismissed = true)}
+                  aria-label="Dismiss warning"
+                >
+                  ×
+                </button>
+              </div>
+            `
+          : nothing}
         <div class="tl-panel">
           <div class="tl-grid-wrap">
-            <div
-              class="tl-res-col"
-              @scroll=${
-                (e: Event) =>
-                  e.preventDefault() /* Native lock, handled by ref */
-              }
-            >
-              <div class="tl-res-col__header">RESOURCE</div>
-              ${groups.map(
-                (g) => html`
-                  <div>
-                    ${g.label
-                      ? html`<div class="tl-res-group-label">${g.label}</div>`
-                      : nothing}
-                    ${g.items.map(
-                      (r) => html`
-                        <div class="tl-res-row">
-                          ${this.renderAvatar(r)}
-                          <div class="tl-res-info">
-                            <span class="tl-res-name">${r.name}</span>
-                            <span class="tl-res-sub">${r.subtitle}</span>
-                          </div>
+            <div class="tl-res-col" @scroll=${this._onResScroll}>
+              <div
+                class="tl-res-col__header"
+                style="height: ${HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT}px"
+              >
+                RESOURCE
+              </div>
+              ${(() => {
+                let resY = 0;
+                return groups.map((g) => {
+                  const labelHtml = g.label
+                    ? html`<div class="tl-res-group-label">${g.label}</div>`
+                    : nothing;
+                  if (g.label) resY += GROUP_LABEL_HEIGHT;
+
+                  const itemsHtml = g.items.map((r) => {
+                    const tracksCount =
+                      resourceTrackMap.get(r.id)?.trackCount || 1;
+                    const rowHeightPx = tracksCount * ROW_HEIGHT;
+                    const isVisible =
+                      resY + rowHeightPx >= visMinRowPx && resY <= visMaxRowPx;
+                    resY += rowHeightPx;
+
+                    if (!isVisible) {
+                      return html`<div
+                        class="tl-res-row"
+                        style="height: ${rowHeightPx}px"
+                      ></div>`;
+                    }
+
+                    return html`
+                      <div class="tl-res-row" style="height: ${rowHeightPx}px">
+                        ${this.renderAvatar(r)}
+                        <div class="tl-res-info">
+                          <span class="tl-res-name">${r.name}</span>
+                          <span class="tl-res-sub">${r.subtitle}</span>
                         </div>
-                      `,
-                    )}
-                  </div>
-                `,
-              )}
+                      </div>
+                    `;
+                  });
+
+                  return html`<div>${labelHtml}${itemsHtml}</div>`;
+                });
+              })()}
             </div>
 
-            <div class="tl-time-scroll" @scroll=${this._onGridScroll}>
+            <div
+              class="tl-time-scroll"
+              @scroll=${this._onGridScroll}
+              @wheel=${this._handleWheel}
+            >
               <div class="tl-time-inner" style="width: ${totalW}px">
+                <!-- Super header row -->
+                ${visSuperLabels.length > 0
+                  ? html`
+                      <div class="tl-super-header">
+                        ${visSuperLabels.map(
+                          (sl) => html`
+                            <div
+                              class="tl-super-cell"
+                              style="left: ${sl.px}px; width: ${sl.width}px;"
+                            >
+                              ${sl.label}
+                            </div>
+                          `,
+                        )}
+                      </div>
+                    `
+                  : html`<div class="tl-super-header"></div>`}
+
+                <!-- Column headers -->
                 <div class="tl-hour-header">
-                  ${VISIBLE_HOURS.map(
-                    (h) => html`
-                      <div class="tl-hour-cell" style="width: ${HOUR_WIDTH}px">
-                        ${h.toString().padStart(2, "0")}:00
+                  ${visColumns.map(
+                    (col) => html`
+                      <div
+                        class="tl-hour-cell"
+                        style="left: ${col.px}px; width: ${col.width}px;"
+                      >
+                        ${col.label}
                       </div>
                     `,
                   )}
                 </div>
 
-                ${nl > 0 && nl < totalW
+                <!-- Shared vertical grid lines layer -->
+                <div class="tl-vlines-layer">
+                  ${visColumns.map(
+                    (col) =>
+                      html`<div
+                        class="tl-vline"
+                        style="left: ${col.px}px"
+                      ></div>`,
+                  )}
+                </div>
+
+                <!-- Now line -->
+                ${nowPx >= visMinPx && nowPx <= visMaxPx
                   ? html`
-                      <div class="tl-now-line" style="left: ${nl}px">
+                      <div class="tl-now-line" style="left: ${nowPx}px">
                         <span class="tl-now-dot"></span>
                       </div>
                     `
                   : nothing}
-                ${groups.map(
-                  (g) => html`
-                    <div>
-                      ${g.label
-                        ? html`<div class="tl-group-spacer"></div>`
-                        : nothing}
-                      ${g.items.map(
-                        (r) => html`
-                          <div
-                            class="tl-event-row"
-                            data-resource-id=${r.id}
-                            @pointerdown=${(e: PointerEvent) =>
-                              this._onRowPointerDown(e, r.id)}
-                          >
-                            ${VISIBLE_HOURS.map(
-                              (h) =>
-                                html`<div
-                                  class="tl-vline"
-                                  style="left: ${(h - HOUR_START) *
-                                  HOUR_WIDTH}px"
-                                ></div>`,
-                            )}
-                            ${r.events.map(
-                              (ev) => html`
+
+                <!-- Resource rows with events -->
+                ${(() => {
+                  let rowY = 0;
+                  return groups.map((g) => {
+                    const spacerHtml = g.label
+                      ? html`<div class="tl-group-spacer"></div>`
+                      : nothing;
+                    if (g.label) rowY += GROUP_LABEL_HEIGHT;
+
+                    const itemsHtml = g.items.map((r) => {
+                      const trackInfo = resourceTrackMap.get(r.id);
+                      const tracksCount = trackInfo?.trackCount || 1;
+                      const evTracks = trackInfo?.eventTracks;
+                      const rowHeightPx = tracksCount * ROW_HEIGHT;
+
+                      const isVisible =
+                        rowY + rowHeightPx >= visMinRowPx &&
+                        rowY <= visMaxRowPx;
+                      rowY += rowHeightPx;
+
+                      if (!isVisible) {
+                        return html`<div
+                          class="tl-event-row"
+                          style="height: ${rowHeightPx}px"
+                          data-resource-id=${r.id}
+                        ></div>`;
+                      }
+
+                      // Horizontally culled events for this visible row.
+                      // `r.events` is already sorted by startMs in
+                      // _syncFromStore, and filter preserves order, so no
+                      // per-render sort is needed (z-index stacking below is
+                      // therefore unchanged).
+                      const sortedEvents = r.events.filter(
+                        (ev) => ev.endMs >= visMinMs && ev.startMs <= visMaxMs,
+                      );
+
+                      return html`
+                        <div
+                          class="tl-event-row"
+                          style="height: ${rowHeightPx}px"
+                          data-resource-id=${r.id}
+                          @pointerdown=${(e: PointerEvent) =>
+                            this._onRowPointerDown(e, r.id)}
+                        >
+                          <!-- Events -->
+                          ${sortedEvents.map((ev, index) => {
+                            const trackIndex = evTracks?.get(ev.id) || 0;
+                            const evTop = trackIndex * ROW_HEIGHT + 8;
+
+                            const evLeft = timestampToPx(
+                              ev.startMs,
+                              viewStartMs,
+                              pxPerMs,
+                            );
+                            const evWidth =
+                              timestampToPx(ev.endMs, viewStartMs, pxPerMs) -
+                              evLeft;
+
+                            if (evWidth < 1) return nothing;
+
+                            const MIN_EVENT_PX = 24;
+                            const displayWidth = Math.max(
+                              evWidth,
+                              MIN_EVENT_PX,
+                            );
+                            const isTiny = displayWidth < 60;
+                            const showTime = displayWidth >= 120;
+                            const tooltipLabel = `${ev.title} · ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}`;
+
+                            const zIndex = 10 + index;
+
+                            return html`
+                              <div
+                                class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
+                                  ev,
+                                )
+                                  ? "tl-event--dragging"
+                                  : ""} ${isTiny
+                                  ? "tl-event--tiny"
+                                  : ""} ${conflicts.conflictingEventIds.has(
+                                  ev.id,
+                                )
+                                  ? "tl-event--conflict"
+                                  : ""}"
+                                style="top: ${evTop}px; bottom: auto; height: ${ROW_HEIGHT -
+                                16}px; left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
+                                data-tooltip="${tooltipLabel}"
+                                @pointerdown=${(e: PointerEvent) =>
+                                  this._onEventPointerDown(e, ev, r.id, evTop)}
+                                @click=${(e: Event) =>
+                                  this._handleEventClick(e, ev)}
+                              >
                                 <div
-                                  class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(
-                                    ev,
-                                  )
-                                    ? "tl-event--dragging"
-                                    : ""}"
-                                  style=${eventStyle(ev)}
+                                  class="tl-event-resize-handle tl-event-resize-handle--start"
                                   @pointerdown=${(e: PointerEvent) =>
-                                    this._onEventPointerDown(e, ev, r.id)}
-                                  @click=${(e: Event) =>
-                                    this._handleEventClick(e, ev)}
-                                >
-                                  <div
-                                    class="tl-event-resize-handle tl-event-resize-handle--start"
-                                    @pointerdown=${(e: PointerEvent) =>
-                                      this._onResizePointerDown(
-                                        e,
-                                        ev,
-                                        r.id,
-                                        "start",
-                                      )}
-                                  ></div>
-                                  <span class="tl-event__title"
-                                    >${ev.title}</span
-                                  >
-                                  <span class="tl-event__time"
-                                    >${fmt12(ev.startTime)} –
-                                    ${fmt12(ev.endTime)}</span
-                                  >
-                                  <div
-                                    class="tl-event-resize-handle tl-event-resize-handle--end"
-                                    @pointerdown=${(e: PointerEvent) =>
-                                      this._onResizePointerDown(
-                                        e,
-                                        ev,
-                                        r.id,
-                                        "end",
-                                      )}
-                                  ></div>
-                                </div>
-                              `,
-                            )}
-                          </div>
-                        `,
-                      )}
-                    </div>
-                  `,
-                )}
+                                    this._onResizePointerDown(
+                                      e,
+                                      ev,
+                                      r.id,
+                                      "start",
+                                      evTop,
+                                    )}
+                                ></div>
+                                ${!isTiny
+                                  ? html`<span class="tl-event__title"
+                                      >${ev.title}</span
+                                    >`
+                                  : nothing}
+                                ${conflicts.conflictingEventIds.has(ev.id)
+                                  ? html`<span
+                                      class="tl-event__conflict-dot"
+                                      title="Conflict overlap detected"
+                                    ></span>`
+                                  : nothing}
+                                ${showTime
+                                  ? html`<span class="tl-event__time"
+                                      >${fmt12(ev.startTime)} –
+                                      ${fmt12(ev.endTime)}</span
+                                    >`
+                                  : nothing}
+                                <div
+                                  class="tl-event-resize-handle tl-event-resize-handle--end"
+                                  @pointerdown=${(e: PointerEvent) =>
+                                    this._onResizePointerDown(
+                                      e,
+                                      ev,
+                                      r.id,
+                                      "end",
+                                      evTop,
+                                    )}
+                                ></div>
+                              </div>
+                            `;
+                          })}
+                        </div>
+                      `;
+                    });
+
+                    return html`<div>${spacerHtml}${itemsHtml}</div>`;
+                  });
+                })()}
                 ${this._renderDragGhost()}
               </div>
             </div>
           </div>
-
-          <div class="tl-ai-wrap">
-            <div class="tl-ai-card">
-              ${SparkleIcon()}
-              <input
-                class="tl-ai-card__input"
-                type="text"
-                .value=${this.aiPrompt}
-                @input=${(e: Event) =>
-                  (this.aiPrompt = (e.target as HTMLInputElement).value)}
-                placeholder="Try 'Schedule a design sync with Alex tomorrow at 10am in Room A'"
-              />
-              <button class="tl-ai-card__btn">Schedule</button>
-            </div>
-          </div>
         </div>
 
-        <button
-          class="tl-fab"
-          @click=${this._handleAddEvent}
-          aria-label="Add event"
-        >
-          ${PlusIcon()}
-        </button>
+        <!-- FAB -->
+        ${this.showFab
+          ? html`
+              <button
+                class="tl-fab"
+                @click=${this._handleAddEvent}
+                aria-label="Add event"
+              >
+                ${PlusIcon()}
+              </button>
+            `
+          : nothing}
+
+        <!-- Blocked Conflict Alert Dialog -->
+        ${this._showBlockedConflictDialog
+          ? html`
+              <div class="tl-alert-dialog-backdrop">
+                <div
+                  class="tl-alert-dialog"
+                  role="alertdialog"
+                  aria-modal="true"
+                >
+                  <div class="tl-alert-dialog__header">
+                    <span class="tl-alert-dialog__title"
+                      >Schedule Conflict Blocked</span
+                    >
+                  </div>
+                  <div class="tl-alert-dialog__body">
+                    <p>${this._blockedConflictMessage}</p>
+                  </div>
+                  <div class="tl-alert-dialog__footer">
+                    <button
+                      class="tl-alert-dialog__btn"
+                      @click=${this._closeBlockedConflictDialog}
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            `
+          : nothing}
       </div>
     `;
   }

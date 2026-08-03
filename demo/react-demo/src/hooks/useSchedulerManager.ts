@@ -1,5 +1,9 @@
 import { useMemo } from "react";
-import { SchedulerManager } from "@janus-scheduler/react";
+import {
+  SchedulerManager,
+  getBrowserTimezone,
+  zonedInputToISO,
+} from "@janus-scheduler/react";
 
 export interface HookError {
   operation: string;
@@ -60,27 +64,77 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     // Zustand store is a module singleton — this block only runs once
     // even across React hot-reloads.
     if (mgr.getResourceCount() === 0) {
-      mgr.addResource({ id: "r1", name: "Dr. Sarah Chen", type: "person" });
-      mgr.addResource({ id: "r2", name: "Dr. Michael Ross", type: "person" });
-      mgr.addResource({ id: "r3", name: "Operating Room 1", type: "room" });
-      mgr.addResource({ id: "r4", name: "MRI Scanner A", type: "equipment" });
+      mgr.addResource({
+        id: "r1",
+        name: "Dr. Sarah Chen",
+        type: "person",
+        avatar:
+          "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+      });
+      mgr.addResource({
+        id: "r2",
+        name: "Dr. Michael Ross",
+        type: "person",
+        avatar:
+          "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
+      });
+      mgr.addResource({
+        id: "r3",
+        name: "Dr. Ann sherin",
+        type: "person",
+        avatar:
+          "https://westernsydneydiabetes.com.au/uploads/2021/06/Rona-scaled.jpg",
+      });
+      mgr.addResource({
+        id: "r4",
+        name: "Operating Room 1",
+        type: "room",
+        avatar:
+          "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=120&h=120",
+      });
+      mgr.addResource({
+        id: "r5",
+        name: "MRI Scanner A",
+        type: "equipment",
+        avatar:
+          "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=120&h=120",
+      });
+      mgr.addResource({
+        id: "r6",
+        name: "MRI Scanner B",
+        type: "equipment",
+        avatar:
+          "https://tse3.mm.bing.net/th/id/OIP.gB5vMFJ88MAKfv9CPhYJ9QHaE7?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+      });
+      mgr.addResource({
+        id: "r7",
+        name: "Dr. Alan Turing",
+        type: "person",
+        avatar:
+          "https://tse4.mm.bing.net/th/id/OIP.kqx_nQhmMAt1EtXnbBhOBwHaK0?r=0&w=832&h=1216&rs=1&pid=ImgDetMain&o=7&rm=3",
+      });
+
+      console.log("Assignments", mgr.getAssignmentsByEvent("e1"));
 
       const today = new Date().toISOString().split("T")[0];
+      const tz = getBrowserTimezone();
       mgr.addEvent({
         id: "e1",
         title: "Appendectomy",
-        startTime: `${today}T09:00:00Z`,
-        endTime: `${today}T11:30:00Z`,
-        resourceId: "r1",
+        startTime: zonedInputToISO(today, "09:00", tz),
+        endTime: zonedInputToISO(today, "11:30", tz),
+        resourceIds: ["r1", "r3"],
         status: "confirmed",
+        color: "primary",
       });
       mgr.addEvent({
         id: "e2",
         title: "Pre-op Assessment",
-        startTime: `${today}T13:00:00Z`,
-        endTime: `${today}T14:00:00Z`,
-        resourceId: "r2",
+        startTime: zonedInputToISO(today, "13:00", tz),
+        endTime: zonedInputToISO(today, "14:00", tz),
+        resourceIds: ["r2"],
         status: "confirmed",
+        color: "primary",
       });
     }
 

@@ -48,6 +48,7 @@ export default [
     rules: {
       // Disable base rule — @typescript-eslint/no-unused-vars handles this for TS
       "no-unused-vars": "off",
+      "no-duplicate-imports": "error",
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": [
         "warn",
@@ -76,6 +77,9 @@ export default [
       "**/.angular/**",
       "**/coverage/**",
       "reference/**",
+      // Gitignored working notes and benchmark harnesses — never shipped or
+      // consumed by CI, so they are not part of the lint gate.
+      "implementation/**",
       "fix.cjs",
     ],
   },
