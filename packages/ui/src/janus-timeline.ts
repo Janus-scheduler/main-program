@@ -42,6 +42,16 @@ import {
 } from "./timeline-zoom";
 import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
+/** Shared empty result for the no-recurring-events fast path in _syncFromStore. */
+const EMPTY_EVENT_LIST: ReturnType<typeof expandEvents> = [];
+
+/** Nav-label formatters, hoisted so scrolling does not rebuild them per event. */
+const NAV_WEEKDAY_FMT = new Intl.DateTimeFormat("en-US", { weekday: "long" });
+const NAV_SHORT_DATE_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
+
 @customElement("janus-timeline")
 export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
@@ -62,6 +72,10 @@ export class JanusTimeline extends LitElement {
   @state() private _showConflictDetails = false;
   @state() private _isConflictsBannerDismissed = false;
   private _lastConflictIdsKey = "";
+  /** Conflict-recompute inputs from the last willUpdate — see the guard there. */
+  private _confLastResources: TimelineResource[] | null = null;
+  private _confLastTz = "";
+  private _confLastPrevent: boolean | null = null;
   @state() private _cachedConflicts = {
     hasConflict: false,
     messages: [] as string[],
@@ -80,9 +94,17 @@ export class JanusTimeline extends LitElement {
   @query(".tl-res-col") resColRef!: HTMLElement;
   @query(".tl-time-scroll") gridScrollRef!: HTMLElement;
 
-  private _drag = new TimelineDragController(() => {
-    this._dragVersion++;
-  });
+  private _ghostEl: HTMLElement | null = null;
+
+  private _drag = new TimelineDragController(
+    () => {
+      this._dragVersion++;
+      this.requestUpdate();
+    },
+    () => {
+      this._applyGhostStyle();
+    },
+  );
   private _wasDragging = false;
   private _unsubStore?: () => void;
   /** Suppress scroll handler during programmatic scroll adjustments */
@@ -98,9 +120,50 @@ export class JanusTimeline extends LitElement {
     { trackCount: number; eventTracks: Map<string, number> }
   >();
 
+  /** Store-slice references from the last sync — see the early-out in _syncFromStore. */
+  private _lastEventsRef: SchedulerStore["events"] | null = null;
+  private _lastResourcesRef: SchedulerStore["resources"] | null = null;
+  private _lastTz = "";
+
+  /**
+   * Derived-view-model caches: `_vmCache` by a length-prefixed
+   * `resourceId + eventId` composite key, `_rowCache` by resource id. `gen` is
+   * the sync pass that last produced the entry; entries from an older pass are
+   * evicted. See _syncFromStore for the change-detection contract — in
+   * particular why source *fields* are compared rather than object identity.
+   */
+  private _vmCache = new Map<
+    string,
+    {
+      st: string;
+      et: string;
+      ti: string;
+      co: string;
+      gen: number;
+      vm: TimelineEvent;
+    }
+  >();
+  private _rowCache = new Map<
+    string,
+    {
+      /** View-models in *grouping* order — the basis for change detection. */
+      raw: TimelineEvent[];
+      /** Presentation inputs, compared field-by-field to detect row changes. */
+      name: string;
+      type: string;
+      avatar: string;
+      groupLabel: string | undefined;
+      resource: TimelineResource;
+      track: { trackCount: number; eventTracks: Map<string, number> };
+      gen: number;
+    }
+  >();
+  private _syncGen = 0;
+
   private _zoomRafId: number | null = null;
   private _pendingZoomFactor = 1;
   private _pendingPointerX = 0;
+  private _navRafId: number | null = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -117,18 +180,128 @@ export class JanusTimeline extends LitElement {
       cancelAnimationFrame(this._zoomRafId);
       this._zoomRafId = null;
     }
+    if (this._navRafId !== null) {
+      cancelAnimationFrame(this._navRafId);
+      this._navRafId = null;
+    }
+    this._ghostEl = null;
   }
+
+  private _applyGhostStyle = () => {
+    if (!this._ghostEl) {
+      this._ghostEl = this.renderRoot.querySelector(".tl-drag-ghost");
+    }
+    const el = this._ghostEl;
+    if (!el) return;
+
+    const g = this._drag.ghost;
+    el.style.left = `${g.left}px`;
+    el.style.top = `${g.top}px`;
+    el.style.width = `${g.width}px`;
+
+    // Conflict check scoped ONLY to the target resource (O(events in 1 row))
+    const targetResourceId =
+      this._drag.targetResourceId || this._drag.originResourceId;
+    let ghostStartMs = 0;
+    let ghostEndMs = 0;
+    const eventId = this._drag.activeEvent?.id;
+    const snapMs = this._drag.snapMs;
+
+    if (this._drag.mode === "moving") {
+      const durationMs = this._drag.originalEndMs - this._drag.originalStartMs;
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+      ghostEndMs = ghostStartMs + durationMs;
+    } else if (this._drag.mode === "resize-start") {
+      ghostEndMs = this._drag.originalEndMs;
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+    } else if (this._drag.mode === "resize-end") {
+      ghostStartMs = this._drag.originalStartMs;
+      const rawEnd = pxToTimestamp(
+        g.left + g.width,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
+      ghostEndMs = snapTimestamp(rawEnd, snapMs);
+    } else if (this._drag.mode === "creating") {
+      const rawStart = pxToTimestamp(g.left, this._viewStartMs, this._pxPerMs);
+      const rawEnd = pxToTimestamp(
+        g.left + g.width,
+        this._viewStartMs,
+        this._pxPerMs,
+      );
+      ghostStartMs = snapTimestamp(rawStart, snapMs);
+      ghostEndMs = snapTimestamp(rawEnd, snapMs);
+      if (ghostEndMs <= ghostStartMs) ghostEndMs = ghostStartMs + snapMs;
+    }
+
+    const resource = targetResourceId
+      ? this.resources.find((r) => r.id === targetResourceId)
+      : null;
+    const hasDragConflict = resource
+      ? checkSlotConflict(resource.events, ghostStartMs, ghostEndMs, eventId)
+      : false;
+
+    el.classList.toggle("tl-drag-ghost--conflict", hasDragConflict);
+
+    const timeEl = el.querySelector(".tl-drag-ghost__time");
+    if (timeEl) {
+      timeEl.textContent = g.timeLabel;
+    }
+  };
 
   private _syncFromStore(state: SchedulerStore) {
     const tz =
       (state.timezone as string) ||
       Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // ── Slice-identity early-out ────────────────────────────────────────────
+    // The store is subscribed without a selector, so every set() lands here —
+    // including `updateDraft`, which fires on each keystroke in the event modal
+    // and only ever replaces `eventDraft`. Zustand shallow-merges, so slices the
+    // timeline does not read keep their object identity across such writes.
+    //
+    // Identity is a valid signal at the *slice* level (both `updateEvent` and
+    // `updateResource` spread a fresh record) but NOT at the per-event level,
+    // because `updateEvent` mutates the Event instance in place — see the
+    // field-level comparison in the per-resource loop below.
+    if (
+      state.events === this._lastEventsRef &&
+      state.resources === this._lastResourcesRef &&
+      tz === this._lastTz
+    ) {
+      return;
+    }
+    const previousTz = this._lastTz;
+    this._lastEventsRef = state.events;
+    this._lastResourcesRef = state.resources;
+    this._lastTz = tz;
+
+    // A timezone change invalidates every derived label.
+    if (tz !== previousTz) {
+      this._vmCache.clear();
+      this._rowCache.clear();
+    }
+    this._syncGen++;
+
     const newResources: TimelineResource[] = [];
     const rawEvents = Object.values(state.events);
     const centerMs = this._viewStartMs || Date.now();
     const startRange = centerMs - 365 * 24 * 60 * 60 * 1000;
     const endRange = centerMs + 365 * 24 * 60 * 60 * 1000;
-    const coreEvents = expandEvents(rawEvents, startRange, endRange);
+
+    // Only recurring events need expansion. `expandEvents` passes non-recurring
+    // events straight through (unfiltered by range), so splitting the input is
+    // exactly equivalent — and it avoids allocating a throwaway object for
+    // every one of the tens of thousands of plain events on large datasets.
+    let recurring: typeof rawEvents | null = null;
+    for (const e of rawEvents) {
+      if (e.recurrenceRule) (recurring ??= []).push(e);
+    }
+    const occurrences = recurring
+      ? expandEvents(recurring, startRange, endRange)
+      : EMPTY_EVENT_LIST;
     const coreResources = Object.values(state.resources);
 
     const typeOrder: Record<string, number> = {
@@ -149,36 +322,149 @@ export class JanusTimeline extends LitElement {
       { trackCount: number; eventTracks: Map<string, number> }
     >();
 
+    // Pre-group source events by resource ID in a single O(E) pass
+    type SourceEvent = (typeof occurrences)[number];
+    const eventsByResource = new Map<string, SourceEvent[]>();
+    const groupByResource = (e: SourceEvent) => {
+      const rIds =
+        e.resourceIds && e.resourceIds.length > 0
+          ? e.resourceIds
+          : e.resourceId
+            ? [e.resourceId]
+            : [];
+      for (const rId of rIds) {
+        let arr = eventsByResource.get(rId);
+        if (!arr) {
+          arr = [];
+          eventsByResource.set(rId, arr);
+        }
+        arr.push(e);
+      }
+    };
+    for (const e of rawEvents) {
+      if (!e.recurrenceRule) groupByResource(e as unknown as SourceEvent);
+    }
+    for (const e of occurrences) groupByResource(e);
+
+    let vmCount = 0;
+
     for (const res of coreResources) {
-      const resEvents = coreEvents
-        .filter(
-          (e) =>
-            (e.resourceIds && e.resourceIds.includes(res.id)) ||
-            e.resourceId === res.id,
-        )
-        .map((e) => {
-          const startD = new Date(e.startTime);
-          const endD = new Date(e.endTime);
+      const resEventsRaw = eventsByResource.get(res.id) || [];
+
+      // ── Derive view-models, reusing unchanged ones ───────────────────────
+      // `updateEvent` mutates the Event instance in place, so neither the
+      // instance reference nor a record diff detects a change. Compare the
+      // source fields the view-model is derived from instead — they are
+      // strings off the same instance, so `===` is a pointer compare with no
+      // allocation (a concatenated signature would allocate one string per
+      // event per sync, which at 63k events is the very cost we are removing).
+      //
+      // IMPORTANT: this comparison set must cover every source field the
+      // view-model reads below. If you start rendering another field, add it
+      // here or the UI will show stale data.
+      const resEvents: TimelineEvent[] = new Array(resEventsRaw.length);
+      let eventsChanged = false;
+      const prevRow = this._rowCache.get(res.id);
+      const prevRaw = prevRow?.raw;
+
+      for (let i = 0; i < resEventsRaw.length; i++) {
+        const e = resEventsRaw[i];
+        const key = `${res.id.length}:${res.id}${e.id}`;
+        const color = e.color || "primary";
+        const cached = this._vmCache.get(key);
+
+        let vm: TimelineEvent;
+        if (
+          cached !== undefined &&
+          cached.st === e.startTime &&
+          cached.et === e.endTime &&
+          cached.ti === e.title &&
+          cached.co === color
+        ) {
+          vm = cached.vm;
+          cached.gen = this._syncGen;
+        } else {
           const { time: startTime } = isoToZonedDisplay(e.startTime, tz);
           const { time: endTime, date } = isoToZonedDisplay(e.endTime, tz);
-          return {
+          vm = {
             id: e.id,
             title: e.title,
             startTime,
             endTime,
-            startMs: startD.getTime(),
-            endMs: endD.getTime(),
-            color: e.color || "primary",
+            startMs: new Date(e.startTime).getTime(),
+            endMs: new Date(e.endTime).getTime(),
+            color,
             date,
             resourceId: res.id,
           } as TimelineEvent;
-        });
+          this._vmCache.set(key, {
+            st: e.startTime,
+            et: e.endTime,
+            ti: e.title,
+            co: color,
+            gen: this._syncGen,
+            vm,
+          });
+        }
+        resEvents[i] = vm;
+        vmCount++;
 
-      // Calculate tracks for resource
-      const sortedEvents = [...resEvents].sort((a, b) => a.startMs - b.startMs);
+        // Unchanged events keep their object identity, so this is exact.
+        if (!eventsChanged && (!prevRaw || prevRaw[i] !== vm)) {
+          eventsChanged = true;
+        }
+      }
+      if (!eventsChanged && prevRaw && prevRaw.length !== resEvents.length) {
+        eventsChanged = true;
+      }
+
+      // ── Resource presentation metadata ───────────────────────────────────
+      const type = res.type || "person";
+      let groupLabel: string | undefined = undefined;
+      if (type !== currentGroupType) {
+        currentGroupType = type;
+        if (type === "person") groupLabel = "STAFF";
+        else if (type === "room") groupLabel = "ROOMS";
+        else if (type === "equipment") groupLabel = "EQUIPMENT";
+      }
+
+      const avatarSrc = res.avatar ?? "";
+
+      // ── Reuse the whole row when nothing about it changed ────────────────
+      // Fields are compared individually rather than via a concatenated
+      // signature: no per-resource string allocation, and no separator that
+      // could collide (a name containing the separator would otherwise be able
+      // to masquerade as a different name/type split).
+      //
+      // `groupLabel` is included because it depends on the resource's position
+      // in the type-sorted list, not on the resource alone.
+      if (
+        !eventsChanged &&
+        prevRow &&
+        prevRow.name === res.name &&
+        prevRow.type === type &&
+        prevRow.avatar === avatarSrc &&
+        prevRow.groupLabel === groupLabel
+      ) {
+        prevRow.gen = this._syncGen;
+        newResources.push(prevRow.resource);
+        newTrackMap.set(res.id, prevRow.track);
+        continue;
+      }
+
+      // Sort once, here, so render() does not have to re-sort every frame.
+      // Nothing depends on insertion order: checkSlotConflict is
+      // order-independent and computeTimelineConflicts sorts its own copy.
+      //
+      // This must be a COPY, not an in-place sort: `resEvents` is retained as
+      // `raw`, the grouping-order comparison basis for the next sync. Sorting
+      // it in place would make every subsequent comparison compare grouping
+      // order against sorted order and report a spurious change every time.
+      const sorted = resEvents.slice().sort((a, b) => a.startMs - b.startMs);
+
       const tracks: number[] = [];
       const eventTracks = new Map<string, number>();
-      for (const ev of sortedEvents) {
+      for (const ev of sorted) {
         let t = 0;
         while (t < tracks.length && tracks[t] > ev.startMs) {
           t++;
@@ -186,23 +472,14 @@ export class JanusTimeline extends LitElement {
         tracks[t] = ev.endMs;
         eventTracks.set(ev.id, t);
       }
-      newTrackMap.set(res.id, {
+      const track = {
         trackCount: Math.max(1, tracks.length),
         eventTracks,
-      });
+      };
+      newTrackMap.set(res.id, track);
 
       let avatarType: "initials" | "icon" | "image" = "initials";
       let avatarIcon: "room" | "equipment" | undefined = undefined;
-      let groupLabel: string | undefined = undefined;
-
-      const type = res.type || "person";
-
-      if (type !== currentGroupType) {
-        currentGroupType = type;
-        if (type === "person") groupLabel = "STAFF";
-        else if (type === "room") groupLabel = "ROOMS";
-        else if (type === "equipment") groupLabel = "EQUIPMENT";
-      }
       if (res.avatar) {
         avatarType = "image";
       } else if (type === "room") {
@@ -213,7 +490,7 @@ export class JanusTimeline extends LitElement {
         avatarIcon = "equipment";
       }
 
-      newResources.push({
+      const resource: TimelineResource = {
         id: res.id,
         name: res.name,
         subtitle:
@@ -225,39 +502,90 @@ export class JanusTimeline extends LitElement {
         avatarType,
         avatarIcon,
         groupLabel,
-        events: resEvents,
+        events: sorted,
         avatar: res.avatar,
+      };
+
+      newResources.push(resource);
+      this._rowCache.set(res.id, {
+        raw: resEvents,
+        name: res.name,
+        type,
+        avatar: avatarSrc,
+        groupLabel,
+        resource,
+        track,
+        gen: this._syncGen,
       });
+    }
+
+    // ── Evict entries not produced this pass ──────────────────────────────
+    // In steady state (dragging one event) the counts match and no sweep runs.
+    if (this._vmCache.size !== vmCount) {
+      for (const [k, v] of this._vmCache) {
+        if (v.gen !== this._syncGen) this._vmCache.delete(k);
+      }
+    }
+    if (this._rowCache.size !== coreResources.length) {
+      for (const [k, v] of this._rowCache) {
+        if (v.gen !== this._syncGen) this._rowCache.delete(k);
+      }
     }
 
     this._cachedTrackMap = newTrackMap;
 
-    if (newResources.length > 0) {
+    // Reassign `resources` only when something visible actually changed.
+    // Rows reused above keep their object identity, so this comparison is
+    // exact — and it is the contract the conflict guard in willUpdate relies
+    // on: `resources` identity changes if and only if the view changed.
+    let listChanged = newResources.length !== this.resources.length;
+    if (!listChanged) {
+      for (let i = 0; i < newResources.length; i++) {
+        if (newResources[i] !== this.resources[i]) {
+          listChanged = true;
+          break;
+        }
+      }
+    }
+
+    if (listChanged && newResources.length > 0) {
       this.resources = newResources;
     }
   }
 
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
-    if (
-      changedProperties.has("resources") ||
-      changedProperties.has("preventConflicts") ||
-      (this._cachedConflicts.conflictingEventIds.size === 0 &&
-        this.resources.length > 0)
-    ) {
-      const conflictResources = this.resources as unknown as ConflictResource[];
-      const tz = schedulerStore.getState().timezone;
-      this._cachedConflicts = computeTimelineConflicts(conflictResources, tz);
 
-      const currentIdsKey = Array.from(
-        this._cachedConflicts.conflictingEventIds,
-      )
-        .sort()
-        .join(",");
-      if (currentIdsKey !== this._lastConflictIdsKey) {
-        this._isConflictsBannerDismissed = false;
-        this._lastConflictIdsKey = currentIdsKey;
-      }
+    // Recompute conflicts only when an actual input changed.
+    //
+    // The previous guard included `conflictingEventIds.size === 0`, which is
+    // true for every conflict-free dataset — the normal case — so this ran over
+    // every event on EVERY update: each scroll tick, each drag-start, each
+    // dialog toggle. Tracking the inputs by reference fixes that.
+    //
+    // `resources` identity is a sound signal because _syncFromStore reassigns it
+    // if and only if something visible changed, and never mutates it in place.
+    const tz = schedulerStore.getState().timezone;
+    if (
+      this.resources === this._confLastResources &&
+      tz === this._confLastTz &&
+      this.preventConflicts === this._confLastPrevent
+    ) {
+      return;
+    }
+    this._confLastResources = this.resources;
+    this._confLastTz = tz;
+    this._confLastPrevent = this.preventConflicts;
+
+    const conflictResources = this.resources as unknown as ConflictResource[];
+    this._cachedConflicts = computeTimelineConflicts(conflictResources, tz);
+
+    const currentIdsKey = Array.from(this._cachedConflicts.conflictingEventIds)
+      .sort()
+      .join(",");
+    if (currentIdsKey !== this._lastConflictIdsKey) {
+      this._isConflictsBannerDismissed = false;
+      this._lastConflictIdsKey = currentIdsKey;
     }
   }
 
@@ -270,6 +598,12 @@ export class JanusTimeline extends LitElement {
         scrollEl.scrollTop = originalScroll + 1;
         scrollEl.scrollTop = originalScroll;
       }
+    }
+
+    if (this._drag.active && !this._ghostEl) {
+      this._ghostEl = this.renderRoot.querySelector(".tl-drag-ghost");
+    } else if (!this._drag.active && this._ghostEl) {
+      this._ghostEl = null;
     }
   }
 
@@ -365,7 +699,23 @@ export class JanusTimeline extends LitElement {
         this._initializeView(currentCenterMs);
       }
     }
-    this._emitNavChange();
+    this._scheduleNavChange();
+  }
+
+  /**
+   * Coalesce nav-change emission to one per frame.
+   *
+   * `_emitNavChange` formats three date labels and dispatches an event that the
+   * host re-renders on. Firing it per native scroll event (which on a trackpad
+   * exceeds 60Hz) did that work several times per frame for no visible benefit.
+   * Mirrors the existing rAF-coalesced zoom commit.
+   */
+  private _scheduleNavChange() {
+    if (this._navRafId !== null) return;
+    this._navRafId = requestAnimationFrame(() => {
+      this._navRafId = null;
+      this._emitNavChange();
+    });
   }
 
   private _onResScroll() {
@@ -382,12 +732,12 @@ export class JanusTimeline extends LitElement {
     const tz = getBrowserTimezone();
     const navLabel = formatNavDate(visibleCenter, level, tz);
 
+    // `toLocaleDateString` constructs a fresh Intl.DateTimeFormat internally on
+    // every call — the memoization in core's time.ts cannot reach it — so hold
+    // the two formatters here instead.
     const d = new Date(visibleCenter);
-    const dayName = d.toLocaleDateString("en-US", { weekday: "long" });
-    const shortDate = d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    const dayName = NAV_WEEKDAY_FMT.format(d);
+    const shortDate = NAV_SHORT_DATE_FMT.format(d);
 
     this.dispatchEvent(
       new CustomEvent("nav-change", {
@@ -686,6 +1036,46 @@ export class JanusTimeline extends LitElement {
     this._blockedConflictMessage = "";
   }
 
+  // ── Column generation (memoized) ──────────────────────────────────
+
+  /**
+   * Cached `generateColumns` / `generateSuperLabels` pair.
+   *
+   * `viewEndMs` is fully determined by `viewStartMs` and `pxPerMs` (the content
+   * is a fixed pixel width), so it does not need to be part of the key.
+   */
+  private _colMemo: {
+    key: string;
+    columns: ReturnType<typeof generateColumns>;
+    superLabels: ReturnType<typeof generateSuperLabels>;
+  } | null = null;
+
+  private _getColumns(
+    viewStartMs: number,
+    viewEndMs: number,
+    pxPerMs: number,
+    level: ReturnType<typeof getActiveZoomLevel>,
+    tz: string,
+  ) {
+    const key = `${viewStartMs}|${pxPerMs}|${level.unit}|${tz}`;
+    let memo = this._colMemo;
+    if (!memo || memo.key !== key) {
+      memo = {
+        key,
+        columns: generateColumns(viewStartMs, viewEndMs, pxPerMs, level, tz),
+        superLabels: generateSuperLabels(
+          viewStartMs,
+          viewEndMs,
+          pxPerMs,
+          level,
+          tz,
+        ),
+      };
+      this._colMemo = memo;
+    }
+    return memo;
+  }
+
   // ── Resource layout computation ───────────────────────────────────
 
   private _computeResourceLayout(
@@ -698,9 +1088,10 @@ export class JanusTimeline extends LitElement {
     for (const g of groups) {
       if (g.label) y += GROUP_LABEL_HEIGHT;
       for (const r of g.items) {
-        layout.push({ id: r.id, yOffset: y, index: idx });
         const tracks = resourceTrackMap.get(r.id)?.trackCount || 1;
-        y += ROW_HEIGHT * tracks;
+        const height = ROW_HEIGHT * tracks;
+        layout.push({ id: r.id, yOffset: y, index: idx, height });
+        y += height;
         idx++;
       }
     }
@@ -828,9 +1219,13 @@ export class JanusTimeline extends LitElement {
     const visMinMs = pxToTimestamp(visMinPx, viewStartMs, pxPerMs);
     const visMaxMs = pxToTimestamp(visMaxPx, viewStartMs, pxPerMs);
 
-    // Generate columns and super-labels (timezone-aware)
-    const columns = generateColumns(viewStartMs, viewEndMs, pxPerMs, level, tz);
-    const superLabels = generateSuperLabels(
+    // Generate columns and super-labels (timezone-aware), memoized.
+    //
+    // These walk the entire ~20,000px canvas (up to 2500 iterations each) and
+    // format a label per tick. None of their inputs change while scrolling —
+    // `_viewStartMs` only moves on zoom, nav, or the infinite-scroll re-centre —
+    // so a single-slot memo hits on effectively every scroll render.
+    const { columns, superLabels } = this._getColumns(
       viewStartMs,
       viewEndMs,
       pxPerMs,
@@ -890,7 +1285,12 @@ export class JanusTimeline extends LitElement {
     const visMinRowPx = Math.max(0, scrollTop - OVERSCAN_ROW_PX);
     const visMaxRowPx = scrollTop + clientHeight + OVERSCAN_ROW_PX;
 
-    const GROUP_LABEL_HEIGHT = 28;
+    // NOTE: a local `const GROUP_LABEL_HEIGHT = 28` used to shadow the imported
+    // constant here, so the row accumulators below advanced 28px per group
+    // while `_computeResourceLayout` (which the drag controller hit-tests
+    // against) and the CSS `--grp-label-h` both use 32px. That 4px-per-group
+    // drift was masked by the 200px overscan, but it made the culling window
+    // and the true row geometry disagree. Always use the shared constant.
 
     return html`
       <div
@@ -1080,12 +1480,13 @@ export class JanusTimeline extends LitElement {
                         ></div>`;
                       }
 
-                      // Horizontally culled events for this visible row
-                      const visibleEvents = r.events.filter(
+                      // Horizontally culled events for this visible row.
+                      // `r.events` is already sorted by startMs in
+                      // _syncFromStore, and filter preserves order, so no
+                      // per-render sort is needed (z-index stacking below is
+                      // therefore unchanged).
+                      const sortedEvents = r.events.filter(
                         (ev) => ev.endMs >= visMinMs && ev.startMs <= visMaxMs,
-                      );
-                      const sortedEvents = visibleEvents.sort(
-                        (a, b) => a.startMs - b.startMs,
                       );
 
                       return html`

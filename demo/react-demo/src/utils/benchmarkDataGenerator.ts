@@ -148,25 +148,41 @@ const COLORS = [
  * for dense timeline benchmarking.
  * Atomically updates the Zustand store so all resources and events render instantly.
  */
-export function loadDenseBenchmarkData(): {
+export const DEFAULT_BENCHMARK_RESOURCE_COUNT = 500;
+
+/**
+ * Generates a heavy synthetic dataset (configurable: 100, 500, 2,000+ resources)
+ * with proportional timeline events across a 21-day timeline range.
+ * Atomically updates the Zustand store so all resources and events render instantly.
+ */
+export function loadDenseBenchmarkData(
+  requestedResourceCount: number = DEFAULT_BENCHMARK_RESOURCE_COUNT,
+): {
   resourceCount: number;
   eventCount: number;
 } {
   const store = schedulerStore;
   const today = new Date();
 
-  // 1. Generate 150 Resources
+  const count = Math.max(10, requestedResourceCount);
+
+  // Split target count: 40% Staff, 30% Rooms, 30% Equipment
+  const staffCount = Math.max(1, Math.round(count * 0.4));
+  const roomCount = Math.max(1, Math.round(count * 0.3));
+  const equipmentCount = Math.max(1, count - staffCount - roomCount);
+
   const resourceMap: Record<string, Resource> = {};
   const resourceList: Resource[] = [];
 
-  // 60 Staff
-  for (let i = 1; i <= 60; i++) {
+  // 1. Generate Staff
+  for (let i = 1; i <= staffCount; i++) {
     const fn = FIRST_NAMES[i % FIRST_NAMES.length];
     const ln = LAST_NAMES[(i * 3) % LAST_NAMES.length];
     const avatar = DOCTOR_AVATARS[i % DOCTOR_AVATARS.length];
+    const suffix = i > FIRST_NAMES.length ? ` (${i})` : "";
     const r = new Resource({
       id: `r_staff_${i}`,
-      name: `Dr. ${fn} ${ln}`,
+      name: `Dr. ${fn} ${ln}${suffix}`,
       type: "person",
       avatar,
     });
@@ -174,10 +190,14 @@ export function loadDenseBenchmarkData(): {
     resourceList.push(r);
   }
 
-  // 45 Rooms
-  for (let i = 1; i <= 45; i++) {
+  // 2. Generate Rooms
+  for (let i = 1; i <= roomCount; i++) {
     const roomType =
-      i <= 20 ? "Operating Room" : i <= 35 ? "Consulting Suite" : "ICU Bay";
+      i % 3 === 1
+        ? "Operating Room"
+        : i % 3 === 2
+          ? "Consulting Suite"
+          : "ICU Bay";
     const r = new Resource({
       id: `r_room_${i}`,
       name: `${roomType} ${i}`,
@@ -188,12 +208,12 @@ export function loadDenseBenchmarkData(): {
     resourceList.push(r);
   }
 
-  // 45 Equipment
-  for (let i = 1; i <= 45; i++) {
+  // 3. Generate Equipment
+  for (let i = 1; i <= equipmentCount; i++) {
     const eqType =
-      i <= 15
+      i % 3 === 1
         ? "MRI Scanner"
-        : i <= 30
+        : i % 3 === 2
           ? "CT Machine"
           : "Ultrasound Workstation";
     const char = String.fromCharCode(65 + (i % 26));
@@ -207,7 +227,7 @@ export function loadDenseBenchmarkData(): {
     resourceList.push(r);
   }
 
-  // 2. Generate 1,500+ Events across 21 days (-7 to +14 days)
+  // 4. Generate Events across 21 days (-7 to +13 days)
   const eventMap: Record<string, Event> = {};
   let eventCounter = 1;
   const timeSlots = [

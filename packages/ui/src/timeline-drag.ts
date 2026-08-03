@@ -35,6 +35,12 @@ export interface ResourceLayout {
   id: string;
   yOffset: number;
   index: number;
+  /**
+   * Rendered height of the row in px: ROW_HEIGHT * trackCount. Rows holding
+   * overlapping events are stacked into multiple tracks and are therefore
+   * taller than ROW_HEIGHT — hit-testing must use this, not the constant.
+   */
+  height: number;
 }
 
 export interface DragGhost {
@@ -112,8 +118,11 @@ export class TimelineDragController {
     return this._getSnapMs();
   }
 
-  constructor(requestUpdate: () => void) {
+  private _applyGhost: () => void;
+
+  constructor(requestUpdate: () => void, applyGhost: () => void) {
     this._requestUpdate = requestUpdate;
+    this._applyGhost = applyGhost;
     this._boundMove = this._onPointerMove.bind(this);
   }
 
@@ -209,42 +218,62 @@ export class TimelineDragController {
 
   // ── Pointer event handlers ──────────────────────────────────────────
 
+  private _moveRafId: number | null = null;
+  private _latestPointerEvent: PointerEvent | null = null;
+
   private _onPointerMove(e: PointerEvent) {
-    const dx = e.clientX - this._startClientX;
-    const dy = e.clientY - this._startClientY;
+    this._latestPointerEvent = e;
+    if (this._moveRafId !== null) return;
 
-    // Check threshold before activating
-    if (!this.active) {
-      if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) {
-        return;
+    this._moveRafId = requestAnimationFrame(() => {
+      this._moveRafId = null;
+      if (!this._latestPointerEvent) return;
+      const ev = this._latestPointerEvent;
+
+      const dx = ev.clientX - this._startClientX;
+      const dy = ev.clientY - this._startClientY;
+
+      const wasActive = this.active;
+
+      // Check threshold before activating
+      if (!this.active) {
+        if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) {
+          return;
+        }
+        this.active = true;
+        document.body.style.userSelect = "none";
+        document.body.style.cursor =
+          this.mode === "moving"
+            ? "grabbing"
+            : this.mode === "creating"
+              ? "crosshair"
+              : "col-resize";
       }
-      this.active = true;
-      document.body.style.userSelect = "none";
-      document.body.style.cursor =
-        this.mode === "moving"
-          ? "grabbing"
-          : this.mode === "creating"
-            ? "crosshair"
-            : "col-resize";
-    }
 
-    // Compute ghost position
-    switch (this.mode) {
-      case "moving":
-        this._computeMoveGhost(dx, e);
-        break;
-      case "resize-start":
-        this._computeResizeStartGhost(dx);
-        break;
-      case "resize-end":
-        this._computeResizeEndGhost(dx);
-        break;
-      case "creating":
-        this._computeCreateGhost(e);
-        break;
-    }
+      // Compute ghost position
+      switch (this.mode) {
+        case "moving":
+          this._computeMoveGhost(dx, ev);
+          break;
+        case "resize-start":
+          this._computeResizeStartGhost(dx);
+          break;
+        case "resize-end":
+          this._computeResizeEndGhost(dx);
+          break;
+        case "creating":
+          this._computeCreateGhost(ev);
+          break;
+      }
 
-    this._requestUpdate();
+      if (!wasActive) {
+        // Just activated: ONE full render to mount the ghost element into Lit DOM
+        this._requestUpdate();
+      } else {
+        // Already dragging: ghost-only update via direct DOM write (NO full requestUpdate!)
+        this._applyGhost();
+      }
+    });
   }
 
   /**
@@ -256,6 +285,10 @@ export class TimelineDragController {
     | { type: "event-create"; detail: EventCreateDetail }
     | null {
     this._removeMoveListener();
+    if (this._moveRafId !== null) {
+      cancelAnimationFrame(this._moveRafId);
+      this._moveRafId = null;
+    }
     document.body.style.userSelect = "";
     document.body.style.cursor = "";
 
@@ -271,6 +304,10 @@ export class TimelineDragController {
 
   cancel() {
     this._removeMoveListener();
+    if (this._moveRafId !== null) {
+      cancelAnimationFrame(this._moveRafId);
+      this._moveRafId = null;
+    }
     document.body.style.userSelect = "";
     document.body.style.cursor = "";
     this.mode = "idle";
@@ -518,23 +555,50 @@ export class TimelineDragController {
 
   private _findRowFromPointerY(clientY: number): ResourceLayout {
     if (!this._scrollContainer || this._resourceLayout.length === 0) {
-      return this._resourceLayout[0] ?? { id: "", yOffset: 0, index: 0 };
+      return (
+        this._resourceLayout[0] ?? {
+          id: "",
+          yOffset: 0,
+          index: 0,
+          height: ROW_HEIGHT,
+        }
+      );
     }
 
     const rect = this._scrollContainer.getBoundingClientRect();
     const contentY = clientY - rect.top + this._scrollContainer.scrollTop;
 
-    let closest = this._resourceLayout[0];
-    let minDist = Infinity;
-    for (const row of this._resourceLayout) {
-      const rowMid = row.yOffset + ROW_HEIGHT / 2;
-      const dist = Math.abs(contentY - rowMid);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = row;
+    const layout = this._resourceLayout;
+    let low = 0;
+    let high = layout.length - 1;
+
+    // Binary search for row containing contentY
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const row = layout[mid];
+      const rowTop = row.yOffset;
+      // Use the row's own height, not ROW_HEIGHT: multi-track rows (stacked
+      // overlapping events) are taller, and assuming a uniform height made the
+      // binary search miss them and fall through to the clamp below, which
+      // could then resolve the drop to a neighbouring row.
+      const rowBottom = rowTop + row.height;
+
+      if (contentY >= rowTop && contentY < rowBottom) {
+        return row;
+      } else if (contentY < rowTop) {
+        high = mid - 1;
+      } else {
+        low = mid + 1;
       }
     }
-    return closest;
+
+    // Fallback: clamp to closest boundary row
+    if (low >= layout.length) return layout[layout.length - 1];
+    if (high < 0) return layout[0];
+
+    const distLow = Math.abs(contentY - layout[low].yOffset);
+    const distHigh = Math.abs(contentY - layout[high].yOffset);
+    return distLow < distHigh ? layout[low] : layout[high];
   }
 
   private _addMoveListener() {
