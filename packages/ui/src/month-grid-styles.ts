@@ -144,7 +144,7 @@ export const monthGridStyles = css`
   /* ── Day cell ── */
   .mg-day-cell {
     border-right: 1px solid var(--border);
-    padding: 8px 6px 6px;
+    padding: 6px 6px 4px;
     display: flex;
     flex-direction: column;
     gap: 3px;
@@ -189,6 +189,7 @@ export const monthGridStyles = css`
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
+    height: 24px;
   }
 
   .mg-day-cell__num {
@@ -296,15 +297,25 @@ export const monthGridStyles = css`
     font-family: inherit;
     font-size: 11.5px;
     font-weight: 600;
-    color: var(--text-3);
+    color: var(--text-2);
     cursor: pointer;
     padding: 2px 6px;
-    margin: 1px 4px;
+    margin: 1px 4px 4px 4px;
     border-radius: 4px;
     transition:
       background 0.1s,
       color 0.1s;
     width: max-content;
+    max-width: calc(100% - 8px);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    z-index: 2;
+    align-self: flex-start;
+  }
+
+  .mg-more-btn__text::after {
+    content: " more";
   }
 
   .mg-more-btn:hover {
@@ -662,7 +673,21 @@ export const monthGridStyles = css`
       display: none;
     }
 
-    .mg-event--more {
+    .mg-more-btn {
+      padding: 1px 4px;
+      margin: 1px 0;
+      border-radius: 99px;
+      background: #e4e4e7;
+      color: #18181b;
+      font-size: 9.5px;
+      font-weight: 700;
+      width: auto;
+      max-width: 100%;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .mg-more-btn__text::after {
       display: none;
     }
 

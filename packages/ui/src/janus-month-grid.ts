@@ -441,10 +441,10 @@ export class JanusMonthGrid extends LitElement {
               let maxEventsPerDay = 2; // fallback
               if (this._gridHeight > 0) {
                 const weekRowHeight = this._gridHeight / rowCount;
-                // row height - 46px(header) - 4px(padding bottom). Each track is 26px
+                // row height - 28px(header) - 26px(more btn + padding). Each track is 26px
                 maxEventsPerDay = Math.max(
                   0,
-                  Math.floor((weekRowHeight - 50) / 26),
+                  Math.floor((weekRowHeight - 54) / 26),
                 );
               }
 
@@ -464,7 +464,7 @@ export class JanusMonthGrid extends LitElement {
               return html`
                 <div
                   class="mg-week-row"
-                  style="grid-template-rows: 46px repeat(${visibleTracks}, 26px) 1fr; padding-bottom: 4px;"
+                  style="grid-template-rows: 28px repeat(${visibleTracks}, 26px) 1fr; padding-bottom: 4px;"
                 >
                   <!-- Background Day Cells -->
                   ${week.map((day, colIdx) => {
@@ -565,7 +565,7 @@ export class JanusMonthGrid extends LitElement {
                           this._handleDayClick(week[colIdx]);
                         }}
                       >
-                        +${count} more
+                        <span class="mg-more-btn__text">+${count}</span>
                       </button>
                     `;
                   })}
