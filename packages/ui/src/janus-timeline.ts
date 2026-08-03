@@ -164,6 +164,8 @@ export class JanusTimeline extends LitElement {
   private _pendingZoomFactor = 1;
   private _pendingPointerX = 0;
   private _navRafId: number | null = null;
+  private _resizeObserver?: ResizeObserver;
+  private _pendingCenterMs: number | null = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -176,6 +178,9 @@ export class JanusTimeline extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+    }
     if (this._zoomRafId !== null) {
       cancelAnimationFrame(this._zoomRafId);
       this._zoomRafId = null;
@@ -608,9 +613,23 @@ export class JanusTimeline extends LitElement {
   }
 
   firstUpdated() {
-    // Center on today at current time
-    const now = new Date();
-    this._initializeView(now.getTime());
+    if (this.gridScrollRef) {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          if (w > 0) {
+            if (this._pendingCenterMs !== null) {
+              const target = this._pendingCenterMs;
+              this._pendingCenterMs = null;
+              this._initializeView(target);
+            }
+          }
+        }
+      });
+      this._resizeObserver.observe(this.gridScrollRef);
+    }
+    const now = Date.now();
+    this._initializeView(now);
   }
 
   /**
@@ -622,14 +641,16 @@ export class JanusTimeline extends LitElement {
     this._viewStartMs = centerMs - CONTENT_HALF_WIDTH / this._pxPerMs;
     this.requestUpdate();
 
-    requestAnimationFrame(() => {
-      if (!this.gridScrollRef) return;
-      // Scroll to center of the content
-      const containerWidth = this.gridScrollRef.clientWidth;
-      this._suppressScroll = true;
-      this.gridScrollRef.scrollLeft = CONTENT_HALF_WIDTH - containerWidth / 2;
-      this._suppressScroll = false;
-    });
+    if (!this.gridScrollRef || this.gridScrollRef.clientWidth === 0) {
+      this._pendingCenterMs = centerMs;
+      this._emitNavChange();
+      return;
+    }
+
+    const containerWidth = this.gridScrollRef.clientWidth;
+    this._suppressScroll = true;
+    this.gridScrollRef.scrollLeft = CONTENT_HALF_WIDTH - containerWidth / 2;
+    this._suppressScroll = false;
 
     this._emitNavChange();
   }

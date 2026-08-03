@@ -138,6 +138,13 @@ export function SchedulerView({
     if (count !== null) loadDenseBenchmarkData(count);
   }, []);
 
+  // Re-center timeline on current time whenever switching to Timeline view
+  useEffect(() => {
+    if (currentView === "Timeline") {
+      timelineRef.current?.goToToday();
+    }
+  }, [currentView]);
+
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
       navLabel: (detail.navLabel as string) || "",
