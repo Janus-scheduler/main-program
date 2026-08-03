@@ -1,5 +1,6 @@
 import { schedulerStore, type EventData } from "@janus-scheduler/core";
 import { GoogleCalendarClient } from "../client/GoogleCalendarClient.js";
+import { GoogleWebSocketListener } from "../listener/GoogleWebSocketListener.js";
 import { GoogleEventMapper } from "../mapper/GoogleEventMapper.js";
 import type {
   WebSocketMessage,
@@ -11,22 +12,116 @@ export class GoogleSyncManager {
   private readonly client: GoogleCalendarClient;
   private readonly mapper: GoogleEventMapper;
   private isGoogleConnected = false;
+  private readonly statusListeners = new Set<(connected: boolean) => void>();
 
-  // Call this from App.tsx after OAuth completes
   setConnected(value: boolean): void {
     this.isGoogleConnected = value;
+    for (const listener of this.statusListeners) listener(value);
+  }
+
+  /**
+   * Subscribe to connection status changes. Invoked immediately with the
+   * current status, then again on every change. Returns an unsubscribe
+   * function — call it on unmount to avoid updating state after teardown.
+   */
+  onStatusChange(callback: (connected: boolean) => void): () => void {
+    this.statusListeners.add(callback);
+    callback(this.isGoogleConnected);
+    return () => this.statusListeners.delete(callback);
+  }
+
+  /** Starts the OAuth flow — redirects the browser to the backend's /auth/google. */
+  connect(): void {
+    this.client.connect();
+  }
+
+  /**
+   * Disconnects from Google Calendar and broadcasts the status change to any
+   * onStatusChange subscribers.
+   */
+  async disconnect(): Promise<void> {
+    await this.client.disconnect();
+    this.setConnected(false);
+  }
+
+  /**
+   * Asks the backend whether Google Calendar is actually connected right now
+   * (tokens + calendar bootstrap both present — see the backend's /auth/status)
+   * and updates/broadcasts status accordingly. Call this once on mount to
+   * pick up an already-connected backend from a previous session (a plain
+   * page reload with no OAuth redirect in progress).
+   */
+  async refreshStatus(): Promise<boolean> {
+    const connected = await this.client.isConnected();
+    this.setConnected(connected);
+    return connected;
+  }
+
+  /**
+   * Detects a Google OAuth redirect back to this page (the backend appends
+   * `?google_connected=true|false` after the callback completes), updates
+   * status accordingly, and cleans the query param from the URL. Call this
+   * once on mount, before subscribing via onStatusChange. Safe to call when
+   * there's no such param — it's then a no-op.
+   */
+  handleOAuthRedirect(): "connected" | "failed" | "none" {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("google_connected");
+
+    if (connected === "true") {
+      this.setConnected(true);
+      window.history.replaceState({}, "", window.location.pathname);
+      return "connected";
+    }
+    if (connected === "false") {
+      console.error("[Janus Integrations] Google OAuth failed");
+      window.history.replaceState({}, "", window.location.pathname);
+      return "failed";
+    }
+    return "none";
+  }
+
+  private wsListener: GoogleWebSocketListener | null = null;
+
+  /**
+   * Starts real-time sync once a connection is confirmed: pulls in Google's
+   * current events (skipping ones already known locally), pushes any local
+   * events that never got a chance to sync (e.g. seed data created before
+   * connecting), then opens a WebSocket for live Google → Janus updates.
+   *
+   * Call this once per connection (e.g. from the host app's effect gated on
+   * connected status). Returns a stop function — call it when disconnecting
+   * or tearing down, to close the WebSocket and avoid acting on stale data.
+   */
+  async startRealtimeSync(): Promise<() => void> {
+    try {
+      const events = await this.client.fetchInitialEvents();
+      await this.loadInitialEvents(events);
+      await this.pushUnsyncedLocalEvents();
+    } catch (err) {
+      console.error(
+        "[Janus Integrations] Failed to load initial Google events:",
+        err,
+      );
+    }
+
+    this.wsListener?.stop();
+    this.wsListener = new GoogleWebSocketListener(
+      { backendUrl: this.client.getBackendUrl() },
+      (message) => this.handleGoogleChange(message),
+    );
+    this.wsListener.start();
+
+    return () => {
+      this.wsListener?.stop();
+      this.wsListener = null;
+    };
   }
 
   // janusId → googleId
   private readonly mappingTable = new Map<string, string>();
   // googleId → janusId
   private readonly reverseTable = new Map<string, string>();
-  /**
-   * janusIds that originated from Google.
-   * When these appear in onEventAdd/Update/Delete hooks,
-   * we skip pushing them back to Google to prevent sync loops.
-   */
-  private readonly googleSourceIds = new Set<string>();
   // janusId → the resourceIds it was assigned to in Janus (so a reload
   // can restore it under the right resource instead of "google-calendar")
   private readonly resourceIdsTable = new Map<string, string[]>();
@@ -214,7 +309,6 @@ export class GoogleSyncManager {
       }
 
       this.ensurePlaceholderResourceIfNeeded(janusData.resourceIds);
-      this.googleSourceIds.add(janusData.id);
 
       try {
         state.addEvent(janusData);
@@ -251,7 +345,6 @@ export class GoogleSyncManager {
       const janusId = this.reverseTable.get(event.id);
       if (!janusId) return;
 
-      this.googleSourceIds.add(janusId);
       schedulerStore.getState().deleteEvent(janusId);
       this.mappingTable.delete(janusId);
       this.reverseTable.delete(event.id);
@@ -269,8 +362,6 @@ export class GoogleSyncManager {
       existingJanusId,
       resolvedFromAttendees,
     );
-
-    this.googleSourceIds.add(janusData.id);
 
     const storeState = schedulerStore.getState();
 
@@ -303,12 +394,6 @@ export class GoogleSyncManager {
   private async onJanusEventAdd(
     event: import("@janus-scheduler/core").Event,
   ): Promise<void> {
-    // Skip events that came from Google
-    if (this.googleSourceIds.has(event.id)) {
-      this.googleSourceIds.delete(event.id);
-      return;
-    }
-
     const connected = await this.client.isConnected();
     // if (!connected) return;
     // if (!this.isGoogleConnected) return;
@@ -421,11 +506,6 @@ export class GoogleSyncManager {
   private async onJanusEventUpdate(
     event: import("@janus-scheduler/core").Event,
   ): Promise<void> {
-    if (this.googleSourceIds.has(event.id)) {
-      this.googleSourceIds.delete(event.id);
-      return;
-    }
-
     const connected = await this.client.isConnected();
     if (!connected) return;
 
@@ -481,11 +561,6 @@ export class GoogleSyncManager {
   }
 
   private async onJanusEventDelete(id: string): Promise<void> {
-    if (this.googleSourceIds.has(id)) {
-      this.googleSourceIds.delete(id);
-      return;
-    }
-
     const connected = await this.client.isConnected();
     if (!connected) return;
 

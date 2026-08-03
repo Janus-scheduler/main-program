@@ -25,10 +25,13 @@ const BACKEND_URL = "http://localhost:3001";
  * to a backend (simulated here) and handle errors.
  *
  * @param onError - called when any async hook rejects after a store rollback
- * @returns the configured SchedulerManager instance (stable across renders)
+ * @returns `{ manager, syncManager }` — both stable across renders. The caller
+ *   needs `syncManager` too (for the Google Calendar connect/disconnect and
+ *   real-time sync lifecycle), so it's returned directly instead of being
+ *   stashed on `window` for other components to reach into.
  */
 export function useSchedulerManager(onError: (err: HookError) => void) {
-  const manager = useMemo(() => {
+  const { manager, syncManager } = useMemo(() => {
     // Set up Google sync infrastructure
     const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
     const mapper = new GoogleEventMapper();
@@ -156,11 +159,9 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       });
     }
 
-    window.__janusSyncManager = syncManager;
-
-    return mgr;
+    return { manager: mgr, syncManager };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // manager is intentionally created once
 
-  return manager;
+  return { manager, syncManager };
 }

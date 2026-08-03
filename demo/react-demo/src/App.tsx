@@ -7,12 +7,6 @@ import type { ViewType } from "@janus-scheduler/react";
 import { ErrorToast } from "./components/ErrorToast";
 import { useSchedulerManager } from "./hooks/useSchedulerManager";
 import type { HookError } from "./hooks/useSchedulerManager";
-import {
-  GoogleCalendarClient,
-  GoogleWebSocketListener,
-} from "@janus-scheduler/integrations";
-
-const BACKEND_URL = "http://localhost:3001";
 
 /**
  * App — root component and state coordinator.
@@ -29,10 +23,7 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>("Month");
   const [showScheduler, setShowScheduler] = useState(false);
   const [hookError, setHookError] = useState<HookError | null>(null);
-  const [googleConnected, setGoogleConnected] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("google_connected") === "true";
-  });
+  const [googleConnected, setGoogleConnected] = useState(false);
 
   // Set to true to strictly block resource scheduling conflicts, or false to allow double-booking with visual warning banners.
   const preventConflicts = false;
@@ -47,78 +38,56 @@ function App() {
   }, []);
 
   // SchedulerManager is stable (created once via useMemo inside the hook)
-  const manager = useSchedulerManager(handleHookError);
+  const { manager, syncManager } = useSchedulerManager(handleHookError);
 
-  // ── Handle OAuth callback redirect ──────────────────────────────────────────
+  // ── Detect OAuth redirect / pick up an already-connected backend ────────────
+  // handleOAuthRedirect() detects `?google_connected=true|false` (present
+  // right after the OAuth callback) and cleans the URL; onStatusChange fires
+  // immediately with whatever status that just set (or false, if none), then
+  // again on every future change; refreshStatus() asks the backend directly,
+  // covering a plain reload with no redirect in progress but an
+  // already-connected backend from an earlier session.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const connected = params.get("google_connected");
+    syncManager.handleOAuthRedirect();
+    const unsubscribe = syncManager.onStatusChange(setGoogleConnected);
+    syncManager.refreshStatus();
+    return unsubscribe;
+  }, [syncManager]);
 
-    if (connected === "true") {
-      const syncManager = window.__janusSyncManager;
-      if (syncManager) syncManager.setConnected(true);
-      // Clean URL
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (connected === "false") {
-      console.error("[Janus] Google OAuth failed");
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
-
-  // ── Load initial Google events and start WebSocket after connecting ─────────
+  // ── Start real-time sync after connecting ───────────────────────────────────
+  // startRealtimeSync() owns the fetch→load→push sequencing and the
+  // WebSocket lifecycle; this effect just decides *when* (connected) and
+  // owns React's cleanup timing. `cancelled` guards against the effect
+  // tearing down (unmount, or googleConnected flipping again) before the
+  // async startRealtimeSync() call resolves — without it, a fast
+  // disconnect/reconnect could leak a WebSocket from a stale connection.
   useEffect(() => {
     if (!googleConnected) return;
 
-    const syncManager = window.__janusSyncManager;
-    if (!syncManager) return;
+    let cancelled = false;
+    let stop: (() => void) | undefined;
 
-    const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
-
-    // Load existing Google events into store, then push any local events
-    // that were created before this connection existed (e.g. seed data) and
-    // so never got a chance to sync.
-    client
-      .fetchInitialEvents()
-      .then((events) => syncManager.loadInitialEvents(events))
-      .then(() => syncManager.pushUnsyncedLocalEvents())
-      .catch((err) => {
-        console.error("[Janus] Failed to load initial Google events:", err);
-      });
-
-    // Start WebSocket listener for real-time Google → Janus updates
-    const listener = new GoogleWebSocketListener(
-      { backendUrl: BACKEND_URL },
-      (message) => syncManager.handleGoogleChange(message),
-    );
-    listener.start();
-
-    return () => listener.stop();
-  }, [googleConnected]);
-
-  // ── Check existing connection on mount ─────────────────────────────────────
-  useEffect(() => {
-    const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
-    client.isConnected().then((connected) => {
-      if (connected) {
-        setGoogleConnected(true);
-        const syncManager = window.__janusSyncManager;
-        if (syncManager) syncManager.setConnected(true);
+    syncManager.startRealtimeSync().then((stopFn) => {
+      if (cancelled) {
+        stopFn();
+      } else {
+        stop = stopFn;
       }
     });
-  }, []);
 
-  const handleGoogleDisconnect = async () => {
-    await fetch(`${BACKEND_URL}/auth/disconnect`, { method: "POST" });
-    const syncManager = window.__janusSyncManager;
-    if (syncManager) syncManager.setConnected(false);
-    setGoogleConnected(false);
-  };
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [googleConnected, syncManager]);
 
   const handleConnectCalendar = () => {
     if (googleConnected) {
-      handleGoogleDisconnect();
+      // disconnect() calls setConnected(false) internally, which broadcasts
+      // to the onStatusChange subscription above — no need to set it here too.
+      syncManager.disconnect();
     } else {
-      window.location.href = `${BACKEND_URL}/auth/google`;
+      syncManager.connect();
     }
   };
 

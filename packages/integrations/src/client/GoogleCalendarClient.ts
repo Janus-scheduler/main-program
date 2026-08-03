@@ -8,6 +8,11 @@ export class GoogleCalendarClient {
     this.backendUrl = config.backendUrl.replace(/\/$/, "");
   }
 
+  /** The backend base URL this client talks to (e.g. for constructing a matching WebSocket listener). */
+  getBackendUrl(): string {
+    return this.backendUrl;
+  }
+
   /** Create event in Google Calendar via backend. Returns googleEventId. */
   async pushEvent(event: GoogleCalendarEvent): Promise<string> {
     const res = await fetch(`${this.backendUrl}/events`, {
@@ -42,6 +47,20 @@ export class GoogleCalendarClient {
     });
     if (!res.ok)
       throw new Error(`deleteEvent failed: ${res.status} ${res.statusText}`);
+  }
+
+  /** Redirect the browser to the backend's OAuth start endpoint. */
+  connect(): void {
+    window.location.href = `${this.backendUrl}/auth/google`;
+  }
+
+  /** Tell the backend to disconnect (clears its stored tokens/calendar state). */
+  async disconnect(): Promise<void> {
+    const res = await fetch(`${this.backendUrl}/auth/disconnect`, {
+      method: "POST",
+    });
+    if (!res.ok)
+      throw new Error(`disconnect failed: ${res.status} ${res.statusText}`);
   }
 
   /** Check whether the user is connected to Google Calendar. */
