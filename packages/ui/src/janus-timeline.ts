@@ -89,6 +89,8 @@ export class JanusTimeline extends LitElement {
   private _suppressScroll = false;
   private _isScrollingGrid = false;
   private _isScrollingRes = false;
+  private _rafGridScroll: number | null = null;
+  private _rafResScroll: number | null = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -101,6 +103,8 @@ export class JanusTimeline extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
+    if (this._rafGridScroll !== null) cancelAnimationFrame(this._rafGridScroll);
+    if (this._rafResScroll !== null) cancelAnimationFrame(this._rafResScroll);
   }
 
   private _syncFromStore(state: SchedulerStore) {
@@ -165,14 +169,16 @@ export class JanusTimeline extends LitElement {
         else if (type === "room") groupLabel = "ROOMS";
         else if (type === "equipment") groupLabel = "EQUIPMENT";
       }
-      if (res.avatar) {
-        avatarType = "image";
-      } else if (type === "room") {
-        avatarType = "icon";
+      if (type === "room") {
         avatarIcon = "room";
       } else if (type === "equipment") {
-        avatarType = "icon";
         avatarIcon = "equipment";
+      }
+
+      if (res.avatar) {
+        avatarType = "image";
+      } else if (avatarIcon) {
+        avatarType = "icon";
       }
 
       newResources.push({
@@ -285,13 +291,18 @@ export class JanusTimeline extends LitElement {
     if (this.resColRef && this.gridScrollRef) {
       if (!this._isScrollingRes) {
         this._isScrollingGrid = true;
-        if (this.resColRef.scrollTop !== this.gridScrollRef.scrollTop) {
+        if (
+          Math.abs(this.resColRef.scrollTop - this.gridScrollRef.scrollTop) >
+          0.5
+        ) {
           this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
         }
-        // Use a microtask/setTimeout to reset flag after the browser fires the synchronized event
-        setTimeout(() => {
+        if (this._rafGridScroll !== null)
+          cancelAnimationFrame(this._rafGridScroll);
+        this._rafGridScroll = requestAnimationFrame(() => {
           this._isScrollingGrid = false;
-        }, 10);
+          this._rafGridScroll = null;
+        });
       }
     }
 
@@ -318,12 +329,18 @@ export class JanusTimeline extends LitElement {
     if (this.resColRef && this.gridScrollRef) {
       if (!this._isScrollingGrid) {
         this._isScrollingRes = true;
-        if (this.gridScrollRef.scrollTop !== this.resColRef.scrollTop) {
+        if (
+          Math.abs(this.gridScrollRef.scrollTop - this.resColRef.scrollTop) >
+          0.5
+        ) {
           this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
         }
-        setTimeout(() => {
+        if (this._rafResScroll !== null)
+          cancelAnimationFrame(this._rafResScroll);
+        this._rafResScroll = requestAnimationFrame(() => {
           this._isScrollingRes = false;
-        }, 10);
+          this._rafResScroll = null;
+        });
       }
     }
   }
@@ -657,11 +674,21 @@ export class JanusTimeline extends LitElement {
 
   private renderAvatar(r: TimelineResource) {
     if (r.avatarType === "image" && r.avatar) {
-      return html`<img
-        class="tl-avatar tl-avatar--image"
-        src="${r.avatar}"
-        alt="${r.name}"
-      />`;
+      return html`
+        <img
+          class="tl-avatar tl-avatar--image"
+          src="${r.avatar}"
+          alt="${r.name}"
+          @error=${(e: Event) => {
+            const img = e.currentTarget as HTMLImageElement;
+            img.style.display = "none";
+            const parent = img.parentElement;
+            if (parent) {
+              parent.classList.add("avatar-fallback");
+            }
+          }}
+        />
+      `;
     }
     if (r.avatarType === "initials") {
       return html`<span
@@ -670,11 +697,21 @@ export class JanusTimeline extends LitElement {
         >${getInitials(r.name)}</span
       >`;
     }
-    return html`
-      <span class="tl-avatar tl-avatar--icon tl-avatar--${r.avatarIcon}">
-        ${r.avatarIcon === "room" ? RoomIcon() : EquipmentIcon()}
-      </span>
-    `;
+    if (r.avatarIcon === "room") {
+      return html`<span class="tl-avatar tl-avatar--icon tl-avatar--room"
+        >${RoomIcon()}</span
+      >`;
+    }
+    if (r.avatarIcon === "equipment") {
+      return html`<span class="tl-avatar tl-avatar--icon tl-avatar--equipment"
+        >${EquipmentIcon()}</span
+      >`;
+    }
+    return html`<span
+      class="tl-avatar tl-avatar--initials"
+      style="background: ${avatarColor(r.id)}"
+      >${getInitials(r.name)}</span
+    >`;
   }
 
   private _renderDragGhost() {
