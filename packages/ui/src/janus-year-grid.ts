@@ -51,12 +51,6 @@ export class JanusYearGrid extends LitElement {
     this._unsubStore?.();
   }
 
-  willUpdate(changedProperties: Map<string, unknown>) {
-    if (changedProperties.has("_viewYear")) {
-      this._syncFromStore(schedulerStore.getState());
-    }
-  }
-
   override firstUpdated() {
     this._emitNavChange();
   }
@@ -64,16 +58,19 @@ export class JanusYearGrid extends LitElement {
   // ── Navigation ────────────────────────────────────────────────────────
   public goToPrev() {
     this._viewYear -= 1;
+    this._syncFromStore(schedulerStore.getState());
     this._emitNavChange();
   }
 
   public goToNext() {
     this._viewYear += 1;
+    this._syncFromStore(schedulerStore.getState());
     this._emitNavChange();
   }
 
   public goToToday() {
     this._viewYear = new Date().getFullYear();
+    this._syncFromStore(schedulerStore.getState());
     this._emitNavChange();
   }
 
@@ -110,42 +107,39 @@ export class JanusYearGrid extends LitElement {
     const newEventsMap = new Map<string, boolean>();
 
     for (const e of coreEvents) {
-      const startD = new Date(e.startTime);
-      const endD = new Date(e.endTime);
+      const startMs = Math.max(new Date(e.startTime).getTime(), startRange);
+      const endMs = Math.min(new Date(e.endTime).getTime(), endRange);
 
-      const loopStartMs = Math.max(startD.getTime(), startRange);
-      const loopEndMs = Math.min(endD.getTime(), endRange);
+      if (startMs > endMs) continue;
 
-      if (loopStartMs > loopEndMs) continue;
+      // Iterate using UTC day timestamps (86,400,000 ms) to avoid DST shift issues
+      const startDate = new Date(startMs);
+      const endDate = new Date(endMs);
 
-      const loopStartD = new Date(loopStartMs);
-      const loopEndD = new Date(loopEndMs);
-
-      const current = new Date(
-        loopStartD.getFullYear(),
-        loopStartD.getMonth(),
-        loopStartD.getDate(),
-        12,
-        0,
-        0,
+      const startUTC = Date.UTC(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate(),
       );
-      const endLimit = new Date(
-        loopEndD.getFullYear(),
-        loopEndD.getMonth(),
-        loopEndD.getDate(),
-        12,
-        0,
-        0,
+      const endUTC = Date.UTC(
+        endDate.getFullYear(),
+        endDate.getMonth(),
+        endDate.getDate(),
       );
 
-      while (current.getTime() <= endLimit.getTime()) {
+      const ONE_DAY_MS = 86400000;
+      for (
+        let currentMs = startUTC;
+        currentMs <= endUTC;
+        currentMs += ONE_DAY_MS
+      ) {
+        const d = new Date(currentMs);
         const dateStr = toLocalDateStr(
-          current.getFullYear(),
-          current.getMonth(),
-          current.getDate(),
+          d.getUTCFullYear(),
+          d.getUTCMonth(),
+          d.getUTCDate(),
         );
         newEventsMap.set(dateStr, true);
-        current.setDate(current.getDate() + 1);
       }
     }
 
@@ -187,13 +181,24 @@ export class JanusYearGrid extends LitElement {
       cells.push(html`
         <div
           class="yg-day-cell"
+          tabindex="0"
+          role="button"
+          aria-label="${MONTH_NAMES[monthIndex]} ${day}, ${this._viewYear}"
           @click=${() => this._handleDayClick(this._viewYear, monthIndex, day)}
+          @keydown=${(e: KeyboardEvent) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              this._handleDayClick(this._viewYear, monthIndex, day);
+            }
+          }}
         >
           <div class="yg-day-number ${isToday ? "yg-day-number--today" : ""}">
             ${day}
           </div>
-          ${hasEvent && !isToday
-            ? html`<div class="yg-density-dot"></div>`
+          ${hasEvent
+            ? html`<div
+                class="yg-density-dot ${isToday ? "yg-density-dot--today" : ""}"
+              ></div>`
             : nothing}
         </div>
       `);

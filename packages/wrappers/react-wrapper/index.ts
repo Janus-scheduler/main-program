@@ -259,12 +259,14 @@ const _YearGrid = createComponent({
   events: {
     onDayClick: "day-click",
     onNavChange: "nav-change",
+    onViewChange: "view-change",
   },
 });
 
 export interface YearGridProps extends React.HTMLAttributes<HTMLElement> {
   onDayClick?: (detail: { date: string }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,6 +281,10 @@ export const YearGrid = React.forwardRef<any, YearGridProps>((props, ref) => {
     onNavChange: props.onNavChange
       ? (e: Event) =>
           props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
+      : undefined,
+    onViewChange: props.onViewChange
+      ? (e: Event) =>
+          props.onViewChange!((e as CustomEvent<{ view: ViewType }>).detail)
       : undefined,
   });
 });

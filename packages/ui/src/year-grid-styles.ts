@@ -117,6 +117,11 @@ export const yearGridStyles = css`
     background-color: #f4f4f5;
   }
 
+  .yg-day-cell:focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: 1px;
+  }
+
   .yg-day-cell--empty {
     visibility: hidden;
     pointer-events: none;
@@ -152,5 +157,9 @@ export const yearGridStyles = css`
     background: var(--orange);
     position: absolute;
     bottom: 2px;
+  }
+
+  .yg-density-dot--today {
+    background: var(--white);
   }
 `;
