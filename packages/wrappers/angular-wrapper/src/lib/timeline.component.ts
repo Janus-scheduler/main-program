@@ -21,6 +21,7 @@ import type {
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
+  ViewType,
 } from "./types";
 import { schedulerStore, isoToZonedDisplay } from "@janus-scheduler/core";
 
@@ -85,7 +86,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly eventCreate = output<EventCreateDetail>();
 
   /** Emitted when the user toggles the view */
-  readonly viewChange = output<{ view: "Timeline" | "Month" }>();
+  readonly viewChange = output<{ view: ViewType }>();
 
   /** Emitted when the date/zoom nav state changes */
   readonly navChange = output<Record<string, unknown>>();
@@ -156,7 +157,7 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     ).goToToday();
   }
 
-  public setView(view: "Timeline" | "Month"): void {
+  public setView(view: ViewType): void {
     (
       this._elRef().nativeElement as HTMLElement & {
         setView: (v: string) => void;

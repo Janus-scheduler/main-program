@@ -3,6 +3,8 @@ import {
   JanusScheduler as JanusSchedulerWC,
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
+  JanusDayGrid as JanusDayGridWC,
+  JanusWeekGrid as JanusWeekGridWC,
   JanusAiBar as JanusAiBarWC,
   JanusTopbar as JanusTopbarWC,
 } from "@janus-scheduler/ui";
@@ -14,6 +16,12 @@ import type {
   EventCreateDetail,
   SchedulerSaveData,
   SchedulerDeleteData,
+  MonthEvent,
+  TimeGridEvent,
+  TimeGridEventResource,
+  SlotSelectDetail,
+  TimeGridEventMoveDetail,
+  TimeGridEventResizeDetail,
   EventColor,
   ViewType,
   EventData,
@@ -38,6 +46,12 @@ export type {
   EventCreateDetail,
   SchedulerSaveData,
   SchedulerDeleteData,
+  MonthEvent,
+  TimeGridEvent,
+  TimeGridEventResource,
+  SlotSelectDetail,
+  TimeGridEventMoveDetail,
+  TimeGridEventResizeDetail,
   EventColor,
   ViewType,
   EventData,
@@ -53,6 +67,8 @@ declare module "solid-js" {
       "janus-scheduler": Record<string, unknown>;
       "janus-timeline": Record<string, unknown>;
       "janus-month-grid": Record<string, unknown>;
+      "janus-day-grid": Record<string, unknown>;
+      "janus-week-grid": Record<string, unknown>;
       "janus-ai-bar": Record<string, unknown>;
       "janus-topbar": Record<string, unknown>;
     }
@@ -68,6 +84,12 @@ if (!customElements.get("janus-timeline")) {
 }
 if (!customElements.get("janus-month-grid")) {
   customElements.define("janus-month-grid", JanusMonthGridWC);
+}
+if (!customElements.get("janus-day-grid")) {
+  customElements.define("janus-day-grid", JanusDayGridWC);
+}
+if (!customElements.get("janus-week-grid")) {
+  customElements.define("janus-week-grid", JanusWeekGridWC);
 }
 if (!customElements.get("janus-ai-bar")) {
   customElements.define("janus-ai-bar", JanusAiBarWC);
@@ -168,7 +190,7 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
  */
 export interface TimelineProps {
   resources?: TimelineResource[];
-  view?: "Timeline" | "Month";
+  view?: ViewType;
   currentDate?: Date;
   aiPrompt?: string;
   allowCreate?: boolean;
@@ -179,7 +201,7 @@ export interface TimelineProps {
   onEventMove?: (detail: EventMoveDetail) => void;
   onEventResize?: (detail: EventResizeDetail) => void;
   onEventCreate?: (detail: EventCreateDetail) => void;
-  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   ref?: (el: HTMLElement) => void;
   onConflictDetected?: (detail: {
@@ -261,7 +283,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
  *  - onEventClick → CustomEvent<TimelineEvent>                  — user clicked an event chip
  *  - onDayClick   → CustomEvent<{ date: string }>               — user clicked an empty day cell
  *  - onAddEvent   → CustomEvent<void>                           — user clicked the + FAB
- *  - onViewChange → CustomEvent<{ view: "Timeline" | "Month" }> — user switched views
+ *  - onViewChange → CustomEvent<{ view: ViewType }> — user switched views
  *
  * The component reads directly from the Zustand store.
  */
@@ -270,7 +292,7 @@ export interface MonthGridProps {
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;
-  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   ref?: (el: HTMLElement) => void;
 }
@@ -310,6 +332,113 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
   );
 };
 
+/**
+ * <DayGrid> / <WeekGrid> — hour-grid views.
+ *
+ * Both web components expose the same props and events, so they share this
+ * props interface and the factory below.
+ *
+ * Events:
+ *  - onEventClick   → CustomEvent<TimeGridEvent>              — user clicked an event block
+ *  - onDayClick     → CustomEvent<{ date: string }>           — user clicked a column header
+ *  - onSlotSelect   → CustomEvent<SlotSelectDetail>           — user clicked an empty slot
+ *  - onEventMove    → CustomEvent<TimeGridEventMoveDetail>    — drag completed (move)
+ *  - onEventResize  → CustomEvent<TimeGridEventResizeDetail>  — drag completed (resize)
+ *  - onAddEvent     → CustomEvent<void>                       — user clicked the + FAB
+ *  - onViewChange   → CustomEvent<{ view: ViewType }>         — user switched views
+ *
+ * The components read directly from the Zustand store unless `events` is set.
+ */
+export interface TimeGridProps {
+  /** Externally supplied events. Omit to read from the shared store. */
+  events?: TimeGridEvent[];
+  showFab?: boolean;
+  /** Emit `onSlotSelect` when an empty slot is clicked. Default: true */
+  allowCreate?: boolean;
+  /** First hour rendered (0–23). Default: 0 */
+  startHour?: number;
+  /** Last hour rendered, exclusive (1–24). Default: 24 */
+  endHour?: number;
+  /** Granularity of click-to-create, in minutes. Default: 30 */
+  slotMinutes?: number;
+  /** Duration applied to a slot selection, in minutes. Default: 60 */
+  defaultDuration?: number;
+  /** Hour scrolled into view on first paint. Default: 8 */
+  scrollToHour?: number;
+  /** First day of the week — 0 = Sunday, 1 = Monday. Default: 1 */
+  weekStartsOn?: number;
+  onEventClick?: (detail: TimeGridEvent) => void;
+  onDayClick?: (detail: { date: string }) => void;
+  onSlotSelect?: (detail: SlotSelectDetail) => void;
+  onEventMove?: (detail: TimeGridEventMoveDetail) => void;
+  onEventResize?: (detail: TimeGridEventResizeDetail) => void;
+  onAddEvent?: () => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+  ref?: (el: HTMLElement) => void;
+}
+
+/** Builds the Solid component for one of the two hour-grid custom elements. */
+function createTimeGrid(
+  tagName: "janus-day-grid" | "janus-week-grid",
+): Component<TimeGridProps> {
+  return (props) => {
+    let ref!: HTMLElement;
+
+    createEffect(() => {
+      if (!ref) return;
+      const el = ref as unknown as Record<string, unknown>;
+      if (props.events !== undefined) el.events = props.events;
+      if (props.showFab !== undefined) el.showFab = props.showFab;
+      if (props.allowCreate !== undefined) el.allowCreate = props.allowCreate;
+      if (props.startHour !== undefined) el.startHour = props.startHour;
+      if (props.endHour !== undefined) el.endHour = props.endHour;
+      if (props.slotMinutes !== undefined) el.slotMinutes = props.slotMinutes;
+      if (props.defaultDuration !== undefined)
+        el.defaultDuration = props.defaultDuration;
+      if (props.scrollToHour !== undefined)
+        el.scrollToHour = props.scrollToHour;
+      if (props.weekStartsOn !== undefined)
+        el.weekStartsOn = props.weekStartsOn;
+    });
+
+    onMount(() => {
+      const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
+        if (handler) {
+          const listener = (e: Event) => handler((e as CustomEvent).detail);
+          ref?.addEventListener(eventName, listener);
+          onCleanup(() => ref?.removeEventListener(eventName, listener));
+        }
+      };
+      attach("event-click", props.onEventClick);
+      attach("day-click", props.onDayClick);
+      attach("slot-select", props.onSlotSelect);
+      attach("event-move", props.onEventMove);
+      attach("event-resize", props.onEventResize);
+      attach("add-event", props.onAddEvent);
+      attach("view-change", props.onViewChange);
+      attach("nav-change", props.onNavChange);
+    });
+
+    const setRef = (el: HTMLElement) => {
+      ref = el;
+      if (props.ref) props.ref(el);
+    };
+
+    return tagName === "janus-day-grid" ? (
+      <janus-day-grid ref={setRef} />
+    ) : (
+      <janus-week-grid ref={setRef} />
+    );
+  };
+}
+
+export const DayGrid: Component<TimeGridProps> =
+  createTimeGrid("janus-day-grid");
+
+export const WeekGrid: Component<TimeGridProps> =
+  createTimeGrid("janus-week-grid");
+
 export interface AiBarProps {
   placeholder?: string;
   buttonLabel?: string;
@@ -347,14 +476,16 @@ export interface TopbarProps {
   navLabel?: string;
   dayName?: string;
   shortDate?: string;
-  view?: "Timeline" | "Month";
+  view?: ViewType;
+  /** Which view tabs to show, in order. Default: Day, Week, Month, Timeline. */
+  views?: ViewType[];
   allowCreate?: boolean;
   zoomPercent?: number;
   zoomUnit?: string;
   onPrevClick?: () => void;
   onNextClick?: () => void;
   onTodayClick?: () => void;
-  onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewSwitch?: (detail: { view: ViewType }) => void;
   onToggleCreate?: () => void;
 }
 
@@ -368,6 +499,7 @@ export const Topbar: Component<TopbarProps> = (props) => {
       if (props.dayName !== undefined) el.dayName = props.dayName;
       if (props.shortDate !== undefined) el.shortDate = props.shortDate;
       if (props.view !== undefined) el.view = props.view;
+      if (props.views !== undefined) el.views = props.views;
       if (props.allowCreate !== undefined) el.allowCreate = props.allowCreate;
       if (props.zoomPercent !== undefined) el.zoomPercent = props.zoomPercent;
       if (props.zoomUnit !== undefined) el.zoomUnit = props.zoomUnit;

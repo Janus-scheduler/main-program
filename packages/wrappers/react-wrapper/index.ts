@@ -4,6 +4,8 @@ import {
   JanusScheduler as JanusSchedulerWC,
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
+  JanusDayGrid as JanusDayGridWC,
+  JanusWeekGrid as JanusWeekGridWC,
   JanusAiBar as JanusAiBarWC,
   JanusTopbar as JanusTopbarWC,
   JanusConfirmDialog as JanusConfirmDialogWC,
@@ -31,6 +33,12 @@ import type {
   EventCreateDetail,
   SchedulerSaveData,
   SchedulerDeleteData,
+  MonthEvent,
+  TimeGridEvent,
+  TimeGridEventResource,
+  SlotSelectDetail,
+  TimeGridEventMoveDetail,
+  TimeGridEventResizeDetail,
   EventColor,
   ViewType,
   EventData,
@@ -51,6 +59,12 @@ export type {
   EventCreateDetail,
   SchedulerSaveData,
   SchedulerDeleteData,
+  MonthEvent,
+  TimeGridEvent,
+  TimeGridEventResource,
+  SlotSelectDetail,
+  TimeGridEventMoveDetail,
+  TimeGridEventResizeDetail,
   EventColor,
   ViewType,
   EventData,
@@ -144,7 +158,7 @@ const _Timeline = createComponent({
 
 export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   resources?: TimelineResource[];
-  view?: "Timeline" | "Month";
+  view?: ViewType;
   currentDate?: Date;
   aiPrompt?: string;
   allowCreate?: boolean;
@@ -155,7 +169,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   onEventResize?: (detail: EventResizeDetail) => void;
   onEventCreate?: (detail: EventCreateDetail) => void;
   onAddEvent?: () => void;
-  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   onConflictDetected?: (detail: {
     message: string;
@@ -202,9 +216,7 @@ export const Timeline = React.forwardRef<any, TimelineProps>((props, ref) => {
     onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
     onViewChange: props.onViewChange
       ? (e: Event) =>
-          props.onViewChange!(
-            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-          )
+          props.onViewChange!((e as CustomEvent<{ view: ViewType }>).detail)
       : undefined,
     onNavChange: props.onNavChange
       ? (e: Event) =>
@@ -231,7 +243,7 @@ export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;
-  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
 }
 
@@ -251,14 +263,127 @@ export const MonthGrid = React.forwardRef<any, MonthGridProps>((props, ref) => {
     onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
     onViewChange: props.onViewChange
       ? (e: Event) =>
-          props.onViewChange!(
-            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-          )
+          props.onViewChange!((e as CustomEvent<{ view: ViewType }>).detail)
       : undefined,
     onNavChange: props.onNavChange
       ? (e: Event) =>
           props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
       : undefined,
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hour-grid views (Day / Week)
+//
+// Both web components share the same props and events, so they share one
+// props interface and one binding factory here too.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface TimeGridProps extends React.HTMLAttributes<HTMLElement> {
+  /** Externally supplied events. Omit to read from the shared store. */
+  events?: TimeGridEvent[];
+  showFab?: boolean;
+  /** Emit `onSlotSelect` when an empty slot is clicked. Default: true */
+  allowCreate?: boolean;
+  /** First hour rendered (0–23). Default: 0 */
+  startHour?: number;
+  /** Last hour rendered, exclusive (1–24). Default: 24 */
+  endHour?: number;
+  /** Granularity of click-to-create, in minutes. Default: 30 */
+  slotMinutes?: number;
+  /** Duration applied to a slot selection, in minutes. Default: 60 */
+  defaultDuration?: number;
+  /** Hour scrolled into view on first paint. Default: 8 */
+  scrollToHour?: number;
+  /** First day of the week — 0 = Sunday, 1 = Monday. Default: 1 */
+  weekStartsOn?: number;
+  onEventClick?: (detail: TimeGridEvent) => void;
+  onDayClick?: (detail: { date: string }) => void;
+  onSlotSelect?: (detail: SlotSelectDetail) => void;
+  onEventMove?: (detail: TimeGridEventMoveDetail) => void;
+  onEventResize?: (detail: TimeGridEventResizeDetail) => void;
+  onAddEvent?: () => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+}
+
+const timeGridEvents = {
+  onEventClick: "event-click",
+  onDayClick: "day-click",
+  onSlotSelect: "slot-select",
+  onEventMove: "event-move",
+  onEventResize: "event-resize",
+  onAddEvent: "add-event",
+  onViewChange: "view-change",
+  onNavChange: "nav-change",
+} as const;
+
+/** Shared unwrapping of the CustomEvents both hour-grid views fire. */
+function timeGridHandlers(props: TimeGridProps) {
+  return {
+    onEventClick: props.onEventClick
+      ? (e: Event) =>
+          props.onEventClick!((e as CustomEvent<TimeGridEvent>).detail)
+      : undefined,
+    onDayClick: props.onDayClick
+      ? (e: Event) =>
+          props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
+      : undefined,
+    onSlotSelect: props.onSlotSelect
+      ? (e: Event) =>
+          props.onSlotSelect!((e as CustomEvent<SlotSelectDetail>).detail)
+      : undefined,
+    onEventMove: props.onEventMove
+      ? (e: Event) =>
+          props.onEventMove!((e as CustomEvent<TimeGridEventMoveDetail>).detail)
+      : undefined,
+    onEventResize: props.onEventResize
+      ? (e: Event) =>
+          props.onEventResize!(
+            (e as CustomEvent<TimeGridEventResizeDetail>).detail,
+          )
+      : undefined,
+    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+    onViewChange: props.onViewChange
+      ? (e: Event) =>
+          props.onViewChange!((e as CustomEvent<{ view: ViewType }>).detail)
+      : undefined,
+    onNavChange: props.onNavChange
+      ? (e: Event) =>
+          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
+      : undefined,
+  };
+}
+
+const _DayGrid = createComponent({
+  tagName: "janus-day-grid",
+  elementClass: JanusDayGridWC,
+  react: React,
+  events: timeGridEvents,
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const DayGrid = React.forwardRef<any, TimeGridProps>((props, ref) => {
+  return React.createElement(_DayGrid, {
+    ...props,
+    ref,
+    ...timeGridHandlers(props),
+  });
+});
+
+const _WeekGrid = createComponent({
+  tagName: "janus-week-grid",
+  elementClass: JanusWeekGridWC,
+  react: React,
+  events: timeGridEvents,
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const WeekGrid = React.forwardRef<any, TimeGridProps>((props, ref) => {
+  return React.createElement(_WeekGrid, {
+    ...props,
+    ref,
+    ...timeGridHandlers(props),
   });
 });
 
@@ -316,7 +441,9 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   navLabel?: string;
   dayName?: string;
   shortDate?: string;
-  view?: "Timeline" | "Month";
+  view?: ViewType;
+  /** Which view tabs to show, in order. Default: Day, Week, Month, Timeline. */
+  views?: ViewType[];
   allowCreate?: boolean;
   canUndo?: boolean;
   zoomPercent?: number;
@@ -324,7 +451,7 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   onPrevClick?: () => void;
   onNextClick?: () => void;
   onTodayClick?: () => void;
-  onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewSwitch?: (detail: { view: ViewType }) => void;
   onToggleCreate?: () => void;
   onUndoClick?: () => void;
 }
@@ -337,9 +464,7 @@ export function Topbar(props: TopbarProps): React.JSX.Element {
     onTodayClick: props.onTodayClick ? () => props.onTodayClick!() : undefined,
     onViewSwitch: props.onViewSwitch
       ? (e: Event) =>
-          props.onViewSwitch!(
-            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-          )
+          props.onViewSwitch!((e as CustomEvent<{ view: ViewType }>).detail)
       : undefined,
     onToggleCreate: props.onToggleCreate
       ? () => props.onToggleCreate!()

@@ -15,6 +15,7 @@ import { JanusTopbar } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _topbar = JanusTopbar;
+import type { ViewType } from "@janus-scheduler/core";
 
 @Component({
   selector: "janus-topbar-ng",
@@ -37,7 +38,9 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly navLabel = input<string | undefined>(undefined);
   readonly dayName = input<string | undefined>(undefined);
   readonly shortDate = input<string | undefined>(undefined);
-  readonly view = input<"Timeline" | "Month" | undefined>(undefined);
+  readonly view = input<ViewType | undefined>(undefined);
+  /** Which view tabs to show, in order. Default: Day, Week, Month, Timeline. */
+  readonly views = input<ViewType[] | undefined>(undefined);
   readonly allowCreate = input<boolean>(false);
   readonly zoomPercent = input<number>(100);
   readonly zoomUnit = input<string | undefined>(undefined);
@@ -45,7 +48,7 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly prevClick = output<void>();
   readonly nextClick = output<void>();
   readonly todayClick = output<void>();
-  readonly viewSwitch = output<{ view: "Timeline" | "Month" }>();
+  readonly viewSwitch = output<{ view: ViewType }>();
   readonly toggleCreate = output<void>();
 
   private readonly _prevClickHandler = (e: Event) => {
@@ -62,9 +65,7 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
   };
   private readonly _viewSwitchHandler = (e: Event) => {
     e.stopPropagation();
-    this.viewSwitch.emit(
-      (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-    );
+    this.viewSwitch.emit((e as CustomEvent<{ view: ViewType }>).detail);
   };
   private readonly _toggleCreateHandler = (e: Event) => {
     e.stopPropagation();
@@ -115,10 +116,12 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     // Props
     const element = el as HTMLElement & {
       view?: string;
+      views?: ViewType[];
       allowCreate?: boolean;
       zoomPercent?: number;
     };
     element.view = this.view();
+    if (this.views() !== undefined) element.views = this.views();
     element.allowCreate = this.allowCreate();
     element.zoomPercent = this.zoomPercent();
   }

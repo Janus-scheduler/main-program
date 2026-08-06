@@ -2,6 +2,8 @@ import { useRef, useState, useEffect } from "react";
 import {
   Timeline,
   MonthGrid,
+  DayGrid,
+  WeekGrid,
   Scheduler,
   AiBar,
   Topbar,
@@ -113,32 +115,65 @@ export function SchedulerView({
     }
   >(null);
 
-  /**
-   * Tracks a date set by onDayClick so the useEffect below knows
-   * whether to navigate to that date or fall back to today.
-   * Using a ref avoids stale-closure issues with setTimeout.
-   */
-  const pendingTimelineDate = useRef<string | null>(null);
+  /** Day and Week grids share the same imperative navigation API. */
+  type TimeGridHandle = HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+    goToDate: (date: string | number | Date) => void;
+  };
+  const dayGridRef = useRef<TimeGridHandle>(null);
+  const weekGridRef = useRef<TimeGridHandle>(null);
 
-  // Whenever the view switches TO Timeline, navigate to the pending date
-  // (set by a day-click in Month view) or fall back to today.
+  /**
+   * The nav surface every view exposes. `goToDate` is optional because Month
+   * navigates by month rather than by day.
+   */
+  type NavHandle = HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+    goToDate?: (date: string | number | Date) => void;
+  };
+
+  /** The nav-capable component currently on screen, or null if none is. */
+  const activeNavRef = (): NavHandle | null => {
+    if (currentView === "Timeline") return timelineRef.current;
+    if (currentView === "Month") return monthGridRef.current;
+    if (currentView === "Day") return dayGridRef.current;
+    return weekGridRef.current;
+  };
+
+  /**
+   * Date a view-switch should land on, set by a day-click in another view.
+   * A ref (not state) so the useEffect below can't read a stale value.
+   */
+  const pendingDate = useRef<string | null>(null);
+
+  // After a view switch, navigate the newly mounted view to the pending date
+  // (set by a day-click in another view).
   useEffect(() => {
-    if (currentView === "Timeline") {
-      const target = pendingTimelineDate.current;
-      pendingTimelineDate.current = null; // consume it
-      // Capture the ref now — it may become null if the component unmounts
-      // or the ref changes during the 50ms delay.
-      const timeline = timelineRef.current;
-      const timer = setTimeout(() => {
-        if (!timeline) return;
-        if (target) {
-          timeline.goToDate(target);
-        } else {
-          timeline.goToToday();
-        }
-      }, 50);
-      return () => clearTimeout(timer);
-    }
+    const target = pendingDate.current;
+    pendingDate.current = null; // consume it
+
+    // Timeline does not start on today's date the way the calendar views do,
+    // so it needs an explicit reset whenever it is mounted without a target —
+    // otherwise it opens on a stale window and appears to have no events.
+    const needsTodayReset = !target && currentView === "Timeline";
+    if (!target && !needsTodayReset) return;
+
+    // The new view mounts on the next tick, so resolve the ref inside the
+    // timeout rather than capturing a ref that is still null right now.
+    const timer = setTimeout(() => {
+      const el = activeNavRef();
+      if (!el) return;
+      // Month has no goToDate — it navigates by month, not by day.
+      if (target) el.goToDate?.(target);
+      else el.goToToday();
+    }, 50);
+    return () => clearTimeout(timer);
+    // activeNavRef reads refs only — currentView is the real dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentView]);
 
   const [navData, setNavData] = useState({
@@ -160,6 +195,69 @@ export function SchedulerView({
     });
   };
 
+  /**
+   * Day / Week grids report slot selections already split into date + time in
+   * the display timezone, so they can be handed straight to the modal —
+   * unlike Timeline's onEventCreate, which reports ISO instants.
+   */
+  const handleSlotSelect = (detail: {
+    date: string;
+    startTime: string;
+    endTime: string;
+  }) => {
+    setTempEventData({
+      startDate: detail.date,
+      startTime: detail.startTime,
+      endDate: detail.date,
+      endTime: detail.endTime,
+      // Day/Week have no resource axis, so the user picks participants in the
+      // modal — leave it undefined rather than forcing an empty selection.
+      showConfirmOnCreate: true,
+    });
+    onOpenScheduler();
+  };
+
+  /**
+   * Day / Week grids report drag results as wall-clock date+time (like
+   * onSlotSelect), not ISO instants like Timeline — so both handlers convert
+   * via `zonedInputToISO` before writing to the store.
+   */
+  const handleTimeGridMove = ({
+    event,
+    newDate,
+    newStartTime,
+    newEndTime,
+  }: {
+    event: { id: string };
+    newDate: string;
+    newStartTime: string;
+    newEndTime: string;
+  }) => {
+    const tz = schedulerStore.getState().timezone;
+    manager.updateEvent(event.id, {
+      startTime: zonedInputToISO(newDate, newStartTime, tz),
+      endTime: zonedInputToISO(newDate, newEndTime, tz),
+    });
+  };
+
+  const handleTimeGridResize = ({
+    event,
+    date,
+    newStartTime,
+    newEndTime,
+  }: {
+    event: { id: string };
+    date: string;
+    newStartTime: string;
+    newEndTime: string;
+  }) => {
+    const tz = schedulerStore.getState().timezone;
+    manager.updateEvent(event.id, {
+      startTime: zonedInputToISO(date, newStartTime, tz),
+      endTime: zonedInputToISO(date, newEndTime, tz),
+    });
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Topbar
@@ -171,18 +269,9 @@ export function SchedulerView({
         canUndo={canUndo}
         zoomPercent={navData.zoomPercent}
         zoomUnit={navData.zoomUnit}
-        onPrevClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToPrev();
-          else monthGridRef.current?.goToPrev();
-        }}
-        onNextClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToNext();
-          else monthGridRef.current?.goToNext();
-        }}
-        onTodayClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToToday();
-          else monthGridRef.current?.goToToday();
-        }}
+        onPrevClick={() => activeNavRef()?.goToPrev()}
+        onNextClick={() => activeNavRef()?.goToNext()}
+        onTodayClick={() => activeNavRef()?.goToToday()}
         onViewSwitch={(detail) => onViewChange(detail.view)}
         onToggleCreate={() => {
           if (currentView === "Timeline") timelineRef.current?.toggleCreate();
@@ -248,12 +337,46 @@ export function SchedulerView({
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
           onDayClick={(detail) => {
-            pendingTimelineDate.current = detail.date; // store, don't use a floating setTimeout
-            onViewChange("Timeline");
+            pendingDate.current = detail.date; // store, don't use a floating setTimeout
+            onViewChange("Day");
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
           onNavChange={handleNavChange}
           ref={monthGridRef}
+        />
+      )}
+
+      {currentView === "Week" && (
+        <WeekGrid
+          ref={weekGridRef}
+          showFab={true}
+          allowCreate={allowCreate}
+          onAddEvent={() => onOpenScheduler()}
+          onEventClick={(ev) => onOpenScheduler(ev?.id)}
+          onDayClick={(detail) => {
+            pendingDate.current = detail.date;
+            onViewChange("Day");
+          }}
+          onSlotSelect={handleSlotSelect}
+          onEventMove={handleTimeGridMove}
+          onEventResize={handleTimeGridResize}
+          onViewChange={(detail) => onViewChange(detail.view)}
+          onNavChange={handleNavChange}
+        />
+      )}
+
+      {currentView === "Day" && (
+        <DayGrid
+          ref={dayGridRef}
+          showFab={true}
+          allowCreate={allowCreate}
+          onAddEvent={() => onOpenScheduler()}
+          onEventClick={(ev) => onOpenScheduler(ev?.id)}
+          onSlotSelect={handleSlotSelect}
+          onEventMove={handleTimeGridMove}
+          onEventResize={handleTimeGridResize}
+          onViewChange={(detail) => onViewChange(detail.view)}
+          onNavChange={handleNavChange}
         />
       )}
 

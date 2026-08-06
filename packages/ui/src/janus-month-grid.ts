@@ -18,6 +18,7 @@ import {
   expandEvents,
   type EventColor,
   type SchedulerState,
+  type ViewType,
 } from "@janus-scheduler/core";
 
 interface WeekEventBar extends MonthEvent {
@@ -177,7 +178,7 @@ export class JanusMonthGrid extends LitElement {
   // ── Internal state ────────────────────────────────────────────────────
   @state() private _year = new Date().getFullYear();
   @state() private _month = new Date().getMonth(); // 0-based
-  @state() private _view: "Timeline" | "Month" = "Month";
+  @state() private _view: ViewType = "Month";
   @state() private _selectedDateStr: string | null = null;
   @state() private _hoveredEventId: string | null = null;
 
@@ -297,7 +298,7 @@ export class JanusMonthGrid extends LitElement {
     );
   }
 
-  public setView(v: "Timeline" | "Month") {
+  public setView(v: ViewType) {
     this._view = v;
     // Let the parent app know so it can swap components if needed
     this.dispatchEvent(

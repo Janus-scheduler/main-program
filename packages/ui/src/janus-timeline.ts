@@ -10,6 +10,7 @@ import {
   checkSlotConflict,
   type ConflictResource,
   type SchedulerStore,
+  type ViewType,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";
 import "./janus-topbar";
@@ -42,6 +43,13 @@ import {
 } from "./timeline-zoom";
 import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
+/**
+ * How many frames the initial centering will wait for the scroll container to
+ * be laid out before giving up (~1s at 60fps). Bounded so a permanently
+ * hidden timeline cannot spin a render loop forever.
+ */
+const MAX_CENTER_FRAMES = 60;
+
 @customElement("janus-timeline")
 export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
@@ -57,7 +65,7 @@ export class JanusTimeline extends LitElement {
   @state() private _showBlockedConflictDialog = false;
   @state() private _blockedConflictMessage = "";
 
-  @state() view: "Timeline" | "Month" = "Timeline";
+  @state() view: ViewType = "Timeline";
   @state() private _dragVersion = 0; // bumped to trigger re-render during drag
   @state() private _showConflictDetails = false;
   @state() private _isConflictsBannerDismissed = false;
@@ -87,6 +95,19 @@ export class JanusTimeline extends LitElement {
   private _unsubStore?: () => void;
   /** Suppress scroll handler during programmatic scroll adjustments */
   private _suppressScroll = false;
+  /**
+   * Whether the initial centering scroll has actually been applied.
+   *
+   * Between `_initializeView()` setting `_viewStartMs` and its animation frame
+   * applying `scrollLeft`, the container is still scrolled to 0. Any scroll
+   * event delivered in that window reports a viewport ~half the content width
+   * behind the requested date, so the infinite-scroll edge check below must not
+   * act on it — doing so re-centers the timeline days into the past and leaves
+   * today's events off-screen.
+   */
+  private _hasCentered = false;
+  /** Identifies the latest centering attempt so stale retries can bail out. */
+  private _centerToken = 0;
 
   connectedCallback() {
     super.connectedCallback();
@@ -246,14 +267,35 @@ export class JanusTimeline extends LitElement {
     this._viewStartMs = centerMs - CONTENT_HALF_WIDTH / this._pxPerMs;
     this.requestUpdate();
 
-    requestAnimationFrame(() => {
-      if (!this.gridScrollRef) return;
-      // Scroll to center of the content
-      const containerWidth = this.gridScrollRef.clientWidth;
+    // Each call supersedes any centering attempt still retrying from a
+    // previous one, so a late frame can't scroll us back to a stale date.
+    const attempt = ++this._centerToken;
+    let framesLeft = MAX_CENTER_FRAMES;
+
+    const applyCentering = () => {
+      if (attempt !== this._centerToken) return; // superseded
+      const el = this.gridScrollRef;
+      if (!el) return;
+
+      // While the timeline is still being laid out (freshly mounted, or its
+      // container has not been sized yet) clientWidth is 0. Centering against
+      // that width clamps scrollLeft to 0, which silently strands the view
+      // half a content-width behind the requested date — so retry instead.
+      if (el.clientWidth === 0) {
+        if (framesLeft-- > 0) requestAnimationFrame(applyCentering);
+        return;
+      }
+
       this._suppressScroll = true;
-      this.gridScrollRef.scrollLeft = CONTENT_HALF_WIDTH - containerWidth / 2;
+      el.scrollLeft = CONTENT_HALF_WIDTH - el.clientWidth / 2;
       this._suppressScroll = false;
-    });
+      this._hasCentered = true;
+      // Re-emit now that scrollLeft matches _viewStartMs — the synchronous
+      // emit below runs while the container is still at its old offset.
+      this._emitNavChange();
+    };
+
+    requestAnimationFrame(applyCentering);
 
     this._emitNavChange();
   }
@@ -289,8 +331,9 @@ export class JanusTimeline extends LitElement {
     // Skip re-centering during programmatic scroll adjustments
     if (this._suppressScroll) return;
 
-    // Infinite scroll: when user nears the edges, re-center the content
-    if (this.gridScrollRef) {
+    // Infinite scroll: when user nears the edges, re-center the content.
+    // Skipped until the initial centering lands — see _hasCentered.
+    if (this.gridScrollRef && this._hasCentered) {
       const sl = this.gridScrollRef.scrollLeft;
       const containerWidth = this.gridScrollRef.clientWidth;
       const maxScroll = this._totalWidth - containerWidth;
@@ -395,7 +438,7 @@ export class JanusTimeline extends LitElement {
     );
   }
 
-  public setView(v: "Timeline" | "Month") {
+  public setView(v: ViewType) {
     this.view = v;
     // Let the parent app know so it can swap components if needed
     this.dispatchEvent(

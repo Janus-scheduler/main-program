@@ -1,6 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { topbarStyles } from "./topbar-styles";
+import type { ViewType } from "@janus-scheduler/core";
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,7 +23,7 @@ import {
  * @fires prev-click  - User clicked the "previous" arrow.
  * @fires next-click  - User clicked the "next" arrow.
  * @fires today-click - User clicked the "Today" button.
- * @fires view-switch - User selected a view tab.  `event.detail.view` is "Timeline" | "Month".
+ * @fires view-switch - User selected a view tab.  `event.detail.view` is a `ViewType`.
  * @fires toggle-create - User toggled draw-to-create mode.
  */
 @customElement("janus-topbar")
@@ -38,8 +39,19 @@ export class JanusTopbar extends LitElement {
   /** Short date shown on mobile (e.g. "Jun 12"). */
   @property({ type: String, attribute: "short-date" }) shortDate = "";
 
-  /** Currently active view: "Timeline" or "Month". */
-  @property({ type: String }) view: "Timeline" | "Month" = "Timeline";
+  /** Currently active view: "Day", "Week", "Month" or "Timeline". */
+  @property({ type: String }) view: ViewType = "Timeline";
+
+  /**
+   * Which view tabs to offer, in order. Override to hide views a host app
+   * doesn't mount — e.g. `["Day", "Week", "Month"]` for a plain calendar.
+   */
+  @property({ type: Array }) views: ViewType[] = [
+    "Day",
+    "Week",
+    "Month",
+    "Timeline",
+  ];
 
   /** Whether draw-to-create mode is active. */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
@@ -89,7 +101,7 @@ export class JanusTopbar extends LitElement {
     );
   }
 
-  private _emitViewSwitch(v: "Timeline" | "Month") {
+  private _emitViewSwitch(v: ViewType) {
     this.dispatchEvent(
       new CustomEvent("view-switch", {
         bubbles: true,
@@ -163,7 +175,7 @@ export class JanusTopbar extends LitElement {
               >`
             : nothing}
           <div class="tl-view-toggle">
-            ${(["Timeline", "Month"] as const).map(
+            ${this.views.map(
               (v) => html`
                 <button
                   class="tl-view-toggle__btn ${this.view === v ? "active" : ""}"

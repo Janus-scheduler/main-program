@@ -4,5 +4,8 @@ export * from "./janus-timeline";
 export * from "./janus-topbar";
 export * from "./month-grid-types";
 export * from "./janus-month-grid";
+export * from "./time-grid-types";
+export * from "./janus-day-grid";
+export * from "./janus-week-grid";
 export * from "./janus-ai-bar";
 export * from "./janus-confirm-dialog";
