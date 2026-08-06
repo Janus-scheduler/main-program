@@ -4,6 +4,7 @@ import {
   Timeline,
   Scheduler,
   MonthGrid,
+  YearGrid,
   AiBar,
   Topbar,
   type ViewType,
@@ -311,6 +312,20 @@ function App() {
               setSchedulerError(null);
               setShowScheduler(true);
             }}
+            onViewChange={(detail) => setCurrentView(detail.view)}
+            onNavChange={(detail) => {
+              setNavData({
+                navLabel: (detail.navLabel as string) || "",
+                dayName: (detail.dayName as string) || "",
+                shortDate: (detail.shortDate as string) || "",
+                zoomPercent: (detail.zoomPercent as number) || 100,
+                zoomUnit: (detail.zoomUnit as string) || "",
+              });
+            }}
+          />
+        </Show>
+        <Show when={currentView() === "Year"}>
+          <YearGrid
             onViewChange={(detail) => setCurrentView(detail.view)}
             onNavChange={(detail) => {
               setNavData({

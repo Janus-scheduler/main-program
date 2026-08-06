@@ -44,6 +44,14 @@
     @nav-change="handleNavChange"
   />
 
+  <!-- Year view -->
+  <janus-year-grid
+    v-if="currentView === 'Year'"
+    ref="yearGridEl"
+    @view-change="handleViewChange"
+    @nav-change="handleNavChange"
+  />
+
   <!-- Scheduler modal -->
   <janus-scheduler
     v-if="showScheduler"

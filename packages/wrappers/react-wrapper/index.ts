@@ -264,6 +264,7 @@ const _YearGrid = createComponent({
 });
 
 export interface YearGridProps extends React.HTMLAttributes<HTMLElement> {
+  viewYear?: number;
   onDayClick?: (detail: { date: string }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   onViewChange?: (detail: { view: ViewType }) => void;

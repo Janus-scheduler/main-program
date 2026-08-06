@@ -33,9 +33,11 @@ function toLocalDateStr(year: number, month: number, day: number): string {
 export class JanusYearGrid extends LitElement {
   static readonly styles = yearGridStyles;
 
-  // ── Internal state ────────────────────────────────────────────────────
+  // ── Internal state & properties ───────────────────────────────────────
+  @property({ type: Number, attribute: "view-year" })
+  viewYear: number = new Date().getFullYear();
+
   @state() private _eventsMap: Map<string, boolean> = new Map();
-  @state() private _viewYear: number = new Date().getFullYear();
   private _unsubStore?: () => void;
 
   connectedCallback() {
@@ -55,22 +57,25 @@ export class JanusYearGrid extends LitElement {
     this._emitNavChange();
   }
 
+  override willUpdate(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has("viewYear")) {
+      this._syncFromStore(schedulerStore.getState());
+    }
+  }
+
   // ── Navigation ────────────────────────────────────────────────────────
   public goToPrev() {
-    this._viewYear -= 1;
-    this._syncFromStore(schedulerStore.getState());
+    this.viewYear -= 1;
     this._emitNavChange();
   }
 
   public goToNext() {
-    this._viewYear += 1;
-    this._syncFromStore(schedulerStore.getState());
+    this.viewYear += 1;
     this._emitNavChange();
   }
 
   public goToToday() {
-    this._viewYear = new Date().getFullYear();
-    this._syncFromStore(schedulerStore.getState());
+    this.viewYear = new Date().getFullYear();
     this._emitNavChange();
   }
 
@@ -78,7 +83,7 @@ export class JanusYearGrid extends LitElement {
     this.dispatchEvent(
       new CustomEvent("nav-change", {
         detail: {
-          navLabel: `${this._viewYear}`,
+          navLabel: `${this.viewYear}`,
           dayName: "",
           shortDate: "",
           zoomPercent: 100,
@@ -88,14 +93,22 @@ export class JanusYearGrid extends LitElement {
         composed: true,
       }),
     );
+    this.dispatchEvent(
+      new CustomEvent("view-change", {
+        detail: { view: "Year" },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   private _syncFromStore(state: SchedulerState) {
     const rawEvents = state.events;
+    const year = this.viewYear;
 
-    // View bounds for the entire year
-    const startRange = new Date(this._viewYear, 0, 1).getTime();
-    const endRange = new Date(this._viewYear + 1, 0, 1).getTime();
+    // View bounds for the entire calendar year [Jan 1 00:00:00.000 to Dec 31 23:59:59.999]
+    const startRange = new Date(year, 0, 1, 0, 0, 0, 0).getTime();
+    const endRange = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
 
     // Expand recurrences for the year
     const coreEvents = expandEvents(
@@ -107,8 +120,25 @@ export class JanusYearGrid extends LitElement {
     const newEventsMap = new Map<string, boolean>();
 
     for (const e of coreEvents) {
-      const startMs = Math.max(new Date(e.startTime).getTime(), startRange);
-      const endMs = Math.min(new Date(e.endTime).getTime(), endRange);
+      const origStartMs = new Date(e.startTime).getTime();
+      let origEndMs = new Date(e.endTime).getTime();
+
+      // Handle midnight end boundary: if event ends exactly at 00:00:00.000,
+      // subtract 1ms to stay on preceding day before range clamping.
+      if (origEndMs > origStartMs) {
+        const endDCheck = new Date(origEndMs);
+        if (
+          endDCheck.getHours() === 0 &&
+          endDCheck.getMinutes() === 0 &&
+          endDCheck.getSeconds() === 0 &&
+          endDCheck.getMilliseconds() === 0
+        ) {
+          origEndMs -= 1;
+        }
+      }
+
+      const startMs = Math.max(origStartMs, startRange);
+      const endMs = Math.min(origEndMs, endRange);
 
       if (startMs > endMs) continue;
 
@@ -160,10 +190,10 @@ export class JanusYearGrid extends LitElement {
   private _renderMonth(monthIndex: number) {
     const today = new Date();
     const isCurrentMonth =
-      today.getFullYear() === this._viewYear && today.getMonth() === monthIndex;
+      today.getFullYear() === this.viewYear && today.getMonth() === monthIndex;
 
-    const firstDay = new Date(this._viewYear, monthIndex, 1).getDay();
-    const totalDays = new Date(this._viewYear, monthIndex + 1, 0).getDate();
+    const firstDay = new Date(this.viewYear, monthIndex, 1).getDay();
+    const totalDays = new Date(this.viewYear, monthIndex + 1, 0).getDate();
 
     const cells = [];
 
@@ -175,7 +205,7 @@ export class JanusYearGrid extends LitElement {
     // Actual days
     for (let day = 1; day <= totalDays; day++) {
       const isToday = isCurrentMonth && today.getDate() === day;
-      const dateStr = toLocalDateStr(this._viewYear, monthIndex, day);
+      const dateStr = toLocalDateStr(this.viewYear, monthIndex, day);
       const hasEvent = this._eventsMap.has(dateStr);
 
       cells.push(html`
@@ -183,12 +213,12 @@ export class JanusYearGrid extends LitElement {
           class="yg-day-cell"
           tabindex="0"
           role="button"
-          aria-label="${MONTH_NAMES[monthIndex]} ${day}, ${this._viewYear}"
-          @click=${() => this._handleDayClick(this._viewYear, monthIndex, day)}
+          aria-label="${MONTH_NAMES[monthIndex]} ${day}, ${this.viewYear}"
+          @click=${() => this._handleDayClick(this.viewYear, monthIndex, day)}
           @keydown=${(e: KeyboardEvent) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              this._handleDayClick(this._viewYear, monthIndex, day);
+              this._handleDayClick(this.viewYear, monthIndex, day);
             }
           }}
         >

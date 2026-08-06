@@ -3,6 +3,7 @@ import {
   JanusScheduler as JanusSchedulerWC,
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
+  JanusYearGrid as JanusYearGridWC,
   JanusAiBar as JanusAiBarWC,
   JanusTopbar as JanusTopbarWC,
 } from "@janus-scheduler/ui";
@@ -53,6 +54,7 @@ declare module "solid-js" {
       "janus-scheduler": Record<string, unknown>;
       "janus-timeline": Record<string, unknown>;
       "janus-month-grid": Record<string, unknown>;
+      "janus-year-grid": Record<string, unknown>;
       "janus-ai-bar": Record<string, unknown>;
       "janus-topbar": Record<string, unknown>;
     }
@@ -68,6 +70,9 @@ if (!customElements.get("janus-timeline")) {
 }
 if (!customElements.get("janus-month-grid")) {
   customElements.define("janus-month-grid", JanusMonthGridWC);
+}
+if (!customElements.get("janus-year-grid")) {
+  customElements.define("janus-year-grid", JanusYearGridWC);
 }
 if (!customElements.get("janus-ai-bar")) {
   customElements.define("janus-ai-bar", JanusAiBarWC);
@@ -302,6 +307,47 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
 
   return (
     <janus-month-grid
+      ref={(el: HTMLElement) => {
+        ref = el;
+        if (props.ref) props.ref(el);
+      }}
+    />
+  );
+};
+
+export interface YearGridProps {
+  viewYear?: number;
+  onDayClick?: (detail: { date: string }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+  ref?: (el: HTMLElement) => void;
+}
+
+export const YearGrid: Component<YearGridProps> = (props) => {
+  let ref!: HTMLElement;
+
+  createEffect(() => {
+    if (ref) {
+      const el = ref as unknown as Record<string, unknown>;
+      if (props.viewYear !== undefined) el.viewYear = props.viewYear;
+    }
+  });
+
+  onMount(() => {
+    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
+      if (handler) {
+        const listener = (e: Event) => handler((e as CustomEvent).detail);
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
+      }
+    };
+    attach("day-click", props.onDayClick);
+    attach("view-change", props.onViewChange);
+    attach("nav-change", props.onNavChange);
+  });
+
+  return (
+    <janus-year-grid
       ref={(el: HTMLElement) => {
         ref = el;
         if (props.ref) props.ref(el);
