@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Timeline,
   MonthGrid,
@@ -7,14 +7,13 @@ import {
   Scheduler,
   AiBar,
   Topbar,
-} from "@janus-scheduler/react";
-import type { ViewType } from "@janus-scheduler/react";
-import type { SchedulerManager } from "@janus-scheduler/react";
-import {
   isoToZonedDisplay,
   zonedInputToISO,
   schedulerStore,
 } from "@janus-scheduler/react";
+import type { ViewType, SchedulerManager } from "@janus-scheduler/react";
+
+import { loadDenseBenchmarkData } from "../utils/benchmarkDataGenerator";
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
@@ -41,6 +40,18 @@ interface SchedulerViewProps {
   onCloseScheduler: () => void;
   canUndo?: boolean;
   onUndo?: () => void;
+}
+
+/**
+ * Benchmark dataset size requested on the URL (`?resources=N` / `?count=N`),
+ * or null when the param is absent or not a positive integer.
+ */
+function readBenchmarkCountFromUrl(): number | null {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("resources") ?? params.get("count");
+  if (!raw) return null;
+  const count = Number.parseInt(raw, 10);
+  return Number.isNaN(count) || count <= 0 ? null : count;
 }
 
 /**
@@ -76,7 +87,7 @@ export function SchedulerView({
   onCloseScheduler,
   canUndo,
   onUndo,
-}: SchedulerViewProps) {
+}: Readonly<SchedulerViewProps>) {
   const [tempEventData, setTempEventData] = useState<{
     startDate?: string;
     startTime?: string;
@@ -185,6 +196,19 @@ export function SchedulerView({
   });
   const [allowCreate, setAllowCreate] = useState(false);
 
+  // Seed the store once for the URL-selected dataset (?resources=N or ?count=N).
+  useEffect(() => {
+    const count = readBenchmarkCountFromUrl();
+    if (count !== null) loadDenseBenchmarkData(count);
+  }, []);
+
+  // Re-center timeline on current time whenever switching to Timeline view
+  useEffect(() => {
+    if (currentView === "Timeline") {
+      timelineRef.current?.goToToday();
+    }
+  }, [currentView]);
+
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
       navLabel: (detail.navLabel as string) || "",
@@ -257,6 +281,18 @@ export function SchedulerView({
       endTime: zonedInputToISO(date, newEndTime, tz),
     });
   };
+
+  let schedulerTitle = "";
+  if (storeEvent) {
+    schedulerTitle = storeEvent.title;
+  } else if (tempEventData) {
+    schedulerTitle = "New Event";
+  }
+
+  let schedulerParticipants = tempEventData?.participants;
+  if (storeEvent) {
+    schedulerParticipants = storeEvent.resourceIds || undefined;
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -385,20 +421,12 @@ export function SchedulerView({
           preventConflicts={preventConflicts}
           eventId={selectedEventId}
           error={schedulerError}
-          title={
-            storeEvent ? storeEvent.title : tempEventData ? "New Event" : ""
-          }
+          title={schedulerTitle}
           startDate={storeEvent ? startParts?.date : tempEventData?.startDate}
           startTime={storeEvent ? startParts?.time : tempEventData?.startTime}
           endDate={storeEvent ? endParts?.date : tempEventData?.endDate}
           endTime={storeEvent ? endParts?.time : tempEventData?.endTime}
-          participants={
-            storeEvent
-              ? storeEvent.resourceIds
-                ? storeEvent.resourceIds
-                : undefined
-              : tempEventData?.participants
-          }
+          participants={schedulerParticipants}
           description={storeEvent?.description}
           activeColor={storeEvent?.color}
           allDay={storeEvent?.allDay}
@@ -472,7 +500,6 @@ export function SchedulerView({
       <AiBar
         onAiSubmit={({ prompt }) => {
           console.log("AI prompt submitted:", prompt);
-          // TODO: hook into your NLP integration here
         }}
       />
     </div>

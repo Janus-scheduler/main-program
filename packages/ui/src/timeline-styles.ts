@@ -227,9 +227,7 @@ export const timelineStyles = css`
     min-width: 0;
     overflow-x: auto;
     overflow-y: scroll;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    display: block;
     will-change: scroll-position;
     -webkit-overflow-scrolling: touch;
     scroll-behavior: auto;
@@ -253,7 +251,7 @@ export const timelineStyles = css`
 
   .tl-time-inner {
     position: relative;
-    flex: 1;
+    height: max-content;
     min-height: 100%;
     display: flex;
     flex-direction: column;
@@ -335,8 +333,20 @@ export const timelineStyles = css`
     touch-action: none;
     height: var(--row-h);
     position: relative;
+    z-index: 2;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    contain: layout paint;
+  }
+
+  .tl-vlines-layer {
+    position: absolute;
+    top: calc(var(--hour-hdr-h) + var(--super-hdr-h));
+    bottom: 0;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    z-index: 0;
   }
 
   .tl-vline {
@@ -389,11 +399,7 @@ export const timelineStyles = css`
     text-align: left;
     font-family: inherit;
     overflow: hidden;
-    backdrop-filter: blur(2px) saturate(1.1);
-    -webkit-backdrop-filter: blur(2px) saturate(1.1);
-    box-shadow:
-      0 3px 8px rgba(0, 0, 0, 0.12),
-      0 1px 3px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition:
       filter 0.15s,
       transform 0.12s,
@@ -404,9 +410,7 @@ export const timelineStyles = css`
   .tl-event:hover {
     filter: brightness(0.96);
     transform: scaleY(1.02);
-    box-shadow:
-      0 6px 16px rgba(0, 0, 0, 0.16),
-      0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
   }
 
   .tl-event:active {
@@ -466,124 +470,102 @@ export const timelineStyles = css`
   }
 
   .tl-event--primary {
-    background: var(--c-primary-bg);
-    background: color-mix(in srgb, var(--c-primary-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-primary-bg) 32%, var(--white));
     border-color: var(--c-primary-bd);
     color: var(--c-primary-tx);
   }
   .tl-event--primary:hover {
-    background: var(--c-primary-bg);
-    background: color-mix(in srgb, var(--c-primary-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-primary-bg) 55%, var(--white));
   }
 
   .tl-event--orange {
-    background: var(--c-orange-bg);
-    background: color-mix(in srgb, var(--c-orange-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-orange-bg) 32%, var(--white));
     border-color: var(--c-orange-bd);
     color: var(--c-orange-tx);
   }
   .tl-event--orange:hover {
-    background: var(--c-orange-bg);
-    background: color-mix(in srgb, var(--c-orange-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-orange-bg) 55%, var(--white));
   }
 
   .tl-event--blue {
-    background: var(--c-blue-bg);
-    background: color-mix(in srgb, var(--c-blue-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-blue-bg) 32%, var(--white));
     border-color: var(--c-blue-bd);
     color: var(--c-blue-tx);
   }
   .tl-event--blue:hover {
-    background: var(--c-blue-bg);
-    background: color-mix(in srgb, var(--c-blue-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-blue-bg) 55%, var(--white));
   }
 
   .tl-event--yellow {
-    background: var(--c-yellow-bg);
-    background: color-mix(in srgb, var(--c-yellow-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-yellow-bg) 32%, var(--white));
     border-color: var(--c-yellow-bd);
     color: var(--c-yellow-tx);
   }
   .tl-event--yellow:hover {
-    background: var(--c-yellow-bg);
-    background: color-mix(in srgb, var(--c-yellow-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-yellow-bg) 55%, var(--white));
   }
 
   .tl-event--purple {
-    background: var(--c-purple-bg);
-    background: color-mix(in srgb, var(--c-purple-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-purple-bg) 32%, var(--white));
     border-color: var(--c-purple-bd);
     color: var(--c-purple-tx);
   }
   .tl-event--purple:hover {
-    background: var(--c-purple-bg);
-    background: color-mix(in srgb, var(--c-purple-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-purple-bg) 55%, var(--white));
   }
 
   .tl-event--green {
-    background: var(--c-green-bg);
-    background: color-mix(in srgb, var(--c-green-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-green-bg) 32%, var(--white));
     border-color: var(--c-green-bd);
     color: var(--c-green-tx);
   }
   .tl-event--green:hover {
-    background: var(--c-green-bg);
-    background: color-mix(in srgb, var(--c-green-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-green-bg) 55%, var(--white));
   }
 
   .tl-event--red {
-    background: var(--c-red-bg);
-    background: color-mix(in srgb, var(--c-red-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-red-bg) 32%, var(--white));
     border-color: var(--c-red-bd);
     color: var(--c-red-tx);
   }
   .tl-event--red:hover {
-    background: var(--c-red-bg);
-    background: color-mix(in srgb, var(--c-red-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-red-bg) 55%, var(--white));
   }
 
   .tl-event--pink {
-    background: var(--c-pink-bg);
-    background: color-mix(in srgb, var(--c-pink-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-pink-bg) 32%, var(--white));
     border-color: var(--c-pink-bd);
     color: var(--c-pink-tx);
   }
   .tl-event--pink:hover {
-    background: var(--c-pink-bg);
-    background: color-mix(in srgb, var(--c-pink-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-pink-bg) 55%, var(--white));
   }
 
   .tl-event--indigo {
-    background: var(--c-indigo-bg);
-    background: color-mix(in srgb, var(--c-indigo-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-indigo-bg) 32%, var(--white));
     border-color: var(--c-indigo-bd);
     color: var(--c-indigo-tx);
   }
   .tl-event--indigo:hover {
-    background: var(--c-indigo-bg);
-    background: color-mix(in srgb, var(--c-indigo-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-indigo-bg) 55%, var(--white));
   }
 
   .tl-event--cyan {
-    background: var(--c-cyan-bg);
-    background: color-mix(in srgb, var(--c-cyan-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-cyan-bg) 32%, var(--white));
     border-color: var(--c-cyan-bd);
     color: var(--c-cyan-tx);
   }
   .tl-event--cyan:hover {
-    background: var(--c-cyan-bg);
-    background: color-mix(in srgb, var(--c-cyan-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-cyan-bg) 55%, var(--white));
   }
 
   .tl-event--teal {
-    background: var(--c-teal-bg);
-    background: color-mix(in srgb, var(--c-teal-bg) 32%, transparent);
+    background: color-mix(in srgb, var(--c-teal-bg) 32%, var(--white));
     border-color: var(--c-teal-bd);
     color: var(--c-teal-tx);
   }
   .tl-event--teal:hover {
-    background: var(--c-teal-bg);
-    background: color-mix(in srgb, var(--c-teal-bg) 55%, transparent);
+    background: color-mix(in srgb, var(--c-teal-bg) 55%, var(--white));
   }
 
   /* ══════════════════════════════════════════════════════════════════════════════

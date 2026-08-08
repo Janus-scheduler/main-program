@@ -24,52 +24,46 @@ export {
 } from "@janus-scheduler/core";
 
 import type {
-  SchedulerHooks,
-  SchedulerConfig,
   TimelineEvent,
   TimelineResource,
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
   SchedulerSaveData,
-  SchedulerDeleteData,
-  MonthEvent,
   TimeGridEvent,
-  TimeGridEventResource,
   SlotSelectDetail,
   TimeGridEventMoveDetail,
   TimeGridEventResizeDetail,
-  EventColor,
   ViewType,
-  EventData,
-  ResourceData,
-  AssignmentData,
   EventDraft,
-  UndoAction,
 } from "@janus-scheduler/core";
+
+export type { EventColor } from "@janus-scheduler/core";
 
 export type {
   SchedulerHooks,
   SchedulerConfig,
   UndoAction,
+  SchedulerDeleteData,
+  MonthEvent,
+  TimeGridEventResource,
+  EventData,
+  ResourceData,
+  AssignmentData,
+} from "@janus-scheduler/core";
+
+export type {
   TimelineEvent,
   TimelineResource,
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
   SchedulerSaveData,
-  SchedulerDeleteData,
-  MonthEvent,
   TimeGridEvent,
-  TimeGridEventResource,
   SlotSelectDetail,
   TimeGridEventMoveDetail,
   TimeGridEventResizeDetail,
-  EventColor,
   ViewType,
-  EventData,
-  ResourceData,
-  AssignmentData,
   EventDraft,
 };
 
@@ -79,6 +73,14 @@ export type {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { Event, Resource, Assignment } from "@janus-scheduler/core";
+
+function withDetail<T>(cb?: (detail: T) => void) {
+  return cb ? (e: Event) => cb((e as CustomEvent<T>).detail) : undefined;
+}
+
+function withVoid(cb?: () => void) {
+  return cb ? () => cb() : undefined;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Web Component → React bindings
@@ -321,37 +323,14 @@ const timeGridEvents = {
 /** Shared unwrapping of the CustomEvents both hour-grid views fire. */
 function timeGridHandlers(props: TimeGridProps) {
   return {
-    onEventClick: props.onEventClick
-      ? (e: Event) =>
-          props.onEventClick!((e as CustomEvent<TimeGridEvent>).detail)
-      : undefined,
-    onDayClick: props.onDayClick
-      ? (e: Event) =>
-          props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
-      : undefined,
-    onSlotSelect: props.onSlotSelect
-      ? (e: Event) =>
-          props.onSlotSelect!((e as CustomEvent<SlotSelectDetail>).detail)
-      : undefined,
-    onEventMove: props.onEventMove
-      ? (e: Event) =>
-          props.onEventMove!((e as CustomEvent<TimeGridEventMoveDetail>).detail)
-      : undefined,
-    onEventResize: props.onEventResize
-      ? (e: Event) =>
-          props.onEventResize!(
-            (e as CustomEvent<TimeGridEventResizeDetail>).detail,
-          )
-      : undefined,
-    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
-    onViewChange: props.onViewChange
-      ? (e: Event) =>
-          props.onViewChange!((e as CustomEvent<{ view: ViewType }>).detail)
-      : undefined,
-    onNavChange: props.onNavChange
-      ? (e: Event) =>
-          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
-      : undefined,
+    onEventClick: withDetail(props.onEventClick),
+    onDayClick: withDetail(props.onDayClick),
+    onSlotSelect: withDetail(props.onSlotSelect),
+    onEventMove: withDetail(props.onEventMove),
+    onEventResize: withDetail(props.onEventResize),
+    onAddEvent: withVoid(props.onAddEvent),
+    onViewChange: withDetail(props.onViewChange),
+    onNavChange: withDetail(props.onNavChange),
   };
 }
 
@@ -434,6 +413,7 @@ const _Topbar = createComponent({
     onViewSwitch: "view-switch",
     onToggleCreate: "toggle-create",
     onUndoClick: "undo-click",
+    onBenchmarkClick: "benchmark-click",
   },
 });
 
@@ -448,28 +428,28 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   canUndo?: boolean;
   zoomPercent?: number;
   zoomUnit?: string;
+  showBenchmarkBtn?: boolean;
+  isBenchmarkActive?: boolean;
+  benchmarkLabel?: string;
   onPrevClick?: () => void;
   onNextClick?: () => void;
   onTodayClick?: () => void;
   onViewSwitch?: (detail: { view: ViewType }) => void;
   onToggleCreate?: () => void;
   onUndoClick?: () => void;
+  onBenchmarkClick?: () => void;
 }
 
 export function Topbar(props: TopbarProps): React.JSX.Element {
   return React.createElement(_Topbar, {
     ...props,
-    onPrevClick: props.onPrevClick ? () => props.onPrevClick!() : undefined,
-    onNextClick: props.onNextClick ? () => props.onNextClick!() : undefined,
-    onTodayClick: props.onTodayClick ? () => props.onTodayClick!() : undefined,
-    onViewSwitch: props.onViewSwitch
-      ? (e: Event) =>
-          props.onViewSwitch!((e as CustomEvent<{ view: ViewType }>).detail)
-      : undefined,
-    onToggleCreate: props.onToggleCreate
-      ? () => props.onToggleCreate!()
-      : undefined,
-    onUndoClick: props.onUndoClick ? () => props.onUndoClick!() : undefined,
+    onPrevClick: withVoid(props.onPrevClick),
+    onNextClick: withVoid(props.onNextClick),
+    onTodayClick: withVoid(props.onTodayClick),
+    onViewSwitch: withDetail(props.onViewSwitch),
+    onToggleCreate: withVoid(props.onToggleCreate),
+    onUndoClick: withVoid(props.onUndoClick),
+    onBenchmarkClick: withVoid(props.onBenchmarkClick),
   });
 }
 

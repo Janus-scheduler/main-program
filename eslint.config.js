@@ -77,6 +77,9 @@ export default [
       "**/.angular/**",
       "**/coverage/**",
       "reference/**",
+      // Gitignored working notes and benchmark harnesses — never shipped or
+      // consumed by CI, so they are not part of the lint gate.
+      "implementation/**",
       "fix.cjs",
     ],
   },
