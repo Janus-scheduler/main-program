@@ -34,6 +34,8 @@ export function computeTimelineConflicts(
   const messages: string[] = [];
 
   for (const r of resources) {
+    if (!r.events || r.events.length <= 1) continue;
+
     // 1. Sort events chronologically by start time
     const sorted = [...r.events].sort((a, b) => a.startMs - b.startMs);
 
@@ -52,17 +54,20 @@ export function computeTimelineConflicts(
         conflictingEventIds.add(evA.id);
         conflictingEventIds.add(evB.id);
 
-        const overlapStartMs = Math.max(evA.startMs, evB.startMs);
-        const overlapEndMs = Math.min(evA.endMs, evB.endMs);
-        const { dateLabel, startTimeLabel, endTimeLabel } = formatZonedOverlap(
-          new Date(overlapStartMs).toISOString(),
-          new Date(overlapEndMs).toISOString(),
-          timezone,
-        );
+        if (messages.length < 50) {
+          const overlapStartMs = Math.max(evA.startMs, evB.startMs);
+          const overlapEndMs = Math.min(evA.endMs, evB.endMs);
+          const { dateLabel, startTimeLabel, endTimeLabel } =
+            formatZonedOverlap(
+              new Date(overlapStartMs).toISOString(),
+              new Date(overlapEndMs).toISOString(),
+              timezone,
+            );
 
-        const msg = `Conflict: ${r.name} has overlapping events "${evA.title}" and "${evB.title}" on ${dateLabel} between ${startTimeLabel} and ${endTimeLabel}.`;
-        if (!messages.includes(msg)) {
-          messages.push(msg);
+          const msg = `Conflict: ${r.name} has overlapping events "${evA.title}" and "${evB.title}" on ${dateLabel} between ${startTimeLabel} and ${endTimeLabel}.`;
+          if (!messages.includes(msg)) {
+            messages.push(msg);
+          }
         }
       }
     }

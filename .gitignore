@@ -8,3 +8,4 @@ lint_output.txt
 *.timestamp-*
 *.log
 .agents
+implementation
