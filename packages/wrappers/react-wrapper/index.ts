@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { createComponent } from "@lit/react";
 import {
   JanusScheduler as JanusSchedulerWC,
@@ -26,13 +26,8 @@ import {
   presentSession,
   summarise,
   ChatController,
-  type EntityCatalog,
-  type SessionContext,
-  type SessionRequirements,
   type SessionState,
   type JanusChatOptions,
-  type ConfirmOutcome,
-  type NlpEngine,
 } from "@janus-scheduler/nlp";
 
 import {
