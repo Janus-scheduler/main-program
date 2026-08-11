@@ -241,6 +241,7 @@ export class GoogleSyncManager {
         id: GoogleEventMapper.defaultResourceId,
         name: "Google Calendar",
         type: "person",
+        email: "google-calendar@placeholder.local",
       });
     }
   }

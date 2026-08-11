@@ -158,18 +158,22 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
 
   updateResource: (id, updates) => {
     const state = get();
-    const resource = state.resources[id];
-    if (!resource) throw new Error(`Resource ${id} not found`);
+    const existing = state.resources[id];
+    if (!existing) throw new Error(`Resource ${id} not found`);
 
-    if (updates.name) resource.name = updates.name;
-    if (updates.type) resource.type = updates.type;
-    if (updates.email !== undefined) resource.email = updates.email;
-    if (updates.avatar !== undefined) resource.avatar = updates.avatar;
+    const updated = new Resource({
+      id: existing.id,
+      name: updates.name ? updates.name : existing.name,
+      type: updates.type ? updates.type : existing.type,
+      email: updates.email !== undefined ? updates.email : existing.email,
+      avatar: updates.avatar !== undefined ? updates.avatar : existing.avatar,
+    });
+    if (!updated.isValid()) throw new Error("Invalid resource data");
 
     set((state) => ({
-      resources: { ...state.resources, [id]: resource },
+      resources: { ...state.resources, [id]: updated },
     }));
-    return resource;
+    return updated;
   },
 
   deleteResource: (id) => {

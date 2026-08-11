@@ -96,6 +96,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         id: "r2",
         name: "Dr. Michael Ross",
         type: "person",
+        email: "michael.ross@example.com",
         avatar:
           "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
       });
@@ -103,6 +104,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         id: "r3",
         name: "Dr. Ann sherin",
         type: "person",
+        email: "ann.sherin@example.com",
         avatar:
           "https://westernsydneydiabetes.com.au/uploads/2021/06/Rona-scaled.jpg",
       });
@@ -131,6 +133,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         id: "r7",
         name: "Dr. Alan Turing",
         type: "person",
+        email: "alan.turing@example.com",
         avatar:
           "https://tse4.mm.bing.net/th/id/OIP.kqx_nQhmMAt1EtXnbBhOBwHaK0?r=0&w=832&h=1216&rs=1&pid=ImgDetMain&o=7&rm=3",
       });

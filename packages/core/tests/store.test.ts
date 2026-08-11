@@ -178,9 +178,26 @@ describe("Scheduler Store", () => {
       }).toThrow("Resource non-existent not found");
     });
 
+    it("should throw and not mutate when an update makes a person resource invalid", () => {
+      const store = schedulerStore.getState();
+      store.addResource({
+        id: "r1",
+        name: "Resource 1",
+        type: "person",
+        email: "r1@test.com",
+      });
+
+      expect(() => {
+        store.updateResource("r1", { email: "" });
+      }).toThrow("Invalid resource data");
+
+      const unchanged = schedulerStore.getState().resources["r1"];
+      expect(unchanged.email).toBe("r1@test.com");
+    });
+
     it("should delete a resource unless assigned to events", () => {
       const store = schedulerStore.getState();
-      store.addResource({ id: "r1", name: "R1" });
+      store.addResource({ id: "r1", name: "R1", type: "room" });
 
       // Can delete when unassigned
       expect(store.deleteResource("r1")).toBe(true);
@@ -188,7 +205,7 @@ describe("Scheduler Store", () => {
       expect(store.deleteResource("r1")).toBe(false);
 
       // Re-add resource and add event assigning it
-      store.addResource({ id: "r1", name: "R1" });
+      store.addResource({ id: "r1", name: "R1", type: "room" });
       store.addEvent({
         id: "evt-1",
         title: "Test Event",
@@ -206,7 +223,7 @@ describe("Scheduler Store", () => {
   describe("Assignment Management", () => {
     it("should add and delete assignments", () => {
       const store = schedulerStore.getState();
-      store.addResource({ id: "r1", name: "R1" });
+      store.addResource({ id: "r1", name: "R1", type: "room" });
       store.addEvent({
         id: "evt-1",
         title: "Test Event",

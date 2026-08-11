@@ -103,8 +103,18 @@ export class App {
     console.log('🌱 Seeding initial data to core manager...');
 
     // Same resources as React demo
-    this.manager.addResource({ id: 'r1', name: 'Dr. Sarah Chen', type: 'person' });
-    this.manager.addResource({ id: 'r2', name: 'Dr. Michael Ross', type: 'person' });
+    this.manager.addResource({
+      id: 'r1',
+      name: 'Dr. Sarah Chen',
+      type: 'person',
+      email: 'sarah.chen@example.com',
+    });
+    this.manager.addResource({
+      id: 'r2',
+      name: 'Dr. Michael Ross',
+      type: 'person',
+      email: 'michael.ross@example.com',
+    });
     this.manager.addResource({ id: 'r3', name: 'Operating Room 1', type: 'room' });
     this.manager.addResource({ id: 'r4', name: 'MRI Scanner A', type: 'equipment' });
 

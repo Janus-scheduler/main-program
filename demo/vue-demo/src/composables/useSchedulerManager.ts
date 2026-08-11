@@ -44,11 +44,17 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
   if (manager.getResourceCount() === 0) {
     console.log("🌱 Seeding initial data to core manager...");
 
-    manager.addResource({ id: "r1", name: "Dr. Sarah Chen", type: "person" });
+    manager.addResource({
+      id: "r1",
+      name: "Dr. Sarah Chen",
+      type: "person",
+      email: "sarah.chen@example.com",
+    });
     manager.addResource({
       id: "r2",
       name: "Dr. Michael Ross",
       type: "person",
+      email: "michael.ross@example.com",
     });
     manager.addResource({ id: "r3", name: "Operating Room 1", type: "room" });
     manager.addResource({

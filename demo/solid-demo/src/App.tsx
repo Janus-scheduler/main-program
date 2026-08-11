@@ -122,11 +122,13 @@ function App() {
       id: "r1",
       name: "Dr. Sarah Chena",
       type: "person",
+      email: "sarah.chen@example.com",
     });
     manager.addResource({
       id: "r2",
       name: "Dr. Michael Ross",
       type: "person",
+      email: "michael.ross@example.com",
     });
     manager.addResource({
       id: "r3",
