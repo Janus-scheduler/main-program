@@ -11,13 +11,15 @@
   --sidebar-w: 220px;
 }
 
-body, html, #root {
+body,
+html,
+#root {
   margin: 0;
   padding: 0;
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  font-family: 'DM Sans', sans-serif;
+  font-family: "DM Sans", sans-serif;
   background: var(--bg);
 }
 
@@ -86,7 +88,9 @@ body, html, #root {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-2);
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .nav-item svg {
@@ -204,8 +208,14 @@ body, html, #root {
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0)   scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .error-toast__icon {
@@ -276,7 +286,8 @@ body, html, #root {
     flex-shrink: 0;
   }
 
-  .mobile-header-btn, .mobile-header-spacer {
+  .mobile-header-btn,
+  .mobile-header-spacer {
     background: none;
     border: none;
     padding: 8px;
@@ -368,3 +379,346 @@ body, html, #root {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   ChatGallery — Step 4 review harness, reachable at ?chat=1.
+
+   The chrome is driven by the same light/dark choice as the panel, via
+   [data-theme] on the root, so the panel is never a dark rectangle sitting on
+   a light page. Temporary scaffolding; removed when Step 6 wires chat into the
+   app proper.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.chat-gallery {
+  --g-bg: #fafafa;
+  --g-surface: #ffffff;
+  --g-surface-2: #f4f4f5;
+  --g-border: #e4e4e7;
+  --g-text: #18181b;
+  --g-text-2: #52525b;
+  --g-text-3: #a1a1aa;
+  --g-accent: #6d4aff;
+  --g-active-bg: #fff2e8;
+  --g-active-border: #fed7aa;
+  --g-active-text: #9a3412;
+
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: 100vh;
+  background: var(--g-bg);
+  color: var(--g-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+.chat-gallery[data-theme="dark"] {
+  --g-bg: #09090b;
+  --g-surface: #141416;
+  --g-surface-2: #1c1c1f;
+  --g-border: #27272a;
+  --g-text: #fafafa;
+  --g-text-2: #a1a1aa;
+  --g-text-3: #71717a;
+  --g-accent: #a78bfa;
+  --g-active-bg: rgba(249, 115, 22, 0.16);
+  --g-active-border: rgba(249, 115, 22, 0.34);
+  --g-active-text: #fdba74;
+}
+
+.chat-gallery__rail {
+  border-right: 1px solid var(--g-border);
+  background: var(--g-surface);
+  padding: 24px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.chat-gallery__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.chat-gallery__lead {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--g-text-2);
+}
+
+.chat-gallery__themes {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--g-surface-2);
+  border: 1px solid var(--g-border);
+  border-radius: 9px;
+}
+
+.chat-gallery__theme {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--g-text-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-gallery__theme:hover {
+  color: var(--g-text);
+}
+
+.chat-gallery__theme--active {
+  background: var(--g-surface);
+  color: var(--g-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.chat-gallery__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-gallery__tab {
+  text-align: left;
+  padding: 8px 11px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--g-text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chat-gallery__tab:hover {
+  background: var(--g-surface-2);
+  color: var(--g-text);
+}
+
+.chat-gallery__tab--active {
+  background: var(--g-active-bg);
+  border-color: var(--g-active-border);
+  color: var(--g-active-text);
+  font-weight: 600;
+}
+
+.chat-gallery__log {
+  margin-top: auto;
+  border-top: 1px solid var(--g-border);
+  padding-top: 14px;
+  font-size: 11px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.chat-gallery__log-title {
+  font-weight: 700;
+  color: var(--g-text-3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.chat-gallery__log-empty {
+  color: var(--g-text-3);
+  line-height: 1.5;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+}
+
+.chat-gallery__log-row {
+  display: flex;
+  gap: 7px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--g-border);
+  align-items: baseline;
+}
+
+.chat-gallery__log-time {
+  color: var(--g-text-3);
+  flex-shrink: 0;
+}
+
+.chat-gallery__log-type {
+  color: var(--g-accent);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.chat-gallery__log-detail {
+  color: var(--g-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── ChatDock — the conversation panel over the scheduler ──────────────── */
+
+/*
+ * Anchored bottom-right, above the AI bar it opened from. `pointer-events`
+ * is off on the wrapper so the timeline underneath stays fully usable while
+ * the panel is open — the chat is an assistant, not a modal.
+ */
+.chat-dock {
+  position: fixed;
+  right: 24px;
+  bottom: 96px;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.chat-dock__panel {
+  pointer-events: auto;
+  width: 420px;
+  height: min(600px, calc(100vh - 160px));
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 560px) {
+  .chat-dock {
+    right: 12px;
+    left: 12px;
+    bottom: 88px;
+  }
+
+  .chat-dock__panel {
+    width: auto;
+  }
+}
+
+/* ── ChatLive (?chat=live) — reuses the gallery chrome ─────────────────── */
+
+.chat-live__engine {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--g-text-3);
+  background: var(--g-surface);
+  border: 1px solid var(--g-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.chat-live__error {
+  color: #dc2626;
+}
+
+.chat-live__try {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-live__try:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chat-live__try-note {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 10.5px;
+  color: var(--g-text-3);
+}
+
+/* Two columns: label, then value. The value wraps; the label never does. */
+.chat-live__inspector {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  margin: 0;
+  align-items: baseline;
+}
+
+.chat-live__inspector dt {
+  color: var(--g-text-3);
+  white-space: nowrap;
+}
+
+.chat-live__inspector dd {
+  margin: 0;
+  color: var(--g-text);
+  overflow-wrap: anywhere;
+}
+
+.chat-gallery__stage {
+  padding: 28px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.chat-gallery__note {
+  margin: 0;
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--g-text-2);
+  background: var(--g-surface);
+  border: 1px solid var(--g-border);
+  border-left: 3px solid var(--g-accent);
+  border-radius: 8px;
+  padding: 11px 14px;
+}
+
+/* Fixed size so the panel is reviewed at the design's docked-panel width. */
+.chat-gallery__panel {
+  width: 440px;
+  height: 620px;
+  border: 1px solid var(--g-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--g-surface);
+  box-shadow:
+    0 12px 32px rgba(24, 24, 27, 0.12),
+    0 4px 10px rgba(24, 24, 27, 0.06);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.chat-gallery[data-theme="dark"] .chat-gallery__panel {
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.6),
+    0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.chat-gallery__panel janus-chat {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .chat-gallery {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .chat-gallery__rail {
+    border-right: none;
+    border-bottom: 1px solid var(--g-border);
+  }
+
+  .chat-gallery__panel {
+    width: 100%;
+    max-width: 440px;
+    height: 560px;
+  }
+}

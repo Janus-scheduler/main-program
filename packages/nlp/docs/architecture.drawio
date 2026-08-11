@@ -1,0 +1,280 @@
+<mxfile host="65bd71144e">
+    <diagram id="page-build" name="1 - Build Pipeline (offline)">
+        <mxGraphModel dx="209" dy="563" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="b0"/>
+                <mxCell id="b1" parent="b0"/>
+                <mxCell id="btitle" value="BUILD PIPELINE — runs offline in THIS repo, never at runtime&#xa;python scripts/build_embeddings.py" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;whiteSpace=wrap;" parent="b1" vertex="1">
+                    <mxGeometry x="80" y="20" width="1000" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn1" value="corpus/intents.yaml&#xa;&#xa;222 labelled examples&#xa;add 45 · del 20 · mod 39&#xa;get 43 · none 75" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="120" y="110" width="240" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn2" value="model2vec&#xa;minishlab/potion-base-8M&#xa;&#xa;FROZEN token→vector table&#xa;29,528 tokens × 256 dims&#xa;apply_zipf: true&#xa;NEVER trained or fine-tuned" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="480" y="110" width="260" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn3" value="select_vocab()&#xa;&#xa;keep: [PAD][UNK][CLS][SEP][MASK]&#xa;+ ALL ## continuation tokens&#xa;+ ALL single-char tokens&#xa;+ top 6,500 by English rank&#xa;+ every token in the corpus&#xa;+ DOMAIN_RESOURCE_TERMS (20)&#xa;&#xa;29,528 → 11,949 tokens" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="280" y="270" width="300" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn4" value="int8 quantize&#xa;per-row scale = max(abs(row)) / 127" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="280" y="470" width="300" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn5" value="compute_weights()  —  Zipf / SIF&#xa;inv_rank = 1 / arange(2, n+2)&#xa;proba = inv_rank / sum(inv_rank)&#xa;w = 1e-4 / (1e-4 + proba)&#xa;&#xa;mirrors model2vec distillation — DO NOT CHANGE" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="280" y="580" width="300" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn6" value="build_prototypes()&#xa;&#xa;for each of the 222 corpus examples:&#xa;   vec_full = embed( strip_slots(text) )&#xa;   vec_verb = embed( head_verb_phrase_lexicon(text) )&#xa;&#xa;re-embedded through the PRUNED pipeline,&#xa;not model.encode() — so prototypes and&#xa;runtime queries share one vector space" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="240" y="740" width="380" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="bn7" value="build_parity_fixtures()&#xa;&#xa;120 adversarial inputs: caps, w/, emoji,&#xa;accents, empty string, 200-char, punctuation,&#xa;one per contraction rule&#xa;&#xa;records BOTH views per fixture" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;verticalAlign=middle;" parent="b1" vertex="1">
+                    <mxGeometry x="240" y="940" width="380" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="bart" value="ARTIFACTS  (the only runtime inputs)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;startSize=30;fontStyle=1;" parent="b1" vertex="1">
+                    <mxGeometry x="720" y="270" width="330" height="790" as="geometry"/>
+                </mxCell>
+                <mxCell id="ba1" value="vectors.bin&#xa;2.92 MB&#xa;int8, 11,949 × 256&#xa;→ Int8Array" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;" parent="bart" vertex="1">
+                    <mxGeometry x="30" y="50" width="270" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="ba2" value="vocab.json&#xa;476 KB&#xa;tokens / scales / weights (11,949 each)&#xa;dim=256 · unkId=1 · pooling=zipf&#xa;sifCoefficient=1e-4" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;" parent="bart" vertex="1">
+                    <mxGeometry x="30" y="160" width="270" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="ba3" value="prototypes.json&#xa;2.37 MB&#xa;222 × { intent, text,&#xa;vec_full[256], vec_verb[256] }&#xa;&#xa;text field = only 9 KB — keep it" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;" parent="bart" vertex="1">
+                    <mxGeometry x="30" y="480" width="270" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="ba4" value="parity.json&#xa;1.3 MB · 120 fixtures&#xa;&#xa;CI ONLY — not shipped&#xa;covers normalize→wordpiece→embed&#xa;does NOT cover scoring or gates" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;dashed=1;" parent="bart" vertex="1">
+                    <mxGeometry x="30" y="660" width="270" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="bnote" value="⚠ SHIP = vectors.bin + vocab.json + prototypes.json = 5.76 MB&#xa;No Python, no ONNX, no ML dependency travels to runtime." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=center;fontStyle=1;" parent="b1" vertex="1">
+                    <mxGeometry x="120" y="1110" width="930" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="be1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="b1" source="bn1" target="bn3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="b1" source="bn2" target="bn3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="b1" source="bn3" target="bn4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="b1" source="bn4" target="bn5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" parent="b1" source="bn4" target="ba1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" parent="b1" source="bn5" target="ba2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="b1" source="bn5" target="bn6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be8" value="corpus text" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" parent="b1" source="bn1" target="bn6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" parent="b1" source="bn6" target="ba3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="b1" source="bn6" target="bn7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="be11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" parent="b1" source="bn7" target="ba4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="page-runtime" name="2 - Runtime Pipeline (frozen)">
+        <mxGraphModel dx="542" dy="563" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1600" math="0" shadow="0">
+            <root>
+                <mxCell id="r0"/>
+                <mxCell id="r1" parent="r0"/>
+                <mxCell id="rtitle" value="RUNTIME PIPELINE — frozen at Phase 1.7 Task 7&#xa;spec: packages/nlp/docs/ALGORITHM.md   ·   reference impl: packages/nlp/bin/index.js" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;whiteSpace=wrap;" parent="r1" vertex="1">
+                    <mxGeometry x="60" y="20" width="1050" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="rin" value="RAW INPUT TEXT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;" parent="r1" vertex="1">
+                    <mxGeometry x="450" y="100" width="260" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="rviews" value="TWO VIEWS — built in parallel, identical transforms to build time" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;startSize=30;fontStyle=1;" parent="r1" vertex="1">
+                    <mxGeometry x="120" y="200" width="920" height="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="rv1" value="strip_slots(text)&#xa;&#xa;remove times/dates (TIME_PATTERNS)&#xa;+ RESOURCE_NAMES (29)&#xa;+ PARTICIPANT_NAMES (23)&#xa;consuming a leading prep/determiner&#xa;as part of the same match" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="rviews" vertex="1">
+                    <mxGeometry x="40" y="50" width="380" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="rv2" value="head_verb_phrase_lexicon(text)&#xa;&#xa;strip LEADING_WRAPPERS (can you / i need / …)&#xa;then longest-match ^phrase from INTENT_VERBS&#xa;fallback: first \w+ token&#xa;&#xa;deterministic — replaced spaCy (Task 1)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="rviews" vertex="1">
+                    <mxGeometry x="500" y="50" width="380" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="rv3" value="normalize()&#xa;lowercase → w/ → contractions →&#xa;apostrophe-less contractions →&#xa;strip punct → collapse ws" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="rviews" vertex="1">
+                    <mxGeometry x="40" y="190" width="380" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="rv4" value="normalize()&#xa;(identical function)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="rviews" vertex="1">
+                    <mxGeometry x="500" y="190" width="380" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="rv5" value="wordpiece() → embed()&#xa;greedy longest-match · dequantize&#xa;· Zipf-weighted mean · L2" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="rviews" vertex="1">
+                    <mxGeometry x="40" y="290" width="380" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="rv6" value="wordpiece() → embed()&#xa;(identical functions)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="rviews" vertex="1">
+                    <mxGeometry x="500" y="290" width="380" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="rvf" value="vec_full" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;" parent="r1" vertex="1">
+                    <mxGeometry x="230" y="650" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="rvv" value="vec_verb" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;" parent="r1" vertex="1">
+                    <mxGeometry x="690" y="650" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="rscore" value="DUAL-VECTOR kNN  vs  222 prototypes&#xa;&#xa;sim = α · cos(q_full, p_full)  +  β · cos(q_verb, p_verb)&#xa;&#xa;α=0.2  β=0.8   for add / delete / modify / get_details&#xa;α=1.0  β=0.0   for  none    ◄── deliberate asymmetry (Task 4.5)&#xa;&#xa;none is OBJECT-carried; event intents are VERB-carried.&#xa;One blend cannot serve both." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=0;" parent="r1" vertex="1">
+                    <mxGeometry x="290" y="730" width="540" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="rvote" value="VOTE — max similarity per intent over top-5 (NOT sum)&#xa;&#xa;confidence = winning intent score&#xa;margin     = confidence − best OTHER intent&#xa;             ◄── skips  none  entirely, even when none wins" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="r1" vertex="1">
+                    <mxGeometry x="290" y="920" width="540" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="rgates" value="GATE LAYER — first match wins   (reads RAW pre-strip text)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;startSize=30;fontStyle=1;" parent="r1" vertex="1">
+                    <mxGeometry x="180" y="1070" width="760" height="330" as="geometry"/>
+                </mxCell>
+                <mxCell id="rg0" value="negation?  →  CLARIFY          (checked FIRST — Zipf suppresses  not )" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;spacingLeft=10;" parent="rgates" vertex="1">
+                    <mxGeometry x="20" y="40" width="720" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="rg1" value="1 · confidence &lt; CONF_FLOOR 0.45  →  REJECT" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;spacingLeft=10;" parent="rgates" vertex="1">
+                    <mxGeometry x="20" y="80" width="720" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="rg2" value="2 · nearest intent is  none  →  REJECT" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;spacingLeft=10;" parent="rgates" vertex="1">
+                    <mxGeometry x="20" y="120" width="720" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="rg3" value="3 · no domain anchor (time | resource | participant | EVENT_NOUNS)  →  REJECT" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;spacingLeft=10;" parent="rgates" vertex="1">
+                    <mxGeometry x="20" y="160" width="720" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="rg4" value="3b · resource anchor but no time AND no event noun  →  CLARIFY   (the parking case)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;spacingLeft=10;" parent="rgates" vertex="1">
+                    <mxGeometry x="20" y="200" width="720" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="rg5" value="4 · margin &lt; MARGIN_FLOOR 0.10  →  CLARIFY" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;spacingLeft=10;" parent="rgates" vertex="1">
+                    <mxGeometry x="20" y="240" width="720" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="rg6" value="5 · add_event | modify_event with no time anchor  →  CLARIFY   (what time?)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;spacingLeft=10;" parent="rgates" vertex="1">
+                    <mxGeometry x="20" y="280" width="720" height="34" as="geometry"/>
+                </mxCell>
+                <mxCell id="ro1" value="PROCEED&#xa;34/105 · 32.4%&#xa;precision 100% on genuine" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" parent="r1" vertex="1">
+                    <mxGeometry x="140" y="1450" width="240" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="ro2" value="CLARIFY&#xa;34/105 · 32.4%&#xa;ask a chip question" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" parent="r1" vertex="1">
+                    <mxGeometry x="440" y="1450" width="240" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="ro3" value="REJECT&#xa;37/105 · 35.2%&#xa;precision 94.59%" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" parent="r1" vertex="1">
+                    <mxGeometry x="740" y="1450" width="240" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="rwarn" value="⚠ THE GATES ARE NOT OPTIONAL&#xa;raw classifier alone: 21.90% false-accept, 35.00% none recall&#xa;with gates:                    2.86% false-accept, 87.50% none recall&#xa;A port that stops after the kNN will pass happy-path tests and fail on real traffic." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;align=center;" parent="r1" vertex="1">
+                    <mxGeometry x="140" y="1550" width="840" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="re1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="r1" source="rin" target="rviews" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="re2" value="RAW text bypasses the views" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;strokeColor=#b85450;strokeWidth=2;exitX=1;exitY=0.5;entryX=1;entryY=0;" parent="r1" source="rin" target="rgates" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1090" y="125"/>
+                            <mxPoint x="1090" y="1070"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="re3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="r1" source="rvf" target="rscore" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="re4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="r1" source="rvv" target="rscore" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="re5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="r1" source="rscore" target="rvote" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="re6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="r1" source="rvote" target="rgates" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="re7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="r1" source="rgates" target="ro1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="re8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="r1" source="rgates" target="ro2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="re9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="r1" source="rgates" target="ro3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="page-migration" name="3 - Migration to Main Repo">
+        <mxGraphModel dx="1243" dy="704" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1400" math="0" shadow="0">
+            <root>
+                <mxCell id="m0"/>
+                <mxCell id="m1" parent="m0"/>
+                <mxCell id="mtitle" value="MIGRATION — this repo (training) → main repo (npm package)&#xa;decided: CONSUME-ONLY  ·  framework-agnostic npm package" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontStyle=1;whiteSpace=wrap;" parent="m1" vertex="1">
+                    <mxGeometry x="60" y="20" width="1050" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="mthis" value="THIS REPO — static-embedding  (stays here, never migrates)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;startSize=30;fontStyle=1;" parent="m1" vertex="1">
+                    <mxGeometry x="60" y="100" width="420" height="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="mt1" value="corpus/&#xa;intents.yaml (222)&#xa;dev.jsonl (105)&#xa;test.jsonl (46) — SEALED, never scored&#xa;gold.FROZEN.jsonl (151 = dev ∪ test)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" parent="mthis" vertex="1">
+                    <mxGeometry x="25" y="50" width="370" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="mt2" value="scripts/  — 24 Python files&#xa;build_embeddings · reference_embedder&#xa;reference_classifier · gates · metrics&#xa;eval · eval_gates · ablate · audit_corpus&#xa;audit_lexicon · sweep_alpha_beta&#xa;sweep_thresholds · typo_robustness_check" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" parent="mthis" vertex="1">
+                    <mxGeometry x="25" y="170" width="370" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="mt3" value="⚠ TODO BEFORE MIGRATING&#xa;scripts/build_routing_fixtures.py&#xa;→ routing_fixtures.json&#xa;&#xa;parity.json covers only normalize→embed.&#xa;Nothing would catch a wrong CONF_FLOOR&#xa;or a typo in EVENT_NOUNS once Python&#xa;stays behind." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" parent="mthis" vertex="1">
+                    <mxGeometry x="25" y="310" width="370" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="mmain" value="MAIN REPO — @janus-scheduler/nlp  (npm package)" style="swimlane;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;startSize=30;fontStyle=1;" parent="m1" vertex="1">
+                    <mxGeometry x="640" y="100" width="470" height="600" as="geometry"/>
+                </mxCell>
+                <mxCell id="mm1" value="artifacts/   —  5.76 MB, shipped as asset files&#xa;vectors.bin · vocab.json · prototypes.json&#xa;(never base64-inlined)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="mmain" vertex="1">
+                    <mxGeometry x="25" y="50" width="420" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="mm2" value="src/  —  ported from bin/index.js&#xa;&#xa;constants.ts   ◄ SINGLE SOURCE OF TRUTH&#xa;types.ts · normalize.ts · wordpiece.ts&#xa;embed.ts · preprocess.ts · classify.ts&#xa;gates.ts · artifacts.ts" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" parent="mmain" vertex="1">
+                    <mxGeometry x="25" y="140" width="420" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="mm3" value="index.ts  —  entry point  &quot;.&quot;&#xa;PURE core, zero I/O, no fs&#xa;&#xa;parseArtifacts({ vectors, vocab, prototypes })&#xa;createClassifier(artifacts)&#xa;classifier.route(text) → RouteResult" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontStyle=1;" parent="mmain" vertex="1">
+                    <mxGeometry x="25" y="280" width="420" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="mm4" value="node.ts  —  entry point  &quot;./node&quot;&#xa;fs-based convenience loader&#xa;(kept separate so bundlers never see fs)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;" parent="mmain" vertex="1">
+                    <mxGeometry x="25" y="410" width="420" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="mm5" value="__tests__/&#xa;parity.test.ts     — 120 fixtures&#xa;routing.test.ts    — full pipeline lock&#xa;(fixtures excluded from npm bundle)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;dashed=1;" parent="mmain" vertex="1">
+                    <mxGeometry x="25" y="500" width="420" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="marrow" value="COPY&#xa;3 artifacts + fixtures&#xa;one-way, consume-only" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;" parent="m1" vertex="1">
+                    <mxGeometry x="500" y="180" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="mport" value="PORT&#xa;bin/index.js (445 lines)&#xa;+ ALGORITHM.md as the contract" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" parent="m1" vertex="1">
+                    <mxGeometry x="500" y="320" width="120" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcons" value="CONSUMERS — framework-agnostic" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;startSize=30;fontStyle=1;" parent="m1" vertex="1">
+                    <mxGeometry x="640" y="740" width="470" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="mc1" value="Node service&#xa;import from /node&#xa;fs at cold start" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="mcons" vertex="1">
+                    <mxGeometry x="20" y="45" width="135" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="mc2" value="Browser / SPA&#xa;fetch the 3 files&#xa;cache in IndexedDB&#xa;JSON gzips ~4×" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="mcons" vertex="1">
+                    <mxGeometry x="168" y="45" width="135" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="mc3" value="Edge function&#xa;fetch + parseArtifacts&#xa;watch bundle limits" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="mcons" vertex="1">
+                    <mxGeometry x="316" y="45" width="135" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="mtrap" value="⚠ DELETE — DO NOT MIGRATE&#xa;&#xa;src/embed.ts  ·  src/intent.ts&#xa;&#xa;Phase-1 pseudocode. Undefined helpers,&#xa;dead single-vector p.vec schema,&#xa;sum-based voting, none included in margin,&#xa;NO gate layer.&#xa;&#xa;They look like the port. They are a trap." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;align=center;" parent="m1" vertex="1">
+                    <mxGeometry x="60" y="610" width="420" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="mnotes" value="PORTING NOTES&#xa;&#xa;· Keep BOTH asymmetries: none uses α=1.0/β=0.0 · margin skips none even when none wins&#xa;· Gates read RAW text — strip_slots removes exactly the anchors they look for&#xa;· TIME_RE is /gi and shared between stripSlots (.replace) and hasTimeAnchor (.test, advances lastIndex).&#xa;  bin/index.js:312-315 works only because it manually resets. Build TWO regex instances in the port.&#xa;· vectors.bin → Int8Array, preserving byteOffset/byteLength from a Node Buffer&#xa;· package.json: sideEffects false · exports map for &quot;.&quot; and &quot;./node&quot; · files includes artifacts/, excludes fixtures" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=15;verticalAlign=middle;" parent="m1" vertex="1">
+                    <mxGeometry x="60" y="830" width="540" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="mdeferred" value="DEFERRED — not blocking migration&#xa;&#xa;· time_only_anchor sub-gate  (Gate 3 treats a bare time word as strong evidence)&#xa;· typo tolerance  (exact-match lexicon → 0/12 correct PROCEED on typo variants)&#xa;· vec_full density around the anchor-bearing near-miss shape&#xa;· INTENT_VERBS audit for  set aside  and  lock in&#xa;· test.jsonl (46 rows) remains SEALED and unscored" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;spacingLeft=15;verticalAlign=middle;" parent="m1" vertex="1">
+                    <mxGeometry x="640" y="950" width="470" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="me1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;" parent="m1" source="mthis" target="marrow" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="me2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;" parent="m1" source="marrow" target="mmain" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="me3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeWidth=2;dashed=1;" parent="m1" source="mport" target="mmain" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="me4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" parent="m1" source="mmain" target="mcons" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

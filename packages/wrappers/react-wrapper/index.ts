@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useRef, useState, useEffect } from "react";
 import { createComponent } from "@lit/react";
 import {
   JanusScheduler as JanusSchedulerWC,
@@ -6,35 +6,89 @@ import {
   JanusMonthGrid as JanusMonthGridWC,
   JanusAiBar as JanusAiBarWC,
   JanusTopbar as JanusTopbarWC,
+  JanusChat as JanusChatWC,
+  type ChatMessage,
+  type ChatChip,
+  type ChatChipKind,
+  type ChatChoice,
+  type ChatParseCard,
+  type ChatSuggestion,
+  type ChatRole,
+  type ChatSubmitDetail,
+  type ChatActionDetail,
+  type ChatClarifyResponseDetail,
+  type ChatSuggestionDetail,
 } from "@janus-scheduler/ui";
 
+import {
+  beginSession,
+  provideAnswer,
+  presentSession,
+  summarise,
+  ChatController,
+  type EntityCatalog,
+  type SessionContext,
+  type SessionRequirements,
+  type SessionState,
+  type JanusChatOptions,
+  type ConfirmOutcome,
+  type NlpEngine,
+} from "@janus-scheduler/nlp";
+
+import {
+  SchedulerManager,
+  getBrowserTimezone,
+  isoToZonedDisplay,
+  zonedInputToISO,
+  schedulerStore,
+  Event,
+  Resource,
+  Assignment,
+  type SchedulerHooks,
+  type TimelineEvent,
+  type TimelineResource,
+  type EventMoveDetail,
+  type EventResizeDetail,
+  type EventCreateDetail,
+  type SchedulerSaveData,
+  type SchedulerDeleteData,
+  type EventColor,
+  type ViewType,
+  type EventData,
+  type ResourceData,
+  type AssignmentData,
+} from "@janus-scheduler/core";
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Re-export core API so React consumers can import everything from one package:
-//   import { Timeline, SchedulerManager, SchedulerHooks } from '@janus-scheduler/react'
+// Re-exports for host app consumers
 // ─────────────────────────────────────────────────────────────────────────────
+
+export type {
+  ChatMessage,
+  ChatChip,
+  ChatChipKind,
+  ChatChoice,
+  ChatParseCard,
+  ChatSuggestion,
+  ChatRole,
+  ChatSubmitDetail,
+  ChatActionDetail,
+  ChatClarifyResponseDetail,
+  ChatSuggestionDetail,
+};
+
 export {
   SchedulerManager,
   getBrowserTimezone,
   isoToZonedDisplay,
   zonedInputToISO,
   schedulerStore,
-} from "@janus-scheduler/core";
+  Event,
+  Resource,
+  Assignment,
+};
 
-import type {
-  SchedulerHooks,
-  TimelineEvent,
-  TimelineResource,
-  EventMoveDetail,
-  EventResizeDetail,
-  EventCreateDetail,
-  SchedulerSaveData,
-  SchedulerDeleteData,
-  EventColor,
-  ViewType,
-  EventData,
-  ResourceData,
-  AssignmentData,
-} from "@janus-scheduler/core";
+export { presentSession, summarise, beginSession, provideAnswer };
 
 export type {
   SchedulerHooks,
@@ -53,22 +107,63 @@ export type {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Re-export UI event-detail types so the host app can type its callbacks
-// without importing from @janus-scheduler/ui directly.
+// useJanusChat Hook & Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { Event, Resource, Assignment } from "@janus-scheduler/core";
+export interface JanusChatConversation {
+  thread: ChatMessage[];
+  busy: boolean;
+  session: SessionState | null;
+  submit: (text: string) => void;
+  choose: (label: string) => void;
+  confirm: () => void;
+  undo: (messageId: string) => void;
+  reset: () => void;
+}
+
+export function useJanusChat(options: JanusChatOptions): JanusChatConversation {
+  const controllerRef = useRef<ChatController | null>(null);
+
+  if (!controllerRef.current) {
+    controllerRef.current = new ChatController(options);
+  }
+
+  const controller = controllerRef.current;
+
+  // Keep options up to date (e.g. when engine becomes ready)
+  controller.updateOptions(options);
+
+  const [state, setState] = useState({
+    thread: controller.thread,
+    busy: controller.busy,
+    session: controller.session,
+  });
+
+  useEffect(() => {
+    const unsubscribe = controller.subscribe(() => {
+      setState({
+        thread: controller.thread,
+        busy: controller.busy,
+        session: controller.session,
+      });
+    });
+    return unsubscribe;
+  }, [controller]);
+
+  return {
+    thread: state.thread as ChatMessage[],
+    busy: state.busy,
+    session: state.session,
+    submit: (text: string) => controller.submit(text),
+    choose: (label: string) => controller.choose(label),
+    confirm: () => controller.confirm(),
+    undo: (id: string) => controller.undo(id),
+    reset: () => controller.reset(),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Web Component → React bindings
-//
-// The Lit @customElement decorator auto-registers the web components when the
-// module is imported — no manual customElements.define() is needed.
-//
-// We internally use `@lit/react` to map the custom elements to React, and then
-// we wrap those in functional components to "unwrap" the CustomEvent objects.
-// This allows the React consumer to receive the pure data payload rather than
-// having to access `e.detail`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const _Scheduler = createComponent({
@@ -107,11 +202,11 @@ export function Scheduler(props: SchedulerProps): React.JSX.Element {
     ...props,
     onClose: props.onClose ? () => props.onClose!() : undefined,
     onSave: props.onSave
-      ? (e: Event) =>
+      ? (e: globalThis.Event) =>
           props.onSave!((e as CustomEvent<SchedulerSaveData>).detail)
       : undefined,
     onDelete: props.onDelete
-      ? (e: Event) =>
+      ? (e: globalThis.Event) =>
           props.onDelete!(
             (e as CustomEvent<{ id: string | null; title: string }>).detail,
           )
@@ -162,7 +257,7 @@ function withConflictBypass<T>(
   callback?: (detail: T) => void,
 ) {
   if (!callback) return undefined;
-  return (e: Event) => {
+  return (e: globalThis.Event) => {
     const detail = (e as CustomEvent).detail;
     if (prevent && detail?.hasConflict) {
       return;
@@ -171,40 +266,47 @@ function withConflictBypass<T>(
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Timeline = React.forwardRef<any, TimelineProps>((props, ref) => {
-  return React.createElement(_Timeline, {
-    ...props,
-    ref,
-    onConflictDetected: props.onConflictDetected
-      ? (e: Event) => props.onConflictDetected!((e as CustomEvent).detail)
-      : undefined,
-    onEventClick: props.onEventClick
-      ? (e: Event) =>
-          props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
-      : undefined,
-    onEventMove: withConflictBypass(props.preventConflicts, props.onEventMove),
-    onEventResize: withConflictBypass(
-      props.preventConflicts,
-      props.onEventResize,
-    ),
-    onEventCreate: withConflictBypass(
-      props.preventConflicts,
-      props.onEventCreate,
-    ),
-    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
-    onViewChange: props.onViewChange
-      ? (e: Event) =>
-          props.onViewChange!(
-            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-          )
-      : undefined,
-    onNavChange: props.onNavChange
-      ? (e: Event) =>
-          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
-      : undefined,
-  });
-});
+export const Timeline = React.forwardRef<JanusTimelineWC, TimelineProps>(
+  (props, ref) => {
+    return React.createElement(_Timeline, {
+      ...props,
+      ref,
+      onConflictDetected: props.onConflictDetected
+        ? (e: globalThis.Event) =>
+            props.onConflictDetected!((e as CustomEvent).detail)
+        : undefined,
+      onEventClick: props.onEventClick
+        ? (e: globalThis.Event) =>
+            props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+        : undefined,
+      onEventMove: withConflictBypass(
+        props.preventConflicts,
+        props.onEventMove,
+      ),
+      onEventResize: withConflictBypass(
+        props.preventConflicts,
+        props.onEventResize,
+      ),
+      onEventCreate: withConflictBypass(
+        props.preventConflicts,
+        props.onEventCreate,
+      ),
+      onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+      onViewChange: props.onViewChange
+        ? (e: globalThis.Event) =>
+            props.onViewChange!(
+              (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+            )
+        : undefined,
+      onNavChange: props.onNavChange
+        ? (e: globalThis.Event) =>
+            props.onNavChange!(
+              (e as CustomEvent<Record<string, unknown>>).detail,
+            )
+        : undefined,
+    });
+  },
+);
 
 const _MonthGrid = createComponent({
   tagName: "janus-month-grid",
@@ -228,32 +330,35 @@ export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
   onNavChange?: (detail: Record<string, unknown>) => void;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const MonthGrid = React.forwardRef<any, MonthGridProps>((props, ref) => {
-  return React.createElement(_MonthGrid, {
-    ...props,
-    ref,
-    onEventClick: props.onEventClick
-      ? (e: Event) =>
-          props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
-      : undefined,
-    onDayClick: props.onDayClick
-      ? (e: Event) =>
-          props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
-      : undefined,
-    onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
-    onViewChange: props.onViewChange
-      ? (e: Event) =>
-          props.onViewChange!(
-            (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-          )
-      : undefined,
-    onNavChange: props.onNavChange
-      ? (e: Event) =>
-          props.onNavChange!((e as CustomEvent<Record<string, unknown>>).detail)
-      : undefined,
-  });
-});
+export const MonthGrid = React.forwardRef<JanusMonthGridWC, MonthGridProps>(
+  (props, ref) => {
+    return React.createElement(_MonthGrid, {
+      ...props,
+      ref,
+      onEventClick: props.onEventClick
+        ? (e: globalThis.Event) =>
+            props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+        : undefined,
+      onDayClick: props.onDayClick
+        ? (e: globalThis.Event) =>
+            props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
+        : undefined,
+      onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
+      onViewChange: props.onViewChange
+        ? (e: globalThis.Event) =>
+            props.onViewChange!(
+              (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
+            )
+        : undefined,
+      onNavChange: props.onNavChange
+        ? (e: globalThis.Event) =>
+            props.onNavChange!(
+              (e as CustomEvent<Record<string, unknown>>).detail,
+            )
+        : undefined,
+    });
+  },
+);
 
 const _AiBar = createComponent({
   tagName: "janus-ai-bar",
@@ -277,15 +382,103 @@ export function AiBar(props: AiBarProps): React.JSX.Element {
   return React.createElement(_AiBar, {
     ...props,
     onAiSubmit: props.onAiSubmit
-      ? (e: Event) =>
+      ? (e: globalThis.Event) =>
           props.onAiSubmit!((e as CustomEvent<{ prompt: string }>).detail)
       : undefined,
     onAiInput: props.onAiInput
-      ? (e: Event) =>
+      ? (e: globalThis.Event) =>
           props.onAiInput!((e as CustomEvent<{ prompt: string }>).detail)
       : undefined,
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Chat Wrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
+const _Chat = createComponent({
+  tagName: "janus-chat",
+  elementClass: JanusChatWC,
+  react: React,
+  events: {
+    onChatSubmit: "chat-submit",
+    onChatConfirm: "chat-confirm",
+    onChatEdit: "chat-edit",
+    onChatClarifyResponse: "chat-clarify-response",
+    onChatUndo: "chat-undo",
+    onChatView: "chat-view",
+    onChatSuggestionSelect: "chat-suggestion-select",
+    onChatInput: "chat-input",
+    onChatClose: "chat-close",
+  },
+});
+
+export interface ChatProps extends React.HTMLAttributes<HTMLElement> {
+  messages?: ChatMessage[];
+  suggestions?: ChatSuggestion[];
+  heading?: string;
+  subheading?: string;
+  placeholder?: string;
+  value?: string;
+  /**
+   * Colour scheme. Defaults to `"light"` to match the rest of the Janus
+   * components, which are light-only — `"auto"` follows `prefers-color-scheme`
+   * and should be used only when the host app is itself dark-aware.
+   */
+  theme?: "light" | "dark" | "auto";
+  showClose?: boolean;
+  showVoice?: boolean;
+  /** Appends the animated thinking bubble while classification is in flight. */
+  busy?: boolean;
+  onChatSubmit?: (detail: ChatSubmitDetail) => void;
+  /** The user approved the parse card. Nothing is written until you act on it. */
+  onChatConfirm?: (detail: ChatActionDetail) => void;
+  onChatEdit?: (detail: ChatActionDetail) => void;
+  onChatClarifyResponse?: (detail: ChatClarifyResponseDetail) => void;
+  onChatUndo?: (detail: ChatActionDetail) => void;
+  onChatView?: (detail: ChatActionDetail) => void;
+  onChatSuggestionSelect?: (detail: ChatSuggestionDetail) => void;
+  onChatInput?: (detail: ChatSubmitDetail) => void;
+  onChatClose?: () => void;
+}
+
+/**
+ * Unwraps every `CustomEvent` so consumers receive `detail` directly.
+ */
+export const Chat = React.forwardRef<JanusChatWC, ChatProps>((props, ref) => {
+  const unwrapped: Record<string, unknown> = { ...props, ref };
+
+  const handlers: Array<[keyof ChatProps, ((d: never) => void) | undefined]> = [
+    ["onChatSubmit", props.onChatSubmit as (d: never) => void],
+    ["onChatConfirm", props.onChatConfirm as (d: never) => void],
+    ["onChatEdit", props.onChatEdit as (d: never) => void],
+    [
+      "onChatClarifyResponse",
+      props.onChatClarifyResponse as (d: never) => void,
+    ],
+    ["onChatUndo", props.onChatUndo as (d: never) => void],
+    ["onChatView", props.onChatView as (d: never) => void],
+    [
+      "onChatSuggestionSelect",
+      props.onChatSuggestionSelect as (d: never) => void,
+    ],
+    ["onChatInput", props.onChatInput as (d: never) => void],
+  ];
+
+  for (const [name, handler] of handlers) {
+    unwrapped[name] = handler
+      ? (e: globalThis.Event) => handler((e as CustomEvent).detail as never)
+      : undefined;
+  }
+
+  // `chat-close` carries no payload, so it takes no argument.
+  unwrapped.onChatClose = props.onChatClose
+    ? () => props.onChatClose!()
+    : undefined;
+
+  return React.createElement(_Chat, unwrapped);
+});
+Chat.displayName = "Chat";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Topbar Wrapper
@@ -331,7 +524,7 @@ export function Topbar(props: TopbarProps): React.JSX.Element {
     onNextClick: props.onNextClick ? () => props.onNextClick!() : undefined,
     onTodayClick: props.onTodayClick ? () => props.onTodayClick!() : undefined,
     onViewSwitch: props.onViewSwitch
-      ? (e: Event) =>
+      ? (e: globalThis.Event) =>
           props.onViewSwitch!(
             (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
           )

@@ -1,0 +1,2135 @@
+[
+ {
+  "text": "change the vendor demo time to 11am",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9011557221412658,
+  "margin": 0.9011557221412658,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "can you change the transportation booking",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9990984797477722,
+  "margin": 0.9990984797477722,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "arrange a session with the recruiter",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.9273758172988893,
+  "margin": 0.9273758172988893,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "can you grab equipment for the workshop",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 1.0000231742858887,
+  "margin": 0.6255275934934617,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "is there anything on my calendar with hr",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8725828647613526,
+  "margin": 0.8725828647613526,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "can you remove my call with finance",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9582877397537232,
+  "margin": 0.9582877397537232,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "clear the recruiter session",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.917411494255066,
+  "margin": 0.917411494255066,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "how many calls do i have this week",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8876582384109498,
+  "margin": 0.8876582384109498,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "move the auditor meeting to next month",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9253264665603638,
+  "margin": 0.9253264665603638,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "sing me a song",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.4847223162651062,
+  "margin": 0.3131757199764251,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "is the demo room already booked",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9851927280426026,
+  "margin": 0.9851927280426026,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "yo what's up",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.24296613037586212,
+  "margin": 0.24296613037586212,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "do you like pizza",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.7557388372719288,
+  "margin": 0.4307746537029743,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "what's the meaning of life",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.909549355506897,
+  "margin": 0.909549355506897,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "push the qa review to next sprint",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9371859312057496,
+  "margin": 0.5961490988731384,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "add a call with the investors next monday",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.9626278042793275,
+  "margin": 0.9626278042793275,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "update our av setup for the call",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9265671491622925,
+  "margin": 0.9265671491622925,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "update the reserved seating count",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9072824597358704,
+  "margin": 0.9072824597358704,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "what's your favorite color",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8583165764808656,
+  "margin": 0.8583165764808656,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "get a review meeting scheduled with qa",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.937663209438324,
+  "margin": 0.04704529047012329,
+  "route": "CLARIFY",
+  "gate": "gate4_margin"
+ },
+ {
+  "text": "shift the standup to 9:30",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9922516107559205,
+  "margin": 0.9922516107559205,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "move the offsite venue booking",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9127397537231445,
+  "margin": 0.9127397537231445,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "thank you so much",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.7635870575904846,
+  "margin": 0.7635870575904846,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "check if seating is reserved for the investors",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9353641510009766,
+  "margin": 0.6266110658645629,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "what's coming up with the auditors",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9999623775482178,
+  "margin": 0.9999623775482178,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "i don't need the qa review anymore",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9042104005813599,
+  "margin": 0.5379447937011719,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "drop my meeting with the auditors",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9078338742256165,
+  "margin": 0.9078338742256165,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "do i have any calls this afternoon",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8581412196159364,
+  "margin": 0.4036555171012879,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "add an event for the town hall",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.9218697786331177,
+  "margin": 0.9218697786331177,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "show me everything scheduled for friday",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9801658391952515,
+  "margin": 0.9801658391952515,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "reserve seating for the investor meeting",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.9563193321228027,
+  "margin": 0.9563193321228027,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "is the boardroom currently free",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9236863374710084,
+  "margin": 0.9236863374710084,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "what's 10 times 10",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8384609699249268,
+  "margin": 0.8384609699249268,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "switch the boardroom booking to next week",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9290381193161011,
+  "margin": 0.9290381193161011,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "shift the recruiter session earlier",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9438909053802491,
+  "margin": 0.9438909053802491,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "take tomorrow's retro off my calendar",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.8985165953636169,
+  "margin": 0.43952668905258174,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what's my agenda for wednesday",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9061453580856323,
+  "margin": 0.9061453580856323,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what's the square root of 144",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8441551804542542,
+  "margin": 0.8441551804542542,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "what's reserved for the town hall",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8988448262214661,
+  "margin": 0.8988448262214661,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what do i have going on today",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.938918423652649,
+  "margin": 0.938918423652649,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "is the offsite venue confirmed",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8409482836723329,
+  "margin": 0.8409482836723329,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "reschedule the onboarding call for next week",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9556670904159547,
+  "margin": 0.7441564619541169,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "is anything reserved for finance today",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9396295070648194,
+  "margin": 0.9396295070648194,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "i'm bored",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.27050422430038457,
+  "margin": 0.27050422430038457,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "move my check-in with the manager to friday",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9242059946060182,
+  "margin": 0.9242059946060182,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "set aside 30 minutes for the retro tomorrow",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.28215688467025757,
+  "margin": 0.026384460926055897,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "update the microphone reservation",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9498669862747193,
+  "margin": 0.9498669862747193,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "can you get us microphones for the town hall",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.845636123418808,
+  "margin": 0.016088432073593117,
+  "route": "CLARIFY",
+  "gate": "gate4_margin"
+ },
+ {
+  "text": "can you extend the boardroom booking",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9990242004394532,
+  "margin": 0.6155478179454803,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "remove the vendor demo from my schedule",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9676953434944153,
+  "margin": 0.9676953434944153,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "put a recurring standup at 9am every day",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.9477633595466615,
+  "margin": 0.9477633595466615,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "cancel the investor call",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9999484539031982,
+  "margin": 0.9999484539031982,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "is my morning booked",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 1.0000137567520142,
+  "margin": 1.0000137567520142,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "can you tell me a story",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.5447555780410767,
+  "margin": 0.24679361283779144,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "is there a table free for lunch",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9925599813461304,
+  "margin": 0.9925599813461304,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what's for lunch today",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8586193561553955,
+  "margin": 0.8586193561553955,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "update the equipment reserved for the workshop",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9072792053222657,
+  "margin": 0.9072792053222657,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "can you recommend a movie",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.7357182502746582,
+  "margin": 0.7357182502746582,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "what's on my plate this week",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8559298396110535,
+  "margin": 0.8559298396110535,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "block time for the quarterly planning",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.8363713204860688,
+  "margin": 0.8363713204860688,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "change who the room is reserved under",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9505425453186035,
+  "margin": 0.9505425453186035,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "hjkhjk asdasd",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.501886248588562,
+  "margin": 0.501886248588562,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "push my call with finance back an hour",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9541621923446656,
+  "margin": 0.575106817483902,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "can you move the town hall to next week",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9275713205337525,
+  "margin": 0.9275713205337525,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "can you add a slot for the vendor demo",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.8872621536254883,
+  "margin": 0.8872621536254883,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "can you help me with my homework",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.33170358836650854,
+  "margin": 0.014156338572502203,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "take the client review off my calendar",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9346181511878968,
+  "margin": 0.44718736410140997,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "cancel the check-in with my manager",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.979114830493927,
+  "margin": 0.979114830493927,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "can we lock in a call with the auditors",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.3462819457054138,
+  "margin": 0.04137313365936279,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "get the boardroom booked for the review",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.9341238737106323,
+  "margin": 0.030098271369934038,
+  "route": "CLARIFY",
+  "gate": "gate4_margin"
+ },
+ {
+  "text": "how tall is mount everest",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.6914025545120239,
+  "margin": 0.19655476659536364,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "see you later",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.39052391648292545,
+  "margin": 0.39052391648292545,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "reserve a table for the lunch meeting",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.9993933200836183,
+  "margin": 0.9993933200836183,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "i don't need the room anymore",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9154349803924562,
+  "margin": 0.5514292776584626,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "we don't need the projector booked anymore",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9001219034194947,
+  "margin": 0.5633301615715027,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "i no longer need the meeting with sarah",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.44898515939712524,
+  "margin": 0.10295829772949217,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "you don't have to hold my slot for the retro",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.3277135193347931,
+  "margin": 0.011696872115135204,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "he doesn't need the conference room anymore",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.3299201250076294,
+  "margin": 0.3299201250076294,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "they don't need the training session anymore",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.36528308391571046,
+  "margin": 0.36528308391571046,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "she doesn't need the huddle room anymore",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.2829487189650536,
+  "margin": 0.2829487189650536,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "i don't need to keep the interview slot",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.852278232574463,
+  "margin": 0.5280597150325776,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "is it supposed to be sunny this weekend",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8393871635198594,
+  "margin": 0.8393871635198594,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "what's the score of the game",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8631513297557831,
+  "margin": 0.8631513297557831,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "how do you spell necessary",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.5384338200092316,
+  "margin": 0.5384338200092316,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "what's a good movie to watch",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8548378944396973,
+  "margin": 0.8548378944396973,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "my phone won't charge",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.3805795907974243,
+  "margin": 0.11368465721607207,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "how do i unclog a drain",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.5173138797283172,
+  "margin": 0.5173138797283172,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "cool thanks",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.7263005971908569,
+  "margin": 0.7263005971908569,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "yep sounds good",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.42757368087768555,
+  "margin": 0.42757368087768555,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "qwertyuiop",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.37221911549568176,
+  "margin": 0.19677915573120117,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "update my phone's operating system",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9152550220489503,
+  "margin": 0.9152550220489503,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "change the oil in my car",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.9014026165008545,
+  "margin": 0.9014026165008545,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "cancel my streaming subscription",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.9252607226371765,
+  "margin": 0.9252607226371765,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "move the plants outside",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.901064682006836,
+  "margin": 0.901064682006836,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "add sugar to the recipe",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.8990866899490357,
+  "margin": 0.8990866899490357,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "swap the batteries in the smoke detector",
+  "source": "dev.jsonl",
+  "intent": "modify_event",
+  "confidence": 0.8774427115917206,
+  "margin": 0.8774427115917206,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "clear out the spam folder",
+  "source": "dev.jsonl",
+  "intent": "delete_event",
+  "confidence": 0.8726932227611542,
+  "margin": 0.8726932227611542,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "book a haircut appointment for saturday",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.8690157234668732,
+  "margin": 0.8690157234668732,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "call the plumber about the leak",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.393327534198761,
+  "margin": 0.15776101946830748,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "order pizza for the team meeting",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.4650631844997406,
+  "margin": 0.15536360442638397,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "email everyone about the workshop location",
+  "source": "dev.jsonl",
+  "intent": "none",
+  "confidence": 0.6181710958480835,
+  "margin": 0.3977234780788421,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "reserve a session at the pottery studio",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.8959410309791566,
+  "margin": 0.8959410309791566,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "book a flight for the family vacation",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.8523646235466004,
+  "margin": 0.8523646235466004,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "what's for breakfast tomorrow",
+  "source": "dev.jsonl",
+  "intent": "get_details",
+  "confidence": 0.8399341762065888,
+  "margin": 0.8399341762065888,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "reserve a rental van for the weekend trip",
+  "source": "dev.jsonl",
+  "intent": "add_event",
+  "confidence": 0.8968694388866425,
+  "margin": 0.8968694388866425,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "scedule a meeting at 5pm",
+  "source": "typo_robustness_check",
+  "intent": "modify_event",
+  "confidence": 0.49472546577453613,
+  "margin": 0.49472546577453613,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "bok the boardroom",
+  "source": "typo_robustness_check",
+  "intent": "none",
+  "confidence": 0.2819972634315491,
+  "margin": 0.0804948806762695,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "pyt a recurring standup at 9am every day",
+  "source": "typo_robustness_check",
+  "intent": "add_event",
+  "confidence": 0.3050536513328552,
+  "margin": 0.3050536513328552,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "cancle my 3pm",
+  "source": "typo_robustness_check",
+  "intent": "none",
+  "confidence": 0.3480759263038635,
+  "margin": 0.0002434074878692738,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "remvoe the vendor demo from my schedule",
+  "source": "typo_robustness_check",
+  "intent": "none",
+  "confidence": 0.27883073687553406,
+  "margin": 0.0597029983997345,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "tkae tomorrow's retro off my calendar",
+  "source": "typo_robustness_check",
+  "intent": "none",
+  "confidence": 0.23319938778877258,
+  "margin": 0.23319938778877258,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "resechedule the standup",
+  "source": "typo_robustness_check",
+  "intent": "modify_event",
+  "confidence": 0.46762906908988955,
+  "margin": 0.2236270606517792,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "moev the auditor meeting to next month",
+  "source": "typo_robustness_check",
+  "intent": "none",
+  "confidence": 0.326619952917099,
+  "margin": 0.1799854338169098,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "updaet the microphone reservation",
+  "source": "typo_robustness_check",
+  "intent": "none",
+  "confidence": 0.3926590085029602,
+  "margin": 0.3926590085029602,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "waht's on tomorrow",
+  "source": "typo_robustness_check",
+  "intent": "none",
+  "confidence": 0.1464044451713562,
+  "margin": 0.002150297164916992,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "hwo many calls do i have this week",
+  "source": "typo_robustness_check",
+  "intent": "none",
+  "confidence": 0.27137985825538635,
+  "margin": 0.27137985825538635,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "is teh boardroom currently free",
+  "source": "typo_robustness_check",
+  "intent": "get_details",
+  "confidence": 0.8592460036277771,
+  "margin": 0.8592460036277771,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "schedule a meeting",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9999763369560242,
+  "margin": 0.9999763369560242,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "PENCIL IN A SYNC",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9999601602554322,
+  "margin": 0.9999601602554322,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "cancel my 3pm",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9999522566795349,
+  "margin": 0.9999522566795349,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "w/ Alice tomorrow",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.32783830165863037,
+  "margin": 0.32783830165863037,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "3pm-4pm sync",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.29608044028282166,
+  "margin": 0.29608044028282166,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "reschedule the sync to friday 😀",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 1.0000196218490602,
+  "margin": 1.0000196218490602,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "café meeting at naïve resort",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.24345308542251587,
+  "margin": 0.09715056419372559,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "asdkfj alskdj qqq",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.8532662987709045,
+  "margin": 0.6733530305325985,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.0,
+  "margin": 0.0,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.2798675000667572,
+  "margin": 0.2798675000667572,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "12345",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9118117094039917,
+  "margin": 0.7446382403373718,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "well-known co-worker's meeting",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.3300304114818573,
+  "margin": 0.17910266518592832,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "what's on tomorrow?",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.9999689340591431,
+  "margin": 0.9999689340591431,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "CAN YOU PUT A STANDUP ON MY CALENDAR",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 1.000028705596924,
+  "margin": 1.000028705596924,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "book the conference room, please!!",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.8934809565544128,
+  "margin": 0.8934809565544128,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "is the projector booked for tomorrow???",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 1.0000137567520142,
+  "margin": 1.0000137567520142,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "  extra   whitespace   everywhere  ",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.40450514256954195,
+  "margin": 0.09501623213291172,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "I'm free at 2pm, aren't you?",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.25385695695877075,
+  "margin": 0.026337939500808705,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "don't cancel it",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9580286502838136,
+  "margin": 0.6442997753620148,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "it's a 1:1 with sarah",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.32983683347702025,
+  "margin": 0.32983683347702025,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "dont cancel my meeting",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.6989020824432373,
+  "margin": 0.20338838100433343,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "she doesnt need the room",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.29287961944937707,
+  "margin": 0.29287961944937707,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "he didnt attend",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.38948955535888674,
+  "margin": 0.38948955535888674,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "wont be able to attend",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.288856315612793,
+  "margin": 0.288856315612793,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "cant make it monday",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.3109654068946838,
+  "margin": 0.3109654068946838,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "isnt the room free",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.49951999187469487,
+  "margin": 0.49951999187469487,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "arent we meeting today",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.5864007472991943,
+  "margin": 0.09759741649031634,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "wasnt the call at 3",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.44417595863342285,
+  "margin": 0.14932723045349117,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "werent they invited",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.2414776921272278,
+  "margin": 0.2414776921272278,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "hasnt anyone booked this",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.466284465789795,
+  "margin": 0.466284465789795,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "havent we met before",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.3542887091636658,
+  "margin": 0.12278836444020272,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "hadnt he confirmed yet",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.2901154160499573,
+  "margin": 0.12285031676292418,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "wouldnt that work better",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.31632769107818604,
+  "margin": 0.10007879734039307,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "couldnt we reschedule",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.2346702218055725,
+  "margin": 0.061189842224121105,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "shouldnt this be cancelled",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.5160529613494873,
+  "margin": 0.16465077400207517,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "im busy tomorrow",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.8881774902343751,
+  "margin": 0.8881774902343751,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "youre free at 3",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.7775972843170167,
+  "margin": 0.7775972843170167,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "theyre in a meeting",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.583678662776947,
+  "margin": 0.03789220303297036,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "whats on my calendar",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.980757772922516,
+  "margin": 0.980757772922516,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "thats the wrong time",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.48746135234832766,
+  "margin": 0.48746135234832766,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "whos leading the review",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.8164575576782227,
+  "margin": 0.8164575576782227,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "theres a conflict",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.3327564358711243,
+  "margin": 0.3327564358711243,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "heres the agenda",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.3205246925354004,
+  "margin": 0.0505124449729919,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "lets reschedule the call",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.2899016737937927,
+  "margin": 0.04916995167732238,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "ive got a meeting",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.543872594833374,
+  "margin": 0.054454955458640986,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "youve got the room",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.47804380357265475,
+  "margin": 0.04813611209392549,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "weve got a call",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.40787187218666077,
+  "margin": 0.0041512429714202215,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "theyve confirmed already",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.4905815213918686,
+  "margin": 0.4905815213918686,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "youll need the room",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.2981070280075073,
+  "margin": 0.0941661149263382,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "theyll join later",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.3006672650575638,
+  "margin": 0.3006672650575638,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "youd better check",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.377326101064682,
+  "margin": 0.377326101064682,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "theyd prefer friday",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.2805422842502594,
+  "margin": 0.12614573836326598,
+  "route": "REJECT",
+  "gate": "gate1_confidence"
+ },
+ {
+  "text": "DON'T cancel my meeting",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9479907751083375,
+  "margin": 0.6300609827041627,
+  "route": "CLARIFY",
+  "gate": "negation"
+ },
+ {
+  "text": "  schedule a meeting  ",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9999763369560242,
+  "margin": 0.9999763369560242,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "schedule a meeting!!!",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9999763369560242,
+  "margin": 0.9999763369560242,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "schedule a meeting???",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9999763369560242,
+  "margin": 0.9999763369560242,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "schedule a meeting 😀",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9999763369560242,
+  "margin": 0.9999763369560242,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "schedule a meeting w/ team",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9998197317123413,
+  "margin": 0.9998197317123413,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "schedule a meeting, thanks",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.973792552947998,
+  "margin": 0.973792552947998,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "  cancel my 3pm  ",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9999522566795349,
+  "margin": 0.9999522566795349,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "cancel my 3pm!!!",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9999522566795349,
+  "margin": 0.9999522566795349,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "cancel my 3pm???",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9999522566795349,
+  "margin": 0.9999522566795349,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "cancel my 3pm 😀",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9999522566795349,
+  "margin": 0.9999522566795349,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "cancel my 3pm w/ team",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9998370409011841,
+  "margin": 0.9998370409011841,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "cancel my 3pm, thanks",
+  "source": "parity.json",
+  "intent": "delete_event",
+  "confidence": 0.9816984176635742,
+  "margin": 0.9816984176635742,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "push the meeting to 6",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9999560832977296,
+  "margin": 0.6339935302734375,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "  push the meeting to 6  ",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9999560832977296,
+  "margin": 0.6339935302734375,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "push the meeting to 6!!!",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9999560832977296,
+  "margin": 0.6339935302734375,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "push the meeting to 6???",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9999560832977296,
+  "margin": 0.6339935302734375,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "push the meeting to 6 😀",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9999560832977296,
+  "margin": 0.6339935302734375,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "push the meeting to 6 w/ team",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9997877597808839,
+  "margin": 0.6337355017662049,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "push the meeting to 6, thanks",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9725128054618836,
+  "margin": 0.6101814210414886,
+  "route": "CLARIFY",
+  "gate": "gate5_missing_slot"
+ },
+ {
+  "text": "what's on tomorrow",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.9999689340591431,
+  "margin": 0.9999689340591431,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "  what's on tomorrow  ",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.9999689340591431,
+  "margin": 0.9999689340591431,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what's on tomorrow!!!",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.9999689340591431,
+  "margin": 0.9999689340591431,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what's on tomorrow???",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.9999689340591431,
+  "margin": 0.9999689340591431,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what's on tomorrow 😀",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.9999689340591431,
+  "margin": 0.9999689340591431,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what's on tomorrow w/ team",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.99427330493927,
+  "margin": 0.99427330493927,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "what's on tomorrow, thanks",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9578407406806946,
+  "margin": 0.1035398960113525,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "book the main conference room",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9415854692459107,
+  "margin": 0.9415854692459107,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "  book the main conference room  ",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9415854692459107,
+  "margin": 0.9415854692459107,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "book the main conference room!!!",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9415854692459107,
+  "margin": 0.9415854692459107,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "book the main conference room???",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9415854692459107,
+  "margin": 0.9415854692459107,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "book the main conference room 😀",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9415854692459107,
+  "margin": 0.9415854692459107,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "book the main conference room w/ team",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.9404920101165772,
+  "margin": 0.9404920101165772,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "book the main conference room, thanks",
+  "source": "parity.json",
+  "intent": "add_event",
+  "confidence": 0.8953732490539551,
+  "margin": 0.8953732490539551,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "swap the conference room",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9597432971000672,
+  "margin": 0.9597432971000672,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "  swap the conference room  ",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9597432971000672,
+  "margin": 0.9597432971000672,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "swap the conference room!!!",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9597432971000672,
+  "margin": 0.9597432971000672,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "swap the conference room???",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9597432971000672,
+  "margin": 0.9597432971000672,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "swap the conference room 😀",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9597432971000672,
+  "margin": 0.9597432971000672,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "swap the conference room w/ team",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9596050500869752,
+  "margin": 0.9596050500869752,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "swap the conference room, thanks",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9460388541221619,
+  "margin": 0.9460388541221619,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "is the room free",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 1.0000128746032715,
+  "margin": 1.0000128746032715,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "  is the room free  ",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 1.0000128746032715,
+  "margin": 1.0000128746032715,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "is the room free!!!",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 1.0000128746032715,
+  "margin": 1.0000128746032715,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "is the room free???",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 1.0000128746032715,
+  "margin": 1.0000128746032715,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "is the room free 😀",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 1.0000128746032715,
+  "margin": 1.0000128746032715,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "is the room free w/ team",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.99819815158844,
+  "margin": 0.99819815158844,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "is the room free, thanks",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.9068670749664307,
+  "margin": 0.9068670749664307,
+  "route": "CLARIFY",
+  "gate": "gate3b_resource_only"
+ },
+ {
+  "text": "what's the weather",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 1.000005841255188,
+  "margin": 0.14576433897018426,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "  what's the weather  ",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 1.000005841255188,
+  "margin": 0.14576433897018426,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "what's the weather!!!",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 1.000005841255188,
+  "margin": 0.14576433897018426,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "what's the weather???",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 1.000005841255188,
+  "margin": 0.14576433897018426,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "what's the weather 😀",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 1.000005841255188,
+  "margin": 0.14576433897018426,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "what's the weather w/ team",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9987287521362305,
+  "margin": 0.14375750422477718,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "what's the weather, thanks",
+  "source": "parity.json",
+  "intent": "get_details",
+  "confidence": 0.8549071252346039,
+  "margin": 0.8549071252346039,
+  "route": "REJECT",
+  "gate": "gate3_no_anchor"
+ },
+ {
+  "text": "tell me a joke",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9999712705612183,
+  "margin": 0.7133257746696472,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "  tell me a joke  ",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9999712705612183,
+  "margin": 0.7133257746696472,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "tell me a joke!!!",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9999712705612183,
+  "margin": 0.7133257746696472,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "tell me a joke???",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9999712705612183,
+  "margin": 0.7133257746696472,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "tell me a joke 😀",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9999712705612183,
+  "margin": 0.7133257746696472,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "tell me a joke w/ team",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9993972182273865,
+  "margin": 0.7127960503101349,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "tell me a joke, thanks",
+  "source": "parity.json",
+  "intent": "none",
+  "confidence": 0.9100044965744019,
+  "margin": 0.6174822509288788,
+  "route": "REJECT",
+  "gate": "gate2_nearest_none"
+ },
+ {
+  "text": "reschedule the sync to friday",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 1.0000196218490602,
+  "margin": 1.0000196218490602,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "  reschedule the sync to friday  ",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 1.0000196218490602,
+  "margin": 1.0000196218490602,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "reschedule the sync to friday!!!",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 1.0000196218490602,
+  "margin": 1.0000196218490602,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "reschedule the sync to friday???",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 1.0000196218490602,
+  "margin": 1.0000196218490602,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "reschedule the sync to friday w/ team",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.9999738454818726,
+  "margin": 0.9999738454818726,
+  "route": "PROCEED",
+  "gate": null
+ },
+ {
+  "text": "reschedule the sync to friday, thanks",
+  "source": "parity.json",
+  "intent": "modify_event",
+  "confidence": 0.991917097568512,
+  "margin": 0.991917097568512,
+  "route": "PROCEED",
+  "gate": null
+ }
+]

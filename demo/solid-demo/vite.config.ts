@@ -9,6 +9,7 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
+    emptyOutDir: false,
   },
   resolve: {
     alias: {

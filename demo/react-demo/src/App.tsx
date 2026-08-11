@@ -3,10 +3,27 @@ import "./App.css";
 
 import { Sidebar } from "./components/Sidebar";
 import { SchedulerView } from "./components/SchedulerView";
+import { ChatGallery } from "./components/ChatGallery";
+import { ChatLive } from "./components/ChatLive";
 import type { ViewType } from "@janus-scheduler/react";
 import { ErrorToast } from "./components/ErrorToast";
 import { useSchedulerManager } from "./hooks/useSchedulerManager";
 import type { HookError } from "./hooks/useSchedulerManager";
+
+/**
+ * `?chat=1` — the <janus-chat> fixture gallery (Step 4, static data).
+ * `?chat=live` — the real classifier driving a real conversation (Step 5).
+ *
+ * A URL flag rather than a route: the demo has no router, and this is
+ * temporary scaffolding for reviewing the chat work on its own. Step 6 wires
+ * the chat into the app proper and this branch goes away.
+ */
+function chatModeRequested(): "gallery" | "live" | null {
+  const flag = new URLSearchParams(window.location.search).get("chat");
+  if (flag === "1") return "gallery";
+  if (flag === "live") return "live";
+  return null;
+}
 
 /**
  * App — root component and state coordinator.
@@ -38,6 +55,12 @@ function App() {
 
   // SchedulerManager is stable (created once via useMemo inside the hook)
   const manager = useSchedulerManager(handleHookError);
+
+  // Read once on mount — the flag cannot change without a reload.
+  const [chatMode] = useState(chatModeRequested);
+
+  if (chatMode === "gallery") return <ChatGallery />;
+  if (chatMode === "live") return <ChatLive />;
 
   return (
     <div className="app-shell">

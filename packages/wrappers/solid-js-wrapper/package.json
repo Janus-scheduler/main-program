@@ -16,6 +16,7 @@
     "dist"
   ],
   "scripts": {
+    "prebuild": "rimraf dist",
     "build": "vite build"
   },
   "peerDependencies": {

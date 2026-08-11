@@ -13,8 +13,10 @@ import {
   zonedInputToISO,
   schedulerStore,
 } from "@janus-scheduler/react";
+import type { JanusTimeline, JanusMonthGrid } from "@janus-scheduler/ui";
 
 import { loadDenseBenchmarkData } from "../utils/benchmarkDataGenerator";
+import { ChatDock } from "./ChatDock";
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
@@ -107,20 +109,22 @@ export function SchedulerView({
   const endParts = storeEvent ? splitISO(storeEvent.endTime) : null;
 
   const timelineRef = useRef<
-    HTMLElement & {
-      goToPrev: () => void;
-      goToNext: () => void;
-      goToToday: () => void;
-      toggleCreate: () => void;
-      goToDate: (date: string | number | Date) => void;
-    }
+    | (JanusTimeline & {
+        goToPrev: () => void;
+        goToNext: () => void;
+        goToToday: () => void;
+        toggleCreate: () => void;
+        goToDate: (date: string | number | Date) => void;
+      })
+    | null
   >(null);
   const monthGridRef = useRef<
-    HTMLElement & {
-      goToPrev: () => void;
-      goToNext: () => void;
-      goToToday: () => void;
-    }
+    | (JanusMonthGrid & {
+        goToPrev: () => void;
+        goToNext: () => void;
+        goToToday: () => void;
+      })
+    | null
   >(null);
 
   const [navData, setNavData] = useState({
@@ -131,6 +135,11 @@ export function SchedulerView({
     zoomUnit: "",
   });
   const [allowCreate, setAllowCreate] = useState(false);
+
+  // The conversation panel. `chatPrompt` is what the AI bar was submitted
+  // with; ChatDock sends it as the opening utterance.
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatPrompt, setChatPrompt] = useState<string | null>(null);
 
   // Seed the store once for the URL-selected dataset (?resources=N or ?count=N).
   useEffect(() => {
@@ -341,10 +350,26 @@ export function SchedulerView({
           }}
         />
       )}
+      {/*
+        The AI bar is the entry point, exactly as the design describes it —
+        "the clean input is the entry point, pressing it opens a full
+        conversation". Submitting hands the prompt to <ChatDock>, which
+        classifies it and shows what it understood. Nothing reaches the store
+        until the user presses Confirm on that card.
+      */}
       <AiBar
         onAiSubmit={({ prompt }) => {
-          console.log("AI prompt submitted:", prompt);
-          // TODO: hook into your NLP integration here
+          setChatPrompt(prompt);
+          setChatOpen(true);
+        }}
+      />
+      <ChatDock
+        manager={manager}
+        open={chatOpen}
+        initialPrompt={chatPrompt}
+        onClose={() => {
+          setChatOpen(false);
+          setChatPrompt(null);
         }}
       />
     </div>

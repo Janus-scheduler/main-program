@@ -23,7 +23,7 @@ export default defineConfig({
   plugins: [
     dts({
       insertTypesEntry: true, // Generates janus-scheduler.d.ts
-      rollupTypes: true,
+      rollupTypes: false,
     }),
   ],
 
