@@ -138,13 +138,6 @@ export function SchedulerView({
     if (count !== null) loadDenseBenchmarkData(count);
   }, []);
 
-  // Re-center timeline on current time whenever switching to Timeline view
-  useEffect(() => {
-    if (currentView === "Timeline") {
-      timelineRef.current?.goToToday();
-    }
-  }, [currentView]);
-
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
       navLabel: (detail.navLabel as string) || "",
@@ -183,7 +176,14 @@ export function SchedulerView({
           setAllowCreate(!allowCreate);
         }}
       />
-      {currentView === "Timeline" && (
+      <div
+        style={{
+          display: currentView === "Timeline" ? "flex" : "none",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <Timeline
           ref={timelineRef}
           allowCreate={allowCreate}
@@ -229,28 +229,39 @@ export function SchedulerView({
             onOpenScheduler();
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
+          onNavChange={(detail) => {
+            if (currentView === "Timeline") {
+              handleNavChange(detail);
+            }
+          }}
         />
-      )}
+      </div>
 
-      {currentView === "Month" && (
+      <div
+        style={{
+          display: currentView === "Month" ? "flex" : "none",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <MonthGrid
           showFab={false}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
           onDayClick={(detail) => {
             onViewChange("Timeline");
-            setTimeout(() => {
-              if (timelineRef.current && timelineRef.current.goToDate) {
-                timelineRef.current.goToDate(detail.date);
-              }
-            }, 100);
+            timelineRef.current?.goToDate(detail.date);
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
+          onNavChange={(detail) => {
+            if (currentView === "Month") {
+              handleNavChange(detail);
+            }
+          }}
           ref={monthGridRef}
         />
-      )}
+      </div>
 
       {showScheduler && (
         <Scheduler
