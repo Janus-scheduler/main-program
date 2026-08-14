@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { Chat, useJanusChat } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
 import type {
@@ -49,20 +49,11 @@ const REQUIRES: SessionRequirements = {
   modify_event: ["when"],
 };
 
-interface ChatDockProps {
+interface ChatSidebarProps {
   manager: SchedulerManager;
-  open: boolean;
-  /** Sent as the first utterance when the dock opens. */
-  initialPrompt: string | null;
-  onClose: () => void;
 }
 
-export function ChatDock({
-  manager,
-  open,
-  initialPrompt,
-  onClose,
-}: ChatDockProps) {
+export function ChatSidebar({ manager }: ChatSidebarProps) {
   const engine = useNlpEngine();
 
   // The LIVE store is the catalog. This is the whole reason `extractEntities`
@@ -107,31 +98,13 @@ export function ChatDock({
     onConfirm: handleConfirm,
   });
 
-  // Deliver the prompt that opened the dock, once — and only once the engine
-  // is actually up, or it would be dropped on the floor.
-  const delivered = useRef<string | null>(null);
-  const { submit } = chat;
-  useEffect(() => {
-    if (!open || engine.status !== "ready") return;
-    if (!initialPrompt || delivered.current === initialPrompt) return;
-    delivered.current = initialPrompt;
-    submit(initialPrompt);
-  }, [open, engine.status, initialPrompt, submit]);
-
-  // Forget the delivered prompt when the dock closes, so reopening with the
-  // same text sends it again.
-  useEffect(() => {
-    if (!open) delivered.current = null;
-  }, [open]);
-
-  if (!open) return null;
-
   return (
-    <div className="chat-dock">
-      <div className="chat-dock__panel">
+    <div className="chat-sidebar">
+      <div className="chat-sidebar__panel">
         <Chat
           messages={chat.thread}
           busy={chat.busy || engine.status === "loading"}
+          disabled={chat.busy || engine.status === "loading"}
           theme="light"
           showClose
           placeholder={
@@ -143,8 +116,7 @@ export function ChatDock({
           onChatClarifyResponse={(d) => chat.choose(d.label)}
           onChatConfirm={chat.confirm}
           onChatUndo={(d) => chat.undo(d.messageId)}
-          onChatEdit={chat.reset}
-          onChatClose={onClose}
+          onChatEdit={() => chat.edit?.() ?? chat.reset()}
         />
       </div>
     </div>

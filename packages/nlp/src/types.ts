@@ -305,6 +305,8 @@ export interface ExtractedEntities {
    * entity are removed — the event's title. `undefined` when nothing remains.
    */
   title?: string;
+  /** The span of the original utterance that became the title. */
+  titleSpan?: TextSpan;
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -484,6 +486,10 @@ export interface SessionState {
   };
   /** Plain-English justification, safe to show. */
   reason: string;
+  /** Slots still required to fulfill the host requirements. */
+  outstanding?: RequiredSlot[];
+  /** Slot that was asked but the answer was unresolved/unusable. */
+  unresolved?: SlotName;
 }
 
 /** Everything the session needs. All injected — the module reads no globals. */

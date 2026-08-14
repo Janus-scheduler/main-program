@@ -29,7 +29,6 @@
   },
   "scripts": {
     "test": "jest --coverage",
-    "prebuild": "rimraf dist",
     "build": "vite build"
   },
   "keywords": [

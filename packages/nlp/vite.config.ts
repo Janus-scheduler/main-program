@@ -44,6 +44,7 @@ export default defineConfig({
     },
     sourcemap: true,
     minify: "esbuild",
+    emptyOutDir: false,
   },
 
   plugins: [

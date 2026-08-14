@@ -244,14 +244,6 @@ const LEADING_DETERMINERS = new Set([
  */
 const EDGE_PUNCTUATION = new Set([" ", ",", ".", ";", ":", "!", "?", "-"]);
 
-function trimEdgePunctuation(s: string): string {
-  let start = 0;
-  let end = s.length;
-  while (start < end && EDGE_PUNCTUATION.has(s[start])) start++;
-  while (end > start && EDGE_PUNCTUATION.has(s[end - 1])) end--;
-  return s.slice(start, end);
-}
-
 /**
  * Blank out the given spans, then tidy what remains into a title.
  *
@@ -269,39 +261,35 @@ function titleFromRemainder(
   text: string,
   spans: TextSpan[],
   verbPrefixLength: number,
-): string | undefined {
+): TextSpan | undefined {
   const chars = [...text];
   for (const span of spans) {
     for (let i = span.start; i < span.end && i < chars.length; i++) {
       chars[i] = " ";
     }
   }
-  // Blank the leading wrapper + verb too.
   for (let i = 0; i < verbPrefixLength && i < chars.length; i++) chars[i] = " ";
 
-  // Punctuation-only tokens are dropped BEFORE the function-word pass. A
-  // stranded "." left behind by removing "9am." would otherwise count as the
-  // last token, so the "at" in front of it would not look orphaned and would
-  // survive into the title as "all-hands at".
-  let tokens = chars
-    .join("")
-    .split(/\s+/)
-    .filter((t) => t.length > 0 && /[a-z0-9]/i.test(t));
+  const blanked = chars.join("");
+  let tokens: Array<{ text: string; start: number; end: number }> = [];
+  const re = /[^\s]+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(blanked)) !== null) {
+    if (/[a-z0-9]/i.test(m[0])) {
+      tokens.push({ text: m[0], start: m.index, end: m.index + m[0].length });
+    }
+  }
 
-  // A function word is orphaned when it sits at either edge, or is immediately
-  // followed by another function word (its object was between them). Repeat
-  // until stable — each pass strictly shrinks the array, so this terminates in
-  // at most `tokens.length` passes and is linear in practice.
   let changed = true;
   while (changed && tokens.length > 0) {
     changed = false;
     const kept = tokens.filter((token, i) => {
-      if (!FUNCTION_WORDS.has(token.toLowerCase())) return true;
+      if (!FUNCTION_WORDS.has(token.text.toLowerCase())) return true;
       const isFirst = i === 0;
       const isLast = i === tokens.length - 1;
       const nextIsFunction =
         i + 1 < tokens.length &&
-        FUNCTION_WORDS.has(tokens[i + 1].toLowerCase());
+        FUNCTION_WORDS.has(tokens[i + 1].text.toLowerCase());
       return !(isFirst || isLast || nextIsFunction);
     });
     if (kept.length !== tokens.length) {
@@ -312,13 +300,34 @@ function titleFromRemainder(
 
   while (
     tokens.length > 0 &&
-    LEADING_DETERMINERS.has(tokens[0].toLowerCase())
+    LEADING_DETERMINERS.has(tokens[0].text.toLowerCase())
   ) {
     tokens.shift();
   }
 
-  const title = trimEdgePunctuation(tokens.join(" ")).trim();
-  return title.length > 0 ? title : undefined;
+  if (tokens.length === 0) return undefined;
+
+  let start = tokens[0].start;
+  let end = tokens[tokens.length - 1].end;
+
+  while (
+    start < end &&
+    (EDGE_PUNCTUATION.has(text[start]) || /\s/.test(text[start]))
+  )
+    start++;
+  while (
+    end > start &&
+    (EDGE_PUNCTUATION.has(text[end - 1]) || /\s/.test(text[end - 1]))
+  )
+    end--;
+
+  if (start >= end) return undefined;
+
+  return {
+    text: text.slice(start, end),
+    start,
+    end,
+  };
 }
 
 /**
@@ -361,13 +370,18 @@ export function extractEntities(
     ...dedupedParticipants,
   ];
 
-  const title = titleFromRemainder(text, spans, leadingVerbPrefixLength(text));
+  const titleSpan = titleFromRemainder(
+    text,
+    spans,
+    leadingVerbPrefixLength(text),
+  );
 
   return {
     timeSpan,
     time,
     resources,
     participants: dedupedParticipants,
-    title,
+    title: titleSpan?.text,
+    titleSpan,
   };
 }

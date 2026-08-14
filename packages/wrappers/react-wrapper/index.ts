@@ -114,6 +114,7 @@ export interface JanusChatConversation {
   confirm: () => void;
   undo: (messageId: string) => void;
   reset: () => void;
+  edit?: () => void;
 }
 
 export function useJanusChat(options: JanusChatOptions): JanusChatConversation {
@@ -128,8 +129,12 @@ export function useJanusChat(options: JanusChatOptions): JanusChatConversation {
   // Keep options up to date (e.g. when engine becomes ready)
   controller.updateOptions(options);
 
-  const [state, setState] = useState({
-    thread: controller.thread,
+  const [state, setState] = useState<{
+    thread: ChatMessage[];
+    busy: boolean;
+    session: SessionState | null;
+  }>({
+    thread: controller.thread as unknown as ChatMessage[],
     busy: controller.busy,
     session: controller.session,
   });
@@ -137,7 +142,7 @@ export function useJanusChat(options: JanusChatOptions): JanusChatConversation {
   useEffect(() => {
     const unsubscribe = controller.subscribe(() => {
       setState({
-        thread: controller.thread,
+        thread: controller.thread as unknown as ChatMessage[],
         busy: controller.busy,
         session: controller.session,
       });
@@ -154,6 +159,7 @@ export function useJanusChat(options: JanusChatOptions): JanusChatConversation {
     confirm: () => controller.confirm(),
     undo: (id: string) => controller.undo(id),
     reset: () => controller.reset(),
+    edit: () => controller.edit(),
   };
 }
 
@@ -423,6 +429,7 @@ export interface ChatProps extends React.HTMLAttributes<HTMLElement> {
   theme?: "light" | "dark" | "auto";
   showClose?: boolean;
   showVoice?: boolean;
+  disabled?: boolean;
   /** Appends the animated thinking bubble while classification is in flight. */
   busy?: boolean;
   onChatSubmit?: (detail: ChatSubmitDetail) => void;

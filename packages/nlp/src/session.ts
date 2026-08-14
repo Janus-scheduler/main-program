@@ -461,6 +461,7 @@ interface EvaluateInput {
   intentChoice?: Intent;
   /** The slot just answered, so `rounds` can reset when the topic moves on. */
   lastSlot?: SlotName;
+  unresolved?: SlotName;
 }
 
 /**
@@ -515,6 +516,10 @@ function evaluate(input: EvaluateInput, ctx: SessionContext): SessionState {
     skipped: input.skipped,
     corrections: input.corrections,
     intentChoice: input.intentChoice,
+    unresolved: input.unresolved,
+    outstanding: (ctx.requires?.[draft.intent] ?? []).filter(
+      (slot) => !slotIsFilled(slot, draft),
+    ),
   };
 
   /**
@@ -531,6 +536,31 @@ function evaluate(input: EvaluateInput, ctx: SessionContext): SessionState {
   ): SessionState => {
     const spent = input.lastSlot === question.slot ? rounds : 0;
     if (spent >= maxRounds) {
+      if (
+        draft &&
+        (draft.time ||
+          draft.resources.length > 0 ||
+          draft.participants.length > 0)
+      ) {
+        return {
+          ...base,
+          status: "awaiting",
+          draft,
+          question: {
+            slot: "confirm", // dummy slot to allow choice
+            gate: null,
+            source: "gate",
+            skippable: false,
+            text: "I'm still having trouble. Do you want to open the editor with what I have, or start over?",
+            choices: [
+              { id: "edit", label: "Open the editor", value: "edit" },
+              { id: "start-over", label: "Start over", value: "start over" },
+            ],
+          },
+          reason: `still unclear after ${spent} questions`,
+        };
+      }
+
       return {
         ...base,
         status: "declined",
@@ -731,7 +761,7 @@ export function provideAnswer(
 
   // An empty answer resolves nothing. Re-ask, which also spends a round, so a
   // user mashing send cannot hold the session open forever.
-  if (trimmed.length === 0) return next();
+  if (trimmed.length === 0) return next({ unresolved: question.slot });
 
   switch (question.slot) {
     case "confirm": {
@@ -748,7 +778,7 @@ export function provideAnswer(
       if (!AFFIRMATIVE_RE.test(trimmed)) {
         // Not a yes and not a no. Re-ask rather than guess: this gate exists
         // precisely so an ambiguous instruction is not acted on.
-        return next();
+        return next({ unresolved: "confirm" });
       }
       return next({ satisfied: [...state.satisfied, "negation"] });
     }
@@ -759,7 +789,7 @@ export function provideAnswer(
           c.value === trimmed ||
           c.label.toLowerCase() === trimmed.toLowerCase(),
       );
-      if (!chosen) return next();
+      if (!chosen) return next({ unresolved: "intent" });
       return next({
         satisfied: [...state.satisfied, "gate4_margin"],
         intentChoice: chosen.value as Intent,
@@ -817,7 +847,10 @@ export function provideAnswer(
       // into "tomorrow 3pm". Both resolve identically, but the merged utterance
       // is shown back to the user and should read like something they wrote.
       const span = parseTimeSpan(trimmed);
-      const addition = span ? trimmed.slice(span.start, span.end) : trimmed;
+      if (!span) {
+        return next({ unresolved: "when" });
+      }
+      const addition = trimmed.slice(span.start, span.end);
       const merged = `${state.text} ${addition}`.trim();
       return next({
         text: merged,

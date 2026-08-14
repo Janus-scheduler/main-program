@@ -220,6 +220,9 @@ export class JanusChat extends LitElement {
   @property({ type: Boolean })
   busy = false;
 
+  @property({ type: Boolean })
+  disabled = false;
+
   @state() private _prompt = "";
   @state() private _activeSuggestion = 0;
 
@@ -264,6 +267,7 @@ export class JanusChat extends LitElement {
             placeholder=${this.placeholder}
             aria-label=${this.placeholder}
             autocomplete="off"
+            ?disabled=${this.disabled}
             @input=${this._onInput}
             @keydown=${this._onKeydown}
           />
@@ -272,6 +276,7 @@ export class JanusChat extends LitElement {
                 class="icon-btn"
                 type="button"
                 aria-label="Voice input"
+                ?disabled=${this.disabled}
                 @click=${() => this._emit("chat-voice", {})}
               >
                 ${MicIcon()}
@@ -281,7 +286,7 @@ export class JanusChat extends LitElement {
             class="send"
             type="button"
             aria-label="Send"
-            ?disabled=${!canSend}
+            ?disabled=${!canSend || this.disabled}
             @click=${this._submit}
           >
             ${SendIcon()}
@@ -342,6 +347,12 @@ export class JanusChat extends LitElement {
       case "clarify":
         return this._assistantRow(html`
           <div class="card card--warning">
+            ${m.ack ? html`<div class="card__lead">${m.ack}</div>` : nothing}
+            ${m.chips && m.chips.length
+              ? html`<div class="chips">
+                  ${m.chips.map((chip) => this._renderChip(chip))}
+                </div>`
+              : nothing}
             <div class="card__question">${m.question}</div>
             ${m.choices?.length
               ? html`<div class="choices">
@@ -350,6 +361,7 @@ export class JanusChat extends LitElement {
                       <button
                         class="btn btn--choice"
                         type="button"
+                        ?disabled=${this.disabled}
                         @click=${() =>
                           this._emit("chat-clarify-response", {
                             messageId: m.id,
@@ -361,6 +373,14 @@ export class JanusChat extends LitElement {
                       </button>
                     `,
                   )}
+                </div>`
+              : nothing}
+            ${m.progress
+              ? html`<div
+                  class="progress"
+                  style="font-size: 0.8em; opacity: 0.7; margin-top: 8px;"
+                >
+                  ${m.progress}
                 </div>`
               : nothing}
           </div>

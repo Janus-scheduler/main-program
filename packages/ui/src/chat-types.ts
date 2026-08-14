@@ -125,8 +125,14 @@ export interface ChatParseMessage extends ChatMessageBase {
 export interface ChatClarifyMessage extends ChatMessageBase {
   kind: "clarify";
   role: "assistant";
+  /** "Got it — Room A." Acknowledges the previous answer. */
+  ack?: string;
+  /** What is understood so far, same shapes as a parse card. */
+  chips?: ChatChip[];
   question: string;
   choices?: ChatChoice[];
+  /** "1 more to go" — remaining required slots. */
+  progress?: string;
 }
 
 /** Committed. Offers View and Undo. */

@@ -16,7 +16,6 @@
     "dist"
   ],
   "scripts": {
-    "prebuild": "rimraf dist",
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
     "start": "npm run dev"

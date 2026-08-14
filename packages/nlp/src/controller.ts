@@ -7,6 +7,7 @@ import {
   Prototype,
 } from "./types";
 import { beginSession, provideAnswer } from "./session";
+import { classifySmalltalk } from "./smalltalk";
 import { presentSession, summarise, PresentMessage } from "./presentSession";
 
 export interface ConfirmOutcome {
@@ -20,20 +21,14 @@ export interface NlpEngine {
   prototypes: Prototype[];
 }
 
-// A minimal interface to decouple NLP from Core's SchedulerManager
-export interface ExternalSchedulerManager {
-  addEvent(event: Record<string, unknown>): { id: string } | undefined;
-  deleteEvent(id: string): void;
-}
-
 export interface JanusChatOptions {
   engine: NlpEngine | null;
   catalog: EntityCatalog;
+  correctSpelling?: boolean;
   timezone?: string;
   intro?: PresentMessage;
   requires?: SessionRequirements;
   fallbackResourceName?: string;
-  manager?: ExternalSchedulerManager;
   onConfirm?: (state: SessionState) => ConfirmOutcome | void;
 }
 
@@ -52,6 +47,7 @@ export class ChatController {
   private listeners: (() => void)[] = [];
   private seq = 0;
   private undos = new Map<string, () => void>();
+  private timerId?: ReturnType<typeof setTimeout>;
 
   constructor(public options: JanusChatOptions) {
     this.thread = [options.intro || DEFAULT_INTRO];
@@ -85,18 +81,71 @@ export class ChatController {
   }
 
   public submit(text: string) {
-    if (!this.options.engine || text.trim().length === 0) return;
+    if (!this.options.engine || text.trim().length === 0 || this.busy) return;
+
+    if (this.timerId) {
+      clearTimeout(this.timerId);
+      this.timerId = undefined;
+    }
 
     this.append({ id: this.nextId(), role: "user", kind: "text", text });
     this.busy = true;
     this.notify();
+
+    const smalltalk = classifySmalltalk(text);
+    if (smalltalk) {
+      let reply = "";
+      switch (smalltalk) {
+        case "greeting":
+          reply = "Hi! I can schedule, move, or cancel events for you.";
+          break;
+        case "thanks":
+          reply = "You're welcome.";
+          break;
+        case "farewell":
+          reply = "Goodbye!";
+          break;
+        case "help":
+          reply =
+            "Try asking me to book a room, move a meeting, or check your schedule.";
+          break;
+      }
+      this.append({
+        id: this.nextId(),
+        role: "assistant",
+        kind: "text",
+        text: reply,
+      });
+      this.busy = false;
+      this.notify();
+      return;
+    }
+
+    const CORRECTION_RE =
+      /^\s*(actually|instead|no,|no |change it to|make it)\b\s*(.*)/i;
+    const correctionMatch = text.match(CORRECTION_RE);
+
+    // If it's a correction and we have a draft, we'll try to apply it.
+    // reviseSlot will re-evaluate with the new text. We'll pass undefined for span
+    // to just append the correction and re-evaluate, since the entities extractor
+    // will pick up the new span and override.
+    // We do this by intercepting before provideAnswer.
+    let isCorrection = false;
+    if (
+      correctionMatch &&
+      this.session &&
+      this.session.draft &&
+      this.session.status !== "declined"
+    ) {
+      isCorrection = true;
+    }
 
     const ctx: SessionContext = {
       artifacts: this.options.engine.artifacts,
       prototypes: this.options.engine.prototypes,
       catalog: this.options.catalog,
       requires: this.options.requires,
-      correctSpelling: true,
+      correctSpelling: this.options.correctSpelling ?? true,
       now: new Date(),
       timezone:
         this.options.timezone ||
@@ -104,13 +153,18 @@ export class ChatController {
     };
 
     // Use a small delay for UI animation "thinking" effect
-    setTimeout(() => {
+    this.timerId = setTimeout(() => {
       let next: SessionState | null = null;
       try {
-        next =
-          this.session && this.session.status === "awaiting"
-            ? provideAnswer(this.session, text, ctx)
-            : beginSession(text, ctx);
+        if (isCorrection) {
+          const { reviseSlot } = require("./revise");
+          next = reviseSlot(this.session, undefined, text, ctx);
+        } else {
+          next =
+            this.session && this.session.status === "awaiting"
+              ? provideAnswer(this.session, text, ctx)
+              : beginSession(text, ctx);
+        }
       } catch (error) {
         console.error("nlp threw error", error);
       }
@@ -144,42 +198,6 @@ export class ChatController {
     if (!this.session || this.session.status !== "ready") return;
 
     let outcome: ConfirmOutcome | undefined = undefined;
-
-    // Direct store operation via SchedulerManager if provided
-    if (this.options.manager && this.session.draft) {
-      const draft = this.session.draft;
-      if (draft.intent === "add_event") {
-        try {
-          const res = draft.resources[0]?.id ?? undefined;
-          const created = this.options.manager.addEvent({
-            id: `evt-${Date.now()}`,
-            title: draft.title || "New Event",
-            startTime: draft.time?.startISO || new Date().toISOString(),
-            endTime:
-              draft.time?.endISO ||
-              new Date(Date.now() + 3600000).toISOString(),
-            resourceId: res,
-          });
-          outcome = {
-            ok: true,
-            message: `Created "${draft.title || "Event"}"`,
-            undo: () => {
-              if (created?.id) this.options.manager!.deleteEvent(created.id);
-            },
-          };
-        } catch (err) {
-          outcome = {
-            ok: false,
-            message: `Failed to create event: ${String(err)}`,
-          };
-        }
-      } else if (draft.intent === "get_details") {
-        outcome = {
-          ok: true,
-          message: summarise(this.session),
-        };
-      }
-    }
 
     if (!outcome) {
       outcome = this.options.onConfirm?.(this.session) ?? {
@@ -227,9 +245,37 @@ export class ChatController {
   }
 
   public reset() {
+    if (this.timerId) {
+      clearTimeout(this.timerId);
+      this.timerId = undefined;
+    }
     this.thread = [this.options.intro || DEFAULT_INTRO];
     this.session = null;
     this.undos.clear();
+    this.notify();
+  }
+
+  public edit() {
+    if (!this.session || this.session.status !== "ready") return;
+
+    this.session = {
+      ...this.session,
+      status: "awaiting",
+      question: {
+        slot: "title", // dummy slot to allow any text reply
+        gate: null,
+        source: "requirement",
+        skippable: true,
+        text: "What would you like to change? (e.g., 'actually 3pm', 'instead of Room A')",
+        choices: [],
+      },
+    };
+    const reply = presentSession(this.session, this.nextId(), {
+      fallbackResourceName: this.options.fallbackResourceName,
+    });
+    if (reply) {
+      this.append(reply);
+    }
     this.notify();
   }
 }

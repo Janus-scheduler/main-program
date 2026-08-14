@@ -5,7 +5,7 @@
  * Pure, zero-dependency data mapper for intent-aware parse cards, confidence labels, and dynamic button actions.
  */
 
-import type { SessionState } from "./types";
+import type { FiredGate, SessionState } from "./types";
 
 export interface PresentChip {
   kind: "person" | "time" | "place";
@@ -35,8 +35,14 @@ export type PresentMessage =
       id: string;
       role: "assistant";
       kind: "clarify";
+      /** "Got it — Room A." Acknowledges the previous answer. */
+      ack?: string;
+      /** What is understood so far, same shapes as a parse card. */
+      chips?: PresentChip[];
       question: string;
       choices: PresentChoice[];
+      /** "1 more to go" — remaining required slots. */
+      progress?: string;
     }
   | {
       id: string;
@@ -221,6 +227,14 @@ export function getEditLabel(intent: string): string {
   return intent === "delete_event" ? "Keep it" : "Edit";
 }
 
+const GATE_COPY: Partial<Record<FiredGate, string>> = {
+  gate1_confidence:
+    "I didn't quite follow that. Try something like **book Room A tomorrow at 10am**.",
+  gate2_nearest_none:
+    "That doesn't look like a scheduling request. I can add, move, cancel or look up events.",
+  gate3_no_anchor: "I need something to go on — a time, a room, or a person.",
+};
+
 /**
  * Render one session snapshot as the assistant's reply.
  */
@@ -230,24 +244,51 @@ export function presentSession(
   options: PresentOptions = {},
 ): PresentMessage | null {
   if (state.status === "awaiting" && state.question) {
+    const lastAnswer = state.answers[state.answers.length - 1];
+    const ack = lastAnswer
+      ? lastAnswer.skipped
+        ? "No problem, skipping that."
+        : `Got it — ${lastAnswer.merged || lastAnswer.answer}.`
+      : undefined;
+
+    const progress =
+      state.outstanding && state.outstanding.length > 0
+        ? `${state.outstanding.length} more to go`
+        : undefined;
+
     return {
       id,
       role: "assistant",
       kind: "clarify",
+      ack,
+      chips: draftChips(state, options),
       question: state.question.text,
       choices: state.question.choices.map((c) => ({
         id: c.id,
         label: c.label,
       })),
+      progress,
     };
   }
 
   if (state.status === "declined") {
+    let copy = `I can't act on that — ${state.reason}. Try something like “book Room A tomorrow at 10am”.`;
+    if (state.route.gate && GATE_COPY[state.route.gate]) {
+      copy = GATE_COPY[state.route.gate]!;
+    }
+    // Step 7D recovery lead
+    if (state.unresolved) {
+      if (state.unresolved === "when") {
+        copy =
+          "I didn't catch a time in that — try 'tomorrow at 2pm', or tap one below.";
+      }
+    }
+
     return {
       id,
       role: "assistant",
       kind: "text",
-      text: `I can't act on that — ${state.reason}. Try something like “book Room A tomorrow at 10am”.`,
+      text: copy,
     };
   }
 

@@ -323,9 +323,10 @@ describe("gate5_missing_slot → “when?”", () => {
     for (let i = 0; i < 5 && state.status === "awaiting"; i++) {
       state = provideAnswer(state, "soon", ctx);
     }
-    expect(state.status).toBe("declined");
+    // Now it offers choices instead of immediately declining
+    expect(state.status).toBe("awaiting");
     expect(state.rounds).toBe(2);
-    expect(state.reason).toMatch(/starting over/);
+    expect(state.question?.choices?.[1].value).toBe("start over");
   });
 
   it("spends a round on an empty answer too", () => {
@@ -787,7 +788,8 @@ describe("host completeness requirements", () => {
     for (let i = 0; i < 5 && state.status === "awaiting"; i++) {
       state = provideAnswer(state, "soon", ctx);
     }
-    expect(state.status).toBe("declined");
+    expect(state.status).toBe("awaiting");
+    expect(state.question?.choices?.[1].value).toBe("start over");
   });
 
   /**
@@ -916,6 +918,7 @@ describe("session contract", () => {
   it("respects a caller-supplied round limit", () => {
     const strict: SessionContext = { ...ctx, maxRounds: 0 };
     const state = beginSession("schedule a meeting with Alex", strict);
-    expect(state.status).toBe("declined");
+    expect(state.status).toBe("awaiting");
+    expect(state.question?.choices?.[1].value).toBe("start over");
   });
 });

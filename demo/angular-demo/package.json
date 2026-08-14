@@ -3,8 +3,11 @@
   "version": "0.0.1",
   "scripts": {
     "ng": "ng",
+    "prestart": "node -e \"const fs=require('fs'); fs.cpSync('../../packages/nlp/artifacts', 'src/assets/nlp', {recursive: true, force: true})\"",
     "start": "ng serve",
+    "predev": "node -e \"const fs=require('fs'); fs.cpSync('../../packages/nlp/artifacts', 'src/assets/nlp', {recursive: true, force: true})\"",
     "dev": "ng serve",
+    "prebuild": "node -e \"const fs=require('fs'); fs.cpSync('../../packages/nlp/artifacts', 'src/assets/nlp', {recursive: true, force: true})\"",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",

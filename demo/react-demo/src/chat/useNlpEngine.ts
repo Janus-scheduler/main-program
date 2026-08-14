@@ -48,21 +48,33 @@ export function useNlpEngine(): EngineState {
 
     void (async () => {
       try {
-        const [vocab, vectors, protos] = await Promise.all([
-          fetch(vocabUrl).then((r) => r.text()),
-          fetch(vectorsUrl).then((r) => r.arrayBuffer()),
-          fetch(prototypesUrl).then((r) => r.text()),
+        const fetchAsset = async (url: string, type: "text" | "buffer") => {
+          const r = await fetch(url);
+          if (!r.ok) throw new Error(`Failed to fetch ${url}: ${r.statusText}`);
+          const b = await r.blob();
+          const bytes = b.size;
+          const data = type === "text" ? await b.text() : await b.arrayBuffer();
+          return { bytes, data };
+        };
+
+        const [vocabAsset, vectorsAsset, protosAsset] = await Promise.all([
+          fetchAsset(vocabUrl, "text"),
+          fetchAsset(vectorsUrl, "buffer"),
+          fetchAsset(prototypesUrl, "text"),
         ]);
         if (cancelled) return;
 
         setState({
           status: "ready",
           engine: {
-            artifacts: parseArtifacts({ vocab, vectors }),
-            prototypes: parsePrototypes(protos),
+            artifacts: parseArtifacts({
+              vocab: vocabAsset.data as string,
+              vectors: vectorsAsset.data as ArrayBuffer,
+            }),
+            prototypes: parsePrototypes(protosAsset.data as string),
           },
           ms: Math.round(performance.now() - started),
-          bytes: vocab.length + vectors.byteLength + protos.length,
+          bytes: vocabAsset.bytes + vectorsAsset.bytes + protosAsset.bytes,
         });
       } catch (error) {
         if (cancelled) return;

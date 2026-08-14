@@ -57,6 +57,7 @@ export {
   TIME_RE_SOURCE,
 } from "./preprocess";
 export { classify } from "./classify";
+export { classifySmalltalk, type SmalltalkKind } from "./smalltalk";
 export {
   routeQuery,
   routeFromClassification,
@@ -112,6 +113,7 @@ export {
   SKIP_ANSWER,
   SKIP_CHOICE,
 } from "./session";
+export { reviseSlot } from "./revise";
 
 // ── frozen constants, re-exported for callers that need to reason about them
 export {
@@ -195,9 +197,4 @@ export type {
 
 // ── dialogue state controller (framework-agnostic state machine) ──────────
 export { ChatController, DEFAULT_INTRO } from "./controller";
-export type {
-  JanusChatOptions,
-  ConfirmOutcome,
-  NlpEngine,
-  ExternalSchedulerManager,
-} from "./controller";
+export type { JanusChatOptions, ConfirmOutcome, NlpEngine } from "./controller";

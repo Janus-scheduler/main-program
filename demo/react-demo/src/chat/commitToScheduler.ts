@@ -37,7 +37,7 @@ export function catalogFromResources(resources: ResourceLike[]): EntityCatalog {
     if (r.type === "person") {
       // "Dr. Sarah Chen" also answers to "Sarah Chen": the honorific is not
       // part of how anyone refers to them in a sentence.
-      const withoutTitle = r.name.replace(/^(dr|mr|mrs|ms|prof)\.?\s+/i, "");
+      const withoutTitle = r.name.replace(/^(dr|mr|mrs|ms|prof)\b\.?\s+/i, "");
       participants.push({
         id: r.id,
         name: r.name,
@@ -146,8 +146,13 @@ export function commitSession(
       const named = [...draft.resources, ...draft.participants].map(
         (m) => m.id,
       );
-      const resourceIds = named.length > 0 ? named : [fallbackResourceId ?? ""];
-      if (resourceIds[0] === "") {
+      const resourceIds =
+        named.length > 0
+          ? named
+          : fallbackResourceId
+            ? [fallbackResourceId]
+            : [];
+      if (resourceIds.length === 0) {
         return {
           ok: false,
           message: "There are no resources to schedule against yet.",

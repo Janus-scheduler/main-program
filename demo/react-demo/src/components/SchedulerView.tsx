@@ -1,11 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Timeline,
-  MonthGrid,
-  Scheduler,
-  AiBar,
-  Topbar,
-} from "@janus-scheduler/react";
+import { Timeline, MonthGrid, Scheduler, Topbar } from "@janus-scheduler/react";
 import type { ViewType } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
 import {
@@ -16,7 +10,7 @@ import {
 import type { JanusTimeline, JanusMonthGrid } from "@janus-scheduler/ui";
 
 import { loadDenseBenchmarkData } from "../utils/benchmarkDataGenerator";
-import { ChatDock } from "./ChatDock";
+import { ChatSidebar } from "./ChatDock";
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
@@ -134,12 +128,7 @@ export function SchedulerView({
     zoomPercent: 100,
     zoomUnit: "",
   });
-  const [allowCreate, setAllowCreate] = useState(false);
-
-  // The conversation panel. `chatPrompt` is what the AI bar was submitted
-  // with; ChatDock sends it as the opening utterance.
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatPrompt, setChatPrompt] = useState<string | null>(null);
+  const [allowCreate, setAllowCreate] = useState(true);
 
   // Seed the store once for the URL-selected dataset (?resources=N or ?count=N).
   useEffect(() => {
@@ -165,213 +154,209 @@ export function SchedulerView({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Topbar
-        navLabel={navData.navLabel}
-        dayName={navData.dayName}
-        shortDate={navData.shortDate}
-        view={currentView}
-        allowCreate={allowCreate}
-        zoomPercent={navData.zoomPercent}
-        zoomUnit={navData.zoomUnit}
-        onPrevClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToPrev();
-          else monthGridRef.current?.goToPrev();
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        height: "100%",
+        width: "100%",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minWidth: 0,
+          height: "100%",
         }}
-        onNextClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToNext();
-          else monthGridRef.current?.goToNext();
-        }}
-        onTodayClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToToday();
-          else monthGridRef.current?.goToToday();
-        }}
-        onViewSwitch={(detail) => onViewChange(detail.view)}
-        onToggleCreate={() => {
-          if (currentView === "Timeline") timelineRef.current?.toggleCreate();
-          setAllowCreate(!allowCreate);
-        }}
-      />
-      {currentView === "Timeline" && (
-        <Timeline
-          ref={timelineRef}
+      >
+        <Topbar
+          navLabel={navData.navLabel}
+          dayName={navData.dayName}
+          shortDate={navData.shortDate}
+          view={currentView}
           allowCreate={allowCreate}
-          showFab={true}
-          preventConflicts={preventConflicts}
-          onAddEvent={() => onOpenScheduler()}
-          onEventClick={(ev) => onOpenScheduler(ev?.id)}
-          onEventMove={({
-            event,
-            oldResourceId,
-            newResourceId,
-            newStartTime,
-            newEndTime,
-          }) => {
-            const currentEvent = manager.getEvent(event.id);
-            if (!currentEvent) return;
-            const updatedResourceIds = currentEvent.resourceIds.map((id) =>
-              id === oldResourceId ? newResourceId : id,
-            );
-            manager.updateEvent(event.id, {
-              resourceIds: updatedResourceIds,
-              startTime: newStartTime,
-              endTime: newEndTime,
-            });
+          zoomPercent={navData.zoomPercent}
+          zoomUnit={navData.zoomUnit}
+          onPrevClick={() => {
+            if (currentView === "Timeline") timelineRef.current?.goToPrev();
+            else monthGridRef.current?.goToPrev();
           }}
-          onEventResize={({ event, newStartTime, newEndTime }) => {
-            manager.updateEvent(event.id, {
-              startTime: newStartTime,
-              endTime: newEndTime,
-            });
+          onNextClick={() => {
+            if (currentView === "Timeline") timelineRef.current?.goToNext();
+            else monthGridRef.current?.goToNext();
           }}
-          onEventCreate={({ resourceId, startTime, endTime }) => {
-            const startStr = splitISO(startTime);
-            const endStr = splitISO(endTime);
-            setTempEventData({
-              startDate: startStr.date,
-              startTime: startStr.time,
-              endDate: endStr.date,
-              endTime: endStr.time,
-              participants: [resourceId],
-              showConfirmOnCreate: true,
-            });
-            onOpenScheduler();
+          onTodayClick={() => {
+            if (currentView === "Timeline") timelineRef.current?.goToToday();
+            else monthGridRef.current?.goToToday();
           }}
-          onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
+          onViewSwitch={(detail) => onViewChange(detail.view)}
+          onToggleCreate={() => {
+            if (currentView === "Timeline") timelineRef.current?.toggleCreate();
+            setAllowCreate(!allowCreate);
+          }}
         />
-      )}
+        {currentView === "Timeline" && (
+          <Timeline
+            ref={timelineRef}
+            allowCreate={allowCreate}
+            showFab={true}
+            preventConflicts={preventConflicts}
+            onAddEvent={() => onOpenScheduler()}
+            onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onEventMove={({
+              event,
+              oldResourceId,
+              newResourceId,
+              newStartTime,
+              newEndTime,
+            }) => {
+              const currentEvent = manager.getEvent(event.id);
+              if (!currentEvent) return;
+              const updatedResourceIds = currentEvent.resourceIds.map((id) =>
+                id === oldResourceId ? newResourceId : id,
+              );
+              manager.updateEvent(event.id, {
+                resourceIds: updatedResourceIds,
+                startTime: newStartTime,
+                endTime: newEndTime,
+              });
+            }}
+            onEventResize={({ event, newStartTime, newEndTime }) => {
+              manager.updateEvent(event.id, {
+                startTime: newStartTime,
+                endTime: newEndTime,
+              });
+            }}
+            onEventCreate={({ resourceId, startTime, endTime }) => {
+              const startStr = splitISO(startTime);
+              const endStr = splitISO(endTime);
+              setTempEventData({
+                startDate: startStr.date,
+                startTime: startStr.time,
+                endDate: endStr.date,
+                endTime: endStr.time,
+                participants: [resourceId],
+                showConfirmOnCreate: true,
+              });
+              onOpenScheduler();
+            }}
+            onViewChange={(detail) => onViewChange(detail.view)}
+            onNavChange={handleNavChange}
+          />
+        )}
 
-      {currentView === "Month" && (
-        <MonthGrid
-          showFab={false}
-          onAddEvent={() => onOpenScheduler()}
-          onEventClick={(ev) => onOpenScheduler(ev?.id)}
-          onDayClick={(detail) => {
-            onViewChange("Timeline");
-            setTimeout(() => {
-              if (timelineRef.current && timelineRef.current.goToDate) {
-                timelineRef.current.goToDate(detail.date);
-              }
-            }, 100);
-          }}
-          onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
-          ref={monthGridRef}
-        />
-      )}
+        {currentView === "Month" && (
+          <MonthGrid
+            showFab={false}
+            onAddEvent={() => onOpenScheduler()}
+            onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onDayClick={(detail) => {
+              onViewChange("Timeline");
+              setTimeout(() => {
+                if (timelineRef.current && timelineRef.current.goToDate) {
+                  timelineRef.current.goToDate(detail.date);
+                }
+              }, 100);
+            }}
+            onViewChange={(detail) => onViewChange(detail.view)}
+            onNavChange={handleNavChange}
+            ref={monthGridRef}
+          />
+        )}
 
-      {showScheduler && (
-        <Scheduler
-          preventConflicts={preventConflicts}
-          eventId={selectedEventId}
-          error={schedulerError}
-          title={
-            storeEvent ? storeEvent.title : tempEventData ? "New Event" : ""
-          }
-          startDate={storeEvent ? startParts?.date : tempEventData?.startDate}
-          startTime={storeEvent ? startParts?.time : tempEventData?.startTime}
-          endDate={storeEvent ? endParts?.date : tempEventData?.endDate}
-          endTime={storeEvent ? endParts?.time : tempEventData?.endTime}
-          participants={
-            storeEvent
-              ? storeEvent.resourceIds
+        {showScheduler && (
+          <Scheduler
+            preventConflicts={preventConflicts}
+            eventId={selectedEventId}
+            error={schedulerError}
+            title={
+              storeEvent ? storeEvent.title : tempEventData ? "New Event" : ""
+            }
+            startDate={storeEvent ? startParts?.date : tempEventData?.startDate}
+            startTime={storeEvent ? startParts?.time : tempEventData?.startTime}
+            endDate={storeEvent ? endParts?.date : tempEventData?.endDate}
+            endTime={storeEvent ? endParts?.time : tempEventData?.endTime}
+            participants={
+              storeEvent
                 ? storeEvent.resourceIds
-                : undefined
-              : tempEventData?.participants
-          }
-          description={storeEvent?.description}
-          activeColor={storeEvent?.color}
-          allDay={storeEvent?.allDay}
-          recurrenceRule={storeEvent?.recurrenceRule}
-          showConfirmOnCreate={
-            !selectedEventId && !!tempEventData?.showConfirmOnCreate
-          }
-          onSave={(data) => {
-            const today = new Date().toISOString().split("T")[0];
-            try {
-              if (data.id) {
-                manager.updateEvent(data.id, {
-                  title: data.title,
-                  startTime: zonedInputToISO(
-                    data.startDate || today,
-                    data.startTime,
-                    data.timezone,
-                  ),
-                  endTime: zonedInputToISO(
-                    data.endDate || today,
-                    data.endTime,
-                    data.timezone,
-                  ),
-                  resourceIds: data.participants || ["r1"],
-                  description: data.description,
-                  status: "confirmed",
-                  color: data.activeColor,
-                  allDay: data.allDay,
-                  recurrenceRule: data.recurrenceRule,
-                });
-              } else {
-                manager.addEvent({
-                  id: `evt_${Date.now()}`,
-                  title: data.title || "New Event",
-                  startTime: zonedInputToISO(
-                    data.startDate || today,
-                    data.startTime,
-                    data.timezone,
-                  ),
-                  endTime: zonedInputToISO(
-                    data.endDate || today,
-                    data.endTime,
-                    data.timezone,
-                  ),
-                  resourceIds: data.participants || ["r1"],
-                  description: data.description,
-                  status: "confirmed",
-                  color: data.activeColor,
-                  allDay: data.allDay,
-                  recurrenceRule: data.recurrenceRule,
-                });
-                console.log("Event added:", data);
+                  ? storeEvent.resourceIds
+                  : undefined
+                : tempEventData?.participants
+            }
+            description={storeEvent?.description}
+            activeColor={storeEvent?.color}
+            allDay={storeEvent?.allDay}
+            recurrenceRule={storeEvent?.recurrenceRule}
+            showConfirmOnCreate={
+              !selectedEventId && !!tempEventData?.showConfirmOnCreate
+            }
+            onSave={(data) => {
+              const today = new Date().toISOString().split("T")[0];
+              try {
+                if (data.id) {
+                  manager.updateEvent(data.id, {
+                    title: data.title,
+                    startTime: zonedInputToISO(
+                      data.startDate || today,
+                      data.startTime,
+                      data.timezone,
+                    ),
+                    endTime: zonedInputToISO(
+                      data.endDate || today,
+                      data.endTime,
+                      data.timezone,
+                    ),
+                    resourceIds: data.participants || ["r1"],
+                    description: data.description,
+                    status: "confirmed",
+                    color: data.activeColor,
+                    allDay: data.allDay,
+                    recurrenceRule: data.recurrenceRule,
+                  });
+                } else {
+                  manager.addEvent({
+                    id: `evt_${Date.now()}`,
+                    title: data.title || "New Event",
+                    startTime: zonedInputToISO(
+                      data.startDate || today,
+                      data.startTime,
+                      data.timezone,
+                    ),
+                    endTime: zonedInputToISO(
+                      data.endDate || today,
+                      data.endTime,
+                      data.timezone,
+                    ),
+                    resourceIds: data.participants || ["r1"],
+                    description: data.description,
+                    status: "confirmed",
+                    color: data.activeColor,
+                    allDay: data.allDay,
+                    recurrenceRule: data.recurrenceRule,
+                  });
+                  console.log("Event added:", data);
+                }
+                setTempEventData(null);
+                onCloseScheduler();
+              } catch (err: unknown) {
+                console.error("Store rejected the event:", err);
               }
+            }}
+            onDelete={({ id }) => {
+              if (id) manager.deleteEvent(id);
               setTempEventData(null);
               onCloseScheduler();
-            } catch (err: unknown) {
-              console.error("Store rejected the event:", err);
-            }
-          }}
-          onDelete={({ id }) => {
-            if (id) manager.deleteEvent(id);
-            setTempEventData(null);
-            onCloseScheduler();
-          }}
-          onClose={() => {
-            setTempEventData(null);
-            onCloseScheduler();
-          }}
-        />
-      )}
-      {/*
-        The AI bar is the entry point, exactly as the design describes it —
-        "the clean input is the entry point, pressing it opens a full
-        conversation". Submitting hands the prompt to <ChatDock>, which
-        classifies it and shows what it understood. Nothing reaches the store
-        until the user presses Confirm on that card.
-      */}
-      <AiBar
-        onAiSubmit={({ prompt }) => {
-          setChatPrompt(prompt);
-          setChatOpen(true);
-        }}
-      />
-      <ChatDock
-        manager={manager}
-        open={chatOpen}
-        initialPrompt={chatPrompt}
-        onClose={() => {
-          setChatOpen(false);
-          setChatPrompt(null);
-        }}
-      />
+            }}
+            onClose={() => {
+              setTempEventData(null);
+              onCloseScheduler();
+            }}
+          />
+        )}
+      </div>
+      <ChatSidebar manager={manager} />
     </div>
   );
 }

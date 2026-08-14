@@ -1,1 +1,1 @@
-{"root":["./src/env.d.ts","./src/main.ts","./src/composables/useschedulermanager.ts","./src/app.vue","./src/components/errortoast.vue","./src/components/schedulerview.vue","./src/components/sidebar.vue"],"version":"5.9.3"}
+{"root":["./src/env.d.ts","./src/main.ts","./src/chat/committoscheduler.ts","./src/chat/usejanuschat.ts","./src/chat/usenlpengine.ts","./src/composables/useschedulermanager.ts","./src/app.vue","./src/components/errortoast.vue","./src/components/schedulerview.vue","./src/components/sidebar.vue"],"version":"5.9.3"}

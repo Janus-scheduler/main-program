@@ -87,12 +87,17 @@ export interface JanusChatConversation {
   confirm: () => void;
   undo: (messageId: string) => void;
   reset: () => void;
+  edit?: () => void;
 }
 
 export function createJanusChat(
-  options: JanusChatOptions,
+  options: () => JanusChatOptions,
 ): JanusChatConversation {
-  const controller = new ChatController(options);
+  const controller = new ChatController(options());
+
+  createEffect(() => {
+    controller.updateOptions(options());
+  });
 
   const [thread, setThread] = createSignal(controller.thread);
   const [busy, setBusy] = createSignal(controller.busy);
@@ -115,6 +120,7 @@ export function createJanusChat(
     confirm: () => controller.confirm(),
     undo: (id) => controller.undo(id),
     reset: () => controller.reset(),
+    edit: () => controller.edit(),
   };
 }
 
@@ -529,6 +535,7 @@ export interface ChatProps {
   placeholder?: string;
   value?: string;
   busy?: boolean;
+  disabled?: boolean;
   showClose?: boolean;
   showVoice?: boolean;
   /** `"light"` (default) · `"dark"` · `"auto"` follows the OS. */
@@ -566,6 +573,7 @@ export const Chat: Component<ChatProps> = (props) => {
     if (props.placeholder !== undefined) el.placeholder = props.placeholder;
     if (props.value !== undefined) el.value = props.value;
     if (props.busy !== undefined) el.busy = props.busy;
+    if (props.disabled !== undefined) el.disabled = props.disabled;
     if (props.showClose !== undefined) el.showClose = props.showClose;
     if (props.showVoice !== undefined) el.showVoice = props.showVoice;
     if (props.theme !== undefined) el.theme = props.theme;
