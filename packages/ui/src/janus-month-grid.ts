@@ -199,6 +199,22 @@ export class JanusMonthGrid extends LitElement {
     this._emitNavChange();
   }
 
+  public goToDate(date: string | number | Date) {
+    let d: Date;
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [y, m, day] = date.split("-").map(Number);
+      d = new Date(y, m - 1, day, 12, 0, 0);
+    } else {
+      d = new Date(date);
+    }
+    if (!isNaN(d.getTime())) {
+      this._year = d.getFullYear();
+      this._month = d.getMonth();
+      this._selectedDateStr = toLocalDateStr(d);
+      this._emitNavChange();
+    }
+  }
+
   willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("_year") || changedProperties.has("_month")) {
       this._syncFromStore(schedulerStore.getState());

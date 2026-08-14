@@ -170,6 +170,7 @@ export class JanusTimeline extends LitElement {
   private _navRafId: number | null = null;
   private _resizeObserver?: ResizeObserver;
   private _pendingCenterMs: number | null = null;
+  private _activeDragUpHandler: ((e: PointerEvent) => void) | null = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -195,6 +196,11 @@ export class JanusTimeline extends LitElement {
       cancelAnimationFrame(this._navRafId);
       this._navRafId = null;
     }
+    if (this._activeDragUpHandler) {
+      document.removeEventListener("pointerup", this._activeDragUpHandler);
+      this._activeDragUpHandler = null;
+    }
+    this._drag.cancel();
     this._ghostEl = null;
   }
 
@@ -982,8 +988,15 @@ export class JanusTimeline extends LitElement {
   }
 
   private _addDragUpListener() {
+    if (this._activeDragUpHandler) {
+      document.removeEventListener("pointerup", this._activeDragUpHandler);
+      this._activeDragUpHandler = null;
+    }
     const handler = (_e: PointerEvent) => {
       document.removeEventListener("pointerup", handler);
+      if (this._activeDragUpHandler === handler) {
+        this._activeDragUpHandler = null;
+      }
       const result = this._drag.completeAndGetResult();
       if (result) {
         this._wasDragging = true;
@@ -1076,6 +1089,7 @@ export class JanusTimeline extends LitElement {
         );
       }
     };
+    this._activeDragUpHandler = handler;
     document.addEventListener("pointerup", handler);
   }
 
@@ -1154,45 +1168,50 @@ export class JanusTimeline extends LitElement {
   // ── Rendering helpers ─────────────────────────────────────────────
 
   private renderAvatar(r: TimelineResource) {
+    const isIcon = r.avatarIcon === "room" || r.avatarIcon === "equipment";
+    const borderRadius = isIcon ? "10px" : "50%";
+
+    const fallback =
+      r.avatarIcon === "room"
+        ? html`<span class="tl-avatar tl-avatar--icon tl-avatar--room"
+            >${RoomIcon()}</span
+          >`
+        : r.avatarIcon === "equipment"
+          ? html`<span class="tl-avatar tl-avatar--icon tl-avatar--equipment"
+              >${EquipmentIcon()}</span
+            >`
+          : html`<span
+              class="tl-avatar tl-avatar--initials"
+              style="background: ${avatarColor(r.id)}"
+              >${getInitials(r.name)}</span
+            >`;
+
     if (r.avatarType === "image" && r.avatar) {
       return html`
-        <img
-          class="tl-avatar tl-avatar--image"
-          src="${r.avatar}"
-          alt="${r.name}"
-          @error=${(e: Event) => {
-            const img = e.currentTarget as HTMLImageElement;
-            img.style.display = "none";
-            const parent = img.parentElement;
-            if (parent) {
-              parent.classList.add("avatar-fallback");
-            }
-          }}
-        />
+        <div
+          class="tl-avatar-wrap"
+          style="position: relative; display: inline-flex; flex-shrink: 0;"
+        >
+          ${fallback}
+          <img
+            class="tl-avatar tl-avatar--image"
+            src="${r.avatar}"
+            alt="${r.name}"
+            style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: ${borderRadius};"
+            @load=${(e: Event) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.style.display = "";
+            }}
+            @error=${(e: Event) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.style.display = "none";
+            }}
+          />
+        </div>
       `;
     }
-    if (r.avatarType === "initials") {
-      return html`<span
-        class="tl-avatar tl-avatar--initials"
-        style="background: ${avatarColor(r.id)}"
-        >${getInitials(r.name)}</span
-      >`;
-    }
-    if (r.avatarIcon === "room") {
-      return html`<span class="tl-avatar tl-avatar--icon tl-avatar--room"
-        >${RoomIcon()}</span
-      >`;
-    }
-    if (r.avatarIcon === "equipment") {
-      return html`<span class="tl-avatar tl-avatar--icon tl-avatar--equipment"
-        >${EquipmentIcon()}</span
-      >`;
-    }
-    return html`<span
-      class="tl-avatar tl-avatar--initials"
-      style="background: ${avatarColor(r.id)}"
-      >${getInitials(r.name)}</span
-    >`;
+
+    return fallback;
   }
 
   private _renderDragGhost() {
