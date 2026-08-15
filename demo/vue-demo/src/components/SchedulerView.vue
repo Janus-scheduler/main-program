@@ -24,6 +24,7 @@
   <janus-timeline
     v-if="currentView === 'Timeline'"
     ref="timelineEl"
+    .showFab="true"
     .allowCreate="allowCreate"
     @event-click="handleEventClick"
     @add-event="handleAddEvent"
@@ -38,6 +39,7 @@
   <janus-month-grid
     v-if="currentView === 'Month'"
     ref="monthGridEl"
+    .showFab="true"
     @add-event="handleAddEvent"
     @event-click="handleEventClick"
     @view-change="handleViewChange"

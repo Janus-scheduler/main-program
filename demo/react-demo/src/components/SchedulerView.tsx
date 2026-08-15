@@ -257,7 +257,7 @@ export function SchedulerView({
         }}
       >
         <MonthGrid
-          showFab={false}
+          showFab={true}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
           onDayClick={(detail) => {
