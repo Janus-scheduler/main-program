@@ -249,6 +249,7 @@ function App() {
 
         <Show when={currentView() === "Timeline"}>
           <Timeline
+            showFab={true}
             ref={(el) => (timelineRef = el as unknown as typeof timelineRef)}
             allowCreate={allowCreate()}
             onAddEvent={() => {
@@ -309,6 +310,7 @@ function App() {
         </Show>
         <Show when={currentView() === "Month"}>
           <MonthGrid
+            showFab={true}
             ref={(el) => (monthGridRef = el as unknown as typeof monthGridRef)}
             onAddEvent={() => {
               setSelectedEventId(null);
