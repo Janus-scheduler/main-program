@@ -1,5 +1,5 @@
 import { LitElement, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, state, property } from "lit/decorators.js";
 import { yearGridStyles } from "./year-grid-styles";
 
 import {
