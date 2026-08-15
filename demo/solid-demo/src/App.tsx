@@ -123,21 +123,29 @@ function App() {
       id: "r1",
       name: "Dr. Sarah Chena",
       type: "person",
+      avatar:
+        "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
     });
     manager.addResource({
       id: "r2",
       name: "Dr. Michael Ross",
       type: "person",
+      avatar:
+        "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
     });
     manager.addResource({
       id: "r3",
       name: "Operating Room 1",
       type: "room",
+      avatar:
+        "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=120&h=120",
     });
     manager.addResource({
       id: "r4",
       name: "MRI Scanner A",
       type: "equipment",
+      avatar:
+        "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=120&h=120",
     });
 
     // Add a couple of initial events for today

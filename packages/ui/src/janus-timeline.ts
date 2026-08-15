@@ -10,8 +10,6 @@ import {
   checkSlotConflict,
   type ConflictResource,
   type SchedulerStore,
-  type EventColor,
-  type SchedulerState,
   type ViewType,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";

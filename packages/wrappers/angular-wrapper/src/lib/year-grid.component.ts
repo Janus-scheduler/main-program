@@ -95,8 +95,10 @@ export class YearGridComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   ngOnDestroy(): void {
     const el = this._elRef()?.nativeElement;
-    el?.removeEventListener("day-click", this._dayClickHandler);
-    el?.removeEventListener("view-change", this._viewChangeHandler);
-    el?.removeEventListener("nav-change", this._navChangeHandler);
+    if (el) {
+      el.removeEventListener("day-click", this._dayClickHandler);
+      el.removeEventListener("view-change", this._viewChangeHandler);
+      el.removeEventListener("nav-change", this._navChangeHandler);
+    }
   }
 }

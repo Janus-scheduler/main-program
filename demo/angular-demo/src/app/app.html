@@ -95,6 +95,7 @@
       <janus-year-grid-ng
         #yearGridEl
         (viewChange)="handleViewChange($event)"
+        (dayClick)="handleDayClick($event)"
         (navChange)="handleNavChange($event)"
       />
     }
