@@ -4,11 +4,11 @@ import {
   CUSTOM_ELEMENTS_SCHEMA,
   ElementRef,
   AfterViewInit,
-  OnChanges,
   OnDestroy,
   input,
   viewChild,
   ChangeDetectionStrategy,
+  effect,
 } from "@angular/core";
 // Side-effect import: ensures the <janus-year-grid> custom element is registered
 import { JanusYearGrid } from "@janus-scheduler/ui";
@@ -31,7 +31,7 @@ import { type ViewType } from "@janus-scheduler/core";
     `,
   ],
 })
-export class YearGridComponent implements AfterViewInit, OnDestroy, OnChanges {
+export class YearGridComponent implements AfterViewInit, OnDestroy {
   private readonly _elRef =
     viewChild.required<ElementRef<HTMLElement>>("yearGridEl");
 
@@ -40,6 +40,12 @@ export class YearGridComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly dayClick = output<{ date: string }>();
   readonly viewChange = output<{ view: ViewType }>();
   readonly navChange = output<Record<string, unknown>>();
+
+  constructor() {
+    effect(() => {
+      this._syncProps();
+    });
+  }
 
   private _dayClickHandler = (e: Event) => {
     e.stopPropagation();
@@ -72,6 +78,22 @@ export class YearGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     ).goToToday();
   }
 
+  public goToDate(date: string | number | Date): void {
+    (
+      this._elRef().nativeElement as HTMLElement & {
+        goToDate: (d: string | number | Date) => void;
+      }
+    ).goToDate(date);
+  }
+
+  public setView(view: ViewType): void {
+    (
+      this._elRef().nativeElement as HTMLElement & {
+        setView: (v: string) => void;
+      }
+    ).setView(view);
+  }
+
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
     el.addEventListener("day-click", this._dayClickHandler);
@@ -80,16 +102,16 @@ export class YearGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     this._syncProps();
   }
 
-  ngOnChanges(): void {
-    this._syncProps();
-  }
-
   private _syncProps(): void {
-    const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { viewYear?: number })
-      | undefined;
-    if (el && this.viewYear() !== undefined) {
-      el.viewYear = this.viewYear()!;
+    try {
+      const el = this._elRef()?.nativeElement as
+        | (HTMLElement & { viewYear?: number })
+        | undefined;
+      if (el && this.viewYear() !== undefined) {
+        el.viewYear = this.viewYear()!;
+      }
+    } catch {
+      // ViewChild might not be initialized yet before first view init
     }
   }
 

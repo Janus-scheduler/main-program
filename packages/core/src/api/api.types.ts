@@ -16,7 +16,7 @@ export type EventColor =
   | "teal";
 
 /**
- * The two supported calendar views.
+ * The supported calendar views.
  */
 export type ViewType = "Timeline" | "Month" | "Year";
 

@@ -92,6 +92,14 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     ).goToToday();
   }
 
+  public goToDate(date: string | number | Date): void {
+    (
+      this._elRef().nativeElement as HTMLElement & {
+        goToDate: (d: string | number | Date) => void;
+      }
+    ).goToDate(date);
+  }
+
   public setView(view: ViewType): void {
     (
       this._elRef().nativeElement as HTMLElement & {

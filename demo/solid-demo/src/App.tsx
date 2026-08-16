@@ -114,6 +114,11 @@ function App() {
     goToNext: () => void;
     goToToday: () => void;
   };
+  let yearGridRef: HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+  };
 
   // Initialize the core manager once and populate initial data
   const manager = new SchedulerManager();
@@ -230,15 +235,18 @@ function App() {
           zoomUnit={navData().zoomUnit}
           onPrevClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToPrev();
-            else monthGridRef?.goToPrev();
+            else if (currentView() === "Month") monthGridRef?.goToPrev();
+            else yearGridRef?.goToPrev();
           }}
           onNextClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToNext();
-            else monthGridRef?.goToNext();
+            else if (currentView() === "Month") monthGridRef?.goToNext();
+            else yearGridRef?.goToNext();
           }}
           onTodayClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToToday();
-            else monthGridRef?.goToToday();
+            else if (currentView() === "Month") monthGridRef?.goToToday();
+            else yearGridRef?.goToToday();
           }}
           onViewSwitch={(detail) => setCurrentView(detail.view)}
           onToggleCreate={() => {
@@ -336,6 +344,7 @@ function App() {
         </Show>
         <Show when={currentView() === "Year"}>
           <YearGrid
+            ref={(el) => (yearGridRef = el as unknown as typeof yearGridRef)}
             onViewChange={(detail) => setCurrentView(detail.view)}
             onNavChange={(detail) => {
               setNavData({
@@ -345,6 +354,14 @@ function App() {
                 zoomPercent: (detail.zoomPercent as number) || 100,
                 zoomUnit: (detail.zoomUnit as string) || "",
               });
+            }}
+            onDayClick={(detail) => {
+              setCurrentView("Timeline");
+              setTimeout(() => {
+                if (timelineRef && (timelineRef as any).goToDate) {
+                  (timelineRef as any).goToDate(detail.date);
+                }
+              }, 100);
             }}
           />
         </Show>

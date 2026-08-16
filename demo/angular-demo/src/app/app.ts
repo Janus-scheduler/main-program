@@ -262,10 +262,10 @@ export class App {
   }
 
   handleDayClick(detail: { date: string }): void {
-    console.log('Day clicked in Year View:', detail.date);
-    // You can switch to Timeline view for the clicked date, or open a create modal.
-    // For now, let's open the create modal
-    this.handleAddEvent();
+    this.currentView = 'Timeline';
+    setTimeout(() => {
+      this.timelineEl()?.goToDate(detail.date);
+    }, 100);
   }
 
   handleToggleCreate(): void {

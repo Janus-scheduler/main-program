@@ -173,9 +173,10 @@ function handleTodayClick() {
 
 function handleDayClick(e: Event) {
   const detail = (e as CustomEvent<{ date: string }>).detail;
-  console.log('Day clicked in Year View:', detail.date);
-  // Open the create modal
-  handleAddEvent();
+  emit("view-change", "Timeline");
+  setTimeout(() => {
+    timelineEl.value?.goToDate(detail.date);
+  }, 100);
 }
 
 function handleToggleCreate() {
