@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Timeline,
   MonthGrid,
+  YearGrid,
   Scheduler,
   AiBar,
   Topbar,
@@ -122,6 +123,13 @@ export function SchedulerView({
       goToToday: () => void;
     }
   >(null);
+  const yearGridRef = useRef<
+    HTMLElement & {
+      goToPrev: () => void;
+      goToNext: () => void;
+      goToToday: () => void;
+    }
+  >(null);
 
   const [navData, setNavData] = useState({
     navLabel: "",
@@ -160,15 +168,18 @@ export function SchedulerView({
         zoomUnit={navData.zoomUnit}
         onPrevClick={() => {
           if (currentView === "Timeline") timelineRef.current?.goToPrev();
-          else monthGridRef.current?.goToPrev();
+          else if (currentView === "Month") monthGridRef.current?.goToPrev();
+          else yearGridRef.current?.goToPrev();
         }}
         onNextClick={() => {
           if (currentView === "Timeline") timelineRef.current?.goToNext();
-          else monthGridRef.current?.goToNext();
+          else if (currentView === "Month") monthGridRef.current?.goToNext();
+          else yearGridRef.current?.goToNext();
         }}
         onTodayClick={() => {
           if (currentView === "Timeline") timelineRef.current?.goToToday();
-          else monthGridRef.current?.goToToday();
+          else if (currentView === "Month") monthGridRef.current?.goToToday();
+          else yearGridRef.current?.goToToday();
         }}
         onViewSwitch={(detail) => onViewChange(detail.view)}
         onToggleCreate={() => {
@@ -246,7 +257,7 @@ export function SchedulerView({
         }}
       >
         <MonthGrid
-          showFab={false}
+          showFab={true}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
           onDayClick={(detail) => {
@@ -262,6 +273,21 @@ export function SchedulerView({
           ref={monthGridRef}
         />
       </div>
+
+      {currentView === "Year" && (
+        <YearGrid
+          ref={yearGridRef}
+          onNavChange={handleNavChange}
+          onDayClick={(detail) => {
+            onViewChange("Timeline");
+            setTimeout(() => {
+              if (timelineRef.current && timelineRef.current.goToDate) {
+                timelineRef.current.goToDate(detail.date);
+              }
+            }, 100);
+          }}
+        />
+      )}
 
       {showScheduler && (
         <Scheduler

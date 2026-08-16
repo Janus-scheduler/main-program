@@ -3,6 +3,7 @@ import {
   JanusScheduler as JanusSchedulerWC,
   JanusTimeline as JanusTimelineWC,
   JanusMonthGrid as JanusMonthGridWC,
+  JanusYearGrid as JanusYearGridWC,
   JanusAiBar as JanusAiBarWC,
   JanusTopbar as JanusTopbarWC,
 } from "@janus-scheduler/ui";
@@ -53,6 +54,7 @@ declare module "solid-js" {
       "janus-scheduler": Record<string, unknown>;
       "janus-timeline": Record<string, unknown>;
       "janus-month-grid": Record<string, unknown>;
+      "janus-year-grid": Record<string, unknown>;
       "janus-ai-bar": Record<string, unknown>;
       "janus-topbar": Record<string, unknown>;
     }
@@ -68,6 +70,9 @@ if (!customElements.get("janus-timeline")) {
 }
 if (!customElements.get("janus-month-grid")) {
   customElements.define("janus-month-grid", JanusMonthGridWC);
+}
+if (!customElements.get("janus-year-grid")) {
+  customElements.define("janus-year-grid", JanusYearGridWC);
 }
 if (!customElements.get("janus-ai-bar")) {
   customElements.define("janus-ai-bar", JanusAiBarWC);
@@ -168,7 +173,7 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
  */
 export interface TimelineProps {
   resources?: TimelineResource[];
-  view?: "Timeline" | "Month";
+  view?: ViewType;
   currentDate?: Date;
   aiPrompt?: string;
   allowCreate?: boolean;
@@ -179,7 +184,7 @@ export interface TimelineProps {
   onEventMove?: (detail: EventMoveDetail) => void;
   onEventResize?: (detail: EventResizeDetail) => void;
   onEventCreate?: (detail: EventCreateDetail) => void;
-  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   ref?: (el: HTMLElement) => void;
   onConflictDetected?: (detail: {
@@ -261,7 +266,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
  *  - onEventClick → CustomEvent<TimelineEvent>                  — user clicked an event chip
  *  - onDayClick   → CustomEvent<{ date: string }>               — user clicked an empty day cell
  *  - onAddEvent   → CustomEvent<void>                           — user clicked the + FAB
- *  - onViewChange → CustomEvent<{ view: "Timeline" | "Month" }> — user switched views
+ *  - onViewChange → CustomEvent<{ view: ViewType }> — user switched views
  *
  * The component reads directly from the Zustand store.
  */
@@ -270,7 +275,7 @@ export interface MonthGridProps {
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;
-  onViewChange?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   ref?: (el: HTMLElement) => void;
 }
@@ -302,6 +307,47 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
 
   return (
     <janus-month-grid
+      ref={(el: HTMLElement) => {
+        ref = el;
+        if (props.ref) props.ref(el);
+      }}
+    />
+  );
+};
+
+export interface YearGridProps {
+  viewYear?: number;
+  onDayClick?: (detail: { date: string }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+  ref?: (el: HTMLElement) => void;
+}
+
+export const YearGrid: Component<YearGridProps> = (props) => {
+  let ref!: HTMLElement;
+
+  createEffect(() => {
+    if (ref) {
+      const el = ref as unknown as Record<string, unknown>;
+      if (props.viewYear !== undefined) el.viewYear = props.viewYear;
+    }
+  });
+
+  onMount(() => {
+    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
+      if (handler) {
+        const listener = (e: Event) => handler((e as CustomEvent).detail);
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
+      }
+    };
+    attach("day-click", props.onDayClick);
+    attach("view-change", props.onViewChange);
+    attach("nav-change", props.onNavChange);
+  });
+
+  return (
+    <janus-year-grid
       ref={(el: HTMLElement) => {
         ref = el;
         if (props.ref) props.ref(el);
@@ -347,14 +393,14 @@ export interface TopbarProps {
   navLabel?: string;
   dayName?: string;
   shortDate?: string;
-  view?: "Timeline" | "Month";
+  view?: ViewType;
   allowCreate?: boolean;
   zoomPercent?: number;
   zoomUnit?: string;
   onPrevClick?: () => void;
   onNextClick?: () => void;
   onTodayClick?: () => void;
-  onViewSwitch?: (detail: { view: "Timeline" | "Month" }) => void;
+  onViewSwitch?: (detail: { view: ViewType }) => void;
   onToggleCreate?: () => void;
 }
 
