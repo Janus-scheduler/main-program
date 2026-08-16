@@ -5,6 +5,7 @@ import {
   JanusMonthGrid as JanusMonthGridWC,
   JanusDayGrid as JanusDayGridWC,
   JanusWeekGrid as JanusWeekGridWC,
+  JanusYearGrid as JanusYearGridWC,
   JanusAiBar as JanusAiBarWC,
   JanusTopbar as JanusTopbarWC,
 } from "@janus-scheduler/ui";
@@ -69,6 +70,7 @@ declare module "solid-js" {
       "janus-month-grid": Record<string, unknown>;
       "janus-day-grid": Record<string, unknown>;
       "janus-week-grid": Record<string, unknown>;
+      "janus-year-grid": Record<string, unknown>;
       "janus-ai-bar": Record<string, unknown>;
       "janus-topbar": Record<string, unknown>;
     }
@@ -90,6 +92,9 @@ if (!customElements.get("janus-day-grid")) {
 }
 if (!customElements.get("janus-week-grid")) {
   customElements.define("janus-week-grid", JanusWeekGridWC);
+}
+if (!customElements.get("janus-year-grid")) {
+  customElements.define("janus-year-grid", JanusYearGridWC);
 }
 if (!customElements.get("janus-ai-bar")) {
   customElements.define("janus-ai-bar", JanusAiBarWC);
@@ -378,6 +383,14 @@ export interface TimeGridProps {
   ref?: (el: HTMLElement) => void;
 }
 
+export interface YearGridProps {
+  viewYear?: number;
+  onDayClick?: (detail: { date: string }) => void;
+  onViewChange?: (detail: { view: ViewType }) => void;
+  onNavChange?: (detail: Record<string, unknown>) => void;
+  ref?: (el: HTMLElement) => void;
+}
+
 /** Builds the Solid component for one of the two hour-grid custom elements. */
 function createTimeGrid(
   tagName: "janus-day-grid" | "janus-week-grid",
@@ -438,6 +451,38 @@ export const DayGrid: Component<TimeGridProps> =
 
 export const WeekGrid: Component<TimeGridProps> =
   createTimeGrid("janus-week-grid");
+export const YearGrid: Component<YearGridProps> = (props) => {
+  let ref!: HTMLElement;
+
+  createEffect(() => {
+    if (ref) {
+      const el = ref as unknown as Record<string, unknown>;
+      if (props.viewYear !== undefined) el.viewYear = props.viewYear;
+    }
+  });
+
+  onMount(() => {
+    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
+      if (handler) {
+        const listener = (e: Event) => handler((e as CustomEvent).detail);
+        ref?.addEventListener(eventName, listener);
+        onCleanup(() => ref?.removeEventListener(eventName, listener));
+      }
+    };
+    attach("day-click", props.onDayClick);
+    attach("view-change", props.onViewChange);
+    attach("nav-change", props.onNavChange);
+  });
+
+  return (
+    <janus-year-grid
+      ref={(el: HTMLElement) => {
+        ref = el;
+        if (props.ref) props.ref(el);
+      }}
+    />
+  );
+};
 
 export interface AiBarProps {
   placeholder?: string;

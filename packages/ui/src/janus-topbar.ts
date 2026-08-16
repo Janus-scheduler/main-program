@@ -3,12 +3,12 @@ import { customElement, property } from "lit/decorators.js";
 import { topbarStyles } from "./topbar-styles";
 import type { ViewType } from "@janus-scheduler/core";
 import {
+  BellIcon,
   ChevronLeft,
   ChevronRight,
-  SearchIcon,
-  BellIcon,
   PencilRulerIcon,
   UndoIcon,
+  SearchIcon,
 } from "./timeline-icons";
 
 /**
@@ -28,7 +28,7 @@ import {
  */
 @customElement("janus-topbar")
 export class JanusTopbar extends LitElement {
-  static styles = topbarStyles;
+  static readonly styles = topbarStyles;
 
   /** Full navigation label shown on desktop (e.g. "Tuesday, June 30, 2026"). */
   @property({ type: String, attribute: "nav-label" }) navLabel = "";
@@ -39,7 +39,7 @@ export class JanusTopbar extends LitElement {
   /** Short date shown on mobile (e.g. "Jun 12"). */
   @property({ type: String, attribute: "short-date" }) shortDate = "";
 
-  /** Currently active view: "Day", "Week", "Month" or "Timeline". */
+  /** Currently active view */
   @property({ type: String }) view: ViewType = "Timeline";
 
   /**
@@ -50,6 +50,7 @@ export class JanusTopbar extends LitElement {
     "Day",
     "Week",
     "Month",
+    "Year",
     "Timeline",
   ];
 

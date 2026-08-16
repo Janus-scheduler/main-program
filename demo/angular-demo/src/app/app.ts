@@ -12,6 +12,7 @@ import {
   MonthGridComponent,
   DayGridComponent,
   WeekGridComponent,
+  YearGridComponent,
   AiBarComponent,
   TopbarComponent,
   type TimelineEvent,
@@ -48,6 +49,7 @@ export interface NavData {
     MonthGridComponent,
     DayGridComponent,
     WeekGridComponent,
+    YearGridComponent,
     AiBarComponent,
     TopbarComponent,
   ],
@@ -69,10 +71,11 @@ export class App {
     zoomUnit: '',
   });
 
-  timelineEl = viewChild<TimelineComponent>('timelineEl');
-  monthGridEl = viewChild<MonthGridComponent>('monthGridEl');
-  dayGridEl = viewChild<DayGridComponent>('dayGridEl');
-  weekGridEl = viewChild<WeekGridComponent>('weekGridEl');
+  readonly timelineEl = viewChild<TimelineComponent>('timelineEl');
+  readonly monthGridEl = viewChild<MonthGridComponent>('monthGridEl');
+  readonly dayGridEl = viewChild<DayGridComponent>('dayGridEl');
+  readonly weekGridEl = viewChild<WeekGridComponent>('weekGridEl');
+  readonly yearGridEl = viewChild<YearGridComponent>('yearGridEl');
 
   tempEventData = signal<{
     startDate?: string;
@@ -141,6 +144,7 @@ export class App {
 
     console.log('🌱 Seeding initial data to core manager...');
 
+    // Same resources as React demo
     this.manager.addResource({
       id: 'r1',
       name: 'Dr. Sarah Chen',
@@ -303,6 +307,8 @@ export class App {
       this.dayGridEl()?.goToPrev();
     } else if (this.currentView === 'Week') {
       this.weekGridEl()?.goToPrev();
+    } else if (this.currentView === 'Year') {
+      this.yearGridEl()?.goToPrev();
     }
   }
 
@@ -315,6 +321,8 @@ export class App {
       this.dayGridEl()?.goToNext();
     } else if (this.currentView === 'Week') {
       this.weekGridEl()?.goToNext();
+    } else if (this.currentView === 'Year') {
+      this.yearGridEl()?.goToNext();
     }
   }
 
@@ -327,7 +335,16 @@ export class App {
       this.dayGridEl()?.goToToday();
     } else if (this.currentView === 'Week') {
       this.weekGridEl()?.goToToday();
+    } else if (this.currentView === 'Year') {
+      this.yearGridEl()?.goToToday();
     }
+  }
+
+  handleDayClick(detail: { date: string }): void {
+    this.currentView = 'Timeline';
+    setTimeout(() => {
+      this.timelineEl()?.goToDate(detail.date);
+    }, 100);
   }
 
   handleToggleCreate(): void {

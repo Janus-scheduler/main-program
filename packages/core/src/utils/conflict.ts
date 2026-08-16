@@ -31,7 +31,7 @@ export function computeTimelineConflicts(
   conflictingEventIds: Set<string>;
 } {
   const conflictingEventIds = new Set<string>();
-  const messages: string[] = [];
+  const messagesSet = new Set<string>();
 
   for (const r of resources) {
     if (!r.events || r.events.length <= 1) continue;
@@ -54,7 +54,7 @@ export function computeTimelineConflicts(
         conflictingEventIds.add(evA.id);
         conflictingEventIds.add(evB.id);
 
-        if (messages.length < 50) {
+        if (messagesSet.size < 50) {
           const overlapStartMs = Math.max(evA.startMs, evB.startMs);
           const overlapEndMs = Math.min(evA.endMs, evB.endMs);
           const { dateLabel, startTimeLabel, endTimeLabel } =
@@ -65,9 +65,7 @@ export function computeTimelineConflicts(
             );
 
           const msg = `Conflict: ${r.name} has overlapping events "${evA.title}" and "${evB.title}" on ${dateLabel} between ${startTimeLabel} and ${endTimeLabel}.`;
-          if (!messages.includes(msg)) {
-            messages.push(msg);
-          }
+          messagesSet.add(msg);
         }
       }
     }
@@ -75,7 +73,7 @@ export function computeTimelineConflicts(
 
   return {
     hasConflict: conflictingEventIds.size > 0,
-    messages,
+    messages: Array.from(messagesSet),
     conflictingEventIds,
   };
 }

@@ -19,9 +19,10 @@ export type EventColor =
  * The supported calendar views.
  *
  * "Day" and "Week" are the hour-grid (time-grid) views; "Month" is the
- * calendar grid; "Timeline" is the horizontal resource/time-axis view.
+ * calendar grid; "Timeline" is the horizontal resource/time-axis view;
+ * "Year" is the yearly grid view.
  */
-export type ViewType = "Timeline" | "Month" | "Week" | "Day";
+export type ViewType = "Timeline" | "Month" | "Week" | "Day" | "Year";
 
 export interface TimelineEvent {
   id: string;

@@ -4,6 +4,7 @@ import {
   MonthGrid,
   DayGrid,
   WeekGrid,
+  YearGrid,
   Scheduler,
   AiBar,
   Topbar,
@@ -125,6 +126,13 @@ export function SchedulerView({
       goToToday: () => void;
     }
   >(null);
+  const yearGridRef = useRef<
+    HTMLElement & {
+      goToPrev: () => void;
+      goToNext: () => void;
+      goToToday: () => void;
+    }
+  >(null);
 
   /** Day and Week grids share the same imperative navigation API. */
   type TimeGridHandle = HTMLElement & {
@@ -152,7 +160,8 @@ export function SchedulerView({
     if (currentView === "Timeline") return timelineRef.current;
     if (currentView === "Month") return monthGridRef.current;
     if (currentView === "Day") return dayGridRef.current;
-    return weekGridRef.current;
+    if (currentView === "Week") return weekGridRef.current;
+    return yearGridRef.current;
   };
 
   /**
@@ -201,13 +210,6 @@ export function SchedulerView({
     const count = readBenchmarkCountFromUrl();
     if (count !== null) loadDenseBenchmarkData(count);
   }, []);
-
-  // Re-center timeline on current time whenever switching to Timeline view
-  useEffect(() => {
-    if (currentView === "Timeline") {
-      timelineRef.current?.goToToday();
-    }
-  }, [currentView]);
 
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
@@ -317,7 +319,14 @@ export function SchedulerView({
           if (onUndo) onUndo();
         }}
       />
-      {currentView === "Timeline" && (
+      <div
+        style={{
+          display: currentView === "Timeline" ? "flex" : "none",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <Timeline
           ref={timelineRef}
           allowCreate={allowCreate}
@@ -363,22 +372,49 @@ export function SchedulerView({
             onOpenScheduler();
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
+          onNavChange={(detail) => {
+            if (currentView === "Timeline") {
+              handleNavChange(detail);
+            }
+          }}
         />
-      )}
+      </div>
 
-      {currentView === "Month" && (
+      <div
+        style={{
+          display: currentView === "Month" ? "flex" : "none",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <MonthGrid
-          showFab={false}
+          showFab={true}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
           onDayClick={(detail) => {
-            pendingDate.current = detail.date; // store, don't use a floating setTimeout
+            pendingDate.current = detail.date;
             onViewChange("Day");
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
+          onNavChange={(detail) => {
+            if (currentView === "Month") {
+              handleNavChange(detail);
+            }
+          }}
           ref={monthGridRef}
+        />
+      </div>
+
+      {currentView === "Year" && (
+        <YearGrid
+          ref={yearGridRef}
+          onNavChange={handleNavChange}
+          onDayClick={(detail) => {
+            pendingDate.current = detail.date;
+            onViewChange("Day");
+          }}
+          onViewChange={(detail) => onViewChange(detail.view)}
         />
       )}
 

@@ -10,12 +10,12 @@ import {
   viewChild,
   ChangeDetectionStrategy,
 } from "@angular/core";
+import type { ViewType } from "@janus-scheduler/core";
 // Side-effect import: ensures the <janus-topbar> custom element is registered
 import { JanusTopbar } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _topbar = JanusTopbar;
-import type { ViewType } from "@janus-scheduler/core";
 
 @Component({
   selector: "janus-topbar-ng",

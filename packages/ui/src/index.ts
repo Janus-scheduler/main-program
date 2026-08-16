@@ -9,3 +9,4 @@ export * from "./janus-day-grid";
 export * from "./janus-week-grid";
 export * from "./janus-ai-bar";
 export * from "./janus-confirm-dialog";
+export * from "./janus-year-grid";

@@ -97,8 +97,23 @@ export class JanusMonthGrid extends LitElement {
     const newEvents: MonthEvent[] = [];
 
     for (const e of coreEvents) {
-      const startD = new Date(e.startTime);
-      const endD = new Date(e.endTime);
+      const origStartMs = new Date(e.startTime).getTime();
+      let origEndMs = new Date(e.endTime).getTime();
+
+      if (origEndMs > origStartMs) {
+        const endDCheck = new Date(origEndMs);
+        if (
+          endDCheck.getHours() === 0 &&
+          endDCheck.getMinutes() === 0 &&
+          endDCheck.getSeconds() === 0 &&
+          endDCheck.getMilliseconds() === 0
+        ) {
+          origEndMs -= 1;
+        }
+      }
+
+      const startD = new Date(origStartMs);
+      const endD = new Date(origEndMs);
 
       const startDateStr = toLocalDateStr(startD);
       const endDateStr = toLocalDateStr(endD);
@@ -218,6 +233,22 @@ export class JanusMonthGrid extends LitElement {
     this._year = now.getFullYear();
     this._month = now.getMonth();
     this._emitNavChange();
+  }
+
+  public goToDate(date: string | number | Date) {
+    let d: Date;
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [y, m, day] = date.split("-").map(Number);
+      d = new Date(y, m - 1, day, 12, 0, 0);
+    } else {
+      d = new Date(date);
+    }
+    if (!isNaN(d.getTime())) {
+      this._year = d.getFullYear();
+      this._month = d.getMonth();
+      this._selectedDateStr = toLocalDateStr(d);
+      this._emitNavChange();
+    }
   }
 
   willUpdate(changedProperties: Map<string, unknown>) {

@@ -24,6 +24,7 @@
   <janus-timeline
     v-if="currentView === 'Timeline'"
     ref="timelineEl"
+    .showFab="true"
     .allowCreate="allowCreate"
     @event-click="handleEventClick"
     @add-event="handleAddEvent"
@@ -38,10 +39,20 @@
   <janus-month-grid
     v-if="currentView === 'Month'"
     ref="monthGridEl"
+    .showFab="true"
     @add-event="handleAddEvent"
     @event-click="handleEventClick"
     @view-change="handleViewChange"
     @nav-change="handleNavChange"
+  />
+
+  <!-- Year view -->
+  <janus-year-grid
+    v-if="currentView === 'Year'"
+    ref="yearGridEl"
+    @view-change="handleViewChange"
+    @nav-change="handleNavChange"
+    @day-click="handleDayClick"
   />
 
   <!-- Scheduler modal -->
@@ -110,6 +121,7 @@ const storeEvent = computed(() =>
 
 const timelineEl = ref<any>(null);
 const monthGridEl = ref<any>(null);
+const yearGridEl = ref<any>(null);
 
 const allowCreate = ref(false);
 const navData = reactive({
@@ -132,25 +144,39 @@ function handleNavChange(e: Event) {
 function handlePrevClick() {
   if (props.currentView === "Timeline") {
     timelineEl.value?.goToPrev();
-  } else {
+  } else if (props.currentView === "Month") {
     monthGridEl.value?.goToPrev();
+  } else if (props.currentView === "Year") {
+    yearGridEl.value?.goToPrev();
   }
 }
 
 function handleNextClick() {
   if (props.currentView === "Timeline") {
     timelineEl.value?.goToNext();
-  } else {
+  } else if (props.currentView === "Month") {
     monthGridEl.value?.goToNext();
+  } else if (props.currentView === "Year") {
+    yearGridEl.value?.goToNext();
   }
 }
 
 function handleTodayClick() {
   if (props.currentView === "Timeline") {
     timelineEl.value?.goToToday();
-  } else {
+  } else if (props.currentView === "Month") {
     monthGridEl.value?.goToToday();
+  } else if (props.currentView === "Year") {
+    yearGridEl.value?.goToToday();
   }
+}
+
+function handleDayClick(e: Event) {
+  const detail = (e as CustomEvent<{ date: string }>).detail;
+  emit("view-change", "Timeline");
+  setTimeout(() => {
+    timelineEl.value?.goToDate(detail.date);
+  }, 100);
 }
 
 function handleToggleCreate() {
