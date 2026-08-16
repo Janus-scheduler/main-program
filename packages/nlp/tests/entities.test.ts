@@ -307,4 +307,25 @@ describe("purity and independence", () => {
     });
     expect(e.resources.map((r) => r.id)).toEqual(["r9"]);
   });
+
+  it("strips quotation marks from extracted titles", () => {
+    const e = extract('schedule "Design Sync" tomorrow at 10am');
+    expect(e.title).toBe("Design Sync");
+  });
+
+  it("matches multi-word resources with partial prefix names like 'MRI Scanner'", () => {
+    const catalog: EntityCatalog = {
+      resources: [
+        { id: "mri-a", name: "MRI Scanner A", type: "room" },
+        { id: "mri-b", name: "MRI Scanner B", type: "room" },
+      ],
+    };
+    const e = extractEntities("book the MRI Scanner tomorrow at 10am", {
+      catalog,
+      now: NOW,
+      timezone: "UTC",
+    });
+    expect(e.resources.map((r) => r.id)).toEqual(["mri-a"]);
+    expect(e.resources[0].exact).toBe(false);
+  });
 });

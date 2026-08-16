@@ -6,8 +6,10 @@ import {
   ElementRef,
   AfterViewInit,
   OnDestroy,
+  OnChanges,
   viewChild,
   ChangeDetectionStrategy,
+  effect,
 } from "@angular/core";
 import "@janus-scheduler/ui";
 import type {
@@ -45,7 +47,7 @@ import type {
     `,
   ],
 })
-export class ChatComponent implements AfterViewInit, OnDestroy {
+export class ChatComponent implements AfterViewInit, OnDestroy, OnChanges {
   private readonly _elRef =
     viewChild.required<ElementRef<HTMLElement>>("chatEl");
 
@@ -56,6 +58,7 @@ export class ChatComponent implements AfterViewInit, OnDestroy {
   readonly placeholder = input<string | undefined>(undefined);
   readonly value = input<string | undefined>(undefined);
   readonly busy = input<boolean | undefined>(undefined);
+  readonly disabled = input<boolean | undefined>(undefined);
   readonly showClose = input<boolean | undefined>(undefined);
   readonly showVoice = input<boolean | undefined>(undefined);
   /** `"light"` (default) · `"dark"` · `"auto"` follows the OS. */
@@ -87,6 +90,12 @@ export class ChatComponent implements AfterViewInit, OnDestroy {
   /** Kept so every listener added can be removed again. */
   private readonly _attached: Array<[string, (e: Event) => void]> = [];
 
+  constructor() {
+    effect(() => {
+      this._syncInputs();
+    });
+  }
+
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
 
@@ -99,6 +108,17 @@ export class ChatComponent implements AfterViewInit, OnDestroy {
       this._attached.push([name, listener]);
     }
 
+    this._syncInputs();
+  }
+
+  ngOnChanges(): void {
+    this._syncInputs();
+  }
+
+  private _syncInputs(): void {
+    const el = this._elRef()?.nativeElement;
+    if (!el) return;
+
     const typed = el as HTMLElement & Record<string, unknown>;
     const set = (key: string, value: unknown) => {
       if (value !== undefined) typed[key] = value;
@@ -110,6 +130,7 @@ export class ChatComponent implements AfterViewInit, OnDestroy {
     set("placeholder", this.placeholder());
     set("value", this.value());
     set("busy", this.busy());
+    set("disabled", this.disabled());
     set("showClose", this.showClose());
     set("showVoice", this.showVoice());
     set("theme", this.theme());

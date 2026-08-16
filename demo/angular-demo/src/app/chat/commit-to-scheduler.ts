@@ -151,7 +151,7 @@ export function commitSession(
       }
 
       const id = `nlp_${Date.now()}`;
-      const title = draft.title ?? 'New event';
+      const title = draft.title?.trim() || 'New Event';
       manager.addEvent({
         id,
         title,
@@ -219,30 +219,77 @@ export function commitSession(
       const before = {
         startTime: previous.startTime,
         endTime: previous.endTime,
+        resourceIds: [...previous.resourceIds],
       };
 
-      manager.updateEvent(target.id, {
+      const named = [...draft.resources, ...draft.participants].map((m) => m.id);
+      const updates: {
+        startTime: string;
+        endTime: string;
+        resourceIds?: string[];
+      } = {
         startTime: draft.time.startISO,
         endTime: draft.time.endISO,
-      });
+      };
+      if (named.length > 0) {
+        updates.resourceIds = named;
+      }
+
+      manager.updateEvent(target.id, updates);
+
+      const where =
+        named.length > 0
+          ? ` in ${[...draft.resources, ...draft.participants].map((m) => m.name).join(', ')}`
+          : '';
 
       return {
         ok: true,
-        summary: `Moved “${previous.title}” to ${shortWhen(draft.time.localDate, draft.time.localTime)}`,
+        summary: `Moved “${previous.title}” to ${shortWhen(draft.time.localDate, draft.time.localTime)}${where}`,
         undo: () => manager.updateEvent(target.id, before),
       };
     }
 
     case 'get_details': {
-      // A question, not a mutation. Nothing to undo.
-      const target = resolveTarget(manager, draft.title);
-      if (!target.ok) return target;
-      const event = manager.getEvent(target.id);
-      if (!event) return { ok: false, message: "I couldn't find that event." };
-      const start = new Date(event.startTime);
+      // If a specific event title was matched, show that event
+      if (draft.title) {
+        const target = resolveTarget(manager, draft.title);
+        if (target.ok) {
+          const event = manager.getEvent(target.id);
+          if (event) {
+            const start = new Date(event.startTime);
+            return {
+              ok: true,
+              summary: `${event.title} · ${start.toLocaleString()} · ${event.resourceIds.length} resource(s)`,
+            };
+          }
+        }
+      }
+
+      // Otherwise, summarize all events for the requested day
+      const targetDate = draft.time?.localDate ?? new Date().toISOString().slice(0, 10);
+      const events = manager.getAllEvents().filter((e) => {
+        const eventDate = e.startTime.slice(0, 10);
+        return eventDate === targetDate;
+      });
+
+      const dayLabel = draft.time ? shortWhen(draft.time.localDate, '') : 'today';
+      if (events.length === 0) {
+        return {
+          ok: true,
+          summary: `You have no events scheduled for ${dayLabel}.`,
+        };
+      }
+
+      const list = events
+        .map((e) => {
+          const time = e.startTime.includes('T') ? e.startTime.split('T')[1].slice(0, 5) : '';
+          return `${time ? time + ' ' : ''}“${e.title}”`;
+        })
+        .join(', ');
+
       return {
         ok: true,
-        summary: `${event.title} · ${start.toLocaleString()} · ${event.resourceIds.length} resource(s)`,
+        summary: `${events.length} event(s) on ${dayLabel}: ${list}`,
       };
     }
 

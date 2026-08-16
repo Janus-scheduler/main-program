@@ -26,6 +26,8 @@
  * `@janus-scheduler/nlp` must not depend on `@janus-scheduler/core`.
  */
 
+import * as chrono from "chrono-node";
+
 import type {
   ClockTime,
   DateAnchor,
@@ -80,6 +82,33 @@ const WEEKDAY_BY_STEM: Record<string, number> = {
   thurs: 4,
   fri: 5,
   satur: 6,
+};
+
+const MONTH_BY_NAME: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
 };
 
 // ── timezone primitives ───────────────────────────────────────────────────
@@ -238,10 +267,25 @@ const MENTION_PATTERNS: Array<{
   kind: TimeMention["kind"];
   re: RegExp;
 }> = [
+  // "5pm to 7pm", "5:00 to 7:00 pm", "5 to 7pm", "from 5pm to 7pm", "5pm-7pm"
+  {
+    kind: "clockRange",
+    re: /\b(?:from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|-|until|till|through)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/gi,
+  },
   // "10am", "10:30 pm", "3 PM"
   { kind: "clock", re: /\b(\d{1,2})(?::(\d{2}))?\s?(am|pm)\b/gi },
   { kind: "noon", re: /\bnoon\b/gi },
   { kind: "midnight", re: /\bmidnight\b/gi },
+  // "August 18", "August 18th", "Aug 18", "Aug 18, 2026"
+  {
+    kind: "monthDate",
+    re: /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?\b/gi,
+  },
+  // "18th of August", "18 August", "18th August", "18 Aug 2026"
+  {
+    kind: "monthDate",
+    re: /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s*,?\s*(\d{4}))?\b/gi,
+  },
   // "next monday", "this friday", "last tuesday"
   {
     kind: "relativeWeekday",
@@ -277,24 +321,83 @@ function weekdayFromStem(stem: string): number | undefined {
   return WEEKDAY_BY_STEM[stem.toLowerCase()];
 }
 
+const MONTH_NAMES_RE =
+  /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i;
+
+function extractChronoMentions(text: string): TimeMention[] {
+  const chronoResults = chrono.parse(text);
+  const mentions: TimeMention[] = [];
+
+  for (const r of chronoResults) {
+    const isHourCertain = r.start.isCertain("hour");
+    const isDayCertain = r.start.isCertain("day");
+    const isMonthCertain = r.start.isCertain("month");
+
+    // Only emit monthDate if it contains an explicit month name or calendar date
+    const hasMonthName = MONTH_NAMES_RE.test(r.text);
+    const hasRelativeKeyword =
+      /\b(today|tomorrow|tonight|yesterday|week|month|year|quarter|sprint|hour|hours|mins?|minutes?|day|days)\b/i.test(
+        r.text,
+      );
+
+    if (isDayCertain && isMonthCertain && hasMonthName && !hasRelativeKeyword) {
+      const clock: ClockTime | undefined = isHourCertain
+        ? { hour: r.start.get("hour") ?? 0, minute: r.start.get("minute") ?? 0 }
+        : undefined;
+      const endClock: ClockTime | undefined =
+        r.end && r.end.isCertain("hour")
+          ? { hour: r.end.get("hour") ?? 0, minute: r.end.get("minute") ?? 0 }
+          : undefined;
+
+      let durationMinutes: number | undefined;
+      if (clock && endClock) {
+        const startTotal = clock.hour * 60 + clock.minute;
+        let endTotal = endClock.hour * 60 + endClock.minute;
+        if (endTotal <= startTotal) endTotal += 24 * 60;
+        durationMinutes = endTotal - startTotal;
+      }
+
+      mentions.push({
+        text: r.text,
+        start: r.index,
+        end: r.index + r.text.length,
+        kind: "monthDate",
+        month: r.start.get("month") ?? undefined,
+        day: r.start.get("day") ?? undefined,
+        year: r.start.isCertain("year")
+          ? (r.start.get("year") ?? undefined)
+          : undefined,
+        clock,
+        endClock,
+        durationMinutes,
+      });
+    }
+  }
+
+  return mentions;
+}
+
 /**
  * Every time phrase in `text`, with its character span.
  *
  * Overlapping matches are resolved by preferring the earlier start, then the
- * longer span — so "next monday" is one `relativeWeekday`, not a `relativeUnit`
- * plus a stray `weekday`.
+ * longer span.
  */
 export function extractTimeMentions(text: string): TimeMention[] {
   const found: TimeMention[] = [];
 
+  // 1. Chrono-node natural language parsing
+  try {
+    found.push(...extractChronoMentions(text));
+  } catch {
+    // Fail-safe
+  }
+
+  // 2. Pattern-based mentions (durations, specific regexes)
   for (const { kind, re } of MENTION_PATTERNS) {
-    // Fresh instance per call: these are /g regexes and `exec` is stateful.
-    // Sharing them across calls would make results depend on call order.
     const rx = new RegExp(re.source, re.flags);
     let m: RegExpExecArray | null;
     while ((m = rx.exec(text)) !== null) {
-      // Zero-length matches would loop forever; none of the patterns above can
-      // produce one, but the guard costs nothing and removes the class of bug.
       if (m[0].length === 0) {
         rx.lastIndex++;
         continue;
@@ -323,6 +426,26 @@ function buildMention(
   const base = { text: m[0], start: m.index, end: m.index + m[0].length };
 
   switch (kind) {
+    case "clockRange": {
+      const endMeridiem = (m[6] ?? "pm").toLowerCase();
+      const startMeridiem = m[3] ? m[3].toLowerCase() : endMeridiem;
+      const startHour = to24Hour(Number(m[1]), startMeridiem);
+      const startMinute = m[2] ? Number(m[2]) : 0;
+      const endHour = to24Hour(Number(m[4]), endMeridiem);
+      const endMinute = m[5] ? Number(m[5]) : 0;
+      const startTotal = startHour * 60 + startMinute;
+      let endTotal = endHour * 60 + endMinute;
+      if (endTotal <= startTotal) {
+        endTotal += 24 * 60;
+      }
+      return {
+        ...base,
+        kind,
+        clock: { hour: startHour, minute: startMinute },
+        endClock: { hour: endHour, minute: endMinute },
+        durationMinutes: endTotal - startTotal,
+      };
+    }
     case "clock":
       return {
         ...base,
@@ -352,6 +475,20 @@ function buildMention(
       };
     case "weekday":
       return { ...base, kind, weekday: weekdayFromStem(m[1]) };
+    case "monthDate": {
+      const isMonthFirst = isNaN(Number(m[1]));
+      const monthStr = isMonthFirst ? m[1].toLowerCase() : m[2].toLowerCase();
+      const dayNum = Number(isMonthFirst ? m[2] : m[1]);
+      const yearNum = m[3] ? Number(m[3]) : undefined;
+      const monthNum = MONTH_BY_NAME[monthStr] ?? 1;
+      return {
+        ...base,
+        kind,
+        month: monthNum,
+        day: dayNum,
+        year: yearNum,
+      };
+    }
     case "duration":
       return { ...base, kind, durationMinutes: durationOf(m) };
     case "partOfDay":
@@ -395,10 +532,23 @@ export function toTimeSpan(mentions: TimeMention[]): TimeSpan | undefined {
 
   for (const m of mentions) {
     switch (m.kind) {
+      case "clockRange":
+        span.clock ??= m.clock;
+        span.endClock ??= m.endClock;
+        span.durationMinutes ??= m.durationMinutes;
+        break;
       case "clock":
       case "noon":
       case "midnight":
-        span.clock ??= m.clock;
+        if (!span.clock) {
+          span.clock = m.clock;
+        } else if (!span.endClock && m.clock) {
+          span.endClock = m.clock;
+          const startTotal = span.clock.hour * 60 + span.clock.minute;
+          let endTotal = span.endClock.hour * 60 + span.endClock.minute;
+          if (endTotal <= startTotal) endTotal += 24 * 60;
+          span.durationMinutes ??= endTotal - startTotal;
+        }
         break;
       case "today":
         span.date ??= { kind: "today" };
@@ -430,6 +580,25 @@ export function toTimeSpan(mentions: TimeMention[]): TimeSpan | undefined {
           unit: m.unit ?? "week",
           direction: m.direction ?? "next",
         };
+        break;
+      case "monthDate":
+        if (m.month !== undefined && m.day !== undefined) {
+          span.date ??= {
+            kind: "monthDate",
+            month: m.month,
+            day: m.day,
+            year: m.year,
+          };
+        }
+        if (m.clock) {
+          span.clock ??= m.clock;
+        }
+        if (m.endClock) {
+          span.endClock ??= m.endClock;
+        }
+        if (m.durationMinutes !== undefined) {
+          span.durationMinutes ??= m.durationMinutes;
+        }
         break;
       case "partOfDay":
         span.partOfDay ??= m.partOfDay;
@@ -514,6 +683,20 @@ function resolveDate(
           return "unresolvable";
       }
       return "unresolvable";
+    }
+
+    case "monthDate": {
+      let year = anchor.year;
+      if (year === undefined) {
+        year = today.year;
+        if (
+          anchor.month < today.month ||
+          (anchor.month === today.month && anchor.day < today.day)
+        ) {
+          year += 1;
+        }
+      }
+      return { year, month: anchor.month, day: anchor.day };
     }
   }
 }
@@ -620,6 +803,37 @@ export function resolveTime(
   );
   const endMs = startMs + durationMinutes * MS_PER_MINUTE;
 
+  const isPastRelativeWeekday = Boolean(
+    span?.date?.kind === "relativeWeekday" &&
+    span.date.direction === "this" &&
+    span.date.weekday !== undefined &&
+    weekdayOf(today.year, today.month, today.day) > span.date.weekday,
+  );
+
+  let pastDateStr: string | undefined;
+  let upcomingDateStr: string | undefined;
+  if (
+    isPastRelativeWeekday &&
+    span?.date?.kind === "relativeWeekday" &&
+    span.date.weekday !== undefined
+  ) {
+    const cur = weekdayOf(today.year, today.month, today.day);
+    const pastD = addDays(
+      today.year,
+      today.month,
+      today.day,
+      span.date.weekday - cur,
+    );
+    const upD = addDays(
+      today.year,
+      today.month,
+      today.day,
+      span.date.weekday - cur + 7,
+    );
+    pastDateStr = `${pastD.year}-${pad(pastD.month)}-${pad(pastD.day)}`;
+    upcomingDateStr = `${upD.year}-${pad(upD.month)}-${pad(upD.day)}`;
+  }
+
   return {
     startISO: new Date(startMs).toISOString(),
     endISO: new Date(endMs).toISOString(),
@@ -634,6 +848,9 @@ export function resolveTime(
     localDate: `${date.year}-${pad(date.month)}-${pad(date.day)}`,
     localTime: `${pad(clock.hour)}:${pad(clock.minute)}`,
     weekday: WEEKDAYS[weekdayOf(date.year, date.month, date.day)],
+    pastRelativeWeekday: isPastRelativeWeekday,
+    pastDate: pastDateStr,
+    upcomingDate: upcomingDateStr,
   };
 }
 

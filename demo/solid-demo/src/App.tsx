@@ -30,7 +30,7 @@ const INTRO: PresentMessage = {
 };
 
 const REQUIRES: SessionRequirements = {
-  add_event: ["when", "resource"],
+  add_event: ["when", "duration", "resource"],
   modify_event: ["when"],
 };
 

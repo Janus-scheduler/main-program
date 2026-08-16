@@ -7,9 +7,9 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/janus-scheduler-react.es.js",
-      "require": "./dist/janus-scheduler-react.cjs.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/janus-scheduler-react.cjs.js"
     }
   },
   "files": [

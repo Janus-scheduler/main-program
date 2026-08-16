@@ -161,12 +161,20 @@ export type DateAnchor =
       kind: "relativeUnit";
       unit: "week" | "month" | "quarter" | "year" | "sprint";
       direction: "next" | "this" | "last";
+    }
+  /** An explicit calendar date: "August 18", "18th of August", "Aug 18, 2026". */
+  | {
+      kind: "monthDate";
+      month: number;
+      day: number;
+      year?: number;
     };
 
 /** One time phrase found in the text, with everything parsed out of it. */
 export interface TimeMention extends TextSpan {
   kind:
     | "clock"
+    | "clockRange"
     | "noon"
     | "midnight"
     | "today"
@@ -175,13 +183,18 @@ export interface TimeMention extends TextSpan {
     | "weekday"
     | "relativeWeekday"
     | "relativeUnit"
+    | "monthDate"
     | "partOfDay"
     | "duration";
   clock?: ClockTime;
+  endClock?: ClockTime;
   /** 0 = Sunday. */
   weekday?: number;
   direction?: "next" | "this" | "last";
   unit?: "week" | "month" | "quarter" | "year" | "sprint";
+  month?: number;
+  day?: number;
+  year?: number;
   partOfDay?: PartOfDay;
   durationMinutes?: number;
 }
@@ -192,6 +205,7 @@ export interface TimeSpan extends TextSpan {
   mentions: TimeMention[];
   date?: DateAnchor;
   clock?: ClockTime;
+  endClock?: ClockTime;
   partOfDay?: PartOfDay;
   durationMinutes?: number;
 }
@@ -242,6 +256,12 @@ export interface ResolvedTime {
   localTime: string;
   /** Weekday name of `localDate`, lowercase. */
   weekday: string;
+  /** True when a 'this <weekday>' phrase resolved to a day strictly before now in the current week. */
+  pastRelativeWeekday?: boolean;
+  /** Candidate past date YYYY-MM-DD when pastRelativeWeekday is true. */
+  pastDate?: string;
+  /** Candidate upcoming date YYYY-MM-DD when pastRelativeWeekday is true. */
+  upcomingDate?: string;
 }
 
 /** One entry in the caller-supplied catalog. */
@@ -337,7 +357,13 @@ export type FiredGate = Exclude<Gate, null>;
  * so they can make a session stricter but never looser:
  *   `when` · `resource` · `title`
  */
-export type SlotName = "when" | "intent" | "confirm" | "resource" | "title";
+export type SlotName =
+  | "when"
+  | "intent"
+  | "confirm"
+  | "resource"
+  | "title"
+  | "duration";
 
 /**
  * A field the host app considers mandatory before an event is worth creating.
@@ -352,8 +378,9 @@ export type SlotName = "when" | "intent" | "confirm" | "resource" | "title";
  *   `resource` — at least one catalog match, person or room. Both map onto
  *                `resourceIds`, so "who" and "where" are one requirement.
  *   `title`    — a non-empty title
+ *   `duration` — an explicitly stated or confirmed duration
  */
-export type RequiredSlot = "when" | "resource" | "title";
+export type RequiredSlot = "when" | "resource" | "title" | "duration";
 
 /** Per-intent completeness rules. Anything omitted is not required. */
 export type SessionRequirements = Partial<Record<Intent, RequiredSlot[]>>;
@@ -363,6 +390,8 @@ export interface SessionChoice {
   id: string;
   label: string;
   value: string;
+  kind?: "place" | "person" | "thing";
+  group?: string;
 }
 
 /** A question the session is waiting on. */
@@ -384,6 +413,9 @@ export interface SessionQuestion {
    * understand the utterance well enough to proceed.
    */
   skippable: boolean;
+  multiselect?: boolean;
+  searchable?: boolean;
+  inputPlaceholder?: string;
 }
 
 /** One answered question, kept so a UI can replay the conversation. */

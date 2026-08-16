@@ -921,4 +921,111 @@ describe("session contract", () => {
     expect(state.status).toBe("awaiting");
     expect(state.question?.choices?.[1].value).toBe("start over");
   });
+
+  it("clarifies past relative weekday when 'this monday' is spoken on Wednesday", () => {
+    // NOW is Wednesday 2026-08-05
+    const state = beginSession("book Room A this monday at 10am", ctx);
+    expect(state.status).toBe("awaiting");
+    expect(state.question?.text).toContain("Did you mean past Monday");
+    expect(state.question?.choices).toHaveLength(2);
+
+    const answered = provideAnswer(state, "next monday at 10am", ctx);
+    expect(answered.status).toBe("ready");
+    expect(answered.draft?.time?.localDate).toBe("2026-08-10");
+  });
+
+  it("handles multi-resource answers selecting both rooms and people", () => {
+    const strictCtx: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["resource"] },
+    };
+    const s1 = beginSession("schedule a meeting tomorrow at 10am", strictCtx);
+    expect(s1.status).toBe("awaiting");
+    expect(s1.question?.slot).toBe("resource");
+
+    const s2 = provideAnswer(s1, "Room A and Sarah Chen", strictCtx);
+    expect(s2.status).toBe("ready");
+    expect(s2.draft?.resources.map((r) => r.id)).toEqual(["r1"]);
+    expect(s2.draft?.participants.map((p) => p.id)).toEqual(["p3"]);
+  });
+
+  it("asks for duration when required and handles custom typed end time", () => {
+    const strictCtx: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["when", "duration"] },
+    };
+    const s1 = beginSession(
+      "schedule a meeting tomorrow at 5pm with Sarah",
+      strictCtx,
+    );
+    expect(s1.status).toBe("awaiting");
+    expect(s1.question?.slot).toBe("duration");
+    expect(s1.question?.inputPlaceholder).toContain("45 mins");
+
+    // Test answering with custom typed end time
+    const s2 = provideAnswer(s1, "until 6:30pm", strictCtx);
+    expect(s2.status).toBe("ready");
+    expect(s2.draft?.time?.durationMinutes).toBe(90);
+    expect(s2.draft?.time?.assumed.duration).toBe(false);
+  });
+
+  it("handles custom typed duration answers like 'for 45 mins'", () => {
+    const strictCtx: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["duration"] },
+    };
+    const s1 = beginSession("schedule a meeting tomorrow at 5pm", strictCtx);
+    const s2 = provideAnswer(s1, "45 mins", strictCtx);
+    expect(s2.status).toBe("ready");
+    expect(s2.draft?.time?.durationMinutes).toBe(45);
+    expect(s2.draft?.time?.assumed.duration).toBe(false);
+  });
+
+  it("handles conversational leads like 'Need to book MRI Scanner A today' and asks for specific time", () => {
+    const customCatalog: EntityCatalog = {
+      resources: [
+        { id: "mri-a", name: "MRI Scanner A", type: "room" },
+        { id: "mri-b", name: "MRI Scanner B", type: "room" },
+      ],
+      participants: [{ id: "p1", name: "Sarah Chen", type: "person" }],
+    };
+    const customCtx: SessionContext = {
+      ...ctx,
+      catalog: customCatalog,
+      requires: { add_event: ["when", "duration", "resource"] },
+    };
+
+    const s1 = beginSession("Need to book MRI Scanner A today", customCtx);
+    expect(s1.status).toBe("awaiting");
+    expect(s1.draft?.resources.map((r) => r.id)).toEqual(["mri-a"]);
+    expect(s1.question?.slot).toBe("when");
+
+    const s2 = provideAnswer(s1, "at 2pm", customCtx);
+    expect(s2.status).toBe("awaiting");
+    expect(s2.question?.slot).toBe("duration");
+
+    const s3 = provideAnswer(s2, "for 45 mins", customCtx);
+    expect(s3.status).toBe("ready");
+    expect(s3.draft?.time?.localTime).toBe("14:00");
+    expect(s3.draft?.time?.durationMinutes).toBe(45);
+  });
+
+  it("softens partial resource utterances like 'Book the MRI Scanner' into clarification questions", () => {
+    const customCatalog: EntityCatalog = {
+      resources: [
+        { id: "mri-a", name: "MRI Scanner A", type: "room" },
+        { id: "mri-b", name: "MRI Scanner B", type: "room" },
+      ],
+    };
+    const customCtx: SessionContext = {
+      ...ctx,
+      catalog: customCatalog,
+      requires: { add_event: ["when", "resource"] },
+    };
+
+    const s1 = beginSession("Book the MRI Scanner", customCtx);
+    expect(s1.status).toBe("awaiting");
+    expect(s1.draft?.resources.map((r) => r.id)).toEqual(["mri-a"]);
+    expect(s1.question?.slot).toBe("when");
+  });
 });

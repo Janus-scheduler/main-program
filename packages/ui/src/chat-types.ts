@@ -81,6 +81,8 @@ export interface ChatParseCard {
 export interface ChatChoice {
   id: string;
   label: string;
+  kind?: ChatChipKind;
+  group?: string;
 }
 
 /** One row in the typing-suggestion dropdown. */
@@ -119,6 +121,7 @@ export interface ChatParseMessage extends ChatMessageBase {
   kind: "parse";
   role: "assistant";
   card: ChatParseCard;
+  finalized?: boolean;
 }
 
 /** A CLARIFY result: one question, optional tappable answers. */
@@ -133,6 +136,13 @@ export interface ChatClarifyMessage extends ChatMessageBase {
   choices?: ChatChoice[];
   /** "1 more to go" — remaining required slots. */
   progress?: string;
+  multiselect?: boolean;
+  searchable?: boolean;
+  inputPlaceholder?: string;
+  hint?: string;
+  answeredChoiceId?: string;
+  answeredChoiceIds?: string[];
+  answered?: boolean;
 }
 
 /** Committed. Offers View and Undo. */
@@ -177,6 +187,8 @@ export interface ChatClarifyResponseDetail {
   messageId: string;
   choiceId: string;
   label: string;
+  choiceIds?: string[];
+  labels?: string[];
 }
 
 /** Payload of `chat-suggestion-select`. */

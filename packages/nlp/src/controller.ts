@@ -7,6 +7,8 @@ import {
   Prototype,
 } from "./types";
 import { beginSession, provideAnswer } from "./session";
+import { reviseSlot } from "./revise";
+import { parseTimeSpan } from "./datetime";
 import { classifySmalltalk } from "./smalltalk";
 import { presentSession, summarise, PresentMessage } from "./presentSession";
 
@@ -156,9 +158,30 @@ export class ChatController {
     this.timerId = setTimeout(() => {
       let next: SessionState | null = null;
       try {
-        if (isCorrection) {
-          const { reviseSlot } = require("./revise");
-          next = reviseSlot(this.session, undefined, text, ctx);
+        if (isCorrection && this.session) {
+          const payload =
+            correctionMatch && correctionMatch[2].trim().length > 0
+              ? correctionMatch[2].trim()
+              : text;
+          const parsed = parseTimeSpan(payload);
+          if (parsed && this.session.draft?.timeSpan) {
+            const originalSpan = this.session.draft.timeSpan;
+            let replacementText = payload;
+            if (!parsed.date && originalSpan.date) {
+              const dateMention = originalSpan.mentions.find(
+                (m) =>
+                  m.kind !== "clock" &&
+                  m.kind !== "duration" &&
+                  m.kind !== "partOfDay",
+              );
+              if (dateMention) {
+                replacementText = `${dateMention.text} ${payload}`.trim();
+              }
+            }
+            next = reviseSlot(this.session, originalSpan, replacementText, ctx);
+          } else {
+            next = reviseSlot(this.session, undefined, payload, ctx);
+          }
         } else {
           next =
             this.session && this.session.status === "awaiting"
@@ -188,6 +211,7 @@ export class ChatController {
   }
 
   public choose(label: string) {
+    if (this.busy) return;
     const choice = this.session?.question?.choices?.find(
       (c) => c.label === label,
     );
@@ -195,7 +219,7 @@ export class ChatController {
   }
 
   public confirm() {
-    if (!this.session || this.session.status !== "ready") return;
+    if (this.busy || !this.session || this.session.status !== "ready") return;
 
     let outcome: ConfirmOutcome | undefined = undefined;
 
@@ -220,6 +244,9 @@ export class ChatController {
     if (outcome.undo) this.undos.set(id, outcome.undo);
 
     this.session = null;
+    this.thread = this.thread.map((m) =>
+      m.kind === "parse" ? { ...m, finalized: true } : m,
+    );
     this.append({
       id,
       role: "assistant",

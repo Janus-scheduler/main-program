@@ -160,4 +160,83 @@ describe("presentSession intent-aware formatting in @janus-scheduler/nlp", () =>
     expect(getEditLabel("delete_event")).toBe("Keep it");
     expect(getEditLabel("add_event")).toBe("Edit");
   });
+
+  test("clarify cards (awaiting) show ONLY confirmed user chips", () => {
+    const clarifyState: SessionState = {
+      ...baseSessionState,
+      status: "awaiting",
+      question: {
+        slot: "when",
+        gate: null,
+        source: "requirement",
+        skippable: true,
+        text: "When should MRI Scanner A be?",
+        choices: [{ id: "c1", label: "Today", value: "today" }],
+      },
+      draft: {
+        intent: "add_event",
+        title: undefined,
+        time: {
+          startISO: "2026-08-10T09:00:00.000Z",
+          endISO: "2026-08-10T10:00:00.000Z",
+          startMs: 12345,
+          endMs: 23456,
+          durationMinutes: 60,
+          timezone: "UTC",
+          localDate: "2026-08-10",
+          localTime: "09:00",
+          weekday: "monday",
+          assumed: {
+            date: false,
+            timeOfDay: true, // assumed!
+            duration: true, // assumed!
+          },
+          assumptions: ["assumed 09:00"],
+        },
+        resources: [
+          {
+            id: "mri-a",
+            name: "MRI Scanner A",
+            type: "room",
+            exact: true,
+            start: 0,
+            end: 13,
+            text: "MRI Scanner A",
+          },
+        ],
+        participants: [],
+      },
+    };
+
+    const msg = presentSession(clarifyState, "c1", {
+      fallbackResourceName: "Dr. Sarah Chen",
+    });
+    expect(msg?.kind).toBe("clarify");
+    if (msg?.kind === "clarify") {
+      // Only the confirmed resource chip is present
+      expect(msg.chips).toEqual([
+        {
+          kind: "place",
+          label: "MRI Scanner A",
+        },
+      ]);
+    }
+  });
+
+  test("defaults untitled add_event parse card title to 'New Event'", () => {
+    const untitledState: SessionState = {
+      ...baseSessionState,
+      status: "ready",
+      draft: {
+        ...baseSessionState.draft!,
+        intent: "add_event",
+        title: undefined,
+      },
+    };
+    const msg = presentSession(untitledState, "c2");
+    expect(msg?.kind).toBe("parse");
+    if (msg?.kind === "parse") {
+      expect(msg.card.title).toBe("New Event");
+    }
+  });
 });

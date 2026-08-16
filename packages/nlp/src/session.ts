@@ -41,6 +41,7 @@ import { parseTimeSpan } from "./datetime";
 import { extractEntities } from "./entities";
 import { correctTimeWords } from "./spelling";
 import type {
+  CatalogEntry,
   ClassifyResult,
   FiredGate,
   Intent,
@@ -112,6 +113,17 @@ const WHEN_CHOICES: SessionChoice[] = [
     value: "tomorrow afternoon",
   },
   { id: "when-next-week", label: "Next week", value: "next week" },
+];
+
+const TIME_OF_DAY_CHOICES: SessionChoice[] = [
+  { id: "time-9am", label: "9:00 AM", value: "at 9:00 AM" },
+  { id: "time-10am", label: "10:00 AM", value: "at 10:00 AM" },
+  { id: "time-11am", label: "11:00 AM", value: "at 11:00 AM" },
+  { id: "time-2pm", label: "2:00 PM", value: "at 2:00 PM" },
+  { id: "time-3pm", label: "3:00 PM", value: "at 3:00 PM" },
+  { id: "time-4pm", label: "4:00 PM", value: "at 4:00 PM" },
+  { id: "time-morning", label: "Morning", value: "in the morning" },
+  { id: "time-afternoon", label: "Afternoon", value: "in the afternoon" },
 ];
 
 const YES_NO_CHOICES: SessionChoice[] = [
@@ -231,7 +243,7 @@ function subjectOf(draft: SessionDraft): string {
   if (draft.resources.length > 0) return draft.resources[0].name;
   if (draft.participants.length > 0)
     return `your time with ${draft.participants[0].name}`;
-  return "this";
+  return "New Event";
 }
 
 /** The distinct intents in the top-K neighbours, best first, `none` dropped. */
@@ -314,42 +326,54 @@ function buildQuestion(
 
 // ── host requirements ─────────────────────────────────────────────────────
 
-/** How many catalog entries to offer as chips before it becomes a wall. */
-const MAX_RESOURCE_CHOICES = 6;
+const DURATION_CHOICES: SessionChoice[] = [
+  { id: "dur-30m", label: "30 min", value: "for 30 minutes" },
+  { id: "dur-45m", label: "45 min", value: "for 45 minutes" },
+  { id: "dur-1h", label: "1 hr", value: "for 1 hour" },
+  { id: "dur-1.5h", label: "1.5 hr", value: "for 1.5 hours" },
+  { id: "dur-2h", label: "2 hr", value: "for 2 hours" },
+];
 
 /** Is this requirement satisfied by what has been understood so far? */
 function slotIsFilled(slot: RequiredSlot, draft: SessionDraft): boolean {
   switch (slot) {
     case "when":
-      return draft.time !== null;
+      return draft.time !== null && !draft.time.assumed.timeOfDay;
     case "resource":
       // People and rooms are both rows on the timeline, so either satisfies
       // it — "with Sarah" and "in Room A" are equally complete.
       return draft.resources.length > 0 || draft.participants.length > 0;
     case "title":
-      return typeof draft.title === "string" && draft.title.length > 0;
+      return typeof draft.title === "string" && draft.title.trim().length > 0;
+    case "duration":
+      return draft.time !== null && !draft.time.assumed.duration;
   }
 }
 
 /**
- * Offer the catalog as chips, rooms first.
- *
- * `value` is the entry's name, which gets merged into the utterance and then
- * re-matched by `extractEntities` on the next turn — so a tapped chip and a
- * typed name go down exactly the same path, and the draft stays a pure
- * function of the accumulated text.
+ * Offer the catalog as choices, categorized by kind.
  */
 function resourceChoices(ctx: SessionContext): SessionChoice[] {
-  const entries = [
-    ...(ctx.catalog?.resources ?? []),
-    ...(ctx.catalog?.participants ?? []),
-  ].slice(0, MAX_RESOURCE_CHOICES);
+  const rooms: SessionChoice[] = (ctx.catalog?.resources ?? []).map(
+    (entry) => ({
+      id: `resource-${entry.id}`,
+      label: entry.name,
+      value: entry.name,
+      kind: "place",
+      group: "Rooms / Locations",
+    }),
+  );
+  const people: SessionChoice[] = (ctx.catalog?.participants ?? []).map(
+    (entry) => ({
+      id: `resource-${entry.id}`,
+      label: entry.name,
+      value: entry.name,
+      kind: "person",
+      group: "People / Participants",
+    }),
+  );
 
-  return entries.map((entry) => ({
-    id: `resource-${entry.id}`,
-    label: entry.name,
-    value: entry.name,
-  }));
+  return [...rooms, ...people];
 }
 
 /**
@@ -385,21 +409,55 @@ function requirementQuestion(
     if (slotIsFilled(slot, draft) || skipped.includes(slot)) continue;
 
     switch (slot) {
-      case "when":
-        return asking("when", `When should ${subjectOf(draft)} be?`, [
-          ...WHEN_CHOICES,
-        ]);
+      case "when": {
+        const hasExplicitDate = draft.time !== null && !draft.time.assumed.date;
+        if (hasExplicitDate) {
+          const dateStr = draft.time?.localDate
+            ? ` (${draft.time.localDate})`
+            : "";
+          return {
+            ...asking(
+              "when",
+              `What time${dateStr} should ${subjectOf(draft)} be?`,
+              TIME_OF_DAY_CHOICES,
+            ),
+            inputPlaceholder: "e.g. 2:30 PM, 10am…",
+          };
+        }
+        return {
+          ...asking("when", `When should ${subjectOf(draft)} be?`, [
+            ...WHEN_CHOICES,
+          ]),
+          inputPlaceholder: "e.g. tomorrow at 2pm, Aug 18 at 10am…",
+        };
+      }
+
+      case "duration":
+        return {
+          ...asking(
+            "duration",
+            `How long should ${subjectOf(draft)} be, or when should it end?`,
+            DURATION_CHOICES,
+          ),
+          inputPlaceholder: "e.g. 45 mins, or until 6:30 PM…",
+        };
 
       case "resource": {
         const choices = resourceChoices(ctx);
         // Nothing to offer means nothing to ask about — an empty catalog is
         // the host's problem, not something to interrogate the user over.
         if (choices.length === 0) continue;
-        return asking(
-          "resource",
-          `Which room or person is ${subjectOf(draft)} for?`,
-          choices,
-        );
+        const isSearchable = choices.length > 5;
+        return {
+          ...asking(
+            "resource",
+            `Which room or person is ${subjectOf(draft)} for?`,
+            choices,
+          ),
+          multiselect: true,
+          searchable: isSearchable,
+          inputPlaceholder: "Type or search names…",
+        };
       }
 
       case "title":
@@ -446,7 +504,7 @@ function catalogSoftening(
   return {
     gate: route.gate,
     matched: match.name,
-    note: `“${match.name}” is in your catalog but not in the frozen anchor list - asking rather than refusing`,
+    note: `“${match.name}” is in your catalog - asking rather than refusing`,
   };
 }
 
@@ -581,6 +639,44 @@ function evaluate(input: EvaluateInput, ctx: SessionContext): SessionState {
   };
 
   if (route.route === "PROCEED") {
+    if (
+      draft.time?.pastRelativeWeekday &&
+      (draft.intent === "add_event" || draft.intent === "modify_event") &&
+      !input.skipped.includes("when") &&
+      !input.answers.some((a) => a.slot === "when" && a.gate === null)
+    ) {
+      const weekdayCap = draft.time.weekday
+        ? draft.time.weekday.charAt(0).toUpperCase() +
+          draft.time.weekday.slice(1)
+        : "the day";
+      const timeSuffix = draft.time.assumed?.timeOfDay
+        ? ""
+        : ` at ${draft.time.localTime}`;
+      const pastQ: SessionQuestion = {
+        slot: "when",
+        gate: null,
+        source: "gate",
+        skippable: false,
+        text: `Did you mean past ${weekdayCap} (${draft.time.pastDate}) or upcoming ${weekdayCap} (${draft.time.upcomingDate})?`,
+        choices: [
+          {
+            id: "choice-upcoming",
+            label: `Upcoming ${weekdayCap} (${draft.time.upcomingDate})`,
+            value: `next ${draft.time.weekday}${timeSuffix}`,
+          },
+          {
+            id: "choice-past",
+            label: `Past ${weekdayCap} (${draft.time.pastDate})`,
+            value: `last ${draft.time.weekday}${timeSuffix}`,
+          },
+        ],
+      };
+      return ask(
+        pastQ,
+        "ambiguous whether 'this' weekday refers to past or upcoming day",
+      );
+    }
+
     // Every frozen gate is happy. Now — and ONLY now — check what the HOST
     // says a complete event needs. This can add a question; it can never
     // remove one, so the session only ever gets stricter here.
@@ -617,15 +713,16 @@ function evaluate(input: EvaluateInput, ctx: SessionContext): SessionState {
   // missing is a time — the same thing gate 3b asks for on the resource-only
   // path, and answering it puts a real anchor in the text so the frozen gate
   // passes on its own merits next turn.
+  const reqQuestion = requirementQuestion(draft, ctx, input.skipped);
   const question: SessionQuestion | null = softened
-    ? {
+    ? (reqQuestion ?? {
         slot: "when",
         gate: softened.gate,
         source: "gate",
         skippable: false,
         text: `When would you like ${subjectOf(draft)}?`,
         choices: WHEN_CHOICES,
-      }
+      })
     : buildQuestion(route, draft);
 
   if (!question) {
@@ -647,16 +744,28 @@ function evaluate(input: EvaluateInput, ctx: SessionContext): SessionState {
 
 // ── public API ────────────────────────────────────────────────────────────
 
+function normalizeConversationalLead(text: string): string {
+  let s = text.trim();
+  s = s.replace(
+    /^(?:i\s+|we\s+|please\s+)?(?:need|want|would like|looking)\s+to\s+/i,
+    "",
+  );
+  return s;
+}
+
 /**
- * Start a conversation from a single utterance.
+ * Start a conversation from a user's first utterance.
  *
- * The returned state is `ready` (show the parse card), `awaiting` (show
- * `question`) or `declined`. Nothing is ever committed here — this module has
- * no way to reach a store, which is what makes verify-then-act structural
- * rather than a convention.
+ * Replaces direct `routeQuery` calls in interactive hosts. Non-interactive
+ * callers (batch scripts, parity suites) should continue calling `routeQuery`
+ * directly.
  */
-export function beginSession(text: string, ctx: SessionContext): SessionState {
-  const fixed = correct(text, ctx);
+export function beginSession(
+  rawText: string,
+  ctx: SessionContext,
+): SessionState {
+  const normalized = normalizeConversationalLead(rawText);
+  const fixed = correct(normalized.trim(), ctx);
   return evaluate(
     {
       text: fixed.text,
@@ -796,24 +905,85 @@ export function provideAnswer(
       });
     }
 
+    case "duration": {
+      // User may provide a duration phrase ("for 45 mins", "1 hour", "30 minutes")
+      // OR a clock/end-time phrase ("until 6:30pm", "to 7pm", "till 8:00").
+      const span = parseTimeSpan(trimmed);
+      let addition: string;
+      if (span && span.durationMinutes !== undefined) {
+        addition = `for ${span.durationMinutes} minutes`;
+      } else if (span && span.clock && state.draft?.time) {
+        const [sh, sm] = state.draft.time.localTime.split(":").map(Number);
+        const startTotal = sh * 60 + sm;
+        let endTotal = span.clock.hour * 60 + span.clock.minute;
+        if (endTotal <= startTotal) endTotal += 24 * 60;
+        addition = `for ${endTotal - startTotal} minutes`;
+      } else {
+        const durMatch = trimmed.match(
+          /\b(\d+(?:\.\d+)?)\s*(?:mins?|minutes?|hrs?|hours?)\b/i,
+        );
+        if (durMatch) {
+          addition = `for ${trimmed}`;
+        } else {
+          return next({ unresolved: "duration" });
+        }
+      }
+
+      const merged = `${state.text} ${addition}`.trim();
+      return next({
+        text: merged,
+        utterances: [...state.utterances, addition],
+        answers: record(addition),
+      });
+    }
+
     case "resource": {
-      // Merged as text, like every other answer, so the draft stays a pure
-      // function of the accumulated utterance and `extractEntities` does the
-      // matching exactly once. A preposition is chosen from the catalog entry's
-      // type so the merged sentence reads naturally — "with Sarah Chen",
-      // "in Room A" — which matters because the user is shown it.
-      const entry = [
+      const catalog = [
         ...(ctx.catalog?.resources ?? []),
         ...(ctx.catalog?.participants ?? []),
-      ].find(
-        (e) =>
-          e.name.toLowerCase() === trimmed.toLowerCase() ||
-          (e.aliases ?? []).some(
-            (a) => a.toLowerCase() === trimmed.toLowerCase(),
-          ),
-      );
-      const preposition = entry?.type === "person" ? "with" : "in";
-      const addition = `${preposition} ${entry?.name ?? trimmed}`;
+      ];
+
+      const matchedEntries: CatalogEntry[] = [];
+      const trimmedLower = trimmed.toLowerCase();
+
+      for (const entry of catalog) {
+        const nameLower = entry.name.toLowerCase();
+        if (
+          trimmedLower.includes(nameLower) ||
+          (entry.aliases ?? []).some((a) =>
+            trimmedLower.includes(a.toLowerCase()),
+          )
+        ) {
+          if (!matchedEntries.some((e) => e.id === entry.id)) {
+            matchedEntries.push(entry);
+          }
+        }
+      }
+
+      let addition: string;
+      if (matchedEntries.length > 0) {
+        const rooms = matchedEntries
+          .filter((e) => e.type !== "person")
+          .map((e) => e.name);
+        const people = matchedEntries
+          .filter((e) => e.type === "person")
+          .map((e) => e.name);
+        const parts: string[] = [];
+        if (rooms.length > 0) parts.push(`in ${rooms.join(" and ")}`);
+        if (people.length > 0) parts.push(`with ${people.join(" and ")}`);
+        addition = parts.join(" ");
+      } else {
+        const entry = catalog.find(
+          (e) =>
+            e.name.toLowerCase() === trimmed.toLowerCase() ||
+            (e.aliases ?? []).some(
+              (a) => a.toLowerCase() === trimmed.toLowerCase(),
+            ),
+        );
+        const preposition = entry?.type === "person" ? "with" : "in";
+        addition = `${preposition} ${entry?.name ?? trimmed}`;
+      }
+
       const merged = `${state.text} ${addition}`.trim();
 
       return next({
@@ -841,17 +1011,28 @@ export function provideAnswer(
       // to the utterance and shift the classification; appending
       // "next Tuesday at 2" keeps the merged sentence well formed and keeps the
       // intent the user already established.
-      //
-      // The ORIGINAL substring is taken, not `span.text` — the latter joins the
-      // individual mentions and so drops connectives, turning "tomorrow at 3pm"
-      // into "tomorrow 3pm". Both resolve identically, but the merged utterance
-      // is shown back to the user and should read like something they wrote.
       const span = parseTimeSpan(trimmed);
       if (!span) {
         return next({ unresolved: "when" });
       }
       const addition = trimmed.slice(span.start, span.end);
-      const merged = `${state.text} ${addition}`.trim();
+      let merged: string;
+
+      const hasOnlyClock = span.clock && !span.date;
+      const draftHasDate = state.draft?.time && !state.draft.time.assumed.date;
+
+      if (hasOnlyClock && draftHasDate) {
+        merged = `${state.text} ${addition}`.trim();
+      } else if (state.draft?.timeSpan) {
+        const s = state.draft.timeSpan;
+        merged =
+          `${state.text.slice(0, s.start)} ${addition} ${state.text.slice(s.end)}`
+            .replace(/\s+/g, " ")
+            .trim();
+      } else {
+        merged = `${state.text} ${addition}`.trim();
+      }
+
       return next({
         text: merged,
         utterances: [...state.utterances, addition],

@@ -6,6 +6,7 @@ import { SparkleIcon, MicIcon, SendIcon } from "./timeline-icons";
 import type {
   ChatChip,
   ChatChoice,
+  ChatClarifyMessage,
   ChatMessage,
   ChatParseCard,
   ChatSuggestion,
@@ -225,6 +226,10 @@ export class JanusChat extends LitElement {
 
   @state() private _prompt = "";
   @state() private _activeSuggestion = 0;
+  @state() private _answeredMessageIds = new Set<string>();
+  @state() private _selectedChoices: Record<string, Set<string>> = {};
+  @state() private _searchQueries: Record<string, string> = {};
+  @state() private _answeredChoiceMap: Record<string, string> = {};
 
   @query(".thread") private _thread?: HTMLElement;
 
@@ -242,6 +247,31 @@ export class JanusChat extends LitElement {
     const text = this._prompt || this.value;
     const canSend = text.trim().length > 0;
 
+    let latestActiveId: string | undefined;
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      const msg = this.messages[i];
+      if (
+        msg.role === "assistant" &&
+        (msg.kind === "clarify" || msg.kind === "parse")
+      ) {
+        latestActiveId = msg.id;
+        break;
+      }
+    }
+
+    let currentPlaceholder = this.placeholder;
+    if (this.messages.length > 0) {
+      const lastMsg = this.messages[this.messages.length - 1];
+      if (
+        lastMsg.kind === "clarify" &&
+        lastMsg.inputPlaceholder &&
+        !this._answeredMessageIds.has(lastMsg.id) &&
+        !lastMsg.answered
+      ) {
+        currentPlaceholder = lastMsg.inputPlaceholder;
+      }
+    }
+
     return html`
       ${this._renderHeader()}
       <div
@@ -253,7 +283,7 @@ export class JanusChat extends LitElement {
         ${repeat(
           rows,
           (m) => m.id,
-          (m) => this._renderMessage(m),
+          (m) => this._renderMessage(m, latestActiveId),
         )}
       </div>
       <div class="composer-area">
@@ -264,8 +294,8 @@ export class JanusChat extends LitElement {
             class="composer__input"
             type="text"
             .value=${text}
-            placeholder=${this.placeholder}
-            aria-label=${this.placeholder}
+            placeholder=${currentPlaceholder}
+            aria-label=${currentPlaceholder}
             autocomplete="off"
             ?disabled=${this.disabled}
             @input=${this._onInput}
@@ -320,7 +350,10 @@ export class JanusChat extends LitElement {
     `;
   }
 
-  private _renderMessage(m: ChatMessage): TemplateResult {
+  private _renderMessage(
+    m: ChatMessage,
+    latestActiveId?: string,
+  ): TemplateResult {
     switch (m.kind) {
       case "divider":
         return html`<div class="divider">${m.text}</div>`;
@@ -342,9 +375,46 @@ export class JanusChat extends LitElement {
         `);
 
       case "parse":
-        return this._assistantRow(this._renderParseCard(m.id, m.card));
+        return this._assistantRow(
+          this._renderParseCard(
+            m.id,
+            m.card,
+            m.id === latestActiveId,
+            Boolean(m.finalized),
+          ),
+        );
 
-      case "clarify":
+      case "clarify": {
+        const isAnswered = Boolean(
+          this._answeredMessageIds.has(m.id) || m.answered,
+        );
+        const isLatest = m.id === latestActiveId;
+        const isDisabled = this.disabled || isAnswered || !isLatest;
+
+        const selectedSet = this._selectedChoices[m.id] ?? new Set<string>();
+        const query = (this._searchQueries[m.id] ?? "").toLowerCase().trim();
+
+        const allChoices = m.choices ?? [];
+        const filteredChoices = query
+          ? allChoices.filter(
+              (c) =>
+                c.label.toLowerCase().includes(query) ||
+                (c.group && c.group.toLowerCase().includes(query)),
+            )
+          : allChoices;
+
+        const hasGroups = allChoices.some((c) => Boolean(c.group));
+        const groups: Record<string, ChatChoice[]> = {};
+        if (hasGroups) {
+          for (const c of filteredChoices) {
+            const grp = c.group || "Other";
+            groups[grp] = groups[grp] || [];
+            groups[grp].push(c);
+          }
+        }
+
+        const selectedCount = selectedSet.size;
+
         return this._assistantRow(html`
           <div class="card card--warning">
             ${m.ack ? html`<div class="card__lead">${m.ack}</div>` : nothing}
@@ -354,26 +424,89 @@ export class JanusChat extends LitElement {
                 </div>`
               : nothing}
             <div class="card__question">${m.question}</div>
-            ${m.choices?.length
-              ? html`<div class="choices">
-                  ${m.choices.map(
-                    (c: ChatChoice) => html`
-                      <button
-                        class="btn btn--choice"
-                        type="button"
-                        ?disabled=${this.disabled}
-                        @click=${() =>
-                          this._emit("chat-clarify-response", {
-                            messageId: m.id,
-                            choiceId: c.id,
-                            label: c.label,
-                          })}
-                      >
-                        ${c.label}
-                      </button>
+            ${m.hint ? html`<div class="card__hint">${m.hint}</div>` : nothing}
+            ${m.searchable && !isAnswered
+              ? html`
+                  <div class="clarify-search">
+                    <input
+                      class="clarify-search__input"
+                      type="text"
+                      placeholder="🔍 Search rooms & people…"
+                      .value=${this._searchQueries[m.id] ?? ""}
+                      ?disabled=${isDisabled}
+                      @input=${(e: Event) => {
+                        const val = (e.target as HTMLInputElement).value;
+                        this._searchQueries = {
+                          ...this._searchQueries,
+                          [m.id]: val,
+                        };
+                      }}
+                    />
+                  </div>
+                `
+              : nothing}
+            ${m.multiselect && selectedSet.size > 0 && !isAnswered
+              ? html`
+                  <div class="clarify-selected-tags">
+                    ${Array.from(selectedSet).map((choiceId) => {
+                      const c = allChoices.find((ch) => ch.id === choiceId);
+                      return html`
+                        <span class="clarify-selected-tag">
+                          ${c?.label ?? choiceId}
+                          <button
+                            class="clarify-selected-tag__remove"
+                            type="button"
+                            ?disabled=${isDisabled}
+                            @click=${() => this._toggleChoice(m.id, choiceId)}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      `;
+                    })}
+                  </div>
+                `
+              : nothing}
+
+            <div
+              class="${allChoices.length > 6 || hasGroups
+                ? "clarify-scroll"
+                : "choices"}"
+            >
+              ${hasGroups
+                ? Object.entries(groups).map(
+                    ([groupName, groupChoices]) => html`
+                      <div class="clarify-group-title">${groupName}</div>
+                      <div class="choices">
+                        ${groupChoices.map((c) =>
+                          this._renderChoiceButton(
+                            m,
+                            c,
+                            isDisabled,
+                            selectedSet,
+                          ),
+                        )}
+                      </div>
                     `,
+                  )
+                : filteredChoices.map((c) =>
+                    this._renderChoiceButton(m, c, isDisabled, selectedSet),
                   )}
-                </div>`
+            </div>
+
+            ${m.multiselect && !isAnswered
+              ? html`
+                  <div class="clarify-footer">
+                    <button
+                      class="btn btn--primary"
+                      type="button"
+                      ?disabled=${isDisabled || selectedCount === 0}
+                      @click=${() => this._submitMultiSelect(m)}
+                    >
+                      Confirm ${selectedCount > 0 ? `(${selectedCount})` : ""}
+                    </button>
+                  </div>
+                `
               : nothing}
             ${m.progress
               ? html`<div
@@ -385,6 +518,7 @@ export class JanusChat extends LitElement {
               : nothing}
           </div>
         `);
+      }
 
       case "success":
         return this._assistantRow(html`
@@ -422,6 +556,69 @@ export class JanusChat extends LitElement {
     }
   }
 
+  private _toggleChoice(messageId: string, choiceId: string) {
+    const current = new Set(this._selectedChoices[messageId] ?? []);
+    if (current.has(choiceId)) current.delete(choiceId);
+    else current.add(choiceId);
+    this._selectedChoices = { ...this._selectedChoices, [messageId]: current };
+  }
+
+  private _submitChoice(m: ChatClarifyMessage, c: ChatChoice) {
+    this._answeredMessageIds = new Set(this._answeredMessageIds).add(m.id);
+    this._answeredChoiceMap = { ...this._answeredChoiceMap, [m.id]: c.id };
+    this._emit("chat-clarify-response", {
+      messageId: m.id,
+      choiceId: c.id,
+      label: c.label,
+    });
+  }
+
+  private _submitMultiSelect(m: ChatClarifyMessage) {
+    const selected = this._selectedChoices[m.id];
+    if (!selected || selected.size === 0) return;
+    const choiceIds = Array.from(selected);
+    const choices = (m.choices ?? []).filter((c) => selected.has(c.id));
+    const labels = choices.map((c) => c.label);
+    const combinedLabel = labels.join(" and ");
+
+    this._answeredMessageIds = new Set(this._answeredMessageIds).add(m.id);
+    this._emit("chat-clarify-response", {
+      messageId: m.id,
+      choiceId: choiceIds.join(","),
+      label: combinedLabel,
+      choiceIds,
+      labels,
+    });
+  }
+
+  private _renderChoiceButton(
+    m: ChatClarifyMessage,
+    c: ChatChoice,
+    isDisabled: boolean,
+    selectedSet: Set<string>,
+  ): TemplateResult {
+    const isSelected = m.multiselect
+      ? selectedSet.has(c.id)
+      : this._answeredChoiceMap[m.id] === c.id;
+
+    return html`
+      <button
+        class="btn btn--choice ${isSelected ? "btn--choice-selected" : ""}"
+        type="button"
+        ?disabled=${isDisabled && !isSelected}
+        @click=${() => {
+          if (m.multiselect) {
+            this._toggleChoice(m.id, c.id);
+          } else {
+            this._submitChoice(m, c);
+          }
+        }}
+      >
+        ${c.label}
+      </button>
+    `;
+  }
+
   private _assistantRow(body: TemplateResult): TemplateResult {
     return html`
       <div class="row">
@@ -431,8 +628,19 @@ export class JanusChat extends LitElement {
     `;
   }
 
-  private _renderParseCard(id: string, card: ChatParseCard): TemplateResult {
+  private _renderParseCard(
+    id: string,
+    card: ChatParseCard,
+    isLatest: boolean,
+    isFinalized: boolean,
+  ): TemplateResult {
     const lead = card.lead ?? "Here's what I understood:";
+    const isDisabled =
+      this.disabled ||
+      isFinalized ||
+      !isLatest ||
+      this._answeredMessageIds.has(id);
+
     return html`
       <div class="card ${card.destructive ? "card--destructive" : ""}">
         <div class="card__lead">
@@ -460,14 +668,6 @@ export class JanusChat extends LitElement {
           : nothing}
         ${typeof card.confidence === "number"
           ? html`<div class="confidence">
-              <!--
-                This number is the classifier's certainty about the INTENT
-                ("this is a booking"), not about the details beside it. A bare
-                "100% confident" next to a card missing a room reads as a
-                guarantee about the whole card, which it is not. The label says
-                which question it is answering; ChatParseCard.confidenceLabel
-                can override it.
-              -->
               <span
                 class="confidence__pill"
                 title=${card.confidenceLabel ??
@@ -485,7 +685,13 @@ export class JanusChat extends LitElement {
               ? "btn--destructive"
               : ""}"
             type="button"
-            @click=${() => this._emit("chat-confirm", { messageId: id })}
+            ?disabled=${isDisabled}
+            @click=${() => {
+              this._answeredMessageIds = new Set(this._answeredMessageIds).add(
+                id,
+              );
+              this._emit("chat-confirm", { messageId: id });
+            }}
           >
             ${card.confirmLabel ?? "Confirm & schedule"}
           </button>
@@ -494,7 +700,13 @@ export class JanusChat extends LitElement {
             : html`<button
                 class="btn"
                 type="button"
-                @click=${() => this._emit("chat-edit", { messageId: id })}
+                ?disabled=${isDisabled}
+                @click=${() => {
+                  this._answeredMessageIds = new Set(
+                    this._answeredMessageIds,
+                  ).add(id);
+                  this._emit("chat-edit", { messageId: id });
+                }}
               >
                 ${card.editLabel ?? "Edit"}
               </button>`}
@@ -596,6 +808,10 @@ export class JanusChat extends LitElement {
     if (!prompt) return;
     this._emit("chat-submit", { prompt });
     this._prompt = "";
+    this.value = "";
+    const inputEl =
+      this.renderRoot?.querySelector<HTMLInputElement>(".composer__input");
+    if (inputEl) inputEl.value = "";
   }
 
   private _emit(type: string, detail: Record<string, unknown>) {

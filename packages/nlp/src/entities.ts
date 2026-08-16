@@ -61,9 +61,9 @@ function allowsPartialMatch(entry: CatalogEntry): boolean {
 /**
  * Every surface form a catalog entry can be recognised by, longest first.
  *
- * Full name and explicit aliases match as `exact`. A single name token matches
- * as non-exact, so a caller can require confirmation for those — a first-name
- * hit is a genuinely weaker signal when two people share one.
+ * Full name and explicit aliases match as `exact`. Multi-token sub-phrases
+ * (e.g. "MRI Scanner" from "MRI Scanner A") and allowed single tokens match as
+ * non-exact.
  */
 function surfaceForms(
   entry: CatalogEntry,
@@ -83,9 +83,22 @@ function surfaceForms(
   for (const alias of entry.aliases ?? []) push(alias, true);
 
   const tokens = entry.name.split(/\s+/).filter(Boolean);
-  if (tokens.length > 1 && allowsPartialMatch(entry)) {
-    for (const token of tokens) {
-      if (token.length >= MIN_PARTIAL_LENGTH) push(token, false);
+  if (tokens.length > 1) {
+    // Multi-token continuous sub-phrases (e.g. "MRI Scanner" from "MRI Scanner A")
+    for (let len = tokens.length - 1; len >= 2; len--) {
+      for (let i = 0; i <= tokens.length - len; i++) {
+        const subphrase = tokens.slice(i, i + len).join(" ");
+        push(subphrase, false);
+      }
+    }
+
+    // Single tokens only if allowsPartialMatch(entry) is true
+    if (allowsPartialMatch(entry)) {
+      for (const token of tokens) {
+        if (token.length >= MIN_PARTIAL_LENGTH) {
+          push(token, false);
+        }
+      }
     }
   }
 
@@ -242,7 +255,23 @@ const LEADING_DETERMINERS = new Set([
  * Trimmed with an index scan rather than `/^[...]+|[...]+$/` — the anchored
  * alternation form backtracks super-linearly on a long punctuation run.
  */
-const EDGE_PUNCTUATION = new Set([" ", ",", ".", ";", ":", "!", "?", "-"]);
+const EDGE_PUNCTUATION = new Set([
+  " ",
+  ",",
+  ".",
+  ";",
+  ":",
+  "!",
+  "?",
+  "-",
+  '"',
+  "'",
+  "“",
+  "”",
+  "‘",
+  "’",
+  "`",
+]);
 
 /**
  * Blank out the given spans, then tidy what remains into a title.
@@ -298,11 +327,13 @@ function titleFromRemainder(
     }
   }
 
-  while (
-    tokens.length > 0 &&
-    LEADING_DETERMINERS.has(tokens[0].text.toLowerCase())
-  ) {
-    tokens.shift();
+  while (tokens.length > 0) {
+    const firstLower = tokens[0].text.toLowerCase();
+    if (LEADING_DETERMINERS.has(firstLower) || FUNCTION_WORDS.has(firstLower)) {
+      tokens.shift();
+    } else {
+      break;
+    }
   }
 
   if (tokens.length === 0) return undefined;

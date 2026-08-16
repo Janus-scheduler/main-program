@@ -493,4 +493,63 @@ describe("resolveTime — timezones", () => {
       }),
     ).toThrow();
   });
+
+  it("resolves time ranges (e.g. 5pm to 7pm) and calculates exact duration", () => {
+    const r = resolve("meeting tomorrow at 5pm to 7pm")!;
+    expect(r.localDate).toBe("2026-08-06");
+    expect(r.localTime).toBe("17:00");
+    expect(r.durationMinutes).toBe(120);
+    expect(r.assumed.duration).toBe(false);
+  });
+
+  it("resolves time ranges like '5pm to 6pm' without assuming duration", () => {
+    const r = resolve("schedule a meeting on this monday at 5pm to 6pm")!;
+    expect(r.localTime).toBe("17:00");
+    expect(r.durationMinutes).toBe(60);
+    expect(r.assumed.duration).toBe(false);
+  });
+
+  it("resolves time ranges without start meridiem like '5 to 7pm'", () => {
+    const r = resolve("meeting tomorrow from 5 to 7pm")!;
+    expect(r.localTime).toBe("17:00");
+    expect(r.durationMinutes).toBe(120);
+    expect(r.assumed.duration).toBe(false);
+  });
+
+  it("resolves minute ranges like '10:00 to 11:30 am'", () => {
+    const r = resolve("call tomorrow from 10:00 to 11:30 am")!;
+    expect(r.localTime).toBe("10:00");
+    expect(r.durationMinutes).toBe(90);
+    expect(r.assumed.duration).toBe(false);
+  });
+
+  it("resolves explicit calendar dates like 'August 18' and '18th of August'", () => {
+    const r1 = resolve("meeting on August 18 at 2pm")!;
+    expect(r1.localDate).toBe("2026-08-18");
+    expect(r1.localTime).toBe("14:00");
+    expect(r1.assumed.date).toBe(false);
+    expect(r1.assumed.timeOfDay).toBe(false);
+
+    const r2 = resolve("sync on 18th of August at 10am")!;
+    expect(r2.localDate).toBe("2026-08-18");
+    expect(r2.localTime).toBe("10:00");
+    expect(r2.assumed.date).toBe(false);
+
+    const r3 = resolve("review on Aug 18, 2027 at 3pm")!;
+    expect(r3.localDate).toBe("2027-08-18");
+    expect(r3.localTime).toBe("15:00");
+
+    const r4 = resolve("book room on September 25th at 9am")!;
+    expect(r4.localDate).toBe("2026-09-25");
+    expect(r4.localTime).toBe("09:00");
+
+    const r5 = resolve("demo on Oct 12, 2026 at 4:30pm")!;
+    expect(r5.localDate).toBe("2026-10-12");
+    expect(r5.localTime).toBe("16:30");
+
+    const r6 = resolve("annual meeting on 15th of December")!;
+    expect(r6.localDate).toBe("2026-12-15");
+    expect(r6.assumed.date).toBe(false);
+    expect(r6.assumed.timeOfDay).toBe(true);
+  });
 });

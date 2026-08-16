@@ -52,11 +52,8 @@ export class JanusChatService implements OnDestroy {
   }
 
   public edit() {
-    // optional method, fallback to reset if not available on controller
-    if ((this.controller as any).edit) {
-      (this.controller as any).edit();
-    } else {
-      this.controller?.reset();
+    if (this.controller) {
+      this.controller.edit();
     }
   }
 

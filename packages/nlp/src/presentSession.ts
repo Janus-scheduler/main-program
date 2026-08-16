@@ -8,7 +8,7 @@
 import type { FiredGate, SessionState } from "./types";
 
 export interface PresentChip {
-  kind: "person" | "time" | "place";
+  kind: "person" | "time" | "place" | "thing";
   label: string;
   assumed?: boolean;
 }
@@ -16,6 +16,8 @@ export interface PresentChip {
 export interface PresentChoice {
   id: string;
   label: string;
+  kind?: "person" | "time" | "place" | "thing";
+  group?: string;
 }
 
 export interface PresentParseCard {
@@ -43,6 +45,9 @@ export type PresentMessage =
       choices: PresentChoice[];
       /** "1 more to go" — remaining required slots. */
       progress?: string;
+      multiselect?: boolean;
+      searchable?: boolean;
+      inputPlaceholder?: string;
     }
   | {
       id: string;
@@ -110,6 +115,7 @@ export function draftChips(
   if (!draft) return [];
 
   const isQuery = draft.intent === "get_details";
+  const isAwaiting = state.status === "awaiting";
   const chips: PresentChip[] = [];
 
   for (const person of draft.participants) {
@@ -120,16 +126,19 @@ export function draftChips(
     const timeAssumed = draft.time.assumed.date || draft.time.assumed.timeOfDay;
     const durationAssumed = draft.time.assumed.duration;
 
-    // For queries, only show the time chip if date was explicitly provided or relevant
-    if (!isQuery || !timeAssumed) {
-      chips.push({
-        kind: "time",
-        label: formatWhen(draft.time.localDate, draft.time.localTime),
-        assumed: timeAssumed,
-      });
+    // In awaiting/clarify mode, only show time chip if explicitly confirmed by user
+    if (!isAwaiting || !timeAssumed) {
+      if (!isQuery || !timeAssumed) {
+        chips.push({
+          kind: "time",
+          label: formatWhen(draft.time.localDate, draft.time.localTime),
+          assumed: timeAssumed,
+        });
+      }
     }
 
-    if (!isQuery) {
+    // In awaiting/clarify mode, only show duration chip if explicitly confirmed by user
+    if (!isQuery && (!isAwaiting || !durationAssumed)) {
       chips.push({
         kind: "time",
         label: formatDuration(draft.time.durationMinutes),
@@ -142,8 +151,8 @@ export function draftChips(
     chips.push({ kind: "place", label: resource.name });
   }
 
-  // Only offer fallback resource for event creation (add_event / modify_event)
-  if (!isQuery && draft.intent !== "delete_event") {
+  // Only offer fallback resource for final event creation cards, never on clarification questions
+  if (!isQuery && !isAwaiting && draft.intent !== "delete_event") {
     const named = draft.resources.length + draft.participants.length;
     if (named === 0 && options.fallbackResourceName) {
       chips.push({
@@ -266,8 +275,13 @@ export function presentSession(
       choices: state.question.choices.map((c) => ({
         id: c.id,
         label: c.label,
+        kind: c.kind,
+        group: c.group,
       })),
       progress,
+      multiselect: state.question.multiselect,
+      searchable: state.question.searchable,
+      inputPlaceholder: state.question.inputPlaceholder,
     };
   }
 
@@ -301,7 +315,8 @@ export function presentSession(
     kind: "parse",
     card: {
       lead: INTENT_LEAD[draft.intent] ?? INTENT_LEAD.add_event,
-      title: draft.title,
+      title:
+        draft.title || (draft.intent === "add_event" ? "New Event" : undefined),
       chips: draftChips(state, options),
       confidence: state.route.confidence,
       confidenceLabel: getConfidenceLabel(draft.intent),

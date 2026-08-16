@@ -537,6 +537,115 @@ export const chatStyles = css`
     filter: brightness(0.9);
   }
 
+  .btn:disabled,
+  .btn--choice:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .btn--choice-selected {
+    background: var(--janus-primary-solid) !important;
+    color: var(--janus-primary-fg) !important;
+    border-color: var(--janus-primary-solid) !important;
+    opacity: 1 !important;
+  }
+
+  .card__hint {
+    font-size: 11.5px;
+    color: var(--janus-text-3);
+    margin-top: 6px;
+    margin-bottom: 8px;
+  }
+
+  .clarify-search {
+    margin-bottom: 10px;
+  }
+
+  .clarify-search__input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 11px;
+    border-radius: var(--janus-radius-md);
+    border: 1px solid var(--janus-border-strong);
+    background: var(--janus-surface);
+    color: var(--janus-text);
+    font-family: var(--janus-font);
+    font-size: 12.5px;
+    outline: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .clarify-search__input:focus {
+    border-color: var(--janus-primary-solid);
+    box-shadow: 0 0 0 2px var(--janus-primary-ring);
+  }
+
+  .clarify-selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--janus-border);
+  }
+
+  .clarify-selected-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: var(--janus-radius-full);
+    font-size: 11.5px;
+    font-weight: 600;
+    background: var(--janus-primary-subtle);
+    border: 1px solid var(--janus-primary-border);
+    color: var(--janus-primary-solid);
+  }
+
+  .clarify-selected-tag__remove {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--janus-primary-solid);
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  .clarify-scroll {
+    max-height: 180px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+    margin-bottom: 10px;
+  }
+
+  .clarify-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--janus-text-3);
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  .clarify-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--janus-border);
+  }
+
   .btn--choice {
     padding: 6px 12px;
     border-radius: var(--janus-radius-full);

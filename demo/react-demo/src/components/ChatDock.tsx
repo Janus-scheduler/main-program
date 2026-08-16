@@ -43,7 +43,7 @@ const INTRO: PresentMessage = {
  * `Event.isValid()` requires at least one.
  */
 const REQUIRES: SessionRequirements = {
-  add_event: ["when", "resource"],
+  add_event: ["when", "duration", "resource"],
   // Moving an event needs a new time; the target is resolved by title at
   // commit time, which refuses rather than guesses.
   modify_event: ["when"],
