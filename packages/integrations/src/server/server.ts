@@ -44,23 +44,28 @@ const server = http.createServer(app);
 
 initWebSocket(server);
 
-// ── Renew Google webhook every 6 days ────────────────────────────────────────
-// Google webhook channels expire after 7 days maximum.
-cron.schedule("0 0 */6 * *", async () => {
-  console.log("[Janus] Renewing webhook channel...");
+// ── Renew Google webhook before it expires ───────────────────────────────────
+// Checks the channel's actual Google-assigned expiration (rather than blindly
+// renewing on a fixed schedule) and only renews once it's within a day of
+// expiring. Registers the replacement channel *before* stopping the old one:
+// if registration fails, the old (still valid) channel is left untouched and
+// state is left unchanged, so the next check simply retries — a transient
+// failure can no longer permanently wedge renewal. Failing to stop the old
+// channel afterward is non-fatal, since the new one is already active.
+async function renewWebhookIfNeeded(): Promise<void> {
   try {
     if (!isConnected()) return;
 
     const state = getCalendarState();
     if (!state) return;
 
-    await stopWebhook(
-      state.webhookChannelId,
-      state.webhookResourceId,
-      config.clientId,
-      config.clientSecret,
-      config.redirectUri,
-    );
+    const renewBufferMs = 24 * 60 * 60 * 1000;
+    const expiresAt = Number(state.webhookExpiration);
+    if (Number.isFinite(expiresAt) && expiresAt - Date.now() > renewBufferMs) {
+      return;
+    }
+
+    console.log("[Janus] Renewing webhook channel...");
 
     const webhook = await registerWebhook(
       state.janusCalendarId,
@@ -78,13 +83,34 @@ cron.schedule("0 0 */6 * *", async () => {
       webhookExpiration: webhook.expiration,
     });
 
+    try {
+      await stopWebhook(
+        state.webhookChannelId,
+        state.webhookResourceId,
+        config.clientId,
+        config.clientSecret,
+        config.redirectUri,
+      );
+    } catch (err) {
+      console.warn("[Janus] Failed to stop old webhook channel:", err);
+    }
+
     console.log("[Janus] Webhook renewed successfully");
   } catch (err) {
     console.error("[Janus] Webhook renewal failed:", err);
   }
-});
+}
+
+// Check once a day.
+cron.schedule("0 0 * * *", renewWebhookIfNeeded);
 
 server.listen(config.port, () => {
   console.log(`[Janus] Backend running on http://localhost:${config.port}`);
   console.log(`[Janus] WebSocket ready on ws://localhost:${config.port}`);
+
+  // Check once at startup — catches channels that expired while the server
+  // was down (the daily cron alone would otherwise wait for its next tick).
+  // Fired after listen() so a slow/unreachable Google API can't delay the
+  // server from accepting unrelated requests.
+  void renewWebhookIfNeeded();
 });

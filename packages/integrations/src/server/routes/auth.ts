@@ -12,7 +12,11 @@ import {
   clearCalendarState,
   getCalendarState,
 } from "../services/calendarService.js";
-import { registerWebhook, fetchAllEvents } from "../services/googleService.js";
+import {
+  registerWebhook,
+  stopWebhook,
+  fetchAllEvents,
+} from "../services/googleService.js";
 
 export function createAuthRouter(config: {
   clientId: string;
@@ -136,7 +140,24 @@ export function createAuthRouter(config: {
   });
 
   // Disconnect
-  router.post("/disconnect", (_req: Request, res: Response) => {
+  router.post("/disconnect", async (_req: Request, res: Response) => {
+    const state = getCalendarState();
+    if (state) {
+      try {
+        await stopWebhook(
+          state.webhookChannelId,
+          state.webhookResourceId,
+          config.clientId,
+          config.clientSecret,
+          config.redirectUri,
+        );
+      } catch (err) {
+        // Non-fatal — the channel may already be gone. Disconnect proceeds
+        // either way; Google will let it lapse on its own if this fails.
+        console.warn("[Auth] Failed to stop webhook on disconnect:", err);
+      }
+    }
+
     clearTokens();
     clearCalendarState();
     res.json({ disconnected: true });
