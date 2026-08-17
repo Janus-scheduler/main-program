@@ -60,11 +60,13 @@
       [view]="currentView"
       [zoomPercent]="navData().zoomPercent"
       [zoomUnit]="navData().zoomUnit"
+      [isGoogleCalendarConnected]="googleConnected()"
       (prevClick)="handlePrevClick()"
       (nextClick)="handleNextClick()"
       (todayClick)="handleTodayClick()"
       (viewSwitch)="handleViewChange($event)"
       (toggleCreate)="handleToggleCreate()"
+      (connectCalendar)="handleConnectCalendar()"
     />
 
     @if (currentView === 'Timeline') {

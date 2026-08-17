@@ -3,11 +3,18 @@ import {
   getBrowserTimezone,
   zonedInputToISO,
 } from "@janus-scheduler/core";
+import {
+  GoogleSyncManager,
+  GoogleCalendarClient,
+  GoogleEventMapper,
+} from "@janus-scheduler/integrations";
 
 export interface HookError {
   operation: string;
   message: string;
 }
+
+const BACKEND_URL = "http://localhost:3001";
 
 /**
  * useSchedulerManager
@@ -17,17 +24,18 @@ export interface HookError {
  *
  * Since the Zustand store is a module-level singleton, calling this multiple
  * times (e.g. during HMR) is safe — the guard prevents duplicate seeding.
+ *
+ * @returns `{ manager, syncManager }` — the caller needs `syncManager` too,
+ *   for the Google Calendar connect/disconnect and real-time sync lifecycle.
  */
 export function useSchedulerManager(onError: (err: HookError) => void) {
+  // Set up Google sync infrastructure
+  const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
+  const mapper = new GoogleEventMapper();
+  const syncManager = new GoogleSyncManager(client, mapper);
+
   const manager = new SchedulerManager({
-    // ── onEventAdd ──────────────────────────────────────────────────────
-    // Fires AFTER the store is updated (optimistic). If this throws,
-    // SchedulerManager automatically rolls back the store and calls onError.
-    onEventAdd: async (_event) => {
-      await new Promise((r) => setTimeout(r, 400)); // simulate network latency
-      console.log(_event);
-      return; // ← success path
-    },
+    ...syncManager.getHooks(),
 
     // ── onError ─────────────────────────────────────────────────────────
     // The store has already been rolled back before this fires.
@@ -87,5 +95,5 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     console.log("✅ Seeding complete");
   }
 
-  return manager;
+  return { manager, syncManager };
 }

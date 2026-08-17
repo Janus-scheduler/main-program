@@ -12,6 +12,7 @@
     "@janus-scheduler/solid": "^1.0.0",
     "@janus-scheduler/ui": "^1.0.0",
     "@janus-scheduler/core": "^1.0.0",
+    "@janus-scheduler/integrations": "^1.0.0",
     "solid-js": "^1.8.0"
   },
   "devDependencies": {

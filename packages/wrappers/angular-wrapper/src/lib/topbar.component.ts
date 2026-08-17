@@ -41,12 +41,16 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly allowCreate = input<boolean>(false);
   readonly zoomPercent = input<number>(100);
   readonly zoomUnit = input<string | undefined>(undefined);
+  /** Whether Google Calendar is currently connected — controls the connect button's label/state. */
+  readonly isGoogleCalendarConnected = input<boolean>(false);
 
   readonly prevClick = output<void>();
   readonly nextClick = output<void>();
   readonly todayClick = output<void>();
   readonly viewSwitch = output<{ view: "Timeline" | "Month" }>();
   readonly toggleCreate = output<void>();
+  /** Fired when the user clicks the Google Calendar connect/disconnect button. */
+  readonly connectCalendar = output<void>();
 
   private readonly _prevClickHandler = (e: Event) => {
     e.stopPropagation();
@@ -70,6 +74,10 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.toggleCreate.emit();
   };
+  private readonly _connectCalendarHandler = (e: Event) => {
+    e.stopPropagation();
+    this.connectCalendar.emit();
+  };
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
@@ -78,6 +86,7 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("today-click", this._todayClickHandler);
     el.addEventListener("view-switch", this._viewSwitchHandler);
     el.addEventListener("toggle-create", this._toggleCreateHandler);
+    el.addEventListener("connect-calendar", this._connectCalendarHandler);
 
     this._syncInputs();
   }
@@ -93,6 +102,7 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("today-click", this._todayClickHandler);
     el?.removeEventListener("view-switch", this._viewSwitchHandler);
     el?.removeEventListener("toggle-create", this._toggleCreateHandler);
+    el?.removeEventListener("connect-calendar", this._connectCalendarHandler);
   }
 
   private _syncInputs(): void {
@@ -117,9 +127,11 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
       view?: string;
       allowCreate?: boolean;
       zoomPercent?: number;
+      isGoogleCalendarConnected?: boolean;
     };
     element.view = this.view();
     element.allowCreate = this.allowCreate();
     element.zoomPercent = this.zoomPercent();
+    element.isGoogleCalendarConnected = this.isGoogleCalendarConnected();
   }
 }

@@ -5,6 +5,8 @@ import {
   signal,
   computed,
   viewChild,
+  effect,
+  OnDestroy,
 } from '@angular/core';
 import {
   SchedulerComponent,
@@ -24,6 +26,13 @@ import {
   isoToZonedDisplay,
   schedulerStore,
 } from '@janus-scheduler/angular';
+import {
+  GoogleSyncManager,
+  GoogleCalendarClient,
+  GoogleEventMapper,
+} from '@janus-scheduler/integrations';
+
+const BACKEND_URL = 'http://localhost:3001';
 
 export interface NavData {
   navLabel: string;
@@ -48,7 +57,7 @@ export interface NavData {
   styleUrl: './app.css',
   encapsulation: ViewEncapsulation.None,
 })
-export class App {
+export class App implements OnDestroy {
   currentView: ViewType = 'Month';
   showScheduler = false;
   selectedEventId = signal<string | null>(null);
@@ -85,7 +94,17 @@ export class App {
 
   allowCreate = signal(false);
   schedulerError = signal<string | null>(null);
+
+  // ── Google Calendar sync ────────────────────────────────────────────────
+  googleConnected = signal(false);
+  private readonly googleClient = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
+  private readonly googleMapper = new GoogleEventMapper();
+  private readonly syncManager = new GoogleSyncManager(this.googleClient, this.googleMapper);
+  private unsubscribeGoogleStatus: (() => void) | undefined;
+  private stopRealtimeSync: (() => void) | undefined;
+
   private manager = new SchedulerManager({
+    ...this.syncManager.getHooks(),
     onError: ({ operation, error }) => {
       console.error(`❌ Manager error [${operation}]:`, error);
       this.schedulerError.set((error as Error).message || 'An unexpected error occurred');
@@ -94,6 +113,52 @@ export class App {
 
   constructor() {
     this.seedInitialData();
+
+    // Detect OAuth redirect / pick up an already-connected backend, same as
+    // the React demo: handleOAuthRedirect() consumes `?google_connected=`
+    // and cleans the URL, onStatusChange fires immediately with the current
+    // status then on every future change, refreshStatus() covers a plain
+    // reload with an already-connected backend from an earlier session.
+    this.syncManager.handleOAuthRedirect();
+    this.unsubscribeGoogleStatus = this.syncManager.onStatusChange((connected) =>
+      this.googleConnected.set(connected),
+    );
+    this.syncManager.refreshStatus();
+
+    // Start real-time sync after connecting; tear it down on disconnect.
+    effect((onCleanup) => {
+      if (!this.googleConnected()) return;
+
+      let cancelled = false;
+      this.syncManager.startRealtimeSync().then((stop) => {
+        if (cancelled) {
+          stop();
+        } else {
+          this.stopRealtimeSync = stop;
+        }
+      });
+
+      onCleanup(() => {
+        cancelled = true;
+        this.stopRealtimeSync?.();
+        this.stopRealtimeSync = undefined;
+      });
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.unsubscribeGoogleStatus?.();
+    this.stopRealtimeSync?.();
+  }
+
+  handleConnectCalendar(): void {
+    if (this.googleConnected()) {
+      // disconnect() calls setConnected(false) internally, which broadcasts
+      // to the onStatusChange subscription above — no need to set it here too.
+      this.syncManager.disconnect();
+    } else {
+      this.syncManager.connect();
+    }
   }
 
   private seedInitialData() {

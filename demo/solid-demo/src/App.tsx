@@ -1,4 +1,11 @@
-import { createSignal, createMemo, Show } from "solid-js";
+import {
+  createSignal,
+  createMemo,
+  createEffect,
+  onMount,
+  onCleanup,
+  Show,
+} from "solid-js";
 import "./App.css";
 import {
   Timeline,
@@ -13,6 +20,13 @@ import {
   isoToZonedDisplay,
   schedulerStore,
 } from "@janus-scheduler/solid";
+import {
+  GoogleSyncManager,
+  GoogleCalendarClient,
+  GoogleEventMapper,
+} from "@janus-scheduler/integrations";
+
+const BACKEND_URL = "http://localhost:3001";
 
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor">
@@ -101,6 +115,7 @@ function App() {
     zoomUnit: "",
   });
   const [allowCreate, setAllowCreate] = createSignal(false);
+  const [googleConnected, setGoogleConnected] = createSignal(false);
 
   let timelineRef: HTMLElement & {
     goToPrev: () => void;
@@ -114,8 +129,15 @@ function App() {
     goToToday: () => void;
   };
 
+  // ── Google Calendar sync ──────────────────────────────────────────────
+  const googleClient = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
+  const googleMapper = new GoogleEventMapper();
+  const syncManager = new GoogleSyncManager(googleClient, googleMapper);
+
   // Initialize the core manager once and populate initial data
-  const manager = new SchedulerManager();
+  const manager = new SchedulerManager({
+    ...syncManager.getHooks(),
+  });
   // Only populate if empty (for hot reloading safety)
   if (manager.getResourceCount() === 0) {
     manager.addResource({
@@ -166,6 +188,49 @@ function App() {
     const id = selectedEventId();
     return id ? manager.getEvent(id) : null;
   });
+
+  // Detect OAuth redirect / pick up an already-connected backend, same as
+  // the React demo: handleOAuthRedirect() consumes `?google_connected=` and
+  // cleans the URL, onStatusChange fires immediately with the current status
+  // then on every future change, refreshStatus() covers a plain reload with
+  // an already-connected backend from an earlier session.
+  onMount(() => {
+    syncManager.handleOAuthRedirect();
+    const unsubscribe = syncManager.onStatusChange(setGoogleConnected);
+    syncManager.refreshStatus();
+    onCleanup(unsubscribe);
+  });
+
+  // Start real-time sync after connecting; tear it down on disconnect.
+  createEffect(() => {
+    if (!googleConnected()) return;
+
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+
+    syncManager.startRealtimeSync().then((stopFn) => {
+      if (cancelled) {
+        stopFn();
+      } else {
+        stop = stopFn;
+      }
+    });
+
+    onCleanup(() => {
+      cancelled = true;
+      stop?.();
+    });
+  });
+
+  const handleConnectCalendar = () => {
+    if (googleConnected()) {
+      // disconnect() calls setConnected(false) internally, which broadcasts
+      // to the onStatusChange subscription above — no need to set it here too.
+      syncManager.disconnect();
+    } else {
+      syncManager.connect();
+    }
+  };
 
   // Convert a UTC ISO string → local { date, time } using the store's selected timezone.
   const splitISO = (iso: string | undefined) => {
@@ -221,6 +286,8 @@ function App() {
           allowCreate={allowCreate()}
           zoomPercent={navData().zoomPercent}
           zoomUnit={navData().zoomUnit}
+          isGoogleCalendarConnected={googleConnected()}
+          onConnectCalendar={handleConnectCalendar}
           onPrevClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToPrev();
             else monthGridRef?.goToPrev();

@@ -13,11 +13,13 @@
     .allowCreate="allowCreate"
     .zoomPercent="navData.zoomPercent"
     .zoomUnit="navData.zoomUnit"
+    .isGoogleCalendarConnected="isGoogleCalendarConnected"
     @prev-click="handlePrevClick"
     @next-click="handleNextClick"
     @today-click="handleTodayClick"
     @view-switch="handleViewChange"
     @toggle-create="handleToggleCreate"
+    @connect-calendar="$emit('connect-calendar')"
   />
 
   <!-- Timeline view -->
@@ -96,12 +98,16 @@ const props = defineProps<{
   schedulerError: string | null;
   selectedEventId: string | null;
   manager: SchedulerManager;
+  /** Whether Google Calendar is currently connected — shown on the topbar's connect button. */
+  isGoogleCalendarConnected: boolean;
 }>();
 
 const emit = defineEmits<{
   "view-change": [view: ViewType];
   "open-scheduler": [eventId?: string];
   "close-scheduler": [];
+  /** Fired when the user clicks the topbar's Google Calendar connect/disconnect button. */
+  "connect-calendar": [];
 }>();
 
 const storeEvent = computed(() =>
