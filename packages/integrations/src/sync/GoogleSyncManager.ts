@@ -177,13 +177,8 @@ export class GoogleSyncManager {
   /**
    * Resolve a Janus event's assigned resourceIds into Google Calendar attendees.
    * Only "person" resources with an email are included — room/equipment
-   * resources (and people with no email on file) are silently skipped.
+   * resources are silently skipped.
    *
-   * NOTE: we don't set responseStatus here. For personal Gmail attendees,
-   * Google ignores an organizer-set responseStatus on anyone but themselves —
-   * only the attendee's own account can actually RSVP. The backend sends a
-   * real invite (sendUpdates:"all" in googleService.ts) so the attendee gets
-   * a normal, functioning invite email to accept.
    */
   private resolveAttendees(resourceIds: string[]): GoogleAttendee[] {
     const { resources } = schedulerStore.getState();

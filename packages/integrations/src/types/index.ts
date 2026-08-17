@@ -1,7 +1,6 @@
 // ── Google Calendar attendee ──────────────────────────────────────────────────
 export interface GoogleAttendee {
   email: string;
-  responseStatus?: "accepted" | "declined" | "tentative" | "needsAction";
 }
 
 // ── Google Calendar event format ──────────────────────────────────────────────
