@@ -60,10 +60,26 @@ export function createAuthRouter(config: {
     try {
       const { tokens } = await buildOAuthClient().getToken(code);
 
+      // refresh_token is what makes this connection durable — without it,
+      // getValidToken can never refresh once the access token expires. Fail
+      // the connect attempt clearly here rather than silently persisting a
+      // token file that will only break later, invisibly.
+      if (
+        !tokens.access_token ||
+        !tokens.refresh_token ||
+        !tokens.expiry_date
+      ) {
+        console.error(
+          "[Auth] OAuth callback response missing required token fields",
+        );
+        res.redirect(`${config.frontendUrl}?google_connected=false`);
+        return;
+      }
+
       saveTokens({
-        access_token: tokens.access_token!,
-        refresh_token: tokens.refresh_token!,
-        expiry_date: tokens.expiry_date!,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expiry_date: tokens.expiry_date,
       });
 
       // Get or create "Janus Scheduler" calendar

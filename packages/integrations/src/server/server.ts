@@ -20,6 +20,7 @@ const required = [
   "FRONTEND_URL",
   "WEBHOOK_URL",
   "CHANNEL_TOKEN",
+  "TOKEN_ENCRYPTION_KEY",
 ];
 
 for (const key of required) {
