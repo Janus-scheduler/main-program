@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Timeline,
   MonthGrid,
+  YearGrid,
   Scheduler,
   AiBar,
   Topbar,
@@ -13,6 +14,8 @@ import {
   zonedInputToISO,
   schedulerStore,
 } from "@janus-scheduler/react";
+
+import { loadDenseBenchmarkData } from "../utils/benchmarkDataGenerator";
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
@@ -41,6 +44,18 @@ interface SchedulerViewProps {
   onCloseScheduler: () => void;
   /** Fired when the user clicks the topbar's Google Calendar connect/disconnect button. */
   onConnectCalendar: () => void;
+}
+
+/**
+ * Benchmark dataset size requested on the URL (`?resources=N` / `?count=N`),
+ * or null when the param is absent or not a positive integer.
+ */
+function readBenchmarkCountFromUrl(): number | null {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("resources") ?? params.get("count");
+  if (!raw) return null;
+  const count = parseInt(raw, 10);
+  return Number.isNaN(count) || count <= 0 ? null : count;
 }
 
 /**
@@ -114,6 +129,13 @@ export function SchedulerView({
       goToToday: () => void;
     }
   >(null);
+  const yearGridRef = useRef<
+    HTMLElement & {
+      goToPrev: () => void;
+      goToNext: () => void;
+      goToToday: () => void;
+    }
+  >(null);
 
   const [navData, setNavData] = useState({
     navLabel: "",
@@ -123,6 +145,12 @@ export function SchedulerView({
     zoomUnit: "",
   });
   const [allowCreate, setAllowCreate] = useState(false);
+
+  // Seed the store once for the URL-selected dataset (?resources=N or ?count=N).
+  useEffect(() => {
+    const count = readBenchmarkCountFromUrl();
+    if (count !== null) loadDenseBenchmarkData(count);
+  }, []);
 
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
@@ -148,15 +176,18 @@ export function SchedulerView({
         onConnectCalendar={onConnectCalendar}
         onPrevClick={() => {
           if (currentView === "Timeline") timelineRef.current?.goToPrev();
-          else monthGridRef.current?.goToPrev();
+          else if (currentView === "Month") monthGridRef.current?.goToPrev();
+          else yearGridRef.current?.goToPrev();
         }}
         onNextClick={() => {
           if (currentView === "Timeline") timelineRef.current?.goToNext();
-          else monthGridRef.current?.goToNext();
+          else if (currentView === "Month") monthGridRef.current?.goToNext();
+          else yearGridRef.current?.goToNext();
         }}
         onTodayClick={() => {
           if (currentView === "Timeline") timelineRef.current?.goToToday();
-          else monthGridRef.current?.goToToday();
+          else if (currentView === "Month") monthGridRef.current?.goToToday();
+          else yearGridRef.current?.goToToday();
         }}
         onViewSwitch={(detail) => onViewChange(detail.view)}
         onToggleCreate={() => {
@@ -164,7 +195,14 @@ export function SchedulerView({
           setAllowCreate(!allowCreate);
         }}
       />
-      {currentView === "Timeline" && (
+      <div
+        style={{
+          display: currentView === "Timeline" ? "flex" : "none",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <Timeline
           ref={timelineRef}
           allowCreate={allowCreate}
@@ -210,15 +248,44 @@ export function SchedulerView({
             onOpenScheduler();
           }}
           onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
+          onNavChange={(detail) => {
+            if (currentView === "Timeline") {
+              handleNavChange(detail);
+            }
+          }}
         />
-      )}
+      </div>
 
-      {currentView === "Month" && (
+      <div
+        style={{
+          display: currentView === "Month" ? "flex" : "none",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         <MonthGrid
-          showFab={false}
+          showFab={true}
           onAddEvent={() => onOpenScheduler()}
           onEventClick={(ev) => onOpenScheduler(ev?.id)}
+          onDayClick={(detail) => {
+            onViewChange("Timeline");
+            timelineRef.current?.goToDate(detail.date);
+          }}
+          onViewChange={(detail) => onViewChange(detail.view)}
+          onNavChange={(detail) => {
+            if (currentView === "Month") {
+              handleNavChange(detail);
+            }
+          }}
+          ref={monthGridRef}
+        />
+      </div>
+
+      {currentView === "Year" && (
+        <YearGrid
+          ref={yearGridRef}
+          onNavChange={handleNavChange}
           onDayClick={(detail) => {
             onViewChange("Timeline");
             setTimeout(() => {
@@ -227,9 +294,6 @@ export function SchedulerView({
               }
             }, 100);
           }}
-          onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
-          ref={monthGridRef}
         />
       )}
 

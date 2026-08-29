@@ -107,29 +107,42 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     const event = state.events[id];
     if (!event) throw new Error(`Event ${id} not found`);
 
-    if (updates.title) event.title = updates.title;
-    if (updates.startTime) event.startTime = updates.startTime;
-    if (updates.endTime) event.endTime = updates.endTime;
+    let resourceIds = event.resourceIds;
+    let resourceId = event.resourceId;
     if (updates.resourceIds) {
-      event.resourceIds = updates.resourceIds;
-      event.resourceId = updates.resourceIds[0] || "";
+      resourceIds = updates.resourceIds;
+      resourceId = updates.resourceIds[0] || "";
     } else if (updates.resourceId) {
-      event.resourceId = updates.resourceId;
-      event.resourceIds = [updates.resourceId];
+      resourceId = updates.resourceId;
+      resourceIds = [updates.resourceId];
     }
-    if (updates.status) event.status = updates.status;
-    if (updates.description !== undefined)
-      event.description = updates.description;
-    if (updates.color !== undefined) event.color = updates.color;
-    if (updates.allDay !== undefined) event.allDay = updates.allDay;
-    if (updates.recurrenceRule !== undefined)
-      event.recurrenceRule = updates.recurrenceRule;
+
+    const updatedEvent = new Event({
+      id: event.id,
+      title: updates.title !== undefined ? updates.title : event.title,
+      startTime:
+        updates.startTime !== undefined ? updates.startTime : event.startTime,
+      endTime: updates.endTime !== undefined ? updates.endTime : event.endTime,
+      resourceId,
+      resourceIds,
+      status: updates.status !== undefined ? updates.status : event.status,
+      description:
+        updates.description !== undefined
+          ? updates.description
+          : event.description,
+      color: updates.color !== undefined ? updates.color : event.color,
+      allDay: updates.allDay !== undefined ? updates.allDay : event.allDay,
+      recurrenceRule:
+        updates.recurrenceRule !== undefined
+          ? updates.recurrenceRule
+          : event.recurrenceRule,
+    });
 
     // To ensure reactivity in zustand, we create a new object reference for the events record.
     set((state) => ({
-      events: { ...state.events, [id]: event },
+      events: { ...state.events, [id]: updatedEvent },
     }));
-    return event;
+    return updatedEvent;
   },
 
   deleteEvent: (id) => {
@@ -158,22 +171,21 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
 
   updateResource: (id, updates) => {
     const state = get();
-    const existing = state.resources[id];
-    if (!existing) throw new Error(`Resource ${id} not found`);
+    const resource = state.resources[id];
+    if (!resource) throw new Error(`Resource ${id} not found`);
 
-    const updated = new Resource({
-      id: existing.id,
-      name: updates.name ? updates.name : existing.name,
-      type: updates.type ? updates.type : existing.type,
-      email: updates.email !== undefined ? updates.email : existing.email,
-      avatar: updates.avatar !== undefined ? updates.avatar : existing.avatar,
+    const updatedResource = new Resource({
+      id: resource.id,
+      name: updates.name !== undefined ? updates.name : resource.name,
+      type: updates.type !== undefined ? updates.type : resource.type,
+      email: updates.email !== undefined ? updates.email : resource.email,
+      avatar: updates.avatar !== undefined ? updates.avatar : resource.avatar,
     });
-    if (!updated.isValid()) throw new Error("Invalid resource data");
 
     set((state) => ({
-      resources: { ...state.resources, [id]: updated },
+      resources: { ...state.resources, [id]: updatedResource },
     }));
-    return updated;
+    return updatedResource;
   },
 
   deleteResource: (id) => {

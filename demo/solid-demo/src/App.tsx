@@ -11,6 +11,7 @@ import {
   Timeline,
   Scheduler,
   MonthGrid,
+  YearGrid,
   AiBar,
   Topbar,
   type ViewType,
@@ -128,6 +129,11 @@ function App() {
     goToNext: () => void;
     goToToday: () => void;
   };
+  let yearGridRef: HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+  };
 
   // ── Google Calendar sync ──────────────────────────────────────────────
   const googleClient = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
@@ -145,22 +151,30 @@ function App() {
       name: "Dr. Sarah Chena",
       type: "person",
       email: "sarah.chen@example.com",
+      avatar:
+        "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
     });
     manager.addResource({
       id: "r2",
       name: "Dr. Michael Ross",
       type: "person",
       email: "michael.ross@example.com",
+      avatar:
+        "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
     });
     manager.addResource({
       id: "r3",
       name: "Operating Room 1",
       type: "room",
+      avatar:
+        "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=120&h=120",
     });
     manager.addResource({
       id: "r4",
       name: "MRI Scanner A",
       type: "equipment",
+      avatar:
+        "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=120&h=120",
     });
 
     // Add a couple of initial events for today
@@ -290,15 +304,18 @@ function App() {
           onConnectCalendar={handleConnectCalendar}
           onPrevClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToPrev();
-            else monthGridRef?.goToPrev();
+            else if (currentView() === "Month") monthGridRef?.goToPrev();
+            else yearGridRef?.goToPrev();
           }}
           onNextClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToNext();
-            else monthGridRef?.goToNext();
+            else if (currentView() === "Month") monthGridRef?.goToNext();
+            else yearGridRef?.goToNext();
           }}
           onTodayClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToToday();
-            else monthGridRef?.goToToday();
+            else if (currentView() === "Month") monthGridRef?.goToToday();
+            else yearGridRef?.goToToday();
           }}
           onViewSwitch={(detail) => setCurrentView(detail.view)}
           onToggleCreate={() => {
@@ -309,6 +326,7 @@ function App() {
 
         <Show when={currentView() === "Timeline"}>
           <Timeline
+            showFab={true}
             ref={(el) => (timelineRef = el as unknown as typeof timelineRef)}
             allowCreate={allowCreate()}
             onAddEvent={() => {
@@ -369,6 +387,7 @@ function App() {
         </Show>
         <Show when={currentView() === "Month"}>
           <MonthGrid
+            showFab={true}
             ref={(el) => (monthGridRef = el as unknown as typeof monthGridRef)}
             onAddEvent={() => {
               setSelectedEventId(null);
@@ -389,6 +408,29 @@ function App() {
                 zoomPercent: (detail.zoomPercent as number) || 100,
                 zoomUnit: (detail.zoomUnit as string) || "",
               });
+            }}
+          />
+        </Show>
+        <Show when={currentView() === "Year"}>
+          <YearGrid
+            ref={(el) => (yearGridRef = el as unknown as typeof yearGridRef)}
+            onViewChange={(detail) => setCurrentView(detail.view)}
+            onNavChange={(detail) => {
+              setNavData({
+                navLabel: (detail.navLabel as string) || "",
+                dayName: (detail.dayName as string) || "",
+                shortDate: (detail.shortDate as string) || "",
+                zoomPercent: (detail.zoomPercent as number) || 100,
+                zoomUnit: (detail.zoomUnit as string) || "",
+              });
+            }}
+            onDayClick={(detail) => {
+              setCurrentView("Timeline");
+              setTimeout(() => {
+                if (timelineRef && (timelineRef as any).goToDate) {
+                  (timelineRef as any).goToDate(detail.date);
+                }
+              }, 100);
             }}
           />
         </Show>

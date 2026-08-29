@@ -93,6 +93,15 @@
       />
     }
 
+    @if (currentView === 'Year') {
+      <janus-year-grid-ng
+        #yearGridEl
+        (viewChange)="handleViewChange($event)"
+        (dayClick)="handleDayClick($event)"
+        (navChange)="handleNavChange($event)"
+      />
+    }
+
     @if (showScheduler) {
       <janus-scheduler-ng
         [eventId]="selectedEventId()"
