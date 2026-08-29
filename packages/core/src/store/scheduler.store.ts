@@ -181,6 +181,7 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
       email: updates.email !== undefined ? updates.email : resource.email,
       avatar: updates.avatar !== undefined ? updates.avatar : resource.avatar,
     });
+    if (!updatedResource.isValid()) throw new Error("Invalid resource data");
 
     set((state) => ({
       resources: { ...state.resources, [id]: updatedResource },
