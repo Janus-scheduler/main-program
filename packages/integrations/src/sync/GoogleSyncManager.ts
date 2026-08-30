@@ -197,6 +197,65 @@ export class GoogleSyncManager {
   }
 
   /**
+   * Resolve a Janus event's assigned resourceIds into the room/equipment
+   * names + full resourceId list toGoogle() needs to populate `location`,
+   * the generated equipment block in `description`, and
+   * `extendedProperties`. Person resources are excluded here — they're
+   * already covered by resolveAttendees.
+   */
+  private resolveResourceContext(resourceIds: string[]): {
+    roomNames: string[];
+    equipmentNames: string[];
+    resourceIds: string[];
+  } {
+    const { resources } = schedulerStore.getState();
+    const roomNames: string[] = [];
+    const equipmentNames: string[] = [];
+
+    for (const resourceId of resourceIds) {
+      const resource = resources[resourceId];
+      if (!resource) continue;
+      if (resource.type === "room") roomNames.push(resource.name);
+      else if (resource.type === "equipment")
+        equipmentNames.push(resource.name);
+    }
+
+    return { roomNames, equipmentNames, resourceIds };
+  }
+
+  /**
+   * Reverse-map a Google event's `extendedProperties.private.janusResourceIds`
+   * (written by toGoogle() on push — see GoogleResourceContext) back into a
+   * resourceIds array. This is the exact, authoritative source for events
+   * Janus itself pushed — unlike resolveResourceIdsFromAttendees, it covers
+   * room/equipment assignments too, not just person invitees.
+   *
+   * Without this, every push's own webhook echo (Google notifies the watch
+   * channel on API-driven changes too, not just edits made by hand) would
+   * come back through handleGoogleChange and get re-resolved from attendees
+   * alone — silently dropping any room/equipment assignment that was never
+   * an attendee in the first place.
+   *
+   * Ids that no longer exist locally (e.g. the resource was deleted since
+   * the push) are filtered out. Returns undefined when there's nothing
+   * usable, so the caller can fall back to attendee-based resolution.
+   */
+  private resolveResourceIdsFromExtendedProperties(
+    event: GoogleCalendarEvent,
+  ): string[] | undefined {
+    const raw =
+      event.extendedProperties?.private?.[
+        GoogleEventMapper.resourceIdsPropertyKey
+      ];
+    if (!raw) return undefined;
+
+    const { resources } = schedulerStore.getState();
+    const resourceIds = raw.split(",").filter((id) => id && resources[id]);
+
+    return resourceIds.length > 0 ? resourceIds : undefined;
+  }
+
+  /**
    * Reverse-map a Google event's attendee emails back to known Janus
    * resourceIds (for events that originated on the Google side). Returns
    * undefined when there are no attendees or none match a known resource —
@@ -287,13 +346,13 @@ export class GoogleSyncManager {
         continue;
       }
 
-      const resolvedFromAttendees = this.resolveResourceIdsFromAttendees(
-        ge.attendees,
-      );
+      const resolvedResourceIds =
+        this.resolveResourceIdsFromExtendedProperties(ge) ??
+        this.resolveResourceIdsFromAttendees(ge.attendees);
       const janusData = this.mapper.toJanus(
         ge,
         existingJanusId,
-        resolvedFromAttendees,
+        resolvedResourceIds,
       );
 
       if (existingJanusId) {
@@ -350,13 +409,13 @@ export class GoogleSyncManager {
 
     // upserted — create or update
     const existingJanusId = this.reverseTable.get(event.id);
-    const resolvedFromAttendees = this.resolveResourceIdsFromAttendees(
-      event.attendees,
-    );
+    const resolvedResourceIds =
+      this.resolveResourceIdsFromExtendedProperties(event) ??
+      this.resolveResourceIdsFromAttendees(event.attendees);
     const janusData = this.mapper.toJanus(
       event,
       existingJanusId,
-      resolvedFromAttendees,
+      resolvedResourceIds,
     );
 
     const storeState = schedulerStore.getState();
@@ -452,9 +511,11 @@ export class GoogleSyncManager {
 
     try {
       const attendees = this.resolveAttendees(event.resourceIds);
+      const resourceContext = this.resolveResourceContext(event.resourceIds);
       const googleEvent = this.mapper.toGoogle(
         event as unknown as EventData,
         attendees,
+        resourceContext,
       );
       const googleId = await this.client.pushEvent(googleEvent);
       this.mappingTable.set(event.id, googleId);
@@ -538,9 +599,11 @@ export class GoogleSyncManager {
   ): Promise<boolean> {
     try {
       const attendees = this.resolveAttendees(event.resourceIds);
+      const resourceContext = this.resolveResourceContext(event.resourceIds);
       const googleEvent = this.mapper.toGoogle(
         event as unknown as EventData,
         attendees,
+        resourceContext,
       );
       await this.client.updateEvent(googleId, googleEvent);
       this.resourceIdsTable.set(event.id, event.resourceIds);

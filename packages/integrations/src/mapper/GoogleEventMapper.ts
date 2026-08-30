@@ -29,20 +29,75 @@ function fromGoogleRecurrence(recurrence?: string[]): string | undefined {
   return rruleLine?.slice("RRULE:".length);
 }
 
+/**
+ * Marks the start of the auto-generated equipment block appended to
+ * `description` when pushing to Google. Always a single well-known line so
+ * toJanus() can strip it back out — otherwise a Google-authored echo of our
+ * own push (e.g. via the webhook) would bake the block into Janus's
+ * `description` field, and the next push would append a second block on top
+ * of it.
+ */
+const EQUIPMENT_BLOCK_MARKER = "\n\n— Equipment —\n";
+
+/** Rebuilds `description` from the user's own text plus a fresh equipment block — never appends onto a previous block. */
+function buildDescription(
+  description: string,
+  equipmentNames: string[],
+): string {
+  if (equipmentNames.length === 0) return description;
+  const lines = equipmentNames.map((name) => `• ${name}`).join("\n");
+  return `${description}${EQUIPMENT_BLOCK_MARKER}${lines}`;
+}
+
+/** Inverse of buildDescription — strips the generated equipment block back out. */
+function stripEquipmentBlock(description: string): string {
+  const idx = description.indexOf(EQUIPMENT_BLOCK_MARKER);
+  return idx === -1 ? description : description.slice(0, idx);
+}
+
+/** Context the caller (which has store access) resolves from an event's resourceIds. */
+export interface GoogleResourceContext {
+  /** Names of assigned "room" resources — joined into Google's `location` field. */
+  roomNames?: string[];
+  /** Names of assigned "equipment" resources — rendered into a generated `description` block. */
+  equipmentNames?: string[];
+  /** All assigned resourceIds (every type), stashed in `extendedProperties.private` for lossless round-tripping later. */
+  resourceIds?: string[];
+}
+
 export class GoogleEventMapper {
   private static readonly DEFAULT_RESOURCE_ID = "google-calendar";
+  private static readonly RESOURCE_IDS_PROPERTY = "janusResourceIds";
 
   /**
    * Convert a Janus EventData → Google Calendar event format.
-   * `attendees` is always included (even empty) so that an update which
-   * removes the last assigned person clears attendees on the Google side too —
-   * PATCH only touches fields present in the request body.
+   * `attendees`, `location`, and `extendedProperties` are always included
+   * (even empty) so that an update which removes the last assigned
+   * person/room/resource clears them on the Google side too — PATCH only
+   * touches fields present in the request body.
    */
   toGoogle(
     event: EventData,
     attendees: GoogleAttendee[] = [],
+    resourceContext: GoogleResourceContext = {},
   ): GoogleCalendarEvent {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const {
+      roomNames = [],
+      equipmentNames = [],
+      resourceIds = [],
+    } = resourceContext;
+
+    const location = roomNames.join(", ");
+    const description = buildDescription(
+      event.description || "",
+      equipmentNames,
+    );
+    const extendedProperties = {
+      private: {
+        [GoogleEventMapper.RESOURCE_IDS_PROPERTY]: resourceIds.join(","),
+      },
+    };
 
     if (event.allDay) {
       // event.startTime/endTime are UTC-anchored instants produced by
@@ -56,8 +111,10 @@ export class GoogleEventMapper {
       const lastIncludedDate = isoToZonedDisplay(event.endTime, timeZone).date;
       return {
         summary: event.title,
-        description: event.description || "",
+        description,
+        location,
         attendees,
+        extendedProperties,
         recurrence: toGoogleRecurrence(event.recurrenceRule),
         start: { date: startDate },
         // Google's all-day end.date is EXCLUSIVE (the day AFTER the last
@@ -69,8 +126,10 @@ export class GoogleEventMapper {
 
     return {
       summary: event.title,
-      description: event.description || "",
+      description,
+      location,
       attendees,
+      extendedProperties,
       recurrence: toGoogleRecurrence(event.recurrenceRule),
       start: { dateTime: event.startTime, timeZone },
       end: { dateTime: event.endTime, timeZone },
@@ -108,7 +167,7 @@ export class GoogleEventMapper {
       return {
         id: existingJanusId ?? `google-${googleEvent.id}`,
         title: googleEvent.summary || "Untitled",
-        description: googleEvent.description || "",
+        description: stripEquipmentBlock(googleEvent.description || ""),
         allDay: true,
         resourceId: resourceIds[0],
         resourceIds,
@@ -122,7 +181,7 @@ export class GoogleEventMapper {
     return {
       id: existingJanusId ?? `google-${googleEvent.id}`,
       title: googleEvent.summary || "Untitled",
-      description: googleEvent.description || "",
+      description: stripEquipmentBlock(googleEvent.description || ""),
       allDay: false,
       resourceId: resourceIds[0],
       resourceIds,
@@ -135,5 +194,9 @@ export class GoogleEventMapper {
 
   static get defaultResourceId(): string {
     return GoogleEventMapper.DEFAULT_RESOURCE_ID;
+  }
+
+  static get resourceIdsPropertyKey(): string {
+    return GoogleEventMapper.RESOURCE_IDS_PROPERTY;
   }
 }

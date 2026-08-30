@@ -8,8 +8,19 @@ export interface GoogleCalendarEvent {
   id?: string;
   summary?: string;
   description?: string;
+  /** Plain-text location. Janus maps room-type resource names into this field. */
+  location?: string;
   status?: string;
   attendees?: GoogleAttendee[];
+  /**
+   * App-private metadata, invisible in the Google UI and preserved verbatim
+   * even if a human edits the event. Janus stores the full set of assigned
+   * resourceIds here (`janusResourceIds`, comma-joined) so a future pull can
+   * recover room/equipment assignments that don't survive as attendees.
+   */
+  extendedProperties?: {
+    private?: Record<string, string>;
+  };
   /** iCalendar RRULE/EXRULE/RDATE/EXDATE lines, e.g. ["RRULE:FREQ=WEEKLY;COUNT=5"]. */
   recurrence?: string[];
   start: {
