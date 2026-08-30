@@ -226,19 +226,21 @@ export class GoogleSyncManager {
   /**
    * Reverse-map a Google event's `extendedProperties.private.janusResourceIds`
    * (written by toGoogle() on push — see GoogleResourceContext) back into a
-   * resourceIds array. This is the exact, authoritative source for events
-   * Janus itself pushed — unlike resolveResourceIdsFromAttendees, it covers
-   * room/equipment assignments too, not just person invitees.
+   * resourceIds array. Unlike resolveResourceIdsFromAttendees, this covers
+   * room/equipment assignments too, not just person invitees — it's the only
+   * source for those, since Google has no other field to hold them.
    *
-   * Without this, every push's own webhook echo (Google notifies the watch
-   * channel on API-driven changes too, not just edits made by hand) would
-   * come back through handleGoogleChange and get re-resolved from attendees
-   * alone — silently dropping any room/equipment assignment that was never
-   * an attendee in the first place.
+   * Callers should exclude "person" resources from the result (see
+   * excludeResourceType) and merge the rest with resolveResourceIdsFromAttendees
+   * rather than preferring one or the other outright: extendedProperties is a
+   * snapshot frozen at the moment Janus last pushed, so treating it as
+   * authoritative for people too would mean an attendee added/removed by hand
+   * directly in Google — which never touches extendedProperties — silently
+   * never reaches Janus. Attendees are the live source of truth for people;
+   * extendedProperties are the only source for room/equipment.
    *
    * Ids that no longer exist locally (e.g. the resource was deleted since
-   * the push) are filtered out. Returns undefined when there's nothing
-   * usable, so the caller can fall back to attendee-based resolution.
+   * the push) are filtered out. Returns undefined when there's nothing usable.
    */
   private resolveResourceIdsFromExtendedProperties(
     event: GoogleCalendarEvent,
@@ -253,6 +255,17 @@ export class GoogleSyncManager {
     const resourceIds = raw.split(",").filter((id) => id && resources[id]);
 
     return resourceIds.length > 0 ? resourceIds : undefined;
+  }
+
+  /** Drops resourceIds of the given type from a resolver result (e.g. excluding "person" so attendees stay the live source of truth for people). */
+  private excludeResourceType(
+    resourceIds: string[] | undefined,
+    type: "person" | "room" | "equipment",
+  ): string[] | undefined {
+    if (!resourceIds) return undefined;
+    const { resources } = schedulerStore.getState();
+    const filtered = resourceIds.filter((id) => resources[id]?.type !== type);
+    return filtered.length > 0 ? filtered : undefined;
   }
 
   /**
@@ -279,6 +292,61 @@ export class GoogleSyncManager {
       .filter((id): id is string => !!id);
 
     return resourceIds.length > 0 ? resourceIds : undefined;
+  }
+
+  /**
+   * Reverse-map a Google event's `location` text back into room resourceIds
+   * — the only source for rooms on an event Janus never touched (no
+   * `extendedProperties` to read instead). `location` is split on ","
+   * (mirroring how toGoogle() joins room names on push) and each trimmed,
+   * lowercased segment is compared for an *exact* match against a room
+   * resource's name.
+   *
+   * Deliberately exact, not substring: a looser match risks pulling in an
+   * unrelated room whose name happens to appear inside other text. Equipment
+   * is deliberately NOT matched from `description` at all — free text is far
+   * noisier than the purpose-built `location` field (a resource name can
+   * appear in prose without meaning "this is booked"), so unrecognized
+   * equipment is preferable to false matches.
+   */
+  private resolveResourceIdsFromLocation(
+    event: GoogleCalendarEvent,
+  ): string[] | undefined {
+    const locationSegments = new Set(
+      (event.location ?? "")
+        .split(",")
+        .map((segment) => segment.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    if (locationSegments.size === 0) return undefined;
+
+    const { resources } = schedulerStore.getState();
+    const resourceIds = Object.values(resources)
+      .filter(
+        (resource) =>
+          resource.type === "room" &&
+          locationSegments.has(resource.name.trim().toLowerCase()),
+      )
+      .map((resource) => resource.id);
+
+    return resourceIds.length > 0 ? resourceIds : undefined;
+  }
+
+  /**
+   * Dedupe-merge any number of possibly-undefined resourceId lists into one.
+   * Used to combine the independent partial signals a Google event carries —
+   * live people from attendees, room/equipment from extendedProperties,
+   * room from location text — none of which alone is a complete picture, so
+   * they're combined rather than tried in preference order.
+   */
+  private mergeResourceIds(
+    ...idLists: (string[] | undefined)[]
+  ): string[] | undefined {
+    const merged = new Set<string>();
+    for (const ids of idLists) {
+      for (const id of ids ?? []) merged.add(id);
+    }
+    return merged.size > 0 ? Array.from(merged) : undefined;
   }
 
   /**
@@ -346,9 +414,14 @@ export class GoogleSyncManager {
         continue;
       }
 
-      const resolvedResourceIds =
-        this.resolveResourceIdsFromExtendedProperties(ge) ??
-        this.resolveResourceIdsFromAttendees(ge.attendees);
+      const resolvedResourceIds = this.mergeResourceIds(
+        this.resolveResourceIdsFromAttendees(ge.attendees),
+        this.excludeResourceType(
+          this.resolveResourceIdsFromExtendedProperties(ge),
+          "person",
+        ),
+        this.resolveResourceIdsFromLocation(ge),
+      );
       const janusData = this.mapper.toJanus(
         ge,
         existingJanusId,
@@ -409,9 +482,14 @@ export class GoogleSyncManager {
 
     // upserted — create or update
     const existingJanusId = this.reverseTable.get(event.id);
-    const resolvedResourceIds =
-      this.resolveResourceIdsFromExtendedProperties(event) ??
-      this.resolveResourceIdsFromAttendees(event.attendees);
+    const resolvedResourceIds = this.mergeResourceIds(
+      this.resolveResourceIdsFromAttendees(event.attendees),
+      this.excludeResourceType(
+        this.resolveResourceIdsFromExtendedProperties(event),
+        "person",
+      ),
+      this.resolveResourceIdsFromLocation(event),
+    );
     const janusData = this.mapper.toJanus(
       event,
       existingJanusId,
