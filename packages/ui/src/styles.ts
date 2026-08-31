@@ -36,6 +36,9 @@ export const schedulerStyles = css`
     --red: #ef4444;
 
     --c-primary: var(--janus-primary-color, #f97316);
+    --c-primary-bg: var(--janus-primary-bg, color-mix(in srgb, var(--c-primary) 12%, #ffffff));
+    --c-primary-bd: var(--janus-primary-border, var(--c-primary));
+    --c-primary-tx: var(--janus-primary-text, var(--c-primary));
     --c-orange: #f97316;
     --c-blue: #0ea5e9;
     --c-green: #10b981;
@@ -2202,6 +2205,7 @@ export const schedulerStyles = css`
   margin-bottom: 10px;
 }
 
+.swatch-bg-primary { background: var(--c-primary-bg); color: var(--c-primary-tx); }
 .swatch-bg-orange { background: #fff7ed; color: #c2410c; }
 .swatch-bg-blue   { background: #eff6ff; color: #1d4ed8; }
 .swatch-bg-green  { background: #f0fdf4; color: #15803d; }

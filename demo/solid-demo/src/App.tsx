@@ -4,6 +4,8 @@ import {
   Timeline,
   Scheduler,
   MonthGrid,
+  DayGrid,
+  WeekGrid,
   YearGrid,
   AiBar,
   Topbar,
@@ -110,6 +112,17 @@ function App() {
     toggleCreate: () => void;
   };
   let monthGridRef: HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+  };
+  let dayGridRef: HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+    goToDate: (date: string | number | Date) => void;
+  };
+  let weekGridRef: HTMLElement & {
     goToPrev: () => void;
     goToNext: () => void;
     goToToday: () => void;
@@ -236,16 +249,22 @@ function App() {
           onPrevClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToPrev();
             else if (currentView() === "Month") monthGridRef?.goToPrev();
+            else if (currentView() === "Day") dayGridRef?.goToPrev();
+            else if (currentView() === "Week") weekGridRef?.goToPrev();
             else yearGridRef?.goToPrev();
           }}
           onNextClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToNext();
             else if (currentView() === "Month") monthGridRef?.goToNext();
+            else if (currentView() === "Day") dayGridRef?.goToNext();
+            else if (currentView() === "Week") weekGridRef?.goToNext();
             else yearGridRef?.goToNext();
           }}
           onTodayClick={() => {
             if (currentView() === "Timeline") timelineRef?.goToToday();
             else if (currentView() === "Month") monthGridRef?.goToToday();
+            else if (currentView() === "Day") dayGridRef?.goToToday();
+            else if (currentView() === "Week") weekGridRef?.goToToday();
             else yearGridRef?.goToToday();
           }}
           onViewSwitch={(detail) => setCurrentView(detail.view)}
@@ -254,6 +273,108 @@ function App() {
             setAllowCreate((prev) => !prev);
           }}
         />
+
+        <Show when={currentView() === "Day"}>
+          <DayGrid
+            showFab={true}
+            allowCreate={allowCreate()}
+            ref={(el) => (dayGridRef = el as unknown as typeof dayGridRef)}
+            onAddEvent={() => {
+              setSelectedEventId(null);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onEventClick={(detail) => {
+              setSelectedEventId(detail.id);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onSlotSelect={() => {
+              setSelectedEventId(null);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onEventMove={({ event, newDate, newStartTime, newEndTime }) => {
+              const tz = schedulerStore.getState().timezone;
+              manager.updateEvent(event.id, {
+                startTime: zonedInputToISO(newDate, newStartTime, tz),
+                endTime: zonedInputToISO(newDate, newEndTime, tz),
+              });
+            }}
+            onEventResize={({ event, date, newStartTime, newEndTime }) => {
+              const tz = schedulerStore.getState().timezone;
+              manager.updateEvent(event.id, {
+                startTime: zonedInputToISO(date, newStartTime, tz),
+                endTime: zonedInputToISO(date, newEndTime, tz),
+              });
+            }}
+            onViewChange={(detail) => setCurrentView(detail.view)}
+            onNavChange={(detail) => {
+              setNavData({
+                navLabel: (detail.navLabel as string) || "",
+                dayName: (detail.dayName as string) || "",
+                shortDate: (detail.shortDate as string) || "",
+                zoomPercent: (detail.zoomPercent as number) || 100,
+                zoomUnit: (detail.zoomUnit as string) || "",
+              });
+            }}
+          />
+        </Show>
+
+        <Show when={currentView() === "Week"}>
+          <WeekGrid
+            showFab={true}
+            allowCreate={allowCreate()}
+            ref={(el) => (weekGridRef = el as unknown as typeof weekGridRef)}
+            onAddEvent={() => {
+              setSelectedEventId(null);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onEventClick={(detail) => {
+              setSelectedEventId(detail.id);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onDayClick={(detail) => {
+              setCurrentView("Day");
+              setTimeout(() => {
+                if (dayGridRef && (dayGridRef as any).goToDate) {
+                  (dayGridRef as any).goToDate(detail.date);
+                }
+              }, 50);
+            }}
+            onSlotSelect={() => {
+              setSelectedEventId(null);
+              setSchedulerError(null);
+              setShowScheduler(true);
+            }}
+            onEventMove={({ event, newDate, newStartTime, newEndTime }) => {
+              const tz = schedulerStore.getState().timezone;
+              manager.updateEvent(event.id, {
+                startTime: zonedInputToISO(newDate, newStartTime, tz),
+                endTime: zonedInputToISO(newDate, newEndTime, tz),
+              });
+            }}
+            onEventResize={({ event, date, newStartTime, newEndTime }) => {
+              const tz = schedulerStore.getState().timezone;
+              manager.updateEvent(event.id, {
+                startTime: zonedInputToISO(date, newStartTime, tz),
+                endTime: zonedInputToISO(date, newEndTime, tz),
+              });
+            }}
+            onViewChange={(detail) => setCurrentView(detail.view)}
+            onNavChange={(detail) => {
+              setNavData({
+                navLabel: (detail.navLabel as string) || "",
+                dayName: (detail.dayName as string) || "",
+                shortDate: (detail.shortDate as string) || "",
+                zoomPercent: (detail.zoomPercent as number) || 100,
+                zoomUnit: (detail.zoomUnit as string) || "",
+              });
+            }}
+          />
+        </Show>
 
         <Show when={currentView() === "Timeline"}>
           <Timeline
