@@ -8,6 +8,32 @@ import type {
   GoogleAttendee,
 } from "../types/index.js";
 
+interface PersistedMappingEntry {
+  janusId: string;
+  googleId: string;
+  resourceIds: string[];
+}
+
+/**
+ * Runtime shape check for one persisted mapping entry. localStorage is
+ * user-writable and survives across app versions, so a well-formed-but-wrong
+ * JSON payload (an object, an array of strings, entries missing fields) must be
+ * rejected rather than cast blindly — otherwise `undefined` ids leak into the
+ * lookup tables and get re-serialised on the next persist.
+ */
+function isValidMappingEntry(value: unknown): value is PersistedMappingEntry {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Record<string, unknown>;
+  return (
+    typeof entry.janusId === "string" &&
+    entry.janusId.length > 0 &&
+    typeof entry.googleId === "string" &&
+    entry.googleId.length > 0 &&
+    Array.isArray(entry.resourceIds) &&
+    entry.resourceIds.every((id) => typeof id === "string")
+  );
+}
+
 export class GoogleSyncManager {
   private readonly client: GoogleCalendarClient;
   private readonly mapper: GoogleEventMapper;
@@ -82,18 +108,44 @@ export class GoogleSyncManager {
   }
 
   private wsListener: GoogleWebSocketListener | null = null;
+  // While the initial fetch/load/push sequence runs, live WebSocket messages
+  // are queued here instead of applied, then flushed once it completes — see
+  // startRealtimeSync.
+  private isBufferingInitialSync = false;
+  private readonly initialSyncBuffer: WebSocketMessage[] = [];
 
   /**
-   * Starts real-time sync once a connection is confirmed: pulls in Google's
-   * current events (skipping ones already known locally), pushes any local
-   * events that never got a chance to sync (e.g. seed data created before
-   * connecting), then opens a WebSocket for live Google → Janus updates.
+   * Starts real-time sync once a connection is confirmed: opens the WebSocket
+   * for live Google → Janus updates, pulls in Google's current events (skipping
+   * ones already known locally), then pushes any local events that never got a
+   * chance to sync (e.g. seed data created before connecting).
+   *
+   * The WebSocket is opened *before* the initial fetch so that changes made on
+   * the Google side during the load window aren't lost in the gap; messages
+   * that arrive in that window are buffered and applied once the initial load
+   * finishes.
    *
    * Call this once per connection (e.g. from the host app's effect gated on
    * connected status). Returns a stop function — call it when disconnecting
    * or tearing down, to close the WebSocket and avoid acting on stale data.
    */
   async startRealtimeSync(): Promise<() => void> {
+    this.wsListener?.stop();
+    this.isBufferingInitialSync = true;
+    this.initialSyncBuffer.length = 0;
+
+    this.wsListener = new GoogleWebSocketListener(
+      { backendUrl: this.client.getBackendUrl() },
+      (message) => {
+        if (this.isBufferingInitialSync) {
+          this.initialSyncBuffer.push(message);
+        } else {
+          this.handleGoogleChange(message);
+        }
+      },
+    );
+    this.wsListener.start();
+
     try {
       const events = await this.client.fetchInitialEvents();
       await this.loadInitialEvents(events);
@@ -103,18 +155,23 @@ export class GoogleSyncManager {
         "[Janus Integrations] Failed to load initial Google events:",
         err,
       );
+    } finally {
+      // Flush anything that arrived during the load window, in order, then
+      // switch to applying messages live. handleGoogleChange is idempotent
+      // (upsert keyed by reverseTable), so a buffered message that duplicates
+      // an already-loaded event is a harmless no-op.
+      this.isBufferingInitialSync = false;
+      const buffered = this.initialSyncBuffer.splice(0);
+      for (const message of buffered) {
+        this.handleGoogleChange(message);
+      }
     }
-
-    this.wsListener?.stop();
-    this.wsListener = new GoogleWebSocketListener(
-      { backendUrl: this.client.getBackendUrl() },
-      (message) => this.handleGoogleChange(message),
-    );
-    this.wsListener.start();
 
     return () => {
       this.wsListener?.stop();
       this.wsListener = null;
+      this.isBufferingInitialSync = false;
+      this.initialSyncBuffer.length = 0;
     };
   }
 
@@ -138,15 +195,23 @@ export class GoogleSyncManager {
     try {
       const raw = localStorage.getItem(GoogleSyncManager.STORAGE_KEY);
       if (!raw) return;
-      const entries = JSON.parse(raw) as Array<{
-        janusId: string;
-        googleId: string;
-        resourceIds: string[];
-      }>;
-      for (const e of entries) {
-        this.mappingTable.set(e.janusId, e.googleId);
-        this.reverseTable.set(e.googleId, e.janusId);
-        this.resourceIdsTable.set(e.janusId, e.resourceIds);
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        console.warn(
+          "[Janus Integrations] Persisted mapping is not an array — ignoring",
+        );
+        return;
+      }
+      for (const entry of parsed) {
+        if (!isValidMappingEntry(entry)) {
+          console.warn(
+            "[Janus Integrations] Skipping malformed persisted mapping entry",
+          );
+          continue;
+        }
+        this.mappingTable.set(entry.janusId, entry.googleId);
+        this.reverseTable.set(entry.googleId, entry.janusId);
+        this.resourceIdsTable.set(entry.janusId, entry.resourceIds);
       }
     } catch (err) {
       console.error(

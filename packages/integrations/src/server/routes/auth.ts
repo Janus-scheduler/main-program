@@ -76,7 +76,7 @@ export function createAuthRouter(config: {
         return;
       }
 
-      saveTokens({
+      await saveTokens({
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expiry_date: tokens.expiry_date,
@@ -107,7 +107,7 @@ export function createAuthRouter(config: {
         config.redirectUri,
       );
 
-      saveCalendarState({
+      await saveCalendarState({
         janusCalendarId: calendarId,
         syncToken,
         webhookChannelId: webhook.channelId,
@@ -130,14 +130,18 @@ export function createAuthRouter(config: {
   // (GoogleSyncManager's push hooks) use this check to decide whether to
   // push — if it reports "connected" too early, the push 400s and
   // SchedulerManager rolls back the local event.
-  router.get("/status", (_req: Request, res: Response) => {
-    res.json({ connected: isConnected() && getCalendarState() !== null });
+  router.get("/status", async (_req: Request, res: Response) => {
+    const [tokenPresent, calendarState] = await Promise.all([
+      isConnected(),
+      getCalendarState(),
+    ]);
+    res.json({ connected: tokenPresent && calendarState !== null });
   });
 
   // Fetch all current events (called after first connect)
   router.get("/initial-events", async (_req: Request, res: Response) => {
     try {
-      const state = getCalendarState();
+      const state = await getCalendarState();
       if (!state) {
         res.status(400).json({ error: "Not connected" });
         return;
@@ -157,7 +161,7 @@ export function createAuthRouter(config: {
 
   // Disconnect
   router.post("/disconnect", async (_req: Request, res: Response) => {
-    const state = getCalendarState();
+    const state = await getCalendarState();
     if (state) {
       try {
         await stopWebhook(
@@ -174,8 +178,7 @@ export function createAuthRouter(config: {
       }
     }
 
-    clearTokens();
-    clearCalendarState();
+    await Promise.all([clearTokens(), clearCalendarState()]);
     res.json({ disconnected: true });
   });
 

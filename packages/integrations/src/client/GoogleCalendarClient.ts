@@ -1,11 +1,26 @@
 import type { JanusGoogleConfig, GoogleCalendarEvent } from "../types/index.js";
 
+type FetchInit = Parameters<typeof fetch>[1];
+
 export class GoogleCalendarClient {
   private readonly backendUrl: string;
 
   constructor(config: JanusGoogleConfig) {
     // Strip trailing slash for consistent URL building
     this.backendUrl = config.backendUrl.replace(/\/$/, "");
+  }
+
+  /**
+   * `credentials: "include"` so a backend protected by the host's own
+   * cookie/session auth receives the session on cross-origin calls. Harmless
+   * when the backend is unauthenticated (the default) — the existing
+   * `cors({ credentials: true })` config already permits it.
+   */
+  private fetch(path: string, init?: FetchInit): Promise<Response> {
+    return fetch(`${this.backendUrl}${path}`, {
+      credentials: "include",
+      ...init,
+    });
   }
 
   /** The backend base URL this client talks to (e.g. for constructing a matching WebSocket listener). */
@@ -15,7 +30,7 @@ export class GoogleCalendarClient {
 
   /** Create event in Google Calendar via backend. Returns googleEventId. */
   async pushEvent(event: GoogleCalendarEvent): Promise<string> {
-    const res = await fetch(`${this.backendUrl}/events`, {
+    const res = await this.fetch(`/events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(event),
@@ -31,7 +46,7 @@ export class GoogleCalendarClient {
     googleEventId: string,
     event: GoogleCalendarEvent,
   ): Promise<void> {
-    const res = await fetch(`${this.backendUrl}/events/${googleEventId}`, {
+    const res = await this.fetch(`/events/${googleEventId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(event),
@@ -42,11 +57,15 @@ export class GoogleCalendarClient {
 
   /** Delete a Google Calendar event via backend. */
   async deleteEvent(googleEventId: string): Promise<void> {
-    const res = await fetch(`${this.backendUrl}/events/${googleEventId}`, {
+    const res = await this.fetch(`/events/${googleEventId}`, {
       method: "DELETE",
     });
-    if (!res.ok)
-      throw new Error(`deleteEvent failed: ${res.status} ${res.statusText}`);
+    // 404 (Not Found) / 410 (Gone) mean the event is already absent from Google —
+    // for a delete, that's the desired end state, not a failure. Treating it as
+    // success lets the caller clear its local mapping instead of the delete being
+    // rolled back (which would resurrect an event the user just removed).
+    if (res.ok || res.status === 404 || res.status === 410) return;
+    throw new Error(`deleteEvent failed: ${res.status} ${res.statusText}`);
   }
 
   /** Redirect the browser to the backend's OAuth start endpoint. */
@@ -56,7 +75,7 @@ export class GoogleCalendarClient {
 
   /** Tell the backend to disconnect (clears its stored tokens/calendar state). */
   async disconnect(): Promise<void> {
-    const res = await fetch(`${this.backendUrl}/auth/disconnect`, {
+    const res = await this.fetch(`/auth/disconnect`, {
       method: "POST",
     });
     if (!res.ok)
@@ -66,7 +85,7 @@ export class GoogleCalendarClient {
   /** Check whether the user is connected to Google Calendar. */
   async isConnected(): Promise<boolean> {
     try {
-      const res = await fetch(`${this.backendUrl}/auth/status`);
+      const res = await this.fetch(`/auth/status`);
       const data = (await res.json()) as { connected: boolean };
       return data.connected;
     } catch {
@@ -76,7 +95,7 @@ export class GoogleCalendarClient {
 
   /** Fetch all existing Google Calendar events (called once after OAuth). */
   async fetchInitialEvents(): Promise<GoogleCalendarEvent[]> {
-    const res = await fetch(`${this.backendUrl}/auth/initial-events`);
+    const res = await this.fetch(`/auth/initial-events`);
     if (!res.ok) throw new Error(`fetchInitialEvents failed: ${res.status}`);
     const data = (await res.json()) as { events: GoogleCalendarEvent[] };
     return data.events;

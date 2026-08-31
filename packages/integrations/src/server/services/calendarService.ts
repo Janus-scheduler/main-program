@@ -1,26 +1,28 @@
-import fs from "node:fs";
-import path from "node:path";
 import { google } from "googleapis";
 import { getValidToken } from "./tokenService.js";
+import type { CalendarStateStore } from "../stores/types.js";
+import { FileCalendarStateStore } from "../stores/FileCalendarStateStore.js";
 import type { CalendarState } from "../../types/index.js";
 
-const STATE_FILE = path.join(process.cwd(), "janus-calendar-state.json");
+// Module-level default so call sites keep their signatures; createJanusApp
+// swaps it via setCalendarStateStore() when the host supplies their own.
+let calendarStateStore: CalendarStateStore = new FileCalendarStateStore();
 
-export function getCalendarState(): CalendarState | null {
-  try {
-    if (!fs.existsSync(STATE_FILE)) return null;
-    return JSON.parse(fs.readFileSync(STATE_FILE, "utf-8")) as CalendarState;
-  } catch {
-    return null;
-  }
+/** Replace the calendar-state store (called by createJanusApp before routers are mounted). */
+export function setCalendarStateStore(store: CalendarStateStore): void {
+  calendarStateStore = store;
 }
 
-export function saveCalendarState(state: CalendarState): void {
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), "utf-8");
+export function getCalendarState(): Promise<CalendarState | null> {
+  return calendarStateStore.get();
 }
 
-export function clearCalendarState(): void {
-  if (fs.existsSync(STATE_FILE)) fs.unlinkSync(STATE_FILE);
+export function saveCalendarState(state: CalendarState): Promise<void> {
+  return calendarStateStore.set(state);
+}
+
+export function clearCalendarState(): Promise<void> {
+  return calendarStateStore.clear();
 }
 
 function buildCalendarClient(accessToken: string) {

@@ -1,75 +1,17 @@
-import fs from "node:fs";
-import path from "node:path";
-import crypto from "node:crypto";
 import { google } from "googleapis";
 import type { TokenData } from "../../types/index.js";
+import type { TokenStore } from "../stores/types.js";
+import { FileTokenStore } from "../stores/FileTokenStore.js";
 
-// Store tokens next to where the server process runs
-const TOKEN_FILE = path.join(process.cwd(), "janus-tokens.json");
+// The token store is a module-level default so existing call sites keep their
+// signatures. `createJanusApp` swaps it via setTokenStore() when the host
+// supplies their own. This is single-tenant by design — one token set per
+// process; a multi-tenant host implements TokenStore against their own DB.
+let tokenStore: TokenStore = new FileTokenStore();
 
-interface EncryptedEnvelope {
-  iv: string;
-  tag: string;
-  data: string;
-}
-
-// TOKEN_ENCRYPTION_KEY can be any passphrase — hashing it to 32 bytes means
-// it doesn't need to be a precisely-formatted key, just kept secret.
-function getEncryptionKey(): Buffer {
-  const secret = process.env.TOKEN_ENCRYPTION_KEY;
-  if (!secret) {
-    throw new Error(
-      "TOKEN_ENCRYPTION_KEY environment variable is required to store Google tokens.",
-    );
-  }
-  return crypto.createHash("sha256").update(secret).digest();
-}
-
-function encrypt(plaintext: string): EncryptedEnvelope {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
-  const data = Buffer.concat([
-    cipher.update(plaintext, "utf-8"),
-    cipher.final(),
-  ]);
-  return {
-    iv: iv.toString("hex"),
-    tag: cipher.getAuthTag().toString("hex"),
-    data: data.toString("hex"),
-  };
-}
-
-function decrypt(envelope: EncryptedEnvelope): string {
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    getEncryptionKey(),
-    Buffer.from(envelope.iv, "hex"),
-  );
-  decipher.setAuthTag(Buffer.from(envelope.tag, "hex"));
-  const data = Buffer.concat([
-    decipher.update(Buffer.from(envelope.data, "hex")),
-    decipher.final(),
-  ]);
-  return data.toString("utf-8");
-}
-
-function readTokens(): TokenData | null {
-  try {
-    if (!fs.existsSync(TOKEN_FILE)) return null;
-    const raw = fs.readFileSync(TOKEN_FILE, "utf-8");
-    const envelope = JSON.parse(raw) as EncryptedEnvelope;
-    return JSON.parse(decrypt(envelope)) as TokenData;
-  } catch {
-    // Covers a missing/corrupt file, a wrong/rotated encryption key, and a
-    // plaintext file left over from before encryption was added — all
-    // treated the same way as "not connected," prompting a clean reconnect.
-    return null;
-  }
-}
-
-function writeTokens(tokens: TokenData): void {
-  const envelope = encrypt(JSON.stringify(tokens));
-  fs.writeFileSync(TOKEN_FILE, JSON.stringify(envelope, null, 2), "utf-8");
+/** Replace the token store (called by createJanusApp before routers are mounted). */
+export function setTokenStore(store: TokenStore): void {
+  tokenStore = store;
 }
 
 // Google's canonical OAuth2 error code for a refresh token that's been
@@ -83,12 +25,16 @@ function isInvalidGrantError(err: unknown): boolean {
   return message.includes("invalid_grant");
 }
 
-export function saveTokens(tokens: TokenData): void {
-  writeTokens(tokens);
+export async function saveTokens(tokens: TokenData): Promise<void> {
+  await tokenStore.set(tokens);
 }
 
-export function isConnected(): boolean {
-  return readTokens() !== null;
+export async function isConnected(): Promise<boolean> {
+  return (await tokenStore.get()) !== null;
+}
+
+export async function clearTokens(): Promise<void> {
+  await tokenStore.clear();
 }
 
 // Shared by concurrent getValidToken() callers so a burst of calls around the
@@ -111,12 +57,12 @@ async function refreshTokens(
 
   const credentials = await oauth2Client.refreshAccessToken().then(
     (result) => result.credentials,
-    (err: unknown) => {
+    async (err: unknown) => {
       if (isInvalidGrantError(err)) {
         // This connection can never recover on its own — clear local state
         // so isConnected() correctly reports "disconnected" instead of
         // getting stuck silently retrying a refresh that will never succeed.
-        clearTokens();
+        await clearTokens();
       }
       throw err;
     },
@@ -128,7 +74,7 @@ async function refreshTokens(
     expiry_date: credentials.expiry_date!,
   };
 
-  writeTokens(refreshed);
+  await tokenStore.set(refreshed);
   return refreshed.access_token;
 }
 
@@ -142,7 +88,7 @@ export async function getValidToken(
   clientSecret: string,
   redirectUri: string,
 ): Promise<string> {
-  const tokens = readTokens();
+  const tokens = await tokenStore.get();
   if (!tokens) throw new Error("No tokens found. User not connected.");
 
   const fiveMinutesMs = 5 * 60 * 1000;
@@ -164,10 +110,4 @@ export async function getValidToken(
   }
 
   return refreshPromise;
-}
-
-export function clearTokens(): void {
-  if (fs.existsSync(TOKEN_FILE)) {
-    fs.unlinkSync(TOKEN_FILE);
-  }
 }

@@ -2,7 +2,6 @@ import http from "node:http";
 import cron from "node-cron";
 import dotenv from "dotenv";
 import { createJanusApp } from "./app.js";
-import { initWebSocket } from "./websocket.js";
 import {
   getCalendarState,
   saveCalendarState,
@@ -40,10 +39,10 @@ const config = {
   port: Number(process.env.PORT) || 3001,
 };
 
-const app = createJanusApp(config);
+const { app, wsHub } = createJanusApp(config);
 const server = http.createServer(app);
 
-initWebSocket(server);
+wsHub.attach(server);
 
 // ── Renew Google webhook before it expires ───────────────────────────────────
 // Checks the channel's actual Google-assigned expiration (rather than blindly
@@ -55,9 +54,9 @@ initWebSocket(server);
 // channel afterward is non-fatal, since the new one is already active.
 async function renewWebhookIfNeeded(): Promise<void> {
   try {
-    if (!isConnected()) return;
+    if (!(await isConnected())) return;
 
-    const state = getCalendarState();
+    const state = await getCalendarState();
     if (!state) return;
 
     const renewBufferMs = 24 * 60 * 60 * 1000;
@@ -77,7 +76,7 @@ async function renewWebhookIfNeeded(): Promise<void> {
       config.redirectUri,
     );
 
-    saveCalendarState({
+    await saveCalendarState({
       ...state,
       webhookChannelId: webhook.channelId,
       webhookResourceId: webhook.resourceId,

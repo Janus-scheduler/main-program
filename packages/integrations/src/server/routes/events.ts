@@ -6,8 +6,21 @@ import {
 } from "../services/googleService.js";
 import { getCalendarState } from "../services/calendarService.js";
 
-function getCalendarId(res: Response): string | null {
-  const state = getCalendarState();
+/**
+ * Extracts the HTTP status from a googleapis (Gaxios) error, if present.
+ * Gaxios puts it on `.code` (number, sometimes string) and `.response.status`.
+ */
+function getGoogleErrorStatus(err: unknown): number | undefined {
+  const e = err as { code?: unknown; response?: { status?: unknown } };
+  const raw = e?.response?.status ?? e?.code;
+  const status = typeof raw === "string" ? Number(raw) : raw;
+  return typeof status === "number" && Number.isFinite(status)
+    ? status
+    : undefined;
+}
+
+async function getCalendarId(res: Response): Promise<string | null> {
+  const state = await getCalendarState();
   if (!state) {
     res.status(400).json({ error: "Not connected to Google Calendar" });
     return null;
@@ -24,7 +37,7 @@ export function createEventsRouter(config: {
 
   // Create event in Google Calendar
   router.post("/", async (req: Request, res: Response) => {
-    const calendarId = getCalendarId(res);
+    const calendarId = await getCalendarId(res);
     if (!calendarId) return;
 
     try {
@@ -44,7 +57,7 @@ export function createEventsRouter(config: {
 
   // Update event in Google Calendar
   router.patch("/:googleEventId", async (req: Request, res: Response) => {
-    const calendarId = getCalendarId(res);
+    const calendarId = await getCalendarId(res);
     if (!calendarId) return;
 
     try {
@@ -65,7 +78,7 @@ export function createEventsRouter(config: {
 
   // Delete event from Google Calendar
   router.delete("/:googleEventId", async (req: Request, res: Response) => {
-    const calendarId = getCalendarId(res);
+    const calendarId = await getCalendarId(res);
     if (!calendarId) return;
 
     try {
@@ -78,6 +91,16 @@ export function createEventsRouter(config: {
       );
       res.json({ deleted: true });
     } catch (err) {
+      // A 404/410 from Google means the event is already gone — surface that
+      // status so the client can treat the delete as a success (idempotent)
+      // rather than the caller rolling back and resurrecting the local event.
+      const status = getGoogleErrorStatus(err);
+      if (status === 404 || status === 410) {
+        res
+          .status(status)
+          .json({ error: "Event not found in Google Calendar" });
+        return;
+      }
       console.error("[Events] Delete error:", err);
       res.status(500).json({ error: "Failed to delete event" });
     }
