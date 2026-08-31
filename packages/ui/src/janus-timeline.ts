@@ -17,8 +17,7 @@ import {
   type ViewType,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";
-import "./janus-topbar";
-
+import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 type ConflictState = {
   hasConflict: boolean;
   messages: string[];
@@ -28,6 +27,7 @@ type ConflictState = {
 import {
   TimelineEvent,
   TimelineResource,
+  ResourceTypeConfig,
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
@@ -62,6 +62,22 @@ import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 /** Shared empty result for the no-recurring-events fast path in _syncFromStore. */
 const EMPTY_EVENT_LIST: ReturnType<typeof expandEvents> = [];
 
+const DEFAULT_CONFIG: ResourceTypeConfig = {
+  person: { label: "STAFF", subtitle: "Staff", order: 1 },
+  room: {
+    label: "ROOMS",
+    subtitle: "Facility",
+    order: 2,
+    icon: RoomIcon().strings[0],
+  },
+  equipment: {
+    label: "EQUIPMENT",
+    subtitle: "Equipment",
+    order: 3,
+    icon: EquipmentIcon().strings[0],
+  },
+};
+
 /** Nav-label formatters, hoisted so scrolling does not rebuild them per event. */
 const NAV_WEEKDAY_FMT = new Intl.DateTimeFormat("en-US", { weekday: "long" });
 const NAV_SHORT_DATE_FMT = new Intl.DateTimeFormat("en-US", {
@@ -74,6 +90,12 @@ export class JanusTimeline extends LitElement {
   static readonly styles = timelineStyles;
 
   @property({ type: Array }) resources: TimelineResource[] = [];
+  @property({
+    type: Object,
+    hasChanged: (newVal: any, oldVal: any) =>
+      JSON.stringify(newVal) !== JSON.stringify(oldVal),
+  })
+  resourceTypeConfig?: ResourceTypeConfig;
   /** Explicit display timezone (defaults to schedulerStore.timezone or browser timezone). */
   @property({ type: String }) timezone?: string;
   /** When true, dragging on empty row space creates a new event. Default: false */
@@ -197,6 +219,7 @@ export class JanusTimeline extends LitElement {
       name: string;
       type: string;
       avatar: string;
+      subtitle: string;
       groupLabel: string | undefined;
       resource: TimelineResource;
       track: { trackCount: number; eventTracks: Map<string, number> };
@@ -524,16 +547,13 @@ export class JanusTimeline extends LitElement {
     const occurrences = this._expandOccurrences(rawEvents, centerMs);
     const coreResources = Object.values(state.resources);
 
-    const typeOrder: Record<string, number> = {
-      person: 1,
-      room: 2,
-      equipment: 3,
-    };
-    coreResources.sort(
-      (a, b) =>
-        (typeOrder[a.type || "person"] || 99) -
-        (typeOrder[b.type || "person"] || 99),
-    );
+    const config = this.resourceTypeConfig || DEFAULT_CONFIG;
+
+    coreResources.sort((a, b) => {
+      const orderA = config[a.type || "person"]?.order ?? 99;
+      const orderB = config[b.type || "person"]?.order ?? 99;
+      return orderA - orderB;
+    });
 
     let currentGroupType = "";
     const newTrackMap = new Map<
@@ -562,19 +582,27 @@ export class JanusTimeline extends LitElement {
       vmCount += processResult.vmCount;
 
       const type = res.type || "person";
+      const typeConfig = (this.resourceTypeConfig || DEFAULT_CONFIG)[type];
+      const typeLabel = typeConfig?.label || type.toUpperCase();
+
       let groupLabel: string | undefined = undefined;
       if (type !== currentGroupType) {
         currentGroupType = type;
-        groupLabel = this._resolveGroupLabel(type);
+        groupLabel = typeLabel;
       }
       const avatarSrc = res.avatar ?? "";
+      const subtitleSrc =
+        res.subtitle ||
+        typeConfig?.subtitle ||
+        type.charAt(0).toUpperCase() + type.slice(1);
 
       if (
         !eventsChanged &&
         prevRow?.name === res.name &&
         prevRow.type === type &&
         prevRow.avatar === avatarSrc &&
-        prevRow.groupLabel === groupLabel
+        prevRow.groupLabel === groupLabel &&
+        prevRow.subtitle === subtitleSrc
       ) {
         prevRow.gen = this._syncGen;
         newResources.push(prevRow.resource);
@@ -586,12 +614,27 @@ export class JanusTimeline extends LitElement {
       const track = this._computeEventTracks(sorted);
       newTrackMap.set(res.id, track);
 
-      const resource = this._buildTimelineResource(
-        res,
-        sorted,
-        type,
+      let avatarType: "initials" | "icon" | "image" = "initials";
+      let avatarIcon: string | undefined = undefined;
+
+      if (typeConfig?.icon) {
+        avatarType = "icon";
+        avatarIcon = typeConfig.icon;
+      }
+
+      if (res.avatar) {
+        avatarType = "image";
+      }
+
+      const resource: TimelineResource = {
+        id: res.id,
+        name: res.name,
+        subtitle: subtitleSrc,
+        avatarType,
+        avatarIcon,
+        events: sorted,
         groupLabel,
-      );
+      };
 
       newResources.push(resource);
       this._rowCache.set(res.id, {
@@ -599,6 +642,7 @@ export class JanusTimeline extends LitElement {
         name: res.name,
         type,
         avatar: avatarSrc,
+        subtitle: subtitleSrc,
         groupLabel,
         resource,
         track,
@@ -617,9 +661,14 @@ export class JanusTimeline extends LitElement {
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
 
-    if (changedProperties.has("timezone")) {
+    if (
+      changedProperties.has("resourceTypeConfig") ||
+      changedProperties.has("timezone")
+    ) {
       this._vmCache.clear();
       this._rowCache.clear();
+      this._lastEventsRef = null;
+      this._lastResourcesRef = null;
       this._syncFromStore(schedulerStore.getState());
     }
 
@@ -1218,23 +1267,18 @@ export class JanusTimeline extends LitElement {
   // ── Rendering helpers ─────────────────────────────────────────────
 
   private renderAvatar(r: TimelineResource) {
-    const isIcon = r.avatarIcon === "room" || r.avatarIcon === "equipment";
+    const isIcon = r.avatarType === "icon" && !!r.avatarIcon;
     const borderRadius = isIcon ? "10px" : "50%";
 
-    const fallback =
-      r.avatarIcon === "room"
-        ? html`<span class="tl-avatar tl-avatar--icon tl-avatar--room"
-            >${RoomIcon()}</span
-          >`
-        : r.avatarIcon === "equipment"
-          ? html`<span class="tl-avatar tl-avatar--icon tl-avatar--equipment"
-              >${EquipmentIcon()}</span
-            >`
-          : html`<span
-              class="tl-avatar tl-avatar--initials"
-              style="background: ${avatarColor(r.id)}"
-              >${getInitials(r.name)}</span
-            >`;
+    const fallback = isIcon
+      ? html`<span class="tl-avatar tl-avatar--icon">
+          ${unsafeSVG(r.avatarIcon || "")}
+        </span>`
+      : html`<span
+          class="tl-avatar tl-avatar--initials"
+          style="background: ${avatarColor(r.id)}"
+          >${getInitials(r.name)}</span
+        >`;
 
     if (r.avatarType === "image" && r.avatar) {
       return html`

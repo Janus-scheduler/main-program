@@ -55,6 +55,7 @@ import type {
   EventData,
   ResourceData,
   AssignmentData,
+  ResourceTypeConfig,
 } from "@janus-scheduler/core";
 
 export {
@@ -152,6 +153,7 @@ export type {
   EventData,
   ResourceData,
   AssignmentData,
+  ResourceTypeConfig,
 };
 
 /**
@@ -330,6 +332,7 @@ export interface TimelineProps {
   allowCreate?: boolean;
   showFab?: boolean;
   preventConflicts?: boolean;
+  resourceTypeConfig?: ResourceTypeConfig;
   timezone?: string;
   onEventClick?: (detail: TimelineEvent) => void;
   onAddEvent?: () => void;
@@ -360,6 +363,8 @@ export const Timeline: Component<TimelineProps> = (props) => {
       if (props.showFab !== undefined) el.showFab = props.showFab;
       if (props.preventConflicts !== undefined)
         el.preventConflicts = props.preventConflicts;
+      if (props.resourceTypeConfig !== undefined)
+        el.resourceTypeConfig = props.resourceTypeConfig;
       if (props.timezone !== undefined) el.timezone = props.timezone;
     }
   });

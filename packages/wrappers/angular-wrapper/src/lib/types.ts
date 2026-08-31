@@ -23,6 +23,7 @@ export type {
   EventData,
   ResourceData,
   AssignmentData,
+  ResourceTypeConfig,
 } from "@janus-scheduler/core";
 
 export { Event, Resource, Assignment } from "@janus-scheduler/core";

@@ -104,6 +104,18 @@ const SettingsIcon = () => (
   </svg>
 );
 
+const TIMELINE_RESOURCE_CONFIG = {
+  person: { label: "STAFF", subtitle: "Staff", order: 1 },
+  room: { label: "ROOMS", subtitle: "Facility", order: 2 },
+  equipment: { label: "EQUIPMENT", subtitle: "Equipment", order: 3 },
+  vehicle: {
+    label: "VEHICLES",
+    subtitle: "Fleet",
+    order: 4,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11h12Zm0 0h2.5a2.5 2.5 0 0 0 2.5-2.5V11l-4-3v10Z"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="18" r="2"/></svg>`,
+  },
+};
+
 function App() {
   const [showScheduler, setShowScheduler] = createSignal(false);
   const [schedulerError, setSchedulerError] = createSignal<string | null>(null);
@@ -161,8 +173,9 @@ function App() {
   if (manager.getResourceCount() === 0) {
     manager.addResource({
       id: "r1",
-      name: "Dr. Sarah Chena",
+      name: "Dr. Sarah Chen",
       type: "person",
+      subtitle: "Specialist",
       avatar:
         "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
     });
@@ -170,6 +183,7 @@ function App() {
       id: "r2",
       name: "Dr. Michael Ross",
       type: "person",
+      subtitle: "Surgeon",
       avatar:
         "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
     });
@@ -443,6 +457,8 @@ function App() {
           <Show when={currentView() === "Timeline"}>
             <Timeline
               ref={(el) => (timelineRef = el as unknown as typeof timelineRef)}
+              resourceTypeConfig={TIMELINE_RESOURCE_CONFIG}
+              showFab={true}
               allowCreate={allowCreate()}
               onAddEvent={() => {
                 setSelectedEventId(null);

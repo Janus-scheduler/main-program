@@ -48,6 +48,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       id: "r1",
       name: "Dr. Sarah Chen",
       type: "person",
+      subtitle: "Specialist",
       avatar:
         "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
     });
@@ -55,6 +56,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       id: "r2",
       name: "Dr. Michael Ross",
       type: "person",
+      subtitle: "Manager",
       avatar:
         "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
     });

@@ -55,6 +55,17 @@ import {
   type TimeGridEventResizeDetail,
   type ViewType,
   type EventDraft,
+  type EventColor,
+  type SchedulerHooks,
+  type SchedulerConfig,
+  type UndoAction,
+  type SchedulerDeleteData,
+  type MonthEvent,
+  type TimeGridEventResource,
+  type EventData,
+  type ResourceData,
+  type AssignmentData,
+  type ResourceTypeConfig,
 } from "@janus-scheduler/core";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,7 +122,8 @@ export type {
   EventData,
   ResourceData,
   AssignmentData,
-} from "@janus-scheduler/core";
+  ResourceTypeConfig,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // useJanusChat Hook & Types
@@ -256,6 +268,7 @@ const _Timeline = createComponent({
 
 export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   resources?: TimelineResource[];
+  resourceTypeConfig?: ResourceTypeConfig;
   view?: ViewType;
   currentDate?: Date;
   aiPrompt?: string;

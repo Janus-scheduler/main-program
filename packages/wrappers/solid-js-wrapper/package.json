@@ -22,6 +22,8 @@
     "solid-js": "^1.8.0"
   },
   "dependencies": {
+    "@janus-scheduler/core": "^1.0.1",
+    "@janus-scheduler/nlp": "^0.1.0",
     "@janus-scheduler/ui": "^1.0.0"
   },
   "devDependencies": {

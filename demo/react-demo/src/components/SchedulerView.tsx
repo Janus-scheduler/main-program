@@ -17,6 +17,18 @@ import type { JanusTimeline, JanusMonthGrid } from "@janus-scheduler/ui";
 import { loadDenseBenchmarkData } from "../utils/benchmarkDataGenerator";
 import { ChatSidebar } from "./ChatDock";
 
+const TIMELINE_RESOURCE_CONFIG = {
+  person: { label: "STAFF", subtitle: "Staff", order: 1 },
+  room: { label: "ROOMS", subtitle: "Facility", order: 2 },
+  equipment: { label: "EQUIPMENT", subtitle: "Equipment", order: 3 },
+  vehicle: {
+    label: "VEHICLES",
+    subtitle: "Fleet",
+    order: 4,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11h12Zm0 0h2.5a2.5 2.5 0 0 0 2.5-2.5V11l-4-3v10Z"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="18" r="2"/></svg>`,
+  },
+};
+
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
   currentView: ViewType;
@@ -322,8 +334,6 @@ export function SchedulerView({
           navLabel={navData.navLabel}
           dayName={navData.dayName}
           shortDate={navData.shortDate}
-          view={currentView}
-          allowCreate={allowCreate}
           canUndo={canUndo}
           zoomPercent={navData.zoomPercent}
           zoomUnit={navData.zoomUnit}
@@ -353,6 +363,7 @@ export function SchedulerView({
             allowCreate={allowCreate}
             showFab={true}
             preventConflicts={preventConflicts}
+            resourceTypeConfig={TIMELINE_RESOURCE_CONFIG}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}
             onEventMove={({

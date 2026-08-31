@@ -22,8 +22,9 @@ import type {
   EventResizeDetail,
   EventCreateDetail,
   ViewType,
+  ResourceTypeConfig,
 } from "./types";
-import { schedulerStore, isoToZonedDisplay } from "@janus-scheduler/core";
+import { isoToZonedDisplay } from "@janus-scheduler/core";
 
 /**
  * TimelineComponent
@@ -60,6 +61,11 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   /** Timeline resource data to display — leave unset to use built-in sample data */
   readonly resources = input<TimelineResource[] | undefined>(undefined);
+
+  /** Custom resource type mapping config */
+  readonly resourceTypeConfig = input<ResourceTypeConfig | undefined>(
+    undefined,
+  );
 
   /** When true, dragging on empty row space creates a new event */
   readonly allowCreate = input<boolean>(false);
@@ -200,17 +206,20 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     this._applyAllowCreate();
 
     // If an explicit resources input is provided, use it directly.
-    // Otherwise, subscribe to the Zustand store so the web component
-    // stays in sync when data is seeded/mutated by the SchedulerManager.
+    // The web component natively subscribes to the Zustand store internally,
+    // so we don't need to do it here.
     if (this.resources() !== undefined) {
       this._syncResources();
-    } else {
-      this._subscribeToStore();
     }
+
+    // Pass config if provided
+    this._syncConfig();
   }
 
   ngOnChanges(): void {
     this._syncResources();
+    this._syncConfig();
+    this._applyAllowCreate();
     this._applyAllowCreate();
   }
 
@@ -227,109 +236,15 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     this._unsubStore?.();
   }
 
-  private _subscribeToStore(): void {
-    // Immediately sync with the current store state
-    this._pushStoreToElement(schedulerStore.getState());
-
-    // Subscribe to future changes
-    this._unsubStore = schedulerStore.subscribe((state) => {
-      this._pushStoreToElement(state);
-    });
-  }
-
-  private _pushStoreToElement(
-    state: ReturnType<typeof schedulerStore.getState>,
-  ): void {
+  private _syncConfig(): void {
+    const config = this.resourceTypeConfig();
+    if (!config) return;
     const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { resources: TimelineResource[] })
+      | (HTMLElement & { resourceTypeConfig: ResourceTypeConfig })
       | undefined;
-    if (!el) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const resources = Object.values(state.resources) as any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const events = Object.values(state.events) as any[];
-
-    if (resources.length === 0) return;
-
-    const typeOrder: Record<string, number> = {
-      person: 1,
-      room: 2,
-      equipment: 3,
-    };
-    const sorted = [...resources].sort(
-      (a, b) =>
-        (typeOrder[a.type || "person"] || 99) -
-        (typeOrder[b.type || "person"] || 99),
-    );
-
-    let currentGroupType = "";
-    const mapped: TimelineResource[] = sorted.map((res) => {
-      const resEvents = events
-
-        .filter(
-          (
-            e: TimelineEvent & { resourceIds?: string[]; resourceId?: string },
-          ) =>
-            (e.resourceIds && e.resourceIds.includes(res.id)) ||
-            e.resourceId === res.id,
-        )
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((e: any) => {
-          const startD = new Date(e.startTime);
-          const endD = new Date(e.endTime);
-          const tz = state.timezone;
-          const { time: startTime } = isoToZonedDisplay(e.startTime, tz);
-          const { time: endTime, date } = isoToZonedDisplay(e.endTime, tz);
-          return {
-            id: e.id,
-            title: e.title,
-            startTime,
-            endTime,
-            startMs: startD.getTime(),
-            endMs: endD.getTime(),
-            color: "blue" as const,
-            date,
-          };
-        });
-
-      let avatarType: "initials" | "icon" = "initials";
-      let avatarIcon: "room" | "equipment" | undefined = undefined;
-      let groupLabel: string | undefined = undefined;
-      const type = res.type || "person";
-
-      if (type !== currentGroupType) {
-        currentGroupType = type;
-        if (type === "person") groupLabel = "STAFF";
-        else if (type === "room") groupLabel = "ROOMS";
-        else if (type === "equipment") groupLabel = "EQUIPMENT";
-      }
-
-      if (type === "room") {
-        avatarType = "icon";
-        avatarIcon = "room";
-      } else if (type === "equipment") {
-        avatarType = "icon";
-        avatarIcon = "equipment";
-      }
-
-      return {
-        id: res.id,
-        name: res.name,
-        subtitle:
-          type === "person"
-            ? "Staff"
-            : type === "room"
-              ? "Facility"
-              : "Equipment",
-        avatarType,
-        avatarIcon,
-        groupLabel,
-        events: resEvents,
-      };
-    });
-
-    el.resources = mapped;
+    if (el) {
+      el.resourceTypeConfig = config;
+    }
   }
 
   private _syncResources(): void {
