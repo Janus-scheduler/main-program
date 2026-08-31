@@ -15,7 +15,11 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": "..",
+    "rootDir": "../..",
+    "baseUrl": ".",
+    "paths": {
+      "@janus-scheduler/nlp": ["../nlp/src/index.ts"]
+    },
     "types": ["vite/client", "jest", "node"]
   },
   "include": ["src/**/*", "tests/**/*"],
