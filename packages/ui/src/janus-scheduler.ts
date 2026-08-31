@@ -401,6 +401,8 @@ export class JanusScheduler extends LitElement {
   @property({ type: String }) error: string | null = null;
   @property({ type: Boolean }) allDay = false;
   @property({ type: String }) recurrenceRule = "";
+
+  @state() private activeTab: "general" | "participants" | "notes" = "general";
   /**
    * The ID of the event being edited.
    * - `null` / omitted → creation mode (onSave should call addEvent)

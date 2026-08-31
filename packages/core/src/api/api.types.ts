@@ -42,7 +42,7 @@ export interface TimelineResource {
   subtitle: string;
   avatarType: "initials" | "icon" | "image";
   avatar?: string;
-  avatarIcon?: "room" | "equipment";
+  avatarIcon?: string;
   groupLabel?: string;
   events: TimelineEvent[];
 }
@@ -123,4 +123,13 @@ export interface JanusEventMap {
   save: SchedulerSaveData;
   delete: SchedulerDeleteData;
   close: void;
+}
+
+export interface ResourceTypeConfig {
+  [type: string]: {
+    label: string;
+    subtitle: string;
+    icon?: string;
+    order: number;
+  };
 }

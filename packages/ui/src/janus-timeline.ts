@@ -15,7 +15,12 @@ import {
 import "./janus-ai-bar";
 import "./janus-topbar";
 
-import { TimelineEvent, TimelineResource } from "./timeline-types";
+import { unsafeSVG } from "lit/directives/unsafe-svg.js";
+import {
+  TimelineEvent,
+  TimelineResource,
+  ResourceTypeConfig,
+} from "./timeline-types";
 import { RoomIcon, EquipmentIcon, PlusIcon } from "./timeline-icons";
 import {
   ROW_HEIGHT,
@@ -46,6 +51,22 @@ import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 /** Shared empty result for the no-recurring-events fast path in _syncFromStore. */
 const EMPTY_EVENT_LIST: ReturnType<typeof expandEvents> = [];
 
+const DEFAULT_CONFIG: ResourceTypeConfig = {
+  person: { label: "STAFF", subtitle: "Staff", order: 1 },
+  room: {
+    label: "ROOMS",
+    subtitle: "Facility",
+    order: 2,
+    icon: RoomIcon().strings[0],
+  },
+  equipment: {
+    label: "EQUIPMENT",
+    subtitle: "Equipment",
+    order: 3,
+    icon: EquipmentIcon().strings[0],
+  },
+};
+
 /** Nav-label formatters, hoisted so scrolling does not rebuild them per event. */
 const NAV_WEEKDAY_FMT = new Intl.DateTimeFormat("en-US", { weekday: "long" });
 const NAV_SHORT_DATE_FMT = new Intl.DateTimeFormat("en-US", {
@@ -58,6 +79,12 @@ export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
 
   @property({ type: Array }) resources: TimelineResource[] = [];
+  @property({
+    type: Object,
+    hasChanged: (newVal: any, oldVal: any) =>
+      JSON.stringify(newVal) !== JSON.stringify(oldVal),
+  })
+  resourceTypeConfig?: ResourceTypeConfig;
   /** When true, dragging on empty row space creates a new event. Default: false */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
   /** When true, renders a + Floating Action Button to add an event. Default: false */
@@ -322,16 +349,13 @@ export class JanusTimeline extends LitElement {
       : EMPTY_EVENT_LIST;
     const coreResources = Object.values(state.resources);
 
-    const typeOrder: Record<string, number> = {
-      person: 1,
-      room: 2,
-      equipment: 3,
-    };
-    coreResources.sort(
-      (a, b) =>
-        (typeOrder[a.type || "person"] || 99) -
-        (typeOrder[b.type || "person"] || 99),
-    );
+    const config = this.resourceTypeConfig || DEFAULT_CONFIG;
+
+    coreResources.sort((a, b) => {
+      const orderA = config[a.type || "person"]?.order ?? 99;
+      const orderB = config[b.type || "person"]?.order ?? 99;
+      return orderA - orderB;
+    });
 
     let currentGroupType = "";
 
@@ -438,12 +462,13 @@ export class JanusTimeline extends LitElement {
 
       // ── Resource presentation metadata ───────────────────────────────────
       const type = res.type || "person";
+      const typeConfig = (this.resourceTypeConfig || DEFAULT_CONFIG)[type];
+      const typeLabel = typeConfig?.label || type.toUpperCase();
+
       let groupLabel: string | undefined = undefined;
       if (type !== currentGroupType) {
         currentGroupType = type;
-        if (type === "person") groupLabel = "STAFF";
-        else if (type === "room") groupLabel = "ROOMS";
-        else if (type === "equipment") groupLabel = "EQUIPMENT";
+        groupLabel = typeLabel;
       }
       const avatarSrc = res.avatar ?? "";
 
@@ -496,29 +521,24 @@ export class JanusTimeline extends LitElement {
       newTrackMap.set(res.id, track);
 
       let avatarType: "initials" | "icon" | "image" = "initials";
-      let avatarIcon: "room" | "equipment" | undefined = undefined;
+      let avatarIcon: string | undefined = undefined;
 
-      if (type === "room") {
-        avatarIcon = "room";
-      } else if (type === "equipment") {
-        avatarIcon = "equipment";
+      if (typeConfig?.icon) {
+        avatarType = "icon";
+        avatarIcon = typeConfig.icon;
       }
 
       if (res.avatar) {
         avatarType = "image";
-      } else if (avatarIcon) {
-        avatarType = "icon";
       }
 
       const resource: TimelineResource = {
         id: res.id,
         name: res.name,
         subtitle:
-          res.type === "person"
-            ? "Staff"
-            : res.type === "room"
-              ? "Facility"
-              : "Equipment",
+          (res as any).subtitle ||
+          typeConfig?.subtitle ||
+          type.charAt(0).toUpperCase() + type.slice(1),
         avatarType,
         avatarIcon,
         groupLabel,
@@ -575,6 +595,12 @@ export class JanusTimeline extends LitElement {
 
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
+
+    if (changedProperties.has("resourceTypeConfig")) {
+      this._lastEventsRef = null;
+      this._lastResourcesRef = null;
+      this._syncFromStore(schedulerStore.getState());
+    }
 
     // Recompute conflicts only when an actual input changed.
     //
@@ -1169,23 +1195,18 @@ export class JanusTimeline extends LitElement {
   // ── Rendering helpers ─────────────────────────────────────────────
 
   private renderAvatar(r: TimelineResource) {
-    const isIcon = r.avatarIcon === "room" || r.avatarIcon === "equipment";
+    const isIcon = r.avatarType === "icon" && !!r.avatarIcon;
     const borderRadius = isIcon ? "10px" : "50%";
 
-    const fallback =
-      r.avatarIcon === "room"
-        ? html`<span class="tl-avatar tl-avatar--icon tl-avatar--room"
-            >${RoomIcon()}</span
-          >`
-        : r.avatarIcon === "equipment"
-          ? html`<span class="tl-avatar tl-avatar--icon tl-avatar--equipment"
-              >${EquipmentIcon()}</span
-            >`
-          : html`<span
-              class="tl-avatar tl-avatar--initials"
-              style="background: ${avatarColor(r.id)}"
-              >${getInitials(r.name)}</span
-            >`;
+    const fallback = isIcon
+      ? html`<span class="tl-avatar tl-avatar--icon">
+          ${unsafeSVG(r.avatarIcon || "")}
+        </span>`
+      : html`<span
+          class="tl-avatar tl-avatar--initials"
+          style="background: ${avatarColor(r.id)}"
+          >${getInitials(r.name)}</span
+        >`;
 
     if (r.avatarType === "image" && r.avatar) {
       return html`

@@ -35,6 +35,7 @@ import type {
   EventData,
   ResourceData,
   AssignmentData,
+  ResourceTypeConfig,
 } from "@janus-scheduler/core";
 
 export type {
@@ -51,6 +52,7 @@ export type {
   EventData,
   ResourceData,
   AssignmentData,
+  ResourceTypeConfig,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,6 +140,7 @@ const _Timeline = createComponent({
 
 export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   resources?: TimelineResource[];
+  resourceTypeConfig?: ResourceTypeConfig;
   view?: ViewType;
   currentDate?: Date;
   aiPrompt?: string;
