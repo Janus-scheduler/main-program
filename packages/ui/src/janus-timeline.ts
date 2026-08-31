@@ -11,6 +11,7 @@ import {
   checkSlotConflict,
   type ConflictResource,
   type SchedulerStore,
+  type ViewType,
 } from "@janus-scheduler/core";
 import "./janus-ai-bar";
 import "./janus-topbar";
@@ -78,7 +79,7 @@ export class JanusTimeline extends LitElement {
   @state() private _showBlockedConflictDialog = false;
   @state() private _blockedConflictMessage = "";
 
-  @state() view: "Timeline" | "Month" = "Timeline";
+  @state() view: ViewType = "Timeline";
   @state() private _dragVersion = 0; // bumped to trigger re-render during drag
   @state() private _showConflictDetails = false;
   @state() private _isConflictsBannerDismissed = false;
@@ -120,6 +121,10 @@ export class JanusTimeline extends LitElement {
   private _unsubStore?: () => void;
   /** Suppress scroll handler during programmatic scroll adjustments */
   private _suppressScroll = false;
+  private _isScrollingGrid = false;
+  private _isScrollingRes = false;
+  private _rafGridScroll: number | null = null;
+  private _rafResScroll: number | null = null;
 
   @state() private _scrollLeft = 0;
   @state() private _scrollTop = 0;
@@ -177,6 +182,7 @@ export class JanusTimeline extends LitElement {
   private _navRafId: number | null = null;
   private _resizeObserver?: ResizeObserver;
   private _pendingCenterMs: number | null = null;
+  private _activeDragUpHandler: ((e: PointerEvent) => void) | null = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -189,6 +195,8 @@ export class JanusTimeline extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
+    if (this._rafGridScroll !== null) cancelAnimationFrame(this._rafGridScroll);
+    if (this._rafResScroll !== null) cancelAnimationFrame(this._rafResScroll);
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
     }
@@ -200,6 +208,11 @@ export class JanusTimeline extends LitElement {
       cancelAnimationFrame(this._navRafId);
       this._navRafId = null;
     }
+    if (this._activeDragUpHandler) {
+      document.removeEventListener("pointerup", this._activeDragUpHandler);
+      this._activeDragUpHandler = null;
+    }
+    this._drag.cancel();
     this._ghostEl = null;
   }
 
@@ -441,7 +454,6 @@ export class JanusTimeline extends LitElement {
         else if (type === "room") groupLabel = "ROOMS";
         else if (type === "equipment") groupLabel = "EQUIPMENT";
       }
-
       const avatarSrc = res.avatar ?? "";
 
       // ── Reuse the whole row when nothing about it changed ────────────────
@@ -494,14 +506,17 @@ export class JanusTimeline extends LitElement {
 
       let avatarType: "initials" | "icon" | "image" = "initials";
       let avatarIcon: "room" | "equipment" | undefined = undefined;
-      if (res.avatar) {
-        avatarType = "image";
-      } else if (type === "room") {
-        avatarType = "icon";
+
+      if (type === "room") {
         avatarIcon = "room";
       } else if (type === "equipment") {
-        avatarType = "icon";
         avatarIcon = "equipment";
+      }
+
+      if (res.avatar) {
+        avatarType = "image";
+      } else if (avatarIcon) {
+        avatarType = "icon";
       }
 
       const resource: TimelineResource = {
@@ -693,8 +708,20 @@ export class JanusTimeline extends LitElement {
   private _onGridScroll() {
     // Sync vertical scroll between resource column and time grid
     if (this.resColRef && this.gridScrollRef) {
-      if (this.resColRef.scrollTop !== this.gridScrollRef.scrollTop) {
-        this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      if (!this._isScrollingRes) {
+        this._isScrollingGrid = true;
+        if (
+          Math.abs(this.resColRef.scrollTop - this.gridScrollRef.scrollTop) >
+          0.5
+        ) {
+          this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+        }
+        if (this._rafGridScroll !== null)
+          cancelAnimationFrame(this._rafGridScroll);
+        this._rafGridScroll = requestAnimationFrame(() => {
+          this._isScrollingGrid = false;
+          this._rafGridScroll = null;
+        });
       }
     }
 
@@ -756,8 +783,20 @@ export class JanusTimeline extends LitElement {
 
   private _onResScroll() {
     if (this.resColRef && this.gridScrollRef) {
-      if (this.gridScrollRef.scrollTop !== this.resColRef.scrollTop) {
-        this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
+      if (!this._isScrollingGrid) {
+        this._isScrollingRes = true;
+        if (
+          Math.abs(this.gridScrollRef.scrollTop - this.resColRef.scrollTop) >
+          0.5
+        ) {
+          this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
+        }
+        if (this._rafResScroll !== null)
+          cancelAnimationFrame(this._rafResScroll);
+        this._rafResScroll = requestAnimationFrame(() => {
+          this._isScrollingRes = false;
+          this._rafResScroll = null;
+        });
       }
     }
   }
@@ -844,7 +883,7 @@ export class JanusTimeline extends LitElement {
     );
   }
 
-  public setView(v: "Timeline" | "Month") {
+  public setView(v: ViewType) {
     this.view = v;
     // Let the parent app know so it can swap components if needed
     this.dispatchEvent(
@@ -965,8 +1004,15 @@ export class JanusTimeline extends LitElement {
   }
 
   private _addDragUpListener() {
+    if (this._activeDragUpHandler) {
+      document.removeEventListener("pointerup", this._activeDragUpHandler);
+      this._activeDragUpHandler = null;
+    }
     const handler = (_e: PointerEvent) => {
       document.removeEventListener("pointerup", handler);
+      if (this._activeDragUpHandler === handler) {
+        this._activeDragUpHandler = null;
+      }
       const result = this._drag.completeAndGetResult();
       if (result) {
         this._wasDragging = true;
@@ -1059,6 +1105,7 @@ export class JanusTimeline extends LitElement {
         );
       }
     };
+    this._activeDragUpHandler = handler;
     document.addEventListener("pointerup", handler);
   }
 
@@ -1137,25 +1184,50 @@ export class JanusTimeline extends LitElement {
   // ── Rendering helpers ─────────────────────────────────────────────
 
   private renderAvatar(r: TimelineResource) {
+    const isIcon = r.avatarIcon === "room" || r.avatarIcon === "equipment";
+    const borderRadius = isIcon ? "10px" : "50%";
+
+    const fallback =
+      r.avatarIcon === "room"
+        ? html`<span class="tl-avatar tl-avatar--icon tl-avatar--room"
+            >${RoomIcon()}</span
+          >`
+        : r.avatarIcon === "equipment"
+          ? html`<span class="tl-avatar tl-avatar--icon tl-avatar--equipment"
+              >${EquipmentIcon()}</span
+            >`
+          : html`<span
+              class="tl-avatar tl-avatar--initials"
+              style="background: ${avatarColor(r.id)}"
+              >${getInitials(r.name)}</span
+            >`;
+
     if (r.avatarType === "image" && r.avatar) {
-      return html`<img
-        class="tl-avatar tl-avatar--image"
-        src="${r.avatar}"
-        alt="${r.name}"
-      />`;
+      return html`
+        <div
+          class="tl-avatar-wrap"
+          style="position: relative; display: inline-flex; flex-shrink: 0;"
+        >
+          ${fallback}
+          <img
+            class="tl-avatar tl-avatar--image"
+            src="${r.avatar}"
+            alt="${r.name}"
+            style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: ${borderRadius};"
+            @load=${(e: Event) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.style.display = "";
+            }}
+            @error=${(e: Event) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.style.display = "none";
+            }}
+          />
+        </div>
+      `;
     }
-    if (r.avatarType === "initials") {
-      return html`<span
-        class="tl-avatar tl-avatar--initials"
-        style="background: ${avatarColor(r.id)}"
-        >${getInitials(r.name)}</span
-      >`;
-    }
-    return html`
-      <span class="tl-avatar tl-avatar--icon tl-avatar--${r.avatarIcon}">
-        ${r.avatarIcon === "room" ? RoomIcon() : EquipmentIcon()}
-      </span>
-    `;
+
+    return fallback;
   }
 
   private _renderDragGhost() {

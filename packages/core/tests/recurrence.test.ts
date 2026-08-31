@@ -116,4 +116,23 @@ describe("Recurrence Expansion", () => {
       expect(durationMs).toBe(3600000); // 1 hour
     }
   });
+
+  it("should expand monthly recurring events over a full calendar year", () => {
+    const events = [
+      new Event({
+        id: "evt-yearly-rec",
+        title: "Monthly Townhall",
+        startTime: "2026-01-15T09:00:00Z",
+        endTime: "2026-01-15T10:00:00Z",
+        resourceId: "r1",
+        recurrenceRule: "FREQ=MONTHLY;COUNT=12",
+      }),
+    ];
+
+    const startYear = new Date(2026, 0, 1, 0, 0, 0, 0).getTime();
+    const endYear = new Date(2026, 11, 31, 23, 59, 59, 999).getTime();
+
+    const expanded = expandEvents(events, startYear, endYear);
+    expect(expanded).toHaveLength(12);
+  });
 });

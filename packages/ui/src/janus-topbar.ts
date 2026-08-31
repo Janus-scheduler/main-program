@@ -2,12 +2,13 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { topbarStyles } from "./topbar-styles";
 import {
+  BellIcon,
   ChevronLeft,
   ChevronRight,
-  SearchIcon,
-  BellIcon,
   PencilRulerIcon,
+  SearchIcon,
 } from "./timeline-icons";
+import { type ViewType } from "@janus-scheduler/core";
 
 /**
  * `<janus-topbar>` — standalone toolbar for the Janus timeline / month views.
@@ -37,8 +38,8 @@ export class JanusTopbar extends LitElement {
   /** Short date shown on mobile (e.g. "Jun 12"). */
   @property({ type: String, attribute: "short-date" }) shortDate = "";
 
-  /** Currently active view: "Timeline" or "Month". */
-  @property({ type: String }) view: "Timeline" | "Month" = "Timeline";
+  /** Currently active view: "Timeline", "Month" or "Year". */
+  @property({ type: String }) view: ViewType = "Timeline";
 
   /** Whether draw-to-create mode is active. */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
@@ -85,7 +86,7 @@ export class JanusTopbar extends LitElement {
     );
   }
 
-  private _emitViewSwitch(v: "Timeline" | "Month") {
+  private _emitViewSwitch(v: ViewType) {
     this.dispatchEvent(
       new CustomEvent("view-switch", {
         bubbles: true,
@@ -153,7 +154,7 @@ export class JanusTopbar extends LitElement {
               >`
             : nothing}
           <div class="tl-view-toggle">
-            ${(["Timeline", "Month"] as const).map(
+            ${(["Timeline", "Month", "Year"] as const).map(
               (v) => html`
                 <button
                   class="tl-view-toggle__btn ${this.view === v ? "active" : ""}"

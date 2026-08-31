@@ -8,3 +8,4 @@ export * from "./janus-ai-bar";
 export * from "./janus-confirm-dialog";
 export * from "./chat-types";
 export * from "./janus-chat";
+export * from "./janus-year-grid";

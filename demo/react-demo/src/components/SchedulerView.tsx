@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Timeline, MonthGrid, Scheduler, Topbar } from "@janus-scheduler/react";
+import {
+  Timeline,
+  MonthGrid,
+  YearGrid,
+  Scheduler,
+  Topbar,
+} from "@janus-scheduler/react";
 import type { ViewType } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
 import {
@@ -121,6 +127,13 @@ export function SchedulerView({
       })
     | null
   >(null);
+  const yearGridRef = useRef<
+    HTMLElement & {
+      goToPrev: () => void;
+      goToNext: () => void;
+      goToToday: () => void;
+    }
+  >(null);
 
   const [navData, setNavData] = useState({
     navLabel: "",
@@ -136,13 +149,6 @@ export function SchedulerView({
     const count = readBenchmarkCountFromUrl();
     if (count !== null) loadDenseBenchmarkData(count);
   }, []);
-
-  // Re-center timeline on current time whenever switching to Timeline view
-  useEffect(() => {
-    if (currentView === "Timeline") {
-      timelineRef.current?.goToToday();
-    }
-  }, [currentView]);
 
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
@@ -182,15 +188,18 @@ export function SchedulerView({
           zoomUnit={navData.zoomUnit}
           onPrevClick={() => {
             if (currentView === "Timeline") timelineRef.current?.goToPrev();
-            else monthGridRef.current?.goToPrev();
+            else if (currentView === "Month") monthGridRef.current?.goToPrev();
+            else yearGridRef.current?.goToPrev();
           }}
           onNextClick={() => {
             if (currentView === "Timeline") timelineRef.current?.goToNext();
-            else monthGridRef.current?.goToNext();
+            else if (currentView === "Month") monthGridRef.current?.goToNext();
+            else yearGridRef.current?.goToNext();
           }}
           onTodayClick={() => {
             if (currentView === "Timeline") timelineRef.current?.goToToday();
-            else monthGridRef.current?.goToToday();
+            else if (currentView === "Month") monthGridRef.current?.goToToday();
+            else yearGridRef.current?.goToToday();
           }}
           onViewSwitch={(detail) => onViewChange(detail.view)}
           onToggleCreate={() => {
@@ -198,7 +207,14 @@ export function SchedulerView({
             setAllowCreate(!allowCreate);
           }}
         />
-        {currentView === "Timeline" && (
+        <div
+          style={{
+            display: currentView === "Timeline" ? "flex" : "none",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <Timeline
             ref={timelineRef}
             allowCreate={allowCreate}
@@ -244,13 +260,24 @@ export function SchedulerView({
               onOpenScheduler();
             }}
             onViewChange={(detail) => onViewChange(detail.view)}
-            onNavChange={handleNavChange}
+            onNavChange={(detail) => {
+              if (currentView === "Timeline") {
+                handleNavChange(detail);
+              }
+            }}
           />
-        )}
+        </div>
 
-        {currentView === "Month" && (
+        <div
+          style={{
+            display: currentView === "Month" ? "flex" : "none",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <MonthGrid
-            showFab={false}
+            showFab={true}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}
             onDayClick={(detail) => {
@@ -262,8 +289,27 @@ export function SchedulerView({
               }, 100);
             }}
             onViewChange={(detail) => onViewChange(detail.view)}
-            onNavChange={handleNavChange}
+            onNavChange={(detail) => {
+              if (currentView === "Month") {
+                handleNavChange(detail);
+              }
+            }}
             ref={monthGridRef}
+          />
+        </div>
+
+        {currentView === "Year" && (
+          <YearGrid
+            ref={yearGridRef}
+            onNavChange={handleNavChange}
+            onDayClick={(detail) => {
+              onViewChange("Timeline");
+              setTimeout(() => {
+                if (timelineRef.current && timelineRef.current.goToDate) {
+                  timelineRef.current.goToDate(detail.date);
+                }
+              }, 100);
+            }}
           />
         )}
 

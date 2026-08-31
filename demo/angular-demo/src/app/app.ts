@@ -21,6 +21,7 @@ import {
   SchedulerComponent,
   TimelineComponent,
   MonthGridComponent,
+  YearGridComponent,
   TopbarComponent,
   ChatComponent,
   type TimelineEvent,
@@ -63,6 +64,7 @@ export interface NavData {
     SchedulerComponent,
     TimelineComponent,
     MonthGridComponent,
+    YearGridComponent,
     TopbarComponent,
     ChatComponent,
   ],
@@ -84,8 +86,9 @@ export class App {
     zoomUnit: '',
   });
 
-  timelineEl = viewChild<TimelineComponent>('timelineEl');
-  monthGridEl = viewChild(MonthGridComponent);
+  readonly timelineEl = viewChild<TimelineComponent>('timelineEl');
+  readonly monthGridEl = viewChild<MonthGridComponent>('monthGridEl');
+  readonly yearGridEl = viewChild<YearGridComponent>('yearGridEl');
 
   engineService = inject(NlpEngineService);
   chatService = inject(JanusChatService);
@@ -150,10 +153,34 @@ export class App {
     console.log('🌱 Seeding initial data to core manager...');
 
     // Same resources as React demo
-    this.manager.addResource({ id: 'r1', name: 'Dr. Sarah Chen', type: 'person' });
-    this.manager.addResource({ id: 'r2', name: 'Dr. Michael Ross', type: 'person' });
-    this.manager.addResource({ id: 'r3', name: 'Operating Room 1', type: 'room' });
-    this.manager.addResource({ id: 'r4', name: 'MRI Scanner A', type: 'equipment' });
+    this.manager.addResource({
+      id: 'r1',
+      name: 'Dr. Sarah Chen',
+      type: 'person',
+      avatar:
+        'https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
+    });
+    this.manager.addResource({
+      id: 'r2',
+      name: 'Dr. Michael Ross',
+      type: 'person',
+      avatar:
+        'https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000',
+    });
+    this.manager.addResource({
+      id: 'r3',
+      name: 'Operating Room 1',
+      type: 'room',
+      avatar:
+        'https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=120&h=120',
+    });
+    this.manager.addResource({
+      id: 'r4',
+      name: 'MRI Scanner A',
+      type: 'equipment',
+      avatar:
+        'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=120&h=120',
+    });
 
     // Same events as React demo
     const today = new Date().toISOString().split('T')[0];
@@ -237,7 +264,7 @@ export class App {
     this.selectedEventId.set(null);
   }
 
-  handleViewChange(data: { view: 'Timeline' | 'Month' }): void {
+  handleViewChange(data: { view: ViewType }): void {
     this.currentView = data.view;
   }
 
@@ -254,25 +281,38 @@ export class App {
   handlePrevClick(): void {
     if (this.currentView === 'Timeline') {
       this.timelineEl()?.goToPrev();
-    } else {
+    } else if (this.currentView === 'Month') {
       this.monthGridEl()?.goToPrev();
+    } else if (this.currentView === 'Year') {
+      this.yearGridEl()?.goToPrev();
     }
   }
 
   handleNextClick(): void {
     if (this.currentView === 'Timeline') {
       this.timelineEl()?.goToNext();
-    } else {
+    } else if (this.currentView === 'Month') {
       this.monthGridEl()?.goToNext();
+    } else if (this.currentView === 'Year') {
+      this.yearGridEl()?.goToNext();
     }
   }
 
   handleTodayClick(): void {
     if (this.currentView === 'Timeline') {
       this.timelineEl()?.goToToday();
-    } else {
+    } else if (this.currentView === 'Month') {
       this.monthGridEl()?.goToToday();
+    } else if (this.currentView === 'Year') {
+      this.yearGridEl()?.goToToday();
     }
+  }
+
+  handleDayClick(detail: { date: string }): void {
+    this.currentView = 'Timeline';
+    setTimeout(() => {
+      this.timelineEl()?.goToDate(detail.date);
+    }, 100);
   }
 
   handleToggleCreate(): void {

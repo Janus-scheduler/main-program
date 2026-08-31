@@ -20,12 +20,19 @@ import {
   getBrowserTimezone,
   type EventColor,
   type SchedulerState,
+  type ViewType,
 } from "@janus-scheduler/core";
 
 interface WeekEventBar extends MonthEvent {
   startIdx: number;
   endIdx: number;
   track: number;
+}
+
+/** "YYYY-MM-DD" from a Date using local components */
+function toLocalDateStr(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 @customElement("janus-month-grid")
@@ -94,8 +101,18 @@ export class JanusMonthGrid extends LitElement {
     const newEvents: MonthEvent[] = [];
 
     for (const e of coreEvents) {
+      const origStartMs = new Date(e.startTime).getTime();
+      let origEndMs = new Date(e.endTime).getTime();
+
       const startDisplay = isoToZonedDisplay(e.startTime, tz);
-      const endDisplay = isoToZonedDisplay(e.endTime, tz);
+      let endDisplay = isoToZonedDisplay(e.endTime, tz);
+
+      // An event ending exactly at midnight belongs to the previous day —
+      // pull it back 1ms so it doesn't render a spurious trailing day cell.
+      if (origEndMs > origStartMs && endDisplay.time === "00:00") {
+        origEndMs -= 1;
+        endDisplay = isoToZonedDisplay(new Date(origEndMs).toISOString(), tz);
+      }
 
       const startDateStr = startDisplay.date;
       const endDateStr = endDisplay.date;
@@ -149,7 +166,7 @@ export class JanusMonthGrid extends LitElement {
   // ── Internal state ────────────────────────────────────────────────────
   @state() private _year = new Date().getFullYear();
   @state() private _month = new Date().getMonth(); // 0-based
-  @state() private _view: "Timeline" | "Month" = "Month";
+  @state() private _view: ViewType = "Month";
   @state() private _selectedDateStr: string | null = null;
   @state() private _hoveredEventId: string | null = null;
 
@@ -189,6 +206,22 @@ export class JanusMonthGrid extends LitElement {
     this._year = now.getFullYear();
     this._month = now.getMonth();
     this._emitNavChange();
+  }
+
+  public goToDate(date: string | number | Date) {
+    let d: Date;
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [y, m, day] = date.split("-").map(Number);
+      d = new Date(y, m - 1, day, 12, 0, 0);
+    } else {
+      d = new Date(date);
+    }
+    if (!isNaN(d.getTime())) {
+      this._year = d.getFullYear();
+      this._month = d.getMonth();
+      this._selectedDateStr = toLocalDateStr(d);
+      this._emitNavChange();
+    }
   }
 
   override firstUpdated() {
@@ -259,7 +292,7 @@ export class JanusMonthGrid extends LitElement {
     );
   }
 
-  public setView(v: "Timeline" | "Month") {
+  public setView(v: ViewType) {
     this._view = v;
     // Let the parent app know so it can swap components if needed
     this.dispatchEvent(

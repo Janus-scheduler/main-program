@@ -17,6 +17,7 @@
 export { SchedulerComponent } from "./lib/scheduler.component";
 export { TimelineComponent } from "./lib/timeline.component";
 export { MonthGridComponent } from "./lib/month-grid.component";
+export { YearGridComponent } from "./lib/year-grid.component";
 export { AiBarComponent } from "./lib/ai-bar.component";
 export { TopbarComponent } from "./lib/topbar.component";
 export { ChatComponent } from "./lib/chat.component";

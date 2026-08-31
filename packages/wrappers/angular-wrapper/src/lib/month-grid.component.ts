@@ -19,6 +19,7 @@ import {
   schedulerStore,
   isoToZonedDisplay,
   type TimelineEvent,
+  type ViewType,
 } from "@janus-scheduler/core";
 
 @Component({
@@ -50,7 +51,7 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly eventClick = output<TimelineEvent>();
   readonly dayClick = output<{ date: string }>();
   readonly addEvent = output<void>();
-  readonly viewChange = output<{ view: "Timeline" | "Month" }>();
+  readonly viewChange = output<{ view: ViewType }>();
   readonly navChange = output<Record<string, unknown>>();
 
   private _unsubStore?: () => void;
@@ -94,7 +95,15 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     ).goToToday();
   }
 
-  public setView(view: "Timeline" | "Month"): void {
+  public goToDate(date: string | number | Date): void {
+    (
+      this._elRef().nativeElement as HTMLElement & {
+        goToDate: (d: string | number | Date) => void;
+      }
+    ).goToDate(date);
+  }
+
+  public setView(view: ViewType): void {
     (
       this._elRef().nativeElement as HTMLElement & {
         setView: (v: string) => void;

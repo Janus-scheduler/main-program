@@ -613,7 +613,6 @@ export class JanusScheduler extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this._outsideClick = this._outsideClick.bind(this);
     document.addEventListener("click", this._outsideClick);
 
     // Subscribe to store updates to keep the Lit UI reactive
@@ -632,9 +631,9 @@ export class JanusScheduler extends LitElement {
     this._unsubStore?.();
   }
 
-  private _outsideClick() {
+  private _outsideClick = () => {
     if (this.openPicker) this.openPicker = null;
-  }
+  };
 
   private _toggle(p: OpenPicker) {
     this.openPicker = this.openPicker === p ? null : p;
