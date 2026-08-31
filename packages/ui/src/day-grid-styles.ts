@@ -79,7 +79,7 @@ export const dayGridStyles = [
       width: 4px;
       height: 4px;
       border-radius: 50%;
-      background: var(--orange);
+      background: var(--janus-primary-color, #f97316);
     }
 
     .tg-strip__dot--empty {
@@ -87,7 +87,7 @@ export const dayGridStyles = [
     }
 
     .tg-strip__day--selected {
-      background: var(--orange);
+      background: var(--janus-primary-color, #f97316);
     }
 
     .tg-strip__day--selected .tg-strip__dow,
@@ -105,7 +105,7 @@ export const dayGridStyles = [
     }
 
     .tg-strip__day--today:not(.tg-strip__day--selected) .tg-strip__num {
-      color: var(--orange);
+      color: var(--janus-primary-color, #f97316);
       font-weight: 700;
     }
 

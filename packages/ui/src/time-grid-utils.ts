@@ -103,8 +103,16 @@ export function buildHourMarks(startHour: number, endHour: number): number[] {
   return marks;
 }
 
-/** Minutes from midnight for right now, or null when `dateStr` isn't today. */
-export function nowMinutesFor(dateStr: string): number | null {
+/** Minutes from midnight for right now in the given timezone, or null when `dateStr` isn't today. */
+export function nowMinutesFor(
+  dateStr: string,
+  timezone?: string,
+): number | null {
+  if (timezone) {
+    const zoned = isoToZonedDisplay(new Date().toISOString(), timezone);
+    if (zoned.date !== dateStr) return null;
+    return minutesFromTimeStr(zoned.time);
+  }
   const now = new Date();
   if (toDateStr(now) !== dateStr) return null;
   return now.getHours() * 60 + now.getMinutes();

@@ -170,14 +170,6 @@ export class SchedulerManager {
     this._isUndoing = true;
     const action = this._undoStack.pop()!;
 
-    // Helper: reset _isUndoing only after all async hooks have settled.
-    // This prevents rollback handlers from erroneously pushing to the undo
-    // stack when an async hook fails after undo() returns synchronously.
-    const finalize = () => {
-      this._isUndoing = false;
-      this._notifyUndoChanged();
-    };
-
     try {
       switch (action.type) {
         case "addEvent":
@@ -197,13 +189,10 @@ export class SchedulerManager {
       }
     } catch {
       // If the synchronous part of an undo action throws, still finalize.
-      finalize();
-      return;
+    } finally {
+      this._isUndoing = false;
+      this._notifyUndoChanged();
     }
-
-    // Defer finalize to the microtask queue so that any async hook
-    // rejections (which call rollback → _pushUndo) still see _isUndoing=true.
-    Promise.resolve().then(finalize);
   }
 
   private _pushUndo(action: UndoAction) {
@@ -378,18 +367,35 @@ export class SchedulerManager {
     updates: Partial<EventData>,
     occMatch: RegExpExecArray,
   ) {
-    if (!updates.startTime) return;
-    const originalOccStartMs = Number(occMatch[2]);
-    const newStartMs = new Date(updates.startTime).getTime();
-    const deltaMs = newStartMs - originalOccStartMs;
-
     const parentEvent = schedulerStore.getState().events[baseId];
-    if (parentEvent) {
-      const parentStartMs = new Date(parentEvent.startTime).getTime();
-      const parentEndMs = new Date(parentEvent.endTime).getTime();
+    if (!parentEvent) return;
+
+    const originalOccStartMs = Number(occMatch[2]);
+    const parentStartMs = new Date(parentEvent.startTime).getTime();
+    const parentEndMs = new Date(parentEvent.endTime).getTime();
+
+    if (updates.startTime && updates.endTime) {
+      const newStartMs = new Date(updates.startTime).getTime();
+      const newEndMs = new Date(updates.endTime).getTime();
+      const deltaMs = newStartMs - originalOccStartMs;
+      const newDurationMs = newEndMs - newStartMs;
+
+      updates.startTime = new Date(parentStartMs + deltaMs).toISOString();
+      updates.endTime = new Date(
+        parentStartMs + deltaMs + newDurationMs,
+      ).toISOString();
+    } else if (updates.startTime) {
+      const newStartMs = new Date(updates.startTime).getTime();
+      const deltaMs = newStartMs - originalOccStartMs;
 
       updates.startTime = new Date(parentStartMs + deltaMs).toISOString();
       updates.endTime = new Date(parentEndMs + deltaMs).toISOString();
+    } else if (updates.endTime) {
+      const newEndMs = new Date(updates.endTime).getTime();
+      const newDurationMs = newEndMs - originalOccStartMs;
+
+      updates.startTime = parentEvent.startTime;
+      updates.endTime = new Date(parentStartMs + newDurationMs).toISOString();
     }
   }
 
@@ -398,35 +404,20 @@ export class SchedulerManager {
     snapshot: Partial<EventData>,
   ): Partial<EventData> {
     const delta: Partial<EventData> = {};
-    const fields: (keyof EventData)[] = [
-      "title",
-      "startTime",
-      "endTime",
-      "status",
-      "description",
-      "resourceId",
-      "color",
-      "allDay",
-      "recurrenceRule",
-    ];
 
-    for (const key of fields) {
-      if (
-        key in updates &&
-        snapshot[key as keyof typeof snapshot] !== undefined
-      ) {
+    for (const key of Object.keys(updates) as (keyof EventData)[]) {
+      if (key === "id") continue;
+      const snapVal = snapshot[key];
+      const updateVal = updates[key];
+
+      if (key === "resourceIds") {
+        if (JSON.stringify(snapVal) !== JSON.stringify(updateVal)) {
+          delta.resourceIds = snapVal as string[] | undefined;
+        }
+      } else if (snapVal !== updateVal) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (delta as any)[key] = snapshot[key as keyof typeof snapshot];
+        (delta as any)[key] = snapVal;
       }
-    }
-
-    // Special handling for resourceIds (array comparison)
-    if (
-      "resourceIds" in updates &&
-      JSON.stringify(snapshot.resourceIds) !==
-        JSON.stringify(updates.resourceIds)
-    ) {
-      delta.resourceIds = snapshot.resourceIds;
     }
 
     return delta;

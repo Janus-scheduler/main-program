@@ -961,5 +961,81 @@ describe("SchedulerManager", () => {
         "r2",
       ]);
     });
+
+    it("does not record undo delta if fields did not actually change", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "evt-noop",
+        title: "No-op Event",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+      });
+
+      // Undo stack currently has { type: "addEvent", id: "evt-noop" }
+      const initialAction = manager.peekUndo();
+
+      // Update with exact same values
+      manager.updateEvent("evt-noop", {
+        title: "No-op Event",
+        startTime: "2026-06-02T10:00:00Z",
+      });
+
+      // No new updateEvent undo action should have been pushed
+      expect(manager.peekUndo()).toEqual(initialAction);
+    });
+  });
+
+  describe("Recurrence occurrence shifting in updateEvent", () => {
+    it("adjusts parent duration when occurrence is resized via endTime only", () => {
+      const manager = new SchedulerManager();
+      const parent = manager.addEvent({
+        id: "rec-1",
+        title: "Daily Standup",
+        startTime: "2026-06-01T09:00:00.000Z",
+        endTime: "2026-06-01T09:30:00.000Z",
+        resourceId: "r1",
+        recurrenceRule: "FREQ=DAILY",
+      });
+
+      const occStartMs = new Date("2026-06-05T09:00:00.000Z").getTime();
+      const occId = `rec-1_occ_${occStartMs}`;
+
+      // Resize bottom handle: 9:00 -> 10:00 (1 hour duration)
+      manager.updateEvent(occId, {
+        endTime: "2026-06-05T10:00:00.000Z",
+      });
+
+      const updatedParent = manager.getEvent("rec-1");
+      expect(updatedParent).toBeDefined();
+      expect(updatedParent!.startTime).toBe("2026-06-01T09:00:00.000Z");
+      expect(updatedParent!.endTime).toBe("2026-06-01T10:00:00.000Z");
+    });
+
+    it("shifts parent start time and preserves new duration when occurrence is moved and resized", () => {
+      const manager = new SchedulerManager();
+      manager.addEvent({
+        id: "rec-2",
+        title: "Weekly Review",
+        startTime: "2026-06-01T14:00:00.000Z",
+        endTime: "2026-06-01T15:00:00.000Z",
+        resourceId: "r1",
+        recurrenceRule: "FREQ=WEEKLY",
+      });
+
+      const occStartMs = new Date("2026-06-08T14:00:00.000Z").getTime();
+      const occId = `rec-2_occ_${occStartMs}`;
+
+      // Move occurrence to 15:00 and extend to 16:30 (+1h shift, 1.5h duration)
+      manager.updateEvent(occId, {
+        startTime: "2026-06-08T15:00:00.000Z",
+        endTime: "2026-06-08T16:30:00.000Z",
+      });
+
+      const updatedParent = manager.getEvent("rec-2");
+      expect(updatedParent).toBeDefined();
+      expect(updatedParent!.startTime).toBe("2026-06-01T15:00:00.000Z");
+      expect(updatedParent!.endTime).toBe("2026-06-01T16:30:00.000Z");
+    });
   });
 });

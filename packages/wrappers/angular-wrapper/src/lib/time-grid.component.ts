@@ -10,6 +10,7 @@ import {
   viewChild,
   ChangeDetectionStrategy,
   Directive,
+  effect,
 } from "@angular/core";
 // Side-effect imports: ensure the custom elements are registered
 import { JanusDayGrid, JanusWeekGrid } from "@janus-scheduler/ui";
@@ -38,6 +39,12 @@ export abstract class TimeGridBaseComponent
   implements AfterViewInit, OnDestroy, OnChanges
 {
   protected abstract get elRef(): ElementRef<HTMLElement>;
+
+  constructor() {
+    effect(() => {
+      this._syncProps();
+    });
+  }
 
   /** Externally supplied events. Omit to read from the shared store. */
   readonly events = input<TimeGridEvent[] | undefined>(undefined);

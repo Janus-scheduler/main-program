@@ -111,6 +111,8 @@ export abstract class JanusTimeGridBase extends LitElement {
   private _drag = new TimeGridDragController(() => this.requestUpdate());
   /** Suppresses the synthetic click that follows a real drag release. */
   private _wasDragging = false;
+  private _dragUpHandler?: () => void;
+  private _dragCancelHandler?: () => void;
 
   // ── Subclass contract ─────────────────────────────────────────────────
 
@@ -166,6 +168,7 @@ export abstract class JanusTimeGridBase extends LitElement {
     this._unsubStore?.();
     this._resizeObserver?.disconnect();
     if (this._nowTimer) clearInterval(this._nowTimer);
+    this._removeDragListeners();
     this._drag.cancel();
   }
 
@@ -490,9 +493,22 @@ export abstract class JanusTimeGridBase extends LitElement {
     this._addDragUpListener();
   }
 
+  private _removeDragListeners() {
+    if (this._dragUpHandler) {
+      document.removeEventListener("pointerup", this._dragUpHandler);
+      this._dragUpHandler = undefined;
+    }
+    if (this._dragCancelHandler) {
+      document.removeEventListener("pointercancel", this._dragCancelHandler);
+      this._dragCancelHandler = undefined;
+    }
+  }
+
   private _addDragUpListener() {
-    const handler = () => {
-      document.removeEventListener("pointerup", handler);
+    this._removeDragListeners();
+
+    this._dragUpHandler = () => {
+      this._removeDragListeners();
       const result = this._drag.completeAndGetResult();
       if (!result) return;
 
@@ -539,7 +555,14 @@ export abstract class JanusTimeGridBase extends LitElement {
         );
       }
     };
-    document.addEventListener("pointerup", handler);
+
+    this._dragCancelHandler = () => {
+      this._removeDragListeners();
+      this._drag.cancel();
+    };
+
+    document.addEventListener("pointerup", this._dragUpHandler);
+    document.addEventListener("pointercancel", this._dragCancelHandler);
   }
 
   // ── Render helpers ────────────────────────────────────────────────────
@@ -782,7 +805,10 @@ export abstract class JanusTimeGridBase extends LitElement {
 
   private _renderNowLine(day: TimeGridDay, showLabel: boolean) {
     if (!day.isToday) return nothing;
-    const nowMin = nowMinutesFor(day.dateStr);
+    const nowMin = nowMinutesFor(
+      day.dateStr,
+      schedulerStore.getState().timezone,
+    );
     if (
       nowMin === null ||
       nowMin < this._windowStartMin ||
