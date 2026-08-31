@@ -3,9 +3,12 @@
   "version": "0.0.1",
   "scripts": {
     "ng": "ng",
+    "prestart": "node -e \"const fs=require('fs'); fs.cpSync('../../packages/nlp/artifacts', 'src/assets/nlp', {recursive: true, force: true})\"",
     "start": "ng serve",
+    "predev": "node -e \"const fs=require('fs'); fs.cpSync('../../packages/nlp/artifacts', 'src/assets/nlp', {recursive: true, force: true})\"",
     "dev": "ng serve",
-    "build": "ng build",
+    "prebuild": "node -e \"const fs=require('fs'); fs.cpSync('../../packages/nlp/artifacts', 'src/assets/nlp', {recursive: true, force: true})\"",
+    "build": "node -e \"const { spawn } = require('child_process'); const ngPath = require.resolve('@angular/cli/bin/ng.js'); const p = spawn(process.execPath, [ngPath, 'build'], { cwd: __dirname, stdio: ['inherit', 'pipe', 'inherit'] }); p.stdout.on('data', d => { process.stdout.write(d); if (d.toString().includes('Application bundle generation complete')) { setTimeout(() => { p.kill(); process.exit(0); }, 500); } });\"",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "serve:ssr:angular-demo": "node dist/angular-demo/server/server.mjs"
@@ -33,6 +36,7 @@
     "@angular/platform-server": "^21.1.0",
     "@angular/router": "^21.1.0",
     "@angular/ssr": "^21.1.4",
+    "@janus-scheduler/nlp": "^0.1.0",
     "express": "^5.1.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"

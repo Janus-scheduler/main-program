@@ -76,6 +76,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** When true, resource conflicts/double-bookings are strictly blocked */
   readonly preventConflicts = input<boolean>(false);
 
+  /** Explicit display timezone */
+  readonly timezone = input<string | undefined>(undefined);
+
   /** Emitted when an event is clicked */
   readonly eventClick = output<TimelineEvent>();
 
@@ -261,12 +264,14 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
           allowCreate: boolean;
           showFab: boolean;
           preventConflicts: boolean;
+          timezone?: string;
         })
       | undefined;
     if (el) {
       el.allowCreate = this.allowCreate();
       el.showFab = this.showFab();
       el.preventConflicts = this.preventConflicts();
+      if (this.timezone() !== undefined) el.timezone = this.timezone();
     }
   }
 }

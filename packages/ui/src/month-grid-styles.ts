@@ -13,9 +13,12 @@ export const monthGridStyles = css`
     --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours — same vars as timeline */
-    --c-primary-bg: var(--janus-primary-bg, #fff7ed);
-    --c-primary-bd: var(--janus-primary-color, #f97316);
-    --c-primary-tx: var(--janus-primary-text, #c2410c);
+    --c-primary-bg: var(
+      --janus-primary-bg,
+      color-mix(in srgb, var(--c-primary) 12%, #ffffff)
+    );
+    --c-primary-bd: var(--janus-primary-border, var(--c-primary));
+    --c-primary-tx: var(--janus-primary-text, var(--c-primary));
     --c-orange-bg: #fff7ed;
     --c-orange-bd: #f97316;
     --c-orange-tx: #c2410c;

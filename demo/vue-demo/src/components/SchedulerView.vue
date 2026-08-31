@@ -5,7 +5,9 @@
     Functionally identical to React's SchedulerView.tsx and Angular's app.html.
   -->
 
-  <janus-topbar
+  <div style="display: flex; flex-direction: row; height: 100%; width: 100%;">
+    <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; height: 100%;">
+      <janus-topbar
     .navLabel="navData.navLabel"
     .dayName="navData.dayName"
     .shortDate="navData.shortDate"
@@ -32,6 +34,37 @@
     @event-move="handleEventMove"
     @event-resize="handleEventResize"
     @event-create="handleEventCreate"
+    @view-change="handleViewChange"
+    @nav-change="handleNavChange"
+  />
+
+  <!-- Day view -->
+  <janus-day-grid
+    v-if="currentView === 'Day'"
+    ref="dayGridEl"
+    .showFab="true"
+    .allowCreate="allowCreate"
+    @event-click="handleEventClick"
+    @add-event="handleAddEvent"
+    @slot-select="handleSlotSelect"
+    @event-move="handleTimeGridMove"
+    @event-resize="handleTimeGridResize"
+    @view-change="handleViewChange"
+    @nav-change="handleNavChange"
+  />
+
+  <!-- Week view -->
+  <janus-week-grid
+    v-if="currentView === 'Week'"
+    ref="weekGridEl"
+    .showFab="true"
+    .allowCreate="allowCreate"
+    @event-click="handleEventClick"
+    @add-event="handleAddEvent"
+    @day-click="handleWeekDayClick"
+    @slot-select="handleSlotSelect"
+    @event-move="handleTimeGridMove"
+    @event-resize="handleTimeGridResize"
     @view-change="handleViewChange"
     @nav-change="handleNavChange"
   />
@@ -76,9 +109,26 @@
     @close="$emit('close-scheduler')"
   />
 
-  <janus-ai-bar
-    @ai-submit="handleAiSubmit"
-  />
+    </div>
+
+    <div class="chat-sidebar">
+      <div class="chat-sidebar__panel">
+        <janus-chat
+          .messages="chat.thread"
+          :busy="chat.busy || engineState.status === 'loading'"
+          :disabled="chat.busy || engineState.status === 'loading'"
+          theme="light"
+          show-close
+          :placeholder="engineState.status === 'ready' ? 'Ask me to schedule something…' : 'Loading the language model…'"
+          @chatSubmit="(e: CustomEvent) => chat.submit(e.detail.prompt)"
+          @chatClarifyResponse="(e: CustomEvent) => chat.choose(e.detail.label)"
+          @chatConfirm="chat.confirm"
+          @chatUndo="(e: CustomEvent) => chat.undo(e.detail.messageId)"
+          @chatEdit="chat.edit ? chat.edit() : chat.reset()"
+        ></janus-chat>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -99,6 +149,10 @@ import {
 
 // Side-effect import: registers the custom elements
 import "@janus-scheduler/ui";
+import { useNlpEngine } from "../chat/useNlpEngine";
+import { useJanusChat } from "../chat/useJanusChat";
+import { catalogFromResources, commitSession } from "@janus-scheduler/nlp";
+import type { SessionRequirements, SessionState, PresentMessage } from "@janus-scheduler/nlp";
 
 export type { ViewType };
 
@@ -114,6 +168,18 @@ const TIMELINE_RESOURCE_CONFIG = {
   },
 };
 
+const INTRO: PresentMessage = {
+  id: "intro",
+  role: "assistant",
+  kind: "text",
+  text: "Tell me what to schedule. I'll show you what I understood before anything is added.",
+};
+
+const REQUIRES: SessionRequirements = {
+  add_event: ["when", "duration", "resource", "title"],
+  modify_event: ["when"],
+};
+
 const props = defineProps<{
   currentView: ViewType;
   showScheduler: boolean;
@@ -121,6 +187,28 @@ const props = defineProps<{
   selectedEventId: string | null;
   manager: SchedulerManager;
 }>();
+
+const engineState = useNlpEngine();
+const catalog = computed(() => catalogFromResources(props.manager.getAllResources()));
+
+const chatOptions = computed(() => ({
+  engine: engineState.value.status === "ready" ? engineState.value.engine : null,
+  catalog: catalog.value,
+  // Resolved per turn, from the zone the timeline actually renders in.
+      timezone: () => schedulerStore.getState().timezone,
+  intro: INTRO,
+  requires: REQUIRES,
+  fallbackResourceName: props.manager.getAllResources()[0]?.name,
+  onConfirm: (state: SessionState) => {
+    const resources = props.manager.getAllResources();
+    const result = commitSession(props.manager, state, resources[0]?.id);
+    return result.ok
+      ? { ok: true, message: result.summary, undo: result.undo }
+      : { ok: false, message: result.message };
+  }
+}));
+
+const chat = useJanusChat(() => chatOptions.value);
 
 const emit = defineEmits<{
   "view-change": [view: ViewType];
@@ -134,6 +222,8 @@ const storeEvent = computed(() =>
 
 const timelineEl = ref<any>(null);
 const monthGridEl = ref<any>(null);
+const dayGridEl = ref<any>(null);
+const weekGridEl = ref<any>(null);
 const yearGridEl = ref<any>(null);
 
 const allowCreate = ref(false);
@@ -159,6 +249,10 @@ function handlePrevClick() {
     timelineEl.value?.goToPrev();
   } else if (props.currentView === "Month") {
     monthGridEl.value?.goToPrev();
+  } else if (props.currentView === "Day") {
+    dayGridEl.value?.goToPrev();
+  } else if (props.currentView === "Week") {
+    weekGridEl.value?.goToPrev();
   } else if (props.currentView === "Year") {
     yearGridEl.value?.goToPrev();
   }
@@ -169,6 +263,10 @@ function handleNextClick() {
     timelineEl.value?.goToNext();
   } else if (props.currentView === "Month") {
     monthGridEl.value?.goToNext();
+  } else if (props.currentView === "Day") {
+    dayGridEl.value?.goToNext();
+  } else if (props.currentView === "Week") {
+    weekGridEl.value?.goToNext();
   } else if (props.currentView === "Year") {
     yearGridEl.value?.goToNext();
   }
@@ -179,6 +277,10 @@ function handleTodayClick() {
     timelineEl.value?.goToToday();
   } else if (props.currentView === "Month") {
     monthGridEl.value?.goToToday();
+  } else if (props.currentView === "Day") {
+    dayGridEl.value?.goToToday();
+  } else if (props.currentView === "Week") {
+    weekGridEl.value?.goToToday();
   } else if (props.currentView === "Year") {
     yearGridEl.value?.goToToday();
   }
@@ -190,6 +292,50 @@ function handleDayClick(e: Event) {
   setTimeout(() => {
     timelineEl.value?.goToDate(detail.date);
   }, 100);
+}
+
+function handleWeekDayClick(e: Event) {
+  const detail = (e as CustomEvent<{ date: string }>).detail;
+  emit("view-change", "Day");
+  setTimeout(() => {
+    dayGridEl.value?.goToDate(detail.date);
+  }, 50);
+}
+
+function handleSlotSelect() {
+  emit("open-scheduler");
+}
+
+function handleTimeGridMove(e: Event) {
+  const { event, newDate, newStartTime, newEndTime } = (
+    e as CustomEvent<{
+      event: { id: string };
+      newDate: string;
+      newStartTime: string;
+      newEndTime: string;
+    }>
+  ).detail;
+  const tz = schedulerStore.getState().timezone;
+  props.manager.updateEvent(event.id, {
+    startTime: zonedInputToISO(newDate, newStartTime, tz),
+    endTime: zonedInputToISO(newDate, newEndTime, tz),
+  });
+}
+
+function handleTimeGridResize(e: Event) {
+  const { event, date, newStartTime, newEndTime } = (
+    e as CustomEvent<{
+      event: { id: string };
+      date: string;
+      newStartTime: string;
+      newEndTime: string;
+    }>
+  ).detail;
+  const tz = schedulerStore.getState().timezone;
+  props.manager.updateEvent(event.id, {
+    startTime: zonedInputToISO(date, newStartTime, tz),
+    endTime: zonedInputToISO(date, newEndTime, tz),
+  });
 }
 
 function handleToggleCreate() {
@@ -315,9 +461,5 @@ function handleEventCreate(e: Event) {
   });
 }
 
-function handleAiSubmit(e: Event) {
-  const { prompt } = (e as CustomEvent<{ prompt: string }>).detail;
-  console.log("AI prompt submitted:", prompt);
-  // TODO: NLP integration
-}
+
 </script>

@@ -1,0 +1,27 @@
+/*
+ * Type-checking for the test suite.
+ *
+ * `tsconfig.json` deliberately excludes `tests/` — it is the BUILD config, and
+ * tests must not end up in `dist`. But that left the tests type-checked by
+ * nothing: `jest.config.cjs` sets ts-jest's `diagnostics: false`, so the suite
+ * only ever transpiles.
+ *
+ * That matters for `tests/nlp-commit.integration.test.ts`, whose whole job is a
+ * COMPILE-TIME assertion — that `SchedulerManager` still satisfies
+ * `@janus-scheduler/nlp`'s `SchedulerPort`. A type guard nothing type-checks is
+ * theatre, so `npm test` runs this config before Jest.
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "../..",
+    "baseUrl": ".",
+    "paths": {
+      "@janus-scheduler/nlp": ["../nlp/src/index.ts"]
+    },
+    "types": ["vite/client", "jest", "node"]
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -21,12 +21,13 @@ export default defineConfig({
     },
     sourcemap: true,
     minify: "esbuild",
+    emptyOutDir: false,
   },
 
   plugins: [
     dts({
       insertTypesEntry: true,
-      rollupTypes: true,
+      rollupTypes: false,
     }) as PluginOption,
   ],
 

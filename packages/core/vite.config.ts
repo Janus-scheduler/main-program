@@ -18,12 +18,13 @@ export default defineConfig({
     },
     sourcemap: true,
     minify: "esbuild",
+    emptyOutDir: false,
   },
 
   plugins: [
     dts({
       insertTypesEntry: true, // Generates janus-scheduler.d.ts
-      rollupTypes: true,
+      rollupTypes: false,
     }),
   ],
 

@@ -14,6 +14,9 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    emptyOutDir: false,
+  },
   resolve: {
     alias: {
       "@janus-scheduler/ui": path.resolve(

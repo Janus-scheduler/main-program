@@ -116,46 +116,48 @@ export function getUtcMsForZonedDatetime(
   const [y, mo, d] = date.split("-").map(Number);
   const [h, m] = time.split(":").map(Number);
 
-  // Treat the input as UTC first (nominal) then measure the TZ offset at that moment
+  const getOffset = (utcInstant: number) => {
+    const parts = _memoFmt(
+      _fullPartsFmts,
+      timezone,
+      () =>
+        new Intl.DateTimeFormat("en-US", {
+          timeZone: timezone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }),
+    ).formatToParts(new Date(utcInstant));
+
+    const zonedY = Number(parts.find((p) => p.type === "year")?.value);
+    const zonedMo = Number(parts.find((p) => p.type === "month")?.value);
+    const zonedD = Number(parts.find((p) => p.type === "day")?.value);
+    let zonedH = Number(parts.find((p) => p.type === "hour")?.value);
+    const zonedM = Number(parts.find((p) => p.type === "minute")?.value);
+    const zonedS = Number(parts.find((p) => p.type === "second")?.value);
+    if (zonedH === 24) zonedH = 0;
+
+    const zonedAsUtc = Date.UTC(
+      zonedY,
+      zonedMo - 1,
+      zonedD,
+      zonedH,
+      zonedM,
+      zonedS,
+    );
+    return zonedAsUtc - utcInstant;
+  };
+
   const nominalUtc = Date.UTC(y, mo - 1, d, h, m, 0);
+  const firstOffset = getOffset(nominalUtc);
+  const candidate = nominalUtc - firstOffset;
+  const secondOffset = getOffset(candidate);
 
-  const parts = _memoFmt(
-    _fullPartsFmts,
-    timezone,
-    () =>
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      }),
-  ).formatToParts(new Date(nominalUtc));
-
-  const zonedY = Number(parts.find((p) => p.type === "year")?.value);
-  const zonedMo = Number(parts.find((p) => p.type === "month")?.value);
-  const zonedD = Number(parts.find((p) => p.type === "day")?.value);
-  let zonedH = Number(parts.find((p) => p.type === "hour")?.value);
-  const zonedM = Number(parts.find((p) => p.type === "minute")?.value);
-  const zonedS = Number(parts.find((p) => p.type === "second")?.value);
-  if (zonedH === 24) zonedH = 0;
-
-  // tzOffset = how far ahead the timezone is from UTC (ms)
-  const zonedAsUtc = Date.UTC(
-    zonedY,
-    zonedMo - 1,
-    zonedD,
-    zonedH,
-    zonedM,
-    zonedS,
-  );
-  const tzOffset = zonedAsUtc - nominalUtc;
-
-  // actual UTC = input (treated as TZ local) - tzOffset
-  return nominalUtc - tzOffset;
+  return secondOffset === firstOffset ? candidate : nominalUtc - secondOffset;
 }
 
 /**
