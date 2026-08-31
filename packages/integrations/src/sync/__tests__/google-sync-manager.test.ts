@@ -41,7 +41,10 @@ jest.mock("../../listener/GoogleWebSocketListener.js", () => ({
 }));
 
 // Imported after jest.mock so the mock is in place.
-import { GoogleSyncManager } from "../GoogleSyncManager.js";
+import {
+  GoogleSyncManager,
+  type RemoteEventChange,
+} from "../GoogleSyncManager.js";
 import { GoogleEventMapper } from "../../mapper/GoogleEventMapper.js";
 import { GoogleCalendarClient } from "../../client/GoogleCalendarClient.js";
 
@@ -171,5 +174,103 @@ describe("GoogleSyncManager — WebSocket startup race", () => {
 
     stop();
     expect(mockListenerInstances[0].stop).toHaveBeenCalled();
+  });
+});
+
+describe("GoogleSyncManager — onRemoteChange callback", () => {
+  const mapper = new GoogleEventMapper();
+
+  function timedEvent(id: string, title: string): GoogleCalendarEvent {
+    return {
+      id,
+      summary: title,
+      status: "confirmed",
+      start: { dateTime: "2026-09-01T09:00:00.000Z" },
+      end: { dateTime: "2026-09-01T10:00:00.000Z" },
+    };
+  }
+
+  function managerWithHandler(handler: (c: RemoteEventChange) => void) {
+    const client = new GoogleCalendarClient({ backendUrl: "http://backend" });
+    return new GoogleSyncManager(client, mapper, { onRemoteChange: handler });
+  }
+
+  it("fires 'added' then 'updated' then 'deleted' for a live Google event", () => {
+    const changes: RemoteEventChange[] = [];
+    const manager = managerWithHandler((c) => changes.push(c));
+
+    manager.handleGoogleChange({
+      type: "upserted",
+      event: timedEvent("evt1", "Original"),
+    });
+    manager.handleGoogleChange({
+      type: "upserted",
+      event: timedEvent("evt1", "Renamed"),
+    });
+    manager.handleGoogleChange({
+      type: "deleted",
+      event: timedEvent("evt1", "Renamed"),
+    });
+
+    expect(changes.map((c) => c.type)).toEqual(["added", "updated", "deleted"]);
+    expect(changes[0]).toMatchObject({
+      type: "added",
+      event: { id: "google-evt1", title: "Original" },
+    });
+    expect(changes[1]).toMatchObject({
+      type: "updated",
+      event: { title: "Renamed" },
+    });
+    expect(changes[2]).toEqual({ type: "deleted", id: "google-evt1" });
+  });
+
+  it("fires during the initial import", async () => {
+    const changes: RemoteEventChange[] = [];
+    const client = {
+      fetchInitialEvents: jest
+        .fn()
+        .mockResolvedValue([timedEvent("seed1", "Seeded from Google")]),
+      getBackendUrl: jest.fn().mockReturnValue("http://backend"),
+    } as unknown as GoogleCalendarClient;
+
+    const manager = new GoogleSyncManager(client, mapper, {
+      onRemoteChange: (c) => changes.push(c),
+    });
+
+    const stop = await manager.startRealtimeSync();
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({
+      type: "added",
+      event: { id: "google-seed1", title: "Seeded from Google" },
+    });
+    stop();
+  });
+
+  it("a throwing handler does not break sync", () => {
+    const manager = managerWithHandler(() => {
+      throw new Error("host DB down");
+    });
+
+    expect(() =>
+      manager.handleGoogleChange({
+        type: "upserted",
+        event: timedEvent("evt9", "Still applied"),
+      }),
+    ).not.toThrow();
+    expect(schedulerStore.getState().events["google-evt9"]).toBeDefined();
+  });
+
+  it("does nothing when no handler is supplied", () => {
+    const client = new GoogleCalendarClient({ backendUrl: "http://backend" });
+    const manager = new GoogleSyncManager(client, mapper);
+
+    expect(() =>
+      manager.handleGoogleChange({
+        type: "upserted",
+        event: timedEvent("evt0", "No handler"),
+      }),
+    ).not.toThrow();
+    expect(schedulerStore.getState().events["google-evt0"]).toBeDefined();
   });
 });

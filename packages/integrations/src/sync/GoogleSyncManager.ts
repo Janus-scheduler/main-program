@@ -1,4 +1,8 @@
-import { schedulerStore, type EventData } from "@janus-scheduler/core";
+import {
+  schedulerStore,
+  type EventData,
+  type Event,
+} from "@janus-scheduler/core";
 import { GoogleCalendarClient } from "../client/GoogleCalendarClient.js";
 import { GoogleWebSocketListener } from "../listener/GoogleWebSocketListener.js";
 import { GoogleEventMapper } from "../mapper/GoogleEventMapper.js";
@@ -7,6 +11,33 @@ import type {
   GoogleCalendarEvent,
   GoogleAttendee,
 } from "../types/index.js";
+
+/**
+ * A change applied to the local Janus store because it originated on the Google
+ * Calendar side — either a live edit received over the WebSocket or an event
+ * pulled in during the initial connect.
+ */
+export type RemoteEventChange =
+  | { type: "added"; event: Event }
+  | { type: "updated"; event: Event }
+  | { type: "deleted"; id: string };
+
+export interface GoogleSyncManagerOptions {
+  /**
+   * Called after sync applies a Google-originated change to the store. Use it to
+   * mirror those changes into your own backend.
+   *
+   * `SchedulerManager` hooks and `janusEventBus` deliberately do NOT fire for
+   * these changes (routing them back through `SchedulerManager` would push them
+   * straight back to Google), so this callback is the only place to observe them.
+   *
+   * Fires once per event. A fresh connection produces a burst — one call per
+   * Google event not already known locally — so debounce or batch on your side
+   * if that matters. Anything thrown here (or a rejected promise) is logged and
+   * swallowed; it never rolls back the store or interrupts sync.
+   */
+  onRemoteChange?: (change: RemoteEventChange) => void | Promise<void>;
+}
 
 interface PersistedMappingEntry {
   janusId: string;
@@ -37,8 +68,33 @@ function isValidMappingEntry(value: unknown): value is PersistedMappingEntry {
 export class GoogleSyncManager {
   private readonly client: GoogleCalendarClient;
   private readonly mapper: GoogleEventMapper;
+  private readonly onRemoteChange?: (
+    change: RemoteEventChange,
+  ) => void | Promise<void>;
   private isGoogleConnected = false;
   private readonly statusListeners = new Set<(connected: boolean) => void>();
+
+  /**
+   * Notify the host that sync applied a Google-originated change. Never throws:
+   * a handler that throws or rejects is logged, so a failing host persistence
+   * write can't break the sync pipeline.
+   */
+  private emitRemoteChange(change: RemoteEventChange): void {
+    if (!this.onRemoteChange) return;
+    try {
+      const result = this.onRemoteChange(change);
+      if (result instanceof Promise) {
+        result.catch((err) => {
+          console.error(
+            "[Janus Integrations] onRemoteChange handler rejected:",
+            err,
+          );
+        });
+      }
+    } catch (err) {
+      console.error("[Janus Integrations] onRemoteChange handler threw:", err);
+    }
+  }
 
   setConnected(value: boolean): void {
     this.isGoogleConnected = value;
@@ -185,9 +241,14 @@ export class GoogleSyncManager {
 
   private static readonly STORAGE_KEY = "janus-google-sync-map";
 
-  constructor(client: GoogleCalendarClient, mapper: GoogleEventMapper) {
+  constructor(
+    client: GoogleCalendarClient,
+    mapper: GoogleEventMapper,
+    options: GoogleSyncManagerOptions = {},
+  ) {
     this.client = client;
     this.mapper = mapper;
+    this.onRemoteChange = options.onRemoteChange;
     this.loadPersistedMapping();
   }
 
@@ -504,12 +565,13 @@ export class GoogleSyncManager {
       this.ensurePlaceholderResourceIfNeeded(janusData.resourceIds);
 
       try {
-        state.addEvent(janusData);
+        const added = state.addEvent(janusData);
         this.mappingTable.set(janusData.id, ge.id);
         this.reverseTable.set(ge.id, janusData.id);
         if (!existingJanusId) {
           this.persistMapping();
         }
+        this.emitRemoteChange({ type: "added", event: added });
       } catch (err) {
         console.error(
           "[Janus Integrations] Failed to load Google event:",
@@ -541,6 +603,7 @@ export class GoogleSyncManager {
       schedulerStore.getState().deleteEvent(janusId);
       this.mappingTable.delete(janusId);
       this.reverseTable.delete(event.id);
+      this.emitRemoteChange({ type: "deleted", id: janusId });
       console.log("[Janus Integrations] Deleted from Google sync:", janusId);
       return;
     }
@@ -565,7 +628,8 @@ export class GoogleSyncManager {
 
     if (existingJanusId && storeState.events[existingJanusId]) {
       // Update existing
-      storeState.updateEvent(existingJanusId, janusData);
+      const updated = storeState.updateEvent(existingJanusId, janusData);
+      this.emitRemoteChange({ type: "updated", event: updated });
       console.log(
         "[Janus Integrations] Updated from Google sync:",
         existingJanusId,
@@ -574,9 +638,10 @@ export class GoogleSyncManager {
       this.ensurePlaceholderResourceIfNeeded(janusData.resourceIds);
 
       try {
-        storeState.addEvent(janusData);
+        const added = storeState.addEvent(janusData);
         this.mappingTable.set(janusData.id, event.id);
         this.reverseTable.set(event.id, janusData.id);
+        this.emitRemoteChange({ type: "added", event: added });
         console.log(
           "[Janus Integrations] Added from Google sync:",
           janusData.id,

@@ -39,6 +39,30 @@ const stop = await sync.startRealtimeSync(); // returns a teardown function
 See the demo apps under [`demo/`](../../demo) for the full wiring
 (`handleOAuthRedirect`, `onStatusChange`, `refreshStatus`).
 
+### Mirroring Google-originated changes to your own backend
+
+`SchedulerManager` hooks fire for changes made **in the Janus UI** — those get
+pushed to Google. They do **not** fire for changes that come the other way (an
+event edited directly in Google Calendar, or imported on connect): sync applies
+those straight to the store, because routing them back through `SchedulerManager`
+would push them right back to Google.
+
+If your app persists events in its own database, pass `onRemoteChange` so it
+learns about those too:
+
+```ts
+const sync = new GoogleSyncManager(client, new GoogleEventMapper(), {
+  onRemoteChange: (change) => {
+    if (change.type === "deleted") return myBackend.deleteEvent(change.id);
+    return myBackend.upsertEvent(change.event); // "added" | "updated"
+  },
+});
+```
+
+Fires once per event. A fresh connection produces a burst (one per Google event
+not already known locally) — batch on your side if needed. Errors thrown in the
+handler are logged and swallowed; they never interrupt sync.
+
 ---
 
 ## Backend

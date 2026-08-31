@@ -2,6 +2,10 @@
 export { GoogleCalendarClient } from "./client/GoogleCalendarClient.js";
 export { GoogleEventMapper } from "./mapper/GoogleEventMapper.js";
 export { GoogleSyncManager } from "./sync/GoogleSyncManager.js";
+export type {
+  RemoteEventChange,
+  GoogleSyncManagerOptions,
+} from "./sync/GoogleSyncManager.js";
 export { GoogleWebSocketListener } from "./listener/GoogleWebSocketListener.js";
 export type {
   JanusGoogleConfig,
