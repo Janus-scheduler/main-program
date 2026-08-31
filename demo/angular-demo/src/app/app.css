@@ -17,6 +17,13 @@ app-root {
   overflow: hidden;
   font-family: 'DM Sans', sans-serif;
   background: var(--bg);
+
+  /* Change the primary accent color from orange to blue */
+  --janus-primary-color: #3b82f6;
+  --janus-primary-bg: #eff6ff;
+  --janus-primary-glow: rgba(59, 130, 246, 0.15);
+  /* Optionally override the text color used against primary backgrounds */
+  --janus-primary-text: #1d4ed8;
 }
 
 .app-shell {

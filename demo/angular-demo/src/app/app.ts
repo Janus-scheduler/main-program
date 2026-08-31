@@ -21,6 +21,8 @@ import {
   SchedulerComponent,
   TimelineComponent,
   MonthGridComponent,
+  DayGridComponent,
+  WeekGridComponent,
   YearGridComponent,
   TopbarComponent,
   ChatComponent,
@@ -29,6 +31,10 @@ import {
   type EventMoveDetail,
   type EventResizeDetail,
   type EventCreateDetail,
+  type SlotSelectDetail,
+  type TimeGridEvent,
+  type TimeGridEventMoveDetail,
+  type TimeGridEventResizeDetail,
   type ViewType,
   SchedulerManager,
   getBrowserTimezone,
@@ -64,6 +70,8 @@ export interface NavData {
     SchedulerComponent,
     TimelineComponent,
     MonthGridComponent,
+    DayGridComponent,
+    WeekGridComponent,
     YearGridComponent,
     TopbarComponent,
     ChatComponent,
@@ -88,10 +96,22 @@ export class App {
 
   readonly timelineEl = viewChild<TimelineComponent>('timelineEl');
   readonly monthGridEl = viewChild<MonthGridComponent>('monthGridEl');
+  readonly dayGridEl = viewChild<DayGridComponent>('dayGridEl');
+  readonly weekGridEl = viewChild<WeekGridComponent>('weekGridEl');
   readonly yearGridEl = viewChild<YearGridComponent>('yearGridEl');
 
   engineService = inject(NlpEngineService);
   chatService = inject(JanusChatService);
+
+  tempEventData = signal<{
+    startDate?: string;
+    startTime?: string;
+    endDate?: string;
+    endTime?: string;
+    participants?: string[];
+    showConfirmOnCreate?: boolean;
+    activeColor?: string;
+  } | null>(null);
 
   storeEvent = computed(() => {
     const id = this.selectedEventId();
@@ -105,16 +125,35 @@ export class App {
     return { date, time };
   }
 
-  startParts = computed(() => this.splitISO(this.storeEvent()?.startTime));
-  endParts = computed(() => this.splitISO(this.storeEvent()?.endTime));
+  startParts = computed(() => {
+    if (this.storeEvent()) return this.splitISO(this.storeEvent()?.startTime);
+    return { date: this.tempEventData()?.startDate, time: this.tempEventData()?.startTime };
+  });
+
+  endParts = computed(() => {
+    if (this.storeEvent()) return this.splitISO(this.storeEvent()?.endTime);
+    return { date: this.tempEventData()?.endDate, time: this.tempEventData()?.endTime };
+  });
 
   participants = computed(() => {
-    return this.storeEvent()?.resourceIds;
+    if (this.storeEvent()) return this.storeEvent()?.resourceIds;
+    return this.tempEventData()?.participants;
+  });
+
+  modalTitle = computed(() => {
+    if (this.storeEvent()) return this.storeEvent()?.title;
+    if (this.tempEventData()) return 'New Event';
+    return undefined;
+  });
+
+  activeColor = computed(() => {
+    if (this.storeEvent()) return this.storeEvent()?.color;
+    return this.tempEventData()?.activeColor || 'primary';
   });
 
   allowCreate = signal(false);
   schedulerError = signal<string | null>(null);
-  private manager = new SchedulerManager({
+  private readonly manager = new SchedulerManager({
     onError: ({ operation, error }) => {
       console.error(`❌ Manager error [${operation}]:`, error);
       this.schedulerError.set((error as Error).message || 'An unexpected error occurred');
@@ -169,17 +208,37 @@ export class App {
     });
     this.manager.addResource({
       id: 'r3',
+      name: 'Dr. Ann sherin',
+      type: 'person',
+      avatar: 'https://westernsydneydiabetes.com.au/uploads/2021/06/Rona-scaled.jpg',
+    });
+    this.manager.addResource({
+      id: 'r4',
       name: 'Operating Room 1',
       type: 'room',
       avatar:
         'https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=120&h=120',
     });
     this.manager.addResource({
-      id: 'r4',
+      id: 'r5',
       name: 'MRI Scanner A',
       type: 'equipment',
       avatar:
         'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=120&h=120',
+    });
+    this.manager.addResource({
+      id: 'r6',
+      name: 'MRI Scanner B',
+      type: 'equipment',
+      avatar:
+        'https://tse3.mm.bing.net/th/id/OIP.gB5vMFJ88MAKfv9CPhYJ9QHaE7?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
+    });
+    this.manager.addResource({
+      id: 'r7',
+      name: 'Dr. Alan Turing',
+      type: 'person',
+      avatar:
+        'https://tse4.mm.bing.net/th/id/OIP.kqx_nQhmMAt1EtXnbBhOBwHaK0?r=0&w=832&h=1216&rs=1&pid=ImgDetMain&o=7&rm=3',
     });
 
     // Same events as React demo
@@ -193,6 +252,7 @@ export class App {
       endTime: zonedInputToISO(today, '11:30', tz),
       resourceIds: ['r1', 'r3'],
       status: 'confirmed',
+      color: 'primary',
     });
 
     this.manager.addEvent({
@@ -202,6 +262,7 @@ export class App {
       endTime: zonedInputToISO(today, '14:00', tz),
       resourceIds: ['r2'],
       status: 'confirmed',
+      color: 'primary',
     });
 
     console.log('✅ Seeding complete');
@@ -210,10 +271,13 @@ export class App {
   handleAddEvent(): void {
     this.selectedEventId.set(null);
     this.schedulerError.set(null);
+    this.tempEventData.set({
+      activeColor: 'primary',
+    });
     this.showScheduler = true;
   }
 
-  handleEventClick(event: TimelineEvent): void {
+  handleEventClick(event: TimelineEvent | TimeGridEvent): void {
     console.log('Clicked event:', event);
     this.selectedEventId.set(event.id);
     this.schedulerError.set(null);
@@ -246,6 +310,7 @@ export class App {
       this.showScheduler = false;
       this.selectedEventId.set(null);
       this.schedulerError.set(null);
+      this.tempEventData.set(null);
     } catch {
       // Errors are also handled by the manager's onError hook
     }
@@ -257,11 +322,13 @@ export class App {
     }
     this.showScheduler = false;
     this.selectedEventId.set(null);
+    this.tempEventData.set(null);
   }
 
   closeScheduler(): void {
     this.showScheduler = false;
     this.selectedEventId.set(null);
+    this.tempEventData.set(null);
   }
 
   handleViewChange(data: { view: ViewType }): void {
@@ -283,6 +350,10 @@ export class App {
       this.timelineEl()?.goToPrev();
     } else if (this.currentView === 'Month') {
       this.monthGridEl()?.goToPrev();
+    } else if (this.currentView === 'Day') {
+      this.dayGridEl()?.goToPrev();
+    } else if (this.currentView === 'Week') {
+      this.weekGridEl()?.goToPrev();
     } else if (this.currentView === 'Year') {
       this.yearGridEl()?.goToPrev();
     }
@@ -293,6 +364,10 @@ export class App {
       this.timelineEl()?.goToNext();
     } else if (this.currentView === 'Month') {
       this.monthGridEl()?.goToNext();
+    } else if (this.currentView === 'Day') {
+      this.dayGridEl()?.goToNext();
+    } else if (this.currentView === 'Week') {
+      this.weekGridEl()?.goToNext();
     } else if (this.currentView === 'Year') {
       this.yearGridEl()?.goToNext();
     }
@@ -303,6 +378,10 @@ export class App {
       this.timelineEl()?.goToToday();
     } else if (this.currentView === 'Month') {
       this.monthGridEl()?.goToToday();
+    } else if (this.currentView === 'Day') {
+      this.dayGridEl()?.goToToday();
+    } else if (this.currentView === 'Week') {
+      this.weekGridEl()?.goToToday();
     } else if (this.currentView === 'Year') {
       this.yearGridEl()?.goToToday();
     }
@@ -319,9 +398,6 @@ export class App {
     if (this.currentView === 'Timeline') {
       this.timelineEl()?.toggleCreate();
     }
-  }
-
-  toggleCreate(): void {
     this.allowCreate.set(!this.allowCreate());
   }
 
@@ -349,18 +425,119 @@ export class App {
 
   handleEventCreate(data: EventCreateDetail): void {
     console.log('✨ Creating new event:', data);
-    this.manager.addEvent({
-      id: `evt_${Date.now()}`,
-      title: 'New Event',
-      startTime: data.startTime,
-      endTime: data.endTime,
-      resourceIds: [data.resourceId],
-      status: 'confirmed',
+    const startStr = this.splitISO(data.startTime);
+    const endStr = this.splitISO(data.endTime);
+    this.tempEventData.set({
+      startDate: startStr.date,
+      startTime: startStr.time,
+      endDate: endStr.date,
+      endTime: endStr.time,
+      participants: [data.resourceId],
+      showConfirmOnCreate: true,
+      activeColor: 'primary',
+    });
+    this.showScheduler = true;
+  }
+
+  handleSlotSelect(detail: SlotSelectDetail): void {
+    this.tempEventData.set({
+      startDate: detail.date,
+      startTime: detail.startTime,
+      endDate: detail.date,
+      endTime: detail.endTime,
+      showConfirmOnCreate: true,
+      activeColor: 'primary',
+    });
+    this.showScheduler = true;
+  }
+
+  handleTimeGridMove(detail: TimeGridEventMoveDetail): void {
+    console.log('📦 Moving time grid event:', detail);
+    const tz = schedulerStore.getState().timezone;
+    this.manager.updateEvent(detail.event.id, {
+      startTime: zonedInputToISO(detail.newDate, detail.newStartTime, tz),
+      endTime: zonedInputToISO(detail.newDate, detail.newEndTime, tz),
+    });
+  }
+
+  handleTimeGridResize(detail: TimeGridEventResizeDetail): void {
+    console.log('↔️ Resizing time grid event:', detail);
+    const tz = schedulerStore.getState().timezone;
+    this.manager.updateEvent(detail.event.id, {
+      startTime: zonedInputToISO(detail.date, detail.newStartTime, tz),
+      endTime: zonedInputToISO(detail.date, detail.newEndTime, tz),
     });
   }
 
   handleAiSubmit(detail: { prompt: string }): void {
     console.log('AI prompt submitted:', detail.prompt);
-    // TODO: NLP integration
+    // NLP integration to be implemented
+  }
+
+  async syncBulkEvents(): Promise<void> {
+    try {
+      console.log('Fetching from LMS...');
+      await new Promise((r) => setTimeout(r, 800));
+
+      const lmsData = {
+        courses: [
+          {
+            id: 'course_101',
+            courseName: 'Advanced Physiology',
+            teacherId: 'lms_t1',
+            teacherName: 'Dr. Gregory House',
+            startDate: new Date(new Date().setHours(9, 0, 0, 0)).toISOString(),
+            endDate: new Date(new Date().setHours(12, 0, 0, 0)).toISOString(),
+          },
+          {
+            id: 'course_102',
+            courseName: 'Neurology Seminar',
+            teacherId: 'lms_t2',
+            teacherName: 'Dr. Eric Foreman',
+            startDate: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(),
+            endDate: new Date(new Date().setHours(16, 30, 0, 0)).toISOString(),
+          },
+        ],
+      };
+
+      const eventsToAdd: {
+        id: string;
+        title: string;
+        startTime: string;
+        endTime: string;
+        resourceIds: string[];
+        status: 'confirmed';
+      }[] = [];
+
+      lmsData.courses.forEach((course) => {
+        if (!this.manager.getResource(course.teacherId)) {
+          this.manager.addResource({
+            id: course.teacherId,
+            name: course.teacherName,
+            type: 'person',
+          });
+        }
+
+        if (!this.manager.getEvent(course.id)) {
+          eventsToAdd.push({
+            id: course.id,
+            title: course.courseName,
+            startTime: course.startDate,
+            endTime: course.endDate,
+            resourceIds: [course.teacherId],
+            status: 'confirmed' as const,
+          });
+        }
+      });
+
+      if (eventsToAdd.length > 0) {
+        this.manager.batchAddEvents(eventsToAdd);
+      }
+
+      console.log(`Successfully synced ${eventsToAdd.length} events from LMS!`);
+    } catch (error) {
+      console.error('Failed to sync from LMS:', error);
+      alert('Synchronization failed. Please check the logs.');
+    }
   }
 }

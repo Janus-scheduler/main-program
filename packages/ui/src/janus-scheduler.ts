@@ -17,6 +17,7 @@ import "./janus-confirm-dialog";
 const COLORS = [
   "primary",
   "orange",
+  "orange",
   "blue",
   "green",
   "yellow",

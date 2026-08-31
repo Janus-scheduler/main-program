@@ -37,6 +37,37 @@
     @nav-change="handleNavChange"
   />
 
+  <!-- Day view -->
+  <janus-day-grid
+    v-if="currentView === 'Day'"
+    ref="dayGridEl"
+    .showFab="true"
+    .allowCreate="allowCreate"
+    @event-click="handleEventClick"
+    @add-event="handleAddEvent"
+    @slot-select="handleSlotSelect"
+    @event-move="handleTimeGridMove"
+    @event-resize="handleTimeGridResize"
+    @view-change="handleViewChange"
+    @nav-change="handleNavChange"
+  />
+
+  <!-- Week view -->
+  <janus-week-grid
+    v-if="currentView === 'Week'"
+    ref="weekGridEl"
+    .showFab="true"
+    .allowCreate="allowCreate"
+    @event-click="handleEventClick"
+    @add-event="handleAddEvent"
+    @day-click="handleWeekDayClick"
+    @slot-select="handleSlotSelect"
+    @event-move="handleTimeGridMove"
+    @event-resize="handleTimeGridResize"
+    @view-change="handleViewChange"
+    @nav-change="handleNavChange"
+  />
+
   <!-- Month view -->
   <janus-month-grid
     v-if="currentView === 'Month'"
@@ -178,6 +209,8 @@ const storeEvent = computed(() =>
 
 const timelineEl = ref<any>(null);
 const monthGridEl = ref<any>(null);
+const dayGridEl = ref<any>(null);
+const weekGridEl = ref<any>(null);
 const yearGridEl = ref<any>(null);
 
 const allowCreate = ref(false);
@@ -203,6 +236,10 @@ function handlePrevClick() {
     timelineEl.value?.goToPrev();
   } else if (props.currentView === "Month") {
     monthGridEl.value?.goToPrev();
+  } else if (props.currentView === "Day") {
+    dayGridEl.value?.goToPrev();
+  } else if (props.currentView === "Week") {
+    weekGridEl.value?.goToPrev();
   } else if (props.currentView === "Year") {
     yearGridEl.value?.goToPrev();
   }
@@ -213,6 +250,10 @@ function handleNextClick() {
     timelineEl.value?.goToNext();
   } else if (props.currentView === "Month") {
     monthGridEl.value?.goToNext();
+  } else if (props.currentView === "Day") {
+    dayGridEl.value?.goToNext();
+  } else if (props.currentView === "Week") {
+    weekGridEl.value?.goToNext();
   } else if (props.currentView === "Year") {
     yearGridEl.value?.goToNext();
   }
@@ -223,6 +264,10 @@ function handleTodayClick() {
     timelineEl.value?.goToToday();
   } else if (props.currentView === "Month") {
     monthGridEl.value?.goToToday();
+  } else if (props.currentView === "Day") {
+    dayGridEl.value?.goToToday();
+  } else if (props.currentView === "Week") {
+    weekGridEl.value?.goToToday();
   } else if (props.currentView === "Year") {
     yearGridEl.value?.goToToday();
   }
@@ -234,6 +279,50 @@ function handleDayClick(e: Event) {
   setTimeout(() => {
     timelineEl.value?.goToDate(detail.date);
   }, 100);
+}
+
+function handleWeekDayClick(e: Event) {
+  const detail = (e as CustomEvent<{ date: string }>).detail;
+  emit("view-change", "Day");
+  setTimeout(() => {
+    dayGridEl.value?.goToDate(detail.date);
+  }, 50);
+}
+
+function handleSlotSelect() {
+  emit("open-scheduler");
+}
+
+function handleTimeGridMove(e: Event) {
+  const { event, newDate, newStartTime, newEndTime } = (
+    e as CustomEvent<{
+      event: { id: string };
+      newDate: string;
+      newStartTime: string;
+      newEndTime: string;
+    }>
+  ).detail;
+  const tz = schedulerStore.getState().timezone;
+  props.manager.updateEvent(event.id, {
+    startTime: zonedInputToISO(newDate, newStartTime, tz),
+    endTime: zonedInputToISO(newDate, newEndTime, tz),
+  });
+}
+
+function handleTimeGridResize(e: Event) {
+  const { event, date, newStartTime, newEndTime } = (
+    e as CustomEvent<{
+      event: { id: string };
+      date: string;
+      newStartTime: string;
+      newEndTime: string;
+    }>
+  ).detail;
+  const tz = schedulerStore.getState().timezone;
+  props.manager.updateEvent(event.id, {
+    startTime: zonedInputToISO(date, newStartTime, tz),
+    endTime: zonedInputToISO(date, newEndTime, tz),
+  });
 }
 
 function handleToggleCreate() {
