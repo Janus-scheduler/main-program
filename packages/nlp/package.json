@@ -28,8 +28,9 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "jest --coverage",
-    "build": "vite build"
+    "test": "npm run typecheck && jest --coverage",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "typecheck": "tsc -p tsconfig.tests.json"
   },
   "keywords": [
     "nlp",

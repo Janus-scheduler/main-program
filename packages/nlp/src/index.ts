@@ -110,8 +110,15 @@ export {
   hasAnswered,
   stripNegationCues,
   MAX_CLARIFY_ROUNDS,
+  MAX_TOTAL_ROUNDS,
   SKIP_ANSWER,
   SKIP_CHOICE,
+  ESCAPE_START_OVER,
+  ESCAPE_SKIP_PREFIX,
+  EDIT_CANCEL,
+  EDIT_PREFIX,
+  editFieldQuestion,
+  KEEP_TITLE_ANSWER,
 } from "./session";
 export { reviseSlot } from "./revise";
 
@@ -185,7 +192,9 @@ export {
   getConfirmLabel,
   getEditLabel,
   draftChips,
+  FALLBACK_TITLE,
   assumptionNotes,
+  cardWarnings,
 } from "./presentSession";
 export type {
   PresentOptions,
@@ -198,3 +207,20 @@ export type {
 // ── dialogue state controller (framework-agnostic state machine) ──────────
 export { ChatController, DEFAULT_INTRO } from "./controller";
 export type { JanusChatOptions, ConfirmOutcome, NlpEngine } from "./controller";
+
+// ── the commit path ───────────────────────────────────────────────────────
+//
+// The ONLY thing in this package that can change a calendar, and it reaches
+// one only through the `SchedulerPort` a host hands it per call. Nothing here
+// is imported by `session.ts`, by any gate, or by anything frozen — see the
+// banner in `commit.ts`.
+export { commitSession, catalogFromResources } from "./commit";
+export type {
+  SchedulerPort,
+  EventInput,
+  StoredEvent,
+  ResourceLike,
+  CommitResult,
+  CommitSuccess,
+  CommitFailure,
+} from "./commit";

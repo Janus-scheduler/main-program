@@ -124,6 +124,7 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     if (updates.allDay !== undefined) event.allDay = updates.allDay;
     if (updates.recurrenceRule !== undefined)
       event.recurrenceRule = updates.recurrenceRule;
+    if (updates.timezone !== undefined) event.timezone = updates.timezone;
 
     // To ensure reactivity in zustand, we create a new object reference for the events record.
     set((state) => ({

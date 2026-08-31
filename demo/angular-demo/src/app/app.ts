@@ -10,8 +10,13 @@ import {
 } from '@angular/core';
 import { NlpEngineService } from './chat/nlp-engine.service';
 import { JanusChatService } from './chat/janus-chat.service';
-import { catalogFromResources, commitSession } from './chat/commit-to-scheduler';
-import type { SessionRequirements, SessionState, PresentMessage } from '@janus-scheduler/nlp';
+import {
+  catalogFromResources,
+  commitSession,
+  type SessionRequirements,
+  type SessionState,
+  type PresentMessage,
+} from '@janus-scheduler/nlp';
 import {
   SchedulerComponent,
   TimelineComponent,
@@ -39,7 +44,7 @@ const INTRO: PresentMessage = {
 };
 
 const REQUIRES: SessionRequirements = {
-  add_event: ['when', 'duration', 'resource'],
+  add_event: ['when', 'duration', 'resource', 'title'],
   modify_event: ['when'],
 };
 
@@ -122,7 +127,8 @@ export class App {
       this.chatService.initialize({
         engine: state.status === 'ready' ? state.engine : null,
         catalog,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        // Resolved per turn, from the zone the timeline actually renders in.
+        timezone: () => schedulerStore.getState().timezone,
         intro: INTRO,
         requires: REQUIRES,
         fallbackResourceName: resources[0]?.name,

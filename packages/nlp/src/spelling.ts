@@ -115,7 +115,7 @@ export interface SpellingOptions {
  * "tommorow" and "tomrorow" are all one keyboard slip, and plain Levenshtein
  * scores the last of those as 2.
  */
-function withinDistance(a: string, b: string, max: number): boolean {
+export function withinDistance(a: string, b: string, max: number): boolean {
   if (Math.abs(a.length - b.length) > max) return false;
 
   let previous: number[] = [];

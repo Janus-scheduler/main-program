@@ -148,6 +148,7 @@ export interface ClockTime {
 export type DateAnchor =
   | { kind: "today" }
   | { kind: "tomorrow" }
+  | { kind: "yesterday" }
   /** A bare weekday: "friday". */
   | { kind: "weekday"; weekday: number }
   /** A qualified weekday: "next friday". */
@@ -162,6 +163,15 @@ export type DateAnchor =
       unit: "week" | "month" | "quarter" | "year" | "sprint";
       direction: "next" | "this" | "last";
     }
+  /**
+   * A bare day of the month with no month named: "the 25th", "on the 3rd".
+   *
+   * Resolved to the NEXT occurrence of that day — this month if it has not
+   * passed, otherwise next month. Distinct from `monthDate`, which knows its
+   * month; before this existed, "on the 25th at 9am" silently dropped the day
+   * entirely and booked whatever date the rest of the sentence defaulted to.
+   */
+  | { kind: "dayOfMonth"; day: number }
   /** An explicit calendar date: "August 18", "18th of August", "Aug 18, 2026". */
   | {
       kind: "monthDate";
@@ -179,13 +189,24 @@ export interface TimeMention extends TextSpan {
     | "midnight"
     | "today"
     | "tomorrow"
+    | "yesterday"
     | "tonight"
     | "weekday"
     | "relativeWeekday"
     | "relativeUnit"
     | "monthDate"
+    | "dayOfMonth"
     | "partOfDay"
-    | "duration";
+    | "duration"
+    /**
+     * "in 2 hours" — an instant measured from now, not a length.
+     *
+     * Distinct from `duration` because the two are opposites that share a
+     * surface form: "for 2 hours" says how long, "in 2 hours" says when. The
+     * duration pattern claimed both, so "book Room A in 30 minutes" produced a
+     * 30-minute event with no start time at all.
+     */
+    | "relativeOffset";
   clock?: ClockTime;
   endClock?: ClockTime;
   /** 0 = Sunday. */
@@ -197,6 +218,16 @@ export interface TimeMention extends TextSpan {
   year?: number;
   partOfDay?: PartOfDay;
   durationMinutes?: number;
+  /** Minutes from now, for `relativeOffset`. */
+  offsetMinutes?: number;
+  /**
+   * The hour was inferred, because the phrase named no meridiem.
+   *
+   * "half past two" states the minutes exactly and the half of the day not at
+   * all. Resolving it means guessing, and a guess this layer makes has to be
+   * disclosed rather than presented as what the user said.
+   */
+  meridiemAssumed?: boolean;
 }
 
 /** All the time phrases in one utterance, folded into a single intent. */
@@ -208,6 +239,12 @@ export interface TimeSpan extends TextSpan {
   endClock?: ClockTime;
   partOfDay?: PartOfDay;
   durationMinutes?: number;
+  /** Minutes from now, when the utterance said "in 2 hours". */
+  offsetMinutes?: number;
+  /** `clock`'s hour was inferred — see `TimeMention.meridiemAssumed`. */
+  meridiemAssumed?: boolean;
+  /** The phrase that produced an inferred hour, for the disclosure line. */
+  meridiemPhrase?: string;
 }
 
 /** What `resolveTime()` needs in order to turn a span into an instant. */
@@ -249,6 +286,18 @@ export interface ResolvedTime {
     timeOfDay: boolean;
     /** The length was chosen. */
     duration: boolean;
+    /**
+     * Only which HALF OF THE DAY was chosen — "half past two" → 14:30.
+     *
+     * Deliberately not `timeOfDay`. The user did state a time of day, minutes
+     * and all; nothing but the meridiem was invented. Folding the two together
+     * made `slotIsFilled("when")` treat the whole time as missing, so a booking
+     * that had said "half past two" was asked what time it should be.
+     *
+     * Still an assumption, so it is still disclosed — it just does not mean
+     * the question is unanswered.
+     */
+    meridiem: boolean;
   };
   /** Wall-clock date in `timezone`, "YYYY-MM-DD". */
   localDate: string;
@@ -262,6 +311,35 @@ export interface ResolvedTime {
   pastDate?: string;
   /** Candidate upcoming date YYYY-MM-DD when pastRelativeWeekday is true. */
   upcomingDate?: string;
+  /**
+   * True when an explicit calendar date ("August 25th") could only be honoured
+   * by rolling forward a WHOLE YEAR, and the date named is in the RECENT past.
+   *
+   * Rolling forward is right in general — "January 5th" said in December means
+   * next January. It is almost certainly wrong five days after the fact: nobody
+   * saying "August 25th" on 30 August means 2027. They have misremembered the
+   * date or meant a different month, and a silent twelve-month jump hides that.
+   *
+   * Only set inside a bounded window (`RECENT_PAST_DAYS`); beyond it the
+   * rolled-forward reading is the honest one and nothing is flagged.
+   */
+  staleYearRoll?: boolean;
+  /** The date as literally stated, YYYY-MM-DD, when `staleYearRoll` is true. */
+  statedDate?: string;
+  /**
+   * The resolved instant is BEFORE `now`, and nothing in the utterance asked
+   * for a past date.
+   *
+   * Most paths already roll forward on their own — a bare clock goes to
+   * tomorrow, a bare weekday to the next one, a day-of-month to its next
+   * occurrence. The gap is a phrase that names a day explicitly and a time that
+   * has already been and gone: "today at 9am", said at 2pm.
+   *
+   * Deliberately NOT set for `yesterday`, `last <weekday>` or `last week` —
+   * those state a past date outright, and asking about them would be nagging.
+   * Rolling them forward would be worse: it would override what the user said.
+   */
+  resolvedInPast?: boolean;
 }
 
 /** One entry in the caller-supplied catalog. */
@@ -363,7 +441,26 @@ export type SlotName =
   | "confirm"
   | "resource"
   | "title"
-  | "duration";
+  | "duration"
+  /**
+   * The way out, offered once a conversation has provably stopped converging.
+   *
+   * Its own slot rather than a reused `confirm`, because the answers are
+   * neither yes nor no: `confirm`'s handler tests only `AFFIRMATIVE_RE` /
+   * `NEGATIVE_RE`, so "start over" matched neither and fell through to a
+   * re-ask — the escape hatch's own buttons did nothing.
+   */
+  | "escape"
+  /**
+   * "What would you like to change?" — the field picker behind Edit.
+   *
+   * Its own slot for the same reason as `escape`. Edit used to borrow `title`
+   * as a dummy slot, so everything typed after pressing it went to the title
+   * handler: a time was swallowed whole (first-mention-wins kept the original),
+   * and a room or a name was APPENDED rather than replacing. Editing a 3pm
+   * booking to 5pm changed nothing at all.
+   */
+  | "edit";
 
 /**
  * A field the host app considers mandatory before an event is worth creating.
@@ -416,6 +513,16 @@ export interface SessionQuestion {
   multiselect?: boolean;
   searchable?: boolean;
   inputPlaceholder?: string;
+  /**
+   * Splice the answer OVER this span of the utterance instead of appending it.
+   *
+   * Appending is the default and is right for a slot the user never filled.
+   * It is wrong whenever the user already said something in that slot and is
+   * now correcting it: the accumulated text would end up holding both values,
+   * and `toTimeSpan`/`extractEntities` resolve first-wins, so the correction
+   * would be silently ignored (or, for two clock times, read as a range).
+   */
+  replaceSpan?: TextSpan;
 }
 
 /** One answered question, kept so a UI can replay the conversation. */
@@ -440,6 +547,15 @@ export interface SessionAnswer {
 export interface SessionDraft {
   intent: Intent;
   title?: string;
+  /**
+   * Where `title` sits in the utterance.
+   *
+   * `extractEntities` has always computed this — the title IS a span, the one
+   * left over once the verb, the time and every matched entity are blanked —
+   * but it used to stop at the package boundary. It is carried here so a
+   * correction can splice over the title rather than appending beside it.
+   */
+  titleSpan?: TextSpan;
   timeSpan?: TimeSpan;
   /** `null` until a time is known — which is exactly what gate 5 asks about. */
   time: ResolvedTime | null;
@@ -476,6 +592,39 @@ export interface SessionState {
    * three empty fields is a conversation; asking "when?" three times is a loop.
    */
   rounds: number;
+  /**
+   * How many answers this conversation has taken in total, ever.
+   *
+   * Monotonic — it is never reset, by anything. `rounds` deliberately resets
+   * when the topic moves on, which is right for "stop repeating yourself" but
+   * means a session alternating between two slots (`when` → `resource` →
+   * `when` → …) never reaches the per-slot cap on either and loops forever.
+   * This is the backstop that catches that shape, and the only reason it can
+   * work is that nothing is allowed to zero it.
+   */
+  totalRounds: number;
+  /**
+   * The `totalRounds` value the current budget is measured from.
+   *
+   * Only an explicit escape choice moves it, and only ever forward. Without
+   * it, tapping "skip that and continue" would land straight back on the
+   * escape prompt — the total cap is still exceeded — offering to skip a
+   * question the user was never asked.
+   *
+   * This cannot be farmed into an endless conversation: the only thing that
+   * advances it also retires a requirement slot permanently, and there are
+   * finitely many of those.
+   */
+  capBaseline?: number;
+  /**
+   * The conversation hit a round cap — per-slot or total — and gave up.
+   *
+   * A structural marker, deliberately, because the presentation layer used to
+   * identify this state by string-matching the `reason` diagnostic. That
+   * coupling broke silently the moment the wording changed. `reason` is for
+   * humans and logs; this is what code branches on.
+   */
+  roundCapReached?: boolean;
   /**
    * Requirement slots the user explicitly declined.
    *
@@ -522,6 +671,14 @@ export interface SessionState {
   outstanding?: RequiredSlot[];
   /** Slot that was asked but the answer was unresolved/unusable. */
   unresolved?: SlotName;
+  /**
+   * The user was told a name they used is not in the catalog, and chose to keep
+   * it as the event's title anyway.
+   *
+   * Without this the session would notice the same unmatched name on the next
+   * turn and ask the same question again, for ever.
+   */
+  keptTitle?: boolean;
 }
 
 /** Everything the session needs. All injected — the module reads no globals. */

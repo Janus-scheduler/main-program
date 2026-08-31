@@ -14,13 +14,14 @@ import {
   schedulerStore,
   createJanusChat,
 } from "@janus-scheduler/solid";
-import type {
-  SessionRequirements,
-  SessionState,
-  PresentMessage,
+import {
+  catalogFromResources,
+  commitSession,
+  type SessionRequirements,
+  type SessionState,
+  type PresentMessage,
 } from "@janus-scheduler/nlp";
 import { createNlpEngine } from "./chat/createNlpEngine";
-import { catalogFromResources, commitSession } from "./chat/commitToScheduler";
 
 const INTRO: PresentMessage = {
   id: "intro",
@@ -30,7 +31,7 @@ const INTRO: PresentMessage = {
 };
 
 const REQUIRES: SessionRequirements = {
-  add_event: ["when", "duration", "resource"],
+  add_event: ["when", "duration", "resource", "title"],
   modify_event: ["when"],
 };
 
@@ -198,7 +199,8 @@ function App() {
     return {
       engine: s.status === "ready" ? s.engine : null,
       catalog: catalog(),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      // Resolved per turn, from the zone the timeline actually renders in.
+      timezone: () => schedulerStore.getState().timezone,
       intro: INTRO,
       requires: REQUIRES,
       fallbackResourceName: manager.getAllResources()[0]?.name,

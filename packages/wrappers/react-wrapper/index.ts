@@ -191,6 +191,7 @@ export interface SchedulerProps extends React.HTMLAttributes<HTMLElement> {
   error?: string | null;
   allDay?: boolean;
   recurrenceRule?: string;
+  timezone?: string;
   preventConflicts?: boolean;
   showConfirmOnCreate?: boolean;
   onClose?: () => void;
@@ -239,6 +240,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   allowCreate?: boolean;
   showFab?: boolean;
   preventConflicts?: boolean;
+  timezone?: string;
   onEventClick?: (detail: TimelineEvent) => void;
   onEventMove?: (detail: EventMoveDetail) => void;
   onEventResize?: (detail: EventResizeDetail) => void;
@@ -324,6 +326,7 @@ const _MonthGrid = createComponent({
 
 export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
   showFab?: boolean;
+  timezone?: string;
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;

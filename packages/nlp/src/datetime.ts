@@ -58,6 +58,18 @@ export const DEFAULT_HOUR = 9;
 /** Event length assumed when no duration is stated. */
 export const DEFAULT_DURATION_MINUTES = 60;
 
+/**
+ * The exact disclosure line for an invented duration.
+ *
+ * Exported so a caller can drop THIS line without matching prose — a
+ * cancellation has no length to invent, and "assumed 60 minutes" on a card
+ * whose button says "Cancel event" reads as though something is about to be
+ * created. `ResolvedTime.assumed` already warns that matching the wording of
+ * these strings is fragile and was wrong once; comparing against the value
+ * itself is not.
+ */
+export const DURATION_ASSUMPTION = `no duration given — assumed ${DEFAULT_DURATION_MINUTES} minutes`;
+
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 86_400_000;
 
@@ -232,6 +244,54 @@ function addDays(
 }
 
 /**
+ * How far into the past a stated calendar date can be before rolling it a year
+ * forward stops looking like a misremembering and starts looking like intent.
+ *
+ * 45 days: comfortably covers "I meant last month", while leaving "January 5th"
+ * said in December to roll forward silently, which is what it means.
+ */
+const RECENT_PAST_DAYS = 45;
+
+/** Whole days from `b` to `a`, positive when `a` is later. */
+function daysBetween(
+  a: { year: number; month: number; day: number },
+  b: { year: number; month: number; day: number },
+): number {
+  const ms =
+    Date.UTC(b.year, b.month - 1, b.day) - Date.UTC(a.year, a.month - 1, a.day);
+  return Math.round(ms / 86400000);
+}
+
+/**
+ * Did the user actually ASK for a date in the past?
+ *
+ * "yesterday", "last friday", "last week" and a year stated outright all mean
+ * it deliberately. Everything else that lands behind `now` got there by
+ * accident, and is worth a question.
+ */
+function statesAPastDate(span: TimeSpan): boolean {
+  const date = span.date;
+  if (date === undefined) return false;
+  switch (date.kind) {
+    case "yesterday":
+      return true;
+    case "relativeWeekday":
+    case "relativeUnit":
+      return date.direction === "last";
+    case "monthDate":
+      // A year the user typed is a year they meant.
+      return date.year !== undefined;
+    default:
+      return false;
+  }
+}
+
+/** Days in a 1-indexed month. Leap years handled by `Date` itself. */
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
  * Shift by whole months, clamping the day to the target month's length.
  * "next month" from 31 Jan is 28/29 Feb, not 2/3 March.
  */
@@ -249,6 +309,48 @@ function addMonths(
 }
 
 // ── time-phrase extraction ────────────────────────────────────────────────
+
+/** Spelled-out hours, for "half past two". Only 1-12 — a clock has no more. */
+const HOUR_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+};
+
+/** Longest-first, so "twelve" is not shadowed by a shorter alternative. */
+const HOUR_WORD_ALTERNATION = Object.keys(HOUR_WORDS)
+  .sort((a, b) => b.length - a.length)
+  .join("|");
+
+function hourNumber(token: string): number {
+  const word = HOUR_WORDS[token.toLowerCase()];
+  return word ?? Number(token);
+}
+
+/**
+ * Which half of the day a bare hour means, when the phrase never said.
+ *
+ * "half past two" is 14:30 to almost everyone arranging a meeting, and "half
+ * past nine" is 09:30 — the split is the working day, not the clock. 1-5 read
+ * as afternoon, 6-11 as morning, 12 as noon.
+ *
+ * This is a GUESS, and `resolveTime` discloses it on the card rather than
+ * presenting it as something the user said. A wrong guess the user can see and
+ * correct is fine; a wrong guess presented as their own words is not.
+ */
+function businessHour(hour12: number): number {
+  if (hour12 === 12) return 12;
+  return hour12 >= 1 && hour12 <= 5 ? hour12 + 12 : hour12;
+}
 
 /**
  * Labelled patterns mirroring the frozen `TIME_PATTERNS`, one per alternative,
@@ -274,6 +376,18 @@ const MENTION_PATTERNS: Array<{
   },
   // "10am", "10:30 pm", "3 PM"
   { kind: "clock", re: /\b(\d{1,2})(?::(\d{2}))?\s?(am|pm)\b/gi },
+  // "half past two", "quarter past 3", "quarter to four", "half past two pm".
+  //
+  // Must sit AFTER the plain clock pattern so "half past 2pm" gives its own
+  // match rather than the bare "2pm" inside it winning the position first.
+  {
+    kind: "clock",
+    re: new RegExp(
+      String.raw`\b(half|quarter)\s+(past|to|till|til|before|after)\s+` +
+        String.raw`(\d{1,2}|${HOUR_WORD_ALTERNATION})\b(?:\s*(am|pm))?`,
+      "gi",
+    ),
+  },
   { kind: "noon", re: /\bnoon\b/gi },
   { kind: "midnight", re: /\bmidnight\b/gi },
   // "August 18", "August 18th", "Aug 18", "Aug 18, 2026"
@@ -303,11 +417,70 @@ const MENTION_PATTERNS: Array<{
   },
   { kind: "today", re: /\btoday'?s?\b/gi },
   { kind: "tomorrow", re: /\btomorrow'?s?\b/gi },
+  // Matched so it can be HONOURED, not so it can be offered. Before this,
+  // "yesterday" matched nothing, was silently ignored, and the date fell back
+  // to today — the user asked for yesterday and got today, undisclosed.
+  // Recognising it also makes it an EXPLICIT past reference, so the past-date
+  // question below stays quiet for it.
+  { kind: "yesterday", re: /\byesterday'?s?\b/gi },
   { kind: "tonight", re: /\btonight\b/gi },
+  // "in 2 hours", "in an hour", "in 30 minutes" — WHEN, not how long.
+  //
+  // Must precede the duration patterns, and starts at "in" rather than at the
+  // number so the coverage filter in `extractTimeMentions` drops the duration
+  // match nested inside it. Without that, "for 2 hours" and "in 2 hours" — the
+  // two opposite meanings — both came out as a length.
+  //
+  // Minutes and hours only. "in 2 days" is left to the existing date patterns
+  // because a day-scale offset says nothing about the time of day, and
+  // inventing 09:37 from the current clock would be worse than the 09:00
+  // default the normal path already discloses.
+  {
+    kind: "relativeOffset",
+    re: /\bin\s+(an?|\d+(?:\.\d+)?)\s*(minutes?|mins?|hours?|hrs?)\b/gi,
+  },
   // durations
   { kind: "duration", re: /\ban?\s+hour(\s+later)?\b/gi },
   { kind: "duration", re: /\ba\s+day\b/gi },
-  { kind: "duration", re: /\b(\d+)\s+(minutes?|mins?|hours?|hrs?)\b/gi },
+  // LOAD-BEARING DETAILS, both the result of a real defect:
+  //
+  //   `(?:\.\d+)?` — without it `\b(\d+)` cannot span a decimal point, so the
+  //   match restarted AFTER the point and captured the fractional digits as the
+  //   whole number: "1.5 hours" became 5 hours (300 min), "0.5 hours" likewise.
+  //   Every fractional duration collapsed to 300.
+  //
+  //   `\s*` rather than `\s+` — "45mins" otherwise passed the dialogue layer's
+  //   own looser check and was appended to the utterance, but was never parsed
+  //   back out, so `assumed.duration` stayed true and the question repeated for
+  //   ever. There is now exactly one duration regex; `session.ts` defers to it.
+  {
+    kind: "duration",
+    re: /\b(\d+(?:\.\d+)?)\s*(minutes?|mins?|hours?|hrs?)\b/gi,
+  },
+  // A bare day of the month with no month named: "the 25th", "on the 3rd".
+  //
+  // Ordered AFTER the month-name patterns on purpose. "August 25th" is matched
+  // by `monthDate` first, which starts earlier and spans further, so the
+  // coverage filter in `extractTimeMentions` drops this narrower match. Only a
+  // genuinely month-less ordinal survives to here.
+  //
+  // Two guards, and BOTH are needed — requiring only `the` is not enough:
+  //
+  //   1. `the` must precede it, so a bare ordinal in a title is not a date.
+  //   2. The trailing lookahead. Without it "book the 3rd floor room tomorrow"
+  //      matched "the 3rd", beat "tomorrow" on position, and booked 3 September.
+  //      An ordinal used as an ADJECTIVE is followed by the noun it modifies
+  //      ("3rd floor", "2nd attempt"); a date is followed by end-of-phrase,
+  //      punctuation, a preposition, or a clock time. That is the difference.
+  //
+  // The cost of a false positive here is a silently wrong booking date, which
+  // is the failure mode this whole pattern exists to remove — so it is
+  // deliberately conservative. "book it the 25th sometime" is not matched, and
+  // falls through to CLARIFY, which asks.
+  {
+    kind: "dayOfMonth",
+    re: /\b(?:on\s+)?the\s+(\d{1,2})(?:st|nd|rd|th)\b(?=\s*$|\s*[,.;!?]|\s+(?:at|from|to|in|for|with|and|by|before|after|starting|until|till)\b|\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\b)/gi,
+  },
   { kind: "partOfDay", re: /\b(morning|afternoon|evening)\b/gi },
 ];
 
@@ -446,7 +619,32 @@ function buildMention(
         durationMinutes: endTotal - startTotal,
       };
     }
-    case "clock":
+    case "clock": {
+      // Two patterns share this kind, so they are told apart by shape rather
+      // than by a second kind — everything downstream (endClock pairing, the
+      // title blanking in entities.ts) should treat them identically.
+      if (/^(?:half|quarter)$/i.test(m[1])) {
+        const offset = m[1].toLowerCase() === "half" ? 30 : 15;
+        const backwards = /^(?:to|till|til|before)$/i.test(m[2]);
+        const meridiem = m[4];
+        const named = hourNumber(m[3]);
+
+        // "quarter to four" names the hour it counts BACK from, so the event
+        // is in the hour before it.
+        const hour24 = meridiem
+          ? to24Hour(named, meridiem)
+          : businessHour(named);
+        const minute = backwards ? 60 - offset : offset;
+        const hour = backwards ? (hour24 + 23) % 24 : hour24;
+
+        return {
+          ...base,
+          kind,
+          clock: { hour, minute },
+          ...(meridiem ? {} : { meridiemAssumed: true }),
+        };
+      }
+
       return {
         ...base,
         kind,
@@ -455,6 +653,12 @@ function buildMention(
           minute: m[2] ? Number(m[2]) : 0,
         },
       };
+    }
+    case "relativeOffset": {
+      const quantity = /^an?$/i.test(m[1]) ? 1 : Number(m[1]);
+      const perUnit = /^h/i.test(m[2]) ? 60 : 1;
+      return { ...base, kind, offsetMinutes: Math.round(quantity * perUnit) };
+    }
     case "noon":
       return { ...base, kind, clock: { hour: 12, minute: 0 } };
     case "midnight":
@@ -475,6 +679,15 @@ function buildMention(
       };
     case "weekday":
       return { ...base, kind, weekday: weekdayFromStem(m[1]) };
+    case "dayOfMonth": {
+      const day = Number(m[1]);
+      // 32nd, 99th — not a date. Emitting nothing lets the sentence fall through
+      // to CLARIFY, which asks; emitting a bogus day would book something.
+      if (!Number.isInteger(day) || day < 1 || day > 31) {
+        return { ...base, kind: "dayOfMonth" };
+      }
+      return { ...base, kind: "dayOfMonth", day };
+    }
     case "monthDate": {
       const isMonthFirst = isNaN(Number(m[1]));
       const monthStr = isMonthFirst ? m[1].toLowerCase() : m[2].toLowerCase();
@@ -489,8 +702,17 @@ function buildMention(
         year: yearNum,
       };
     }
-    case "duration":
-      return { ...base, kind, durationMinutes: durationOf(m) };
+    case "duration": {
+      const minutes = durationOf(m);
+      // "for 0 minutes" is not a length, and an event of no length is not a
+      // booking — it was accepted and created as a zero-duration event. The
+      // MENTION is still returned so the words stay claimed: unclaimed text
+      // falls through and becomes the event title, which is how "half past
+      // two" once ended up as an event name.
+      return minutes > 0
+        ? { ...base, kind, durationMinutes: minutes }
+        : { ...base, kind };
+    }
     case "partOfDay":
       return {
         ...base,
@@ -542,6 +764,10 @@ export function toTimeSpan(mentions: TimeMention[]): TimeSpan | undefined {
       case "midnight":
         if (!span.clock) {
           span.clock = m.clock;
+          if (m.meridiemAssumed) {
+            span.meridiemAssumed = true;
+            span.meridiemPhrase = m.text;
+          }
         } else if (!span.endClock && m.clock) {
           span.endClock = m.clock;
           const startTotal = span.clock.hour * 60 + span.clock.minute;
@@ -550,11 +776,17 @@ export function toTimeSpan(mentions: TimeMention[]): TimeSpan | undefined {
           span.durationMinutes ??= endTotal - startTotal;
         }
         break;
+      case "relativeOffset":
+        span.offsetMinutes ??= m.offsetMinutes;
+        break;
       case "today":
         span.date ??= { kind: "today" };
         break;
       case "tomorrow":
         span.date ??= { kind: "tomorrow" };
+        break;
+      case "yesterday":
+        span.date ??= { kind: "yesterday" };
         break;
       case "tonight":
         span.date ??= { kind: "today" };
@@ -600,6 +832,11 @@ export function toTimeSpan(mentions: TimeMention[]): TimeSpan | undefined {
           span.durationMinutes ??= m.durationMinutes;
         }
         break;
+      case "dayOfMonth":
+        if (m.day !== undefined) {
+          span.date ??= { kind: "dayOfMonth", day: m.day };
+        }
+        break;
       case "partOfDay":
         span.partOfDay ??= m.partOfDay;
         break;
@@ -632,6 +869,9 @@ function resolveDate(
 
     case "tomorrow":
       return addDays(today.year, today.month, today.day, 1);
+
+    case "yesterday":
+      return addDays(today.year, today.month, today.day, -1);
 
     case "weekday": {
       // A bare weekday means the NEXT one, strictly in the future. Saying
@@ -685,6 +925,33 @@ function resolveDate(
       return "unresolvable";
     }
 
+    case "dayOfMonth": {
+      // The next occurrence of that day: this month if it has not passed,
+      // otherwise next month. Same-day counts as today — someone saying "the
+      // 25th" on the 25th means today, not four weeks away.
+      if (anchor.day >= today.day) {
+        const inThisMonth = daysInMonth(today.year, today.month);
+        if (anchor.day <= inThisMonth) {
+          return { year: today.year, month: today.month, day: anchor.day };
+        }
+      }
+      // Roll forward until a month actually has that day — "the 31st" in
+      // February is April, not an invalid date silently clamped to the 28th.
+      let year = today.year;
+      let month = today.month;
+      for (let i = 0; i < 12; i++) {
+        month += 1;
+        if (month > 12) {
+          month = 1;
+          year += 1;
+        }
+        if (anchor.day <= daysInMonth(year, month)) {
+          return { year, month, day: anchor.day };
+        }
+      }
+      return "unresolvable";
+    }
+
     case "monthDate": {
       let year = anchor.year;
       if (year === undefined) {
@@ -733,16 +1000,55 @@ export function resolveTime(
   // fragile and was already wrong once — `"morning" taken as 09:00` and
   // `no time of day given — assumed 09:00` are the same fact in two wordings,
   // and a regex written for one silently missed the other.
-  const assumed = { date: false, timeOfDay: false, duration: false };
+  const assumed = {
+    date: false,
+    timeOfDay: false,
+    duration: false,
+    meridiem: false,
+  };
 
-  const resolvedDate = resolveDate(span.date, today);
+  /**
+   * "in 2 hours" becomes a concrete date and clock here — the only place with
+   * access to `now`. Parsing cannot do it, which is why the mention carries an
+   * offset rather than an instant.
+   *
+   * Ignored when the utterance also named a date or a clock: "tomorrow in 2
+   * hours" is incoherent, and the stated value is the one the user can see.
+   * The result is exact, not rounded — 09:37 + 2h is 11:37, and quietly
+   * tidying it to 11:30 would be inventing a time they did not ask for.
+   */
+  let offsetParts: { year: number; month: number; day: number } | undefined;
+  let offsetClock: ClockTime | undefined;
+  if (span.offsetMinutes !== undefined && !span.date && !span.clock) {
+    const at = zonedPartsAt(
+      nowMs + span.offsetMinutes * MS_PER_MINUTE,
+      timezone,
+    );
+    offsetParts = { year: at.year, month: at.month, day: at.day };
+    offsetClock = { hour: at.hour, minute: at.minute };
+  }
+
+  const resolvedDate = offsetParts ?? resolveDate(span.date, today);
   if (resolvedDate === "unresolvable") return null;
 
   // Time of day: an explicit clock wins; then a part-of-day default; then the
   // working-day default.
   let clock: ClockTime;
-  if (span.clock) {
+  if (offsetClock) {
+    clock = offsetClock;
+  } else if (span.clock) {
     clock = span.clock;
+    // "half past two" gave the minutes exactly and the half of the day not at
+    // all. The hour is this module's inference, so it is disclosed in the same
+    // shape as every other invented value rather than passed off as stated.
+    if (span.meridiemAssumed) {
+      assumed.meridiem = true;
+      assumptions.push(
+        `"${span.meridiemPhrase}" taken as ${String(clock.hour).padStart(2, "0")}:${String(
+          clock.minute,
+        ).padStart(2, "0")}`,
+      );
+    }
   } else if (span.partOfDay) {
     clock = { hour: PART_OF_DAY_HOURS[span.partOfDay], minute: 0 };
     // "morning" narrows it, but 09:00 exactly is still this module's choice.
@@ -788,9 +1094,7 @@ export function resolveTime(
   const durationMinutes = span.durationMinutes ?? DEFAULT_DURATION_MINUTES;
   if (span.durationMinutes === undefined) {
     assumed.duration = true;
-    assumptions.push(
-      `no duration given — assumed ${DEFAULT_DURATION_MINUTES} minutes`,
-    );
+    assumptions.push(DURATION_ASSUMPTION);
   }
 
   const startMs = zonedToUtcMs(
@@ -834,6 +1138,37 @@ export function resolveTime(
     upcomingDateStr = `${upD.year}-${pad(upD.month)}-${pad(upD.day)}`;
   }
 
+  // ── a calendar date that only resolved by adding a year ─────────────────
+  //
+  // "August 25th" on 30 August resolves to 2027 under the roll-forward rule.
+  // Correct in the abstract, almost certainly not what was meant five days
+  // after the fact — so it is flagged for the dialogue layer to ask about
+  // rather than committed silently. Outside the window the rolled reading is
+  // the honest one: "January 5th" in December really is next January.
+  let staleYearRoll = false;
+  let statedDateStr: string | undefined;
+  if (span?.date?.kind === "monthDate" && span.date.year === undefined) {
+    const stated = {
+      year: today.year,
+      month: span.date.month,
+      day: span.date.day,
+    };
+    const rolledAYear = date.year === today.year + 1;
+    if (rolledAYear && daysBetween(stated, today) <= RECENT_PAST_DAYS) {
+      staleYearRoll = true;
+      statedDateStr = `${stated.year}-${pad(stated.month)}-${pad(stated.day)}`;
+    }
+  }
+
+  // ── landed in the past without being asked to ───────────────────────────
+  //
+  // A general backstop rather than a fix for one phrase. Most paths already
+  // roll forward by themselves; this catches whatever does not — today with an
+  // hour that has gone, and any future parsing path that resolves backwards by
+  // accident — so the dialogue layer can ask once instead of each case needing
+  // its own rule.
+  const resolvedInPast = startMs < nowMs && !statesAPastDate(span);
+
   return {
     startISO: new Date(startMs).toISOString(),
     endISO: new Date(endMs).toISOString(),
@@ -843,6 +1178,9 @@ export function resolveTime(
     timezone,
     assumptions,
     assumed,
+    staleYearRoll,
+    statedDate: statedDateStr,
+    resolvedInPast,
     // Wall-clock values, so a UI can render "Wed 10:00 AM" without redoing the
     // timezone maths.
     localDate: `${date.year}-${pad(date.month)}-${pad(date.day)}`,

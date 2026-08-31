@@ -360,6 +360,19 @@ export const chatStyles = css`
     color: var(--janus-text);
   }
 
+  /*
+   * The recovery variant: shown when the previous answer could not be used.
+   *
+   * Slightly stronger than a plain lead, because it is a correction rather than
+   * a pleasantry — the user needs to notice that their last reply did not land.
+   * Not a warning colour though: nothing has gone wrong with their calendar,
+   * the assistant just needs a different phrasing.
+   */
+  .card__lead--recover {
+    color: var(--janus-text);
+    font-weight: 500;
+  }
+
   .card__question {
     font-size: 13px;
     color: var(--janus-text);
@@ -451,6 +464,64 @@ export const chatStyles = css`
     content: "•";
     position: absolute;
     left: 3px;
+  }
+
+  /*
+   * Warnings sit ABOVE the notes and read louder.
+   *
+   * The distinction is deliberate: a note discloses a value the system chose
+   * ("no duration given — assumed 60 minutes"), a warning is about the world
+   * ("this room is already booked", "the calendar is in a timezone you are not
+   * in"). One is housekeeping, the other may change the user's mind — so it
+   * gets colour, a border and an icon rather than a grey bullet.
+   *
+   * It never disables Confirm. The point is to inform the decision, not take it.
+   */
+  .warnings {
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .warnings__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--janus-warning-text, #92400e);
+    background: var(--janus-warning-bg, #fffbeb);
+    border: 1px solid var(--janus-warning-border, #fde68a);
+    border-radius: 8px;
+    padding: 7px 9px;
+  }
+
+  .warnings__icon {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--janus-warning-border, #fde68a);
+    color: var(--janus-warning-text, #92400e);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+    margin-top: 1px;
+  }
+
+  :host([theme="dark"]) .warnings__item {
+    color: var(--janus-warning-text, #fcd34d);
+    background: var(--janus-warning-bg, rgba(146, 64, 14, 0.18));
+    border-color: var(--janus-warning-border, rgba(252, 211, 77, 0.35));
+  }
+
+  :host([theme="dark"]) .warnings__icon {
+    background: var(--janus-warning-border, rgba(252, 211, 77, 0.35));
+    color: var(--janus-warning-text, #fcd34d);
   }
 
   .change {

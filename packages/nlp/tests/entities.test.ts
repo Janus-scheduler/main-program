@@ -329,3 +329,131 @@ describe("purity and independence", () => {
     expect(e.resources[0].exact).toBe(false);
   });
 });
+
+/**
+ * REGRESSION — asking for one instance silently booked another.
+ *
+ * `surfaceForms` emits continuous sub-phrases so "book the MRI Scanner" can
+ * match "MRI Scanner A". The cost was that "MRI Scanner C" matched it too, and
+ * silently claimed Scanner A — an instance the user never named. With both A
+ * and B in the catalog, which one won was arbitrary.
+ *
+ * A non-exact match followed by an instance designator that is not in that
+ * entry's name is now dropped, so the utterance falls through to the
+ * unknown-resource question instead of picking one.
+ */
+describe("a sub-phrase contradicted by what follows it", () => {
+  const INSTANCES: EntityCatalog = {
+    resources: [
+      { id: "or1", name: "Operating Room 1", type: "room" },
+      { id: "mri-a", name: "MRI Scanner A", type: "equipment" },
+      { id: "mri-b", name: "MRI Scanner B", type: "equipment" },
+    ],
+    participants: [{ id: "p1", name: "Alex Rivera", type: "person" }],
+  };
+  const inst = (text: string) =>
+    extractEntities(text, { catalog: INSTANCES, now: NOW, timezone: "UTC" });
+
+  it.each([
+    "book MRI Scanner C tomorrow at 9am",
+    "book Operating Room 2 tomorrow at 9am",
+    "book MRI Scanner D tomorrow at 9am",
+  ])("claims nothing for an instance we do not have: %s", (text) => {
+    expect(inst(text).resources).toEqual([]);
+  });
+
+  it("still matches the exact name", () => {
+    expect(inst("book MRI Scanner A tomorrow at 9am").resources[0].name).toBe(
+      "MRI Scanner A",
+    );
+  });
+
+  it("still allows a genuine sub-phrase with nothing contradicting it", () => {
+    // No designator follows, so "the MRI Scanner" may still resolve.
+    const e = inst("book the MRI Scanner tomorrow at 9am");
+    expect(e.resources.map((r) => r.name)).toEqual(["MRI Scanner A"]);
+    expect(e.resources[0].exact).toBe(false);
+  });
+
+  /**
+   * The bound that took two attempts. "Any short token" swallowed ordinary
+   * function words — "and", "in" — so "meet Alex and Priya" lost its Alex. A
+   * designator is a single letter or digits, not any short word.
+   */
+  it.each([
+    ["meet Alex and Alex Rivera tomorrow at 10am", "and"],
+    ["schedule a retro with Alex in Operating Room 1 tomorrow", "in"],
+    ["meet Alex at 10am tomorrow", "at"],
+  ])("does not treat %j's %j as a designator", (text) => {
+    expect(inst(text).participants.map((p) => p.name)).toContain("Alex Rivera");
+  });
+});
+
+/**
+ * REGRESSION — a numbered resource name leaked into the date.
+ *
+ * Time was parsed BEFORE the catalog was consulted, so date patterns ran on raw
+ * text and could consume part of a resource NAME:
+ *
+ *   "book Operating Room 1 August 25th at 9am"
+ *      → monthDate "1 August"   ← the room's number, plus the month
+ *      → booked 1 August 2027, and "25th" fell through and became the title
+ *
+ * The card showed that date confidently. Matching the catalog first and
+ * blanking those spans removes the digits before any date pattern sees them.
+ */
+describe("resource names are not mistaken for dates", () => {
+  const NUMBERED: EntityCatalog = {
+    resources: [
+      { id: "or1", name: "Operating Room 1", type: "room" },
+      { id: "r2", name: "Room 2", type: "room" },
+      { id: "mri", name: "MRI Scanner A", type: "equipment" },
+    ],
+    participants: [{ id: "p1", name: "Dr. Sarah Chen", type: "person" }],
+  };
+  const numbered = (text: string) =>
+    extractEntities(text, { catalog: NUMBERED, now: NOW, timezone: "UTC" });
+
+  it("does not read 'Room 1 August' as 1 August", () => {
+    const e = numbered("book Operating Room 1 August 25th at 9am");
+    expect(e.time?.localDate).toBe("2026-08-25");
+    expect(e.resources.map((r) => r.name)).toEqual(["Operating Room 1"]);
+    // "25th" used to survive as the title once the date had eaten "1 August".
+    expect(e.title).toBeUndefined();
+  });
+
+  it("does not let a room's number become a duration", () => {
+    const e = numbered("book Room 2 for 2 hours tomorrow at 3pm");
+    expect(e.time?.durationMinutes).toBe(120);
+    expect(e.resources.map((r) => r.name)).toEqual(["Room 2"]);
+  });
+
+  it("still resolves the date when the room has no digits", () => {
+    const e = numbered("book MRI Scanner A tomorrow at 3pm");
+    expect(e.time?.localDate).toBe("2026-08-06");
+    expect(e.time?.localTime).toBe("15:00");
+  });
+
+  it("keeps the title when there is a real one alongside a numbered room", () => {
+    const e = numbered(
+      "book the design sync in Operating Room 1 tomorrow at 3pm",
+    );
+    expect(e.title).toBe("design sync");
+    expect(e.time?.localDate).toBe("2026-08-06");
+  });
+
+  it("leaves offsets valid against the ORIGINAL text", () => {
+    // Blanking preserves length, so every span can still be sliced out of the
+    // string the caller passed in. `titleSpan` and question `replaceSpan` both
+    // depend on this.
+    const text = "book the design sync in Operating Room 1 tomorrow at 3pm";
+    const e = numbered(text);
+    expect(e.titleSpan).toBeDefined();
+    expect(text.slice(e.titleSpan!.start, e.titleSpan!.end)).toBe(
+      "design sync",
+    );
+    for (const m of e.timeSpan?.mentions ?? []) {
+      expect(text.slice(m.start, m.end)).toBe(m.text);
+    }
+  });
+});

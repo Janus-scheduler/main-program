@@ -27,11 +27,17 @@ import {
   parsePrototypes,
   parseTimeSpan,
   provideAnswer,
+  MAX_TOTAL_ROUNDS,
+  ESCAPE_START_OVER,
+  ESCAPE_SKIP_PREFIX,
   resolveTime,
   routeQuery,
   stripNegationCues,
   SKIP_ANSWER,
+  KEEP_TITLE_ANSWER,
 } from "../src";
+import { rewriteForClassifier } from "../src/rewrite";
+import { presentSession } from "../src/presentSession";
 import type {
   Artifacts,
   EntityCatalog,
@@ -320,13 +326,17 @@ describe("gate5_missing_slot → “when?”", () => {
 
   it("gives up rather than looping when the answer never helps", () => {
     let state = opened;
-    for (let i = 0; i < 5 && state.status === "awaiting"; i++) {
+    // Stop AT the escape question — answering it ends the session, which is a
+    // different assertion (see “the round cap terminates”).
+    while (state.status === "awaiting" && state.question?.slot !== "escape") {
       state = provideAnswer(state, "soon", ctx);
     }
-    // Now it offers choices instead of immediately declining
     expect(state.status).toBe("awaiting");
     expect(state.rounds).toBe(2);
-    expect(state.question?.choices?.[1].value).toBe("start over");
+    // A gate question is never skippable, so starting over is the only way out.
+    expect(state.question?.choices?.map((c) => c.value)).toEqual([
+      ESCAPE_START_OVER,
+    ]);
   });
 
   it("spends a round on an empty answer too", () => {
@@ -611,6 +621,7 @@ describe("catalog names as a gate-3 fallback", () => {
     // `state.route` must still match `routeQuery` exactly — the fallback
     // affects the session's STATUS, never the gates' verdict.
     for (const { text } of fixtures) {
+      if (text !== rewriteForClassifier(text)) continue;
       const state = beginSession(text, withKit());
       const direct = routeQuery(text, artifacts, prototypes);
       expect(state.route.route).toBe(direct.route);
@@ -785,11 +796,18 @@ describe("host completeness requirements", () => {
 
   it("still caps a single question that keeps failing", () => {
     let state = beginSession("schedule a meeting with Alex", ctx);
-    for (let i = 0; i < 5 && state.status === "awaiting"; i++) {
+    // Stop AT the escape question rather than answering it — answering it ends
+    // the session, which is the point of the next test, not this one.
+    while (state.status === "awaiting" && state.question?.slot !== "escape") {
       state = provideAnswer(state, "soon", ctx);
     }
     expect(state.status).toBe("awaiting");
-    expect(state.question?.choices?.[1].value).toBe("start over");
+    expect(state.question?.slot).toBe("escape");
+    expect(state.roundCapReached).toBe(true);
+    // A gate question is not skippable, so starting over is the only way out.
+    expect(state.question?.choices?.map((c) => c.value)).toEqual([
+      ESCAPE_START_OVER,
+    ]);
   });
 
   /**
@@ -907,6 +925,7 @@ describe("session contract", () => {
     // The session must not be a second, subtly different pipeline. On turn one
     // it is exactly `routeQuery` plus extraction.
     for (const { text } of fixtures.slice(0, 60)) {
+      if (text !== rewriteForClassifier(text)) continue;
       const state = beginSession(text, ctx);
       const direct = routeQuery(text, artifacts, prototypes);
       expect(state.route.intent).toBe(direct.intent);
@@ -919,7 +938,10 @@ describe("session contract", () => {
     const strict: SessionContext = { ...ctx, maxRounds: 0 };
     const state = beginSession("schedule a meeting with Alex", strict);
     expect(state.status).toBe("awaiting");
-    expect(state.question?.choices?.[1].value).toBe("start over");
+    expect(state.question?.slot).toBe("escape");
+    expect(state.question?.choices?.map((c) => c.value)).toEqual([
+      ESCAPE_START_OVER,
+    ]);
   });
 
   it("clarifies past relative weekday when 'this monday' is spoken on Wednesday", () => {
@@ -981,6 +1003,513 @@ describe("session contract", () => {
     expect(s2.draft?.time?.assumed.duration).toBe(false);
   });
 
+  /**
+   * REGRESSION — the duration slot used to carry its own, looser regex (`\s*`)
+   * while `datetime.ts` required `\s+`. "45mins" therefore passed the check,
+   * was appended to the utterance, and was then never parsed back out:
+   * `assumed.duration` stayed true, `slotIsFilled("duration")` stayed false,
+   * and the same question repeated until the round cap. `parseTimeSpan` is now
+   * the only thing that decides what a duration is.
+   */
+  it.each([
+    ["45mins", 45],
+    ["2hrs", 120],
+    ["1.5 hours", 90],
+    ["30minutes", 30],
+  ])("resolves the duration answer %s to %i minutes", (answer, minutes) => {
+    const strictCtx: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["duration"] },
+    };
+    const s1 = beginSession("schedule a meeting tomorrow at 5pm", strictCtx);
+    expect(s1.question?.slot).toBe("duration");
+
+    const s2 = provideAnswer(s1, answer, strictCtx);
+    expect(s2.status).toBe("ready");
+    expect(s2.draft?.time?.durationMinutes).toBe(minutes);
+    expect(s2.draft?.time?.assumed.duration).toBe(false);
+  });
+
+  /**
+   * REGRESSION — a room the catalog does not contain became the event's TITLE.
+   *
+   * `extractEntities` matches only the host catalog, by design. So against a
+   * catalog of "Operating Room 1", the utterance "book Room A tomorrow at 3pm"
+   * matched nothing, "Room A" survived into the leftover text, and the leftover
+   * text is the title. The user was then asked "Which room or person is
+   * “Room A” for?" — their room quoted back at them as an event name — and
+   * after picking a real room the event was created called "Room A".
+   */
+  describe("a room name the catalog does not have", () => {
+    const HOSPITAL: EntityCatalog = {
+      resources: [
+        { id: "r4", name: "Operating Room 1", type: "room" },
+        { id: "r5", name: "MRI Scanner A", type: "equipment" },
+      ],
+      participants: [{ id: "r1", name: "Dr. Sarah Chen", type: "person" }],
+    };
+    const hospitalCtx = (): SessionContext => ({
+      ...ctx,
+      catalog: HOSPITAL,
+      requires: { add_event: ["when", "resource"] },
+    });
+
+    it("says the name is unknown instead of quoting it as the subject", () => {
+      const c = hospitalCtx();
+      const s = beginSession("book Room A tomorrow at 3pm", c);
+
+      expect(s.status).toBe("awaiting");
+      expect(s.question?.slot).toBe("resource");
+      expect(s.question?.text).toContain("I don't have");
+      expect(s.question?.text).toContain("Room A");
+      expect(s.question?.text).not.toContain("is “Room A” for?");
+      expect(s.question?.replaceSpan).toBeDefined();
+    });
+
+    it("offers keeping the name as the event title", () => {
+      const c = hospitalCtx();
+      const s = beginSession("book Room A tomorrow at 3pm", c);
+      const keep = s.question?.choices.find(
+        (choice) => choice.value === KEEP_TITLE_ANSWER,
+      );
+      expect(keep).toBeDefined();
+      expect(keep?.label).toContain("event name");
+    });
+
+    it("replaces the unknown name rather than appending beside it", () => {
+      const c = hospitalCtx();
+      const s1 = beginSession("book Room A tomorrow at 3pm", c);
+      const s2 = provideAnswer(s1, "Operating Room 1", c);
+
+      expect(s2.status).toBe("ready");
+      expect(s2.text).not.toMatch(/Room A/i);
+      expect(s2.draft?.resources.map((r) => r.name)).toEqual([
+        "Operating Room 1",
+      ]);
+      // The whole point: the event is no longer called "Room A".
+      expect(s2.draft?.title).not.toBe("Room A");
+    });
+
+    it("keeps the name as the title when the user says so, and stops asking", () => {
+      const c = hospitalCtx();
+      const s1 = beginSession("book Room A tomorrow at 3pm", c);
+      const s2 = provideAnswer(s1, KEEP_TITLE_ANSWER, c);
+
+      expect(s2.keptTitle).toBe(true);
+      expect(s2.draft?.title).toBe("Room A");
+      // It must not ask the same question a second time.
+      expect(s2.question?.text ?? "").not.toContain("I don't have");
+    });
+
+    it.each([
+      ["book Conference Room B tomorrow at 3pm", "Conference Room B"],
+      ["book the boardroom tomorrow at 3pm", "boardroom"],
+    ])("detects %s", (text, name) => {
+      const c = hospitalCtx();
+      const s = beginSession(text, c);
+      expect(s.question?.text).toContain("I don't have");
+      expect(s.question?.text).toContain(name);
+    });
+
+    /**
+     * Rule 2 — the HEAD noun.
+     *
+     * Stripping resource words alone missed "3rd floor room": what remained,
+     * "3rd floor", is neither empty nor a designator, so it read as a title.
+     * The head of an English noun phrase is its last noun, and that is what the
+     * phrase denotes: "3rd floor ROOM" is a room; "room INSPECTION" is an
+     * inspection. Same word, opposite meaning, decided by position.
+     */
+    it("detects a resource word in HEAD position", () => {
+      const s = beginSession(
+        "book the 3rd floor room tomorrow at 3pm",
+        hospitalCtx(),
+      );
+      expect(s.question?.text).toContain("I don't have");
+      expect(s.question?.text).toContain("3rd floor room");
+    });
+
+    /**
+     * Rule 3 — a near-miss for something in the caller's own catalog.
+     * "MRI Scanner C" contains no frozen resource word at all.
+     */
+    it("detects an unknown instance of a real catalog entry", () => {
+      const s = beginSession(
+        "book MRI Scanner C tomorrow at 3pm",
+        hospitalCtx(),
+      );
+      expect(s.question?.text).toContain("I don't have");
+      expect(s.question?.text).toContain("MRI Scanner C");
+    });
+
+    /**
+     * REGRESSION — the unknown name was quoted as the event's subject first.
+     *
+     * With `requires: ["when", "duration", "resource", "title"]`, "book MRI
+     * Scanner C" asked "How long should “MRI Scanner C” be?" BEFORE admitting
+     * there was no Scanner C — the user's room read back to them as an event
+     * name. An unknown name is a correction, not a slot to fill, so it now
+     * preempts the other requirement questions.
+     */
+    it("asks about the unknown name BEFORE any other requirement", () => {
+      const strict: SessionContext = {
+        ...hospitalCtx(),
+        requires: { add_event: ["when", "duration", "resource", "title"] },
+      };
+      const s = beginSession("book MRI Scanner C tomorrow at 3pm", strict);
+
+      expect(s.question?.slot).toBe("resource");
+      expect(s.question?.text).toContain("I don't have");
+      // The duration question must not have quoted the bogus name first.
+      expect(s.question?.text).not.toContain("How long");
+    });
+
+    it("still asks the other requirements afterwards", () => {
+      const strict: SessionContext = {
+        ...hospitalCtx(),
+        requires: { add_event: ["when", "duration", "resource", "title"] },
+      };
+      let s = beginSession("book MRI Scanner C tomorrow at 3pm", strict);
+      s = provideAnswer(s, "MRI Scanner A", strict);
+
+      expect(s.question?.slot).toBe("duration");
+      // And it now names the REAL resource, not the one that did not exist.
+      expect(s.question?.text).not.toContain("MRI Scanner C");
+    });
+
+    it("does not preempt when the title is genuine", () => {
+      const strict: SessionContext = {
+        ...hospitalCtx(),
+        requires: { add_event: ["when", "duration", "resource"] },
+      };
+      const s = beginSession(
+        "schedule a room inspection tomorrow at 3pm",
+        strict,
+      );
+      expect(s.question?.slot).toBe("duration");
+    });
+
+    /**
+     * REGRESSION — one stray word defeated the near-miss rule.
+     *
+     * It compared the WHOLE title against catalog names. "Pick MRI Scanner A"
+     * — where "Pick" is not in the frozen verb lexicon, so it is never
+     * stripped — is nowhere near "MRI Scanner B", so the user was asked "Which
+     * room or person is “Pick MRI Scanner A” for?" instead of being told there
+     * is no Scanner A. Contiguous sub-phrases are checked now, longest first.
+     */
+    it("finds the unknown name even with an unstripped verb in front", () => {
+      const s = beginSession(
+        "Pick MRI Scanner C for tomorrow at 3pm",
+        hospitalCtx(),
+      );
+      expect(s.question?.text).toContain("I don't have");
+      // It names the sub-phrase, not the user's whole sentence back at them.
+      expect(s.question?.text).toContain("MRI Scanner C");
+      expect(s.question?.text).not.toContain("Pick MRI Scanner C");
+    });
+
+    it("does not claim a different instance of a real entry", () => {
+      // The severe half: this used to silently attach MRI Scanner A.
+      const s = beginSession(
+        "book MRI Scanner C tomorrow at 3pm",
+        hospitalCtx(),
+      );
+      expect(s.draft?.resources ?? []).toEqual([]);
+    });
+
+    /**
+     * The signal is NOT "the title contains a resource word" — plenty of real
+     * event names do. It is "nothing but a resource word and maybe a
+     * designator is left". These three must stay titles.
+     */
+    it.each([
+      "schedule a room inspection tomorrow at 3pm",
+      "schedule the projector demo tomorrow at 3pm",
+      "book a table read tomorrow at 3pm",
+    ])("leaves a genuine title alone: %s", (text) => {
+      const c = hospitalCtx();
+      const s = beginSession(text, c);
+      expect(s.question?.text ?? "").not.toContain("I don't have");
+    });
+
+    it("does not second-guess a title when a real resource was matched", () => {
+      const c = hospitalCtx();
+      const s = beginSession(
+        "book the room inspection in Operating Room 1 tomorrow at 3pm",
+        c,
+      );
+      expect(s.question?.text ?? "").not.toContain("I don't have");
+    });
+  });
+
+  /**
+   * REGRESSION — an unnamed event was silently created as "New Event".
+   *
+   * The card printed a title the user had never been offered and never agreed
+   * to, and the success line then reported it back as though it were theirs.
+   * The `title` requirement existed but no host switched it on.
+   */
+  describe("asking for a name when none was given", () => {
+    const namedCtx = (): SessionContext => ({
+      ...ctx,
+      requires: { add_event: ["when", "resource", "title"] },
+    });
+
+    it("asks for a name once the concrete slots are filled", () => {
+      const c = namedCtx();
+      const s = beginSession("book Room A tomorrow at 3pm", c);
+      expect(s.status).toBe("awaiting");
+      expect(s.question?.slot).toBe("title");
+      expect(s.question?.text).toBe("What should I call it?");
+    });
+
+    it("does not ask when the utterance already named the event", () => {
+      const c = namedCtx();
+      const s = beginSession(
+        "book the design sync in Room A tomorrow at 3pm",
+        c,
+      );
+      expect(s.draft?.title).toBe("design sync");
+      expect(s.question?.slot).not.toBe("title");
+    });
+
+    it("suggests only names built from what the user already said", () => {
+      const c = namedCtx();
+      const s = beginSession("book Room A with Alex tomorrow at 3pm", c);
+      expect(s.question?.slot).toBe("title");
+
+      const labels = s.question!.choices.map((choice) => choice.label);
+      expect(labels).toContain("Meeting with Alex Rivera");
+      expect(labels).toContain("Meeting");
+      // No domain guesswork — this package cannot know what kind of
+      // organisation it is running in.
+      expect(labels).not.toContain("Appointment");
+      expect(labels).not.toContain("Consultation");
+    });
+
+    it("accepts a typed name and becomes ready", () => {
+      const c = namedCtx();
+      const s1 = beginSession("book Room A tomorrow at 3pm", c);
+      const s2 = provideAnswer(s1, "Design sync", c);
+      expect(s2.status).toBe("ready");
+      expect(s2.draft?.title).toBe("Design sync");
+    });
+
+    it("lets the user skip, and records that they did", () => {
+      const c = namedCtx();
+      const s1 = beginSession("book Room A tomorrow at 3pm", c);
+      expect(s1.question?.skippable).toBe(true);
+
+      const s2 = provideAnswer(s1, SKIP_ANSWER, c);
+      expect(s2.status).toBe("ready");
+      expect(s2.skipped).toContain("title");
+    });
+
+    it("never puts the fallback title into a question", () => {
+      // "When should New Event be?" reads as though the event has already been
+      // named on the user's behalf.
+      const c: SessionContext = { ...ctx, requires: {} };
+      const s = beginSession("schedule something", c);
+      expect(s.question?.text ?? "").not.toContain("New Event");
+    });
+  });
+
+  /**
+   * REGRESSION — a button that names a date must produce that date.
+   *
+   * The past/upcoming weekday chips were valued "last monday" / "next monday".
+   * "last monday" resolves to the Monday of LAST WEEK, so the button labelled
+   * "Past Monday (2026-08-31)" actually booked 2026-08-24 — a week off its own
+   * label, silently. Both values are now explicit dates derived from the same
+   * strings the labels display, so they cannot drift apart.
+   */
+  describe("the past-weekday buttons keep their promise", () => {
+    // Thursday 2026-09-03: the most recent Monday is 08-31, the next is 09-07.
+    const THU = new Date("2026-09-03T09:00:00.000Z");
+    const c = (): SessionContext => ({
+      ...ctx,
+      now: THU,
+      requires: { add_event: ["when", "resource"] },
+    });
+
+    it("asks which Monday was meant", () => {
+      const s = beginSession("book Room A this monday at 3pm", c());
+      expect(s.question?.text).toContain("2026-08-31");
+      expect(s.question?.text).toContain("2026-09-07");
+    });
+
+    it.each([
+      ["choice-past", "2026-08-31"],
+      ["choice-upcoming", "2026-09-07"],
+    ])("%s resolves to the date on its label, %s", (id, expected) => {
+      const s = beginSession("book Room A this monday at 3pm", c());
+      const choice = s.question!.choices.find((x) => x.id === id)!;
+
+      // The label must name the same date the value produces.
+      expect(choice.label).toContain(expected);
+      const answered = provideAnswer(s, choice.value, c());
+      expect(answered.draft?.time?.localDate).toBe(expected);
+      // And the stated hour survives.
+      expect(answered.draft?.time?.localTime).toBe("15:00");
+    });
+  });
+
+  /**
+   * A booking that landed in the past without being asked to.
+   *
+   * The backstop question. It is ordered last of the three date questions, so
+   * the past-weekday and stale-year cases keep their better-targeted wording
+   * and return before reaching it.
+   */
+  describe("an instant in the past that nobody asked for", () => {
+    // Thursday 2026-09-03, 14:00 in Colombo — 9am has gone.
+    const AFTERNOON = new Date("2026-09-03T08:30:00.000Z");
+    const c = (): SessionContext => ({
+      ...ctx,
+      now: AFTERNOON,
+      requires: { add_event: ["when", "resource"] },
+    });
+
+    it("asks rather than booking a slot that has gone", () => {
+      const s = beginSession("book Room A today at 9am", c());
+      expect(s.status).toBe("awaiting");
+      expect(s.question?.text).toContain("already passed");
+    });
+
+    it.each([
+      ["choice-next-day", "2026-09-04"],
+      ["choice-keep-past", "2026-09-03"],
+    ])("%s resolves to %s, keeping 9am", (id, expected) => {
+      const s = beginSession("book Room A today at 9am", c());
+      const choice = s.question!.choices.find((x) => x.id === id)!;
+      expect(choice.label).toContain(expected);
+
+      const answered = provideAnswer(s, choice.value, c());
+      expect(answered.draft?.time?.localDate).toBe(expected);
+      expect(answered.draft?.time?.localTime).toBe("09:00");
+      expect(answered.status).toBe("ready");
+    });
+
+    /**
+     * The other half of the rule. Asking about a date the user named outright
+     * would be nagging; rolling it forward would be overriding them.
+     */
+    it.each([
+      "book Room A yesterday at 3pm",
+      "book Room A last monday at 3pm",
+      "book Room A last week at 3pm",
+    ])("books a deliberately past date without asking: %s", (text) => {
+      const s = beginSession(text, c());
+      expect(s.status).toBe("ready");
+      expect(s.question).toBeNull();
+    });
+
+    it("does not add a second question to the past-weekday case", () => {
+      // "this monday" already has its own, better-worded question. Only one
+      // should be asked, and it should be that one.
+      const s = beginSession("book Room A this monday at 3pm", c());
+      expect(s.question?.text).toContain("past Monday");
+      expect(s.question?.text).not.toContain("Did you mean a later date");
+    });
+  });
+
+  /**
+   * A stated calendar date that has just passed is asked about, not assumed.
+   */
+  describe("a date that only resolved by adding a year", () => {
+    // Sunday 2026-08-30, so "August 25th" is five days gone.
+    const AUG30 = new Date("2026-08-30T09:00:00.000Z");
+    const c = (): SessionContext => ({
+      ...ctx,
+      now: AUG30,
+      requires: { add_event: ["when", "resource"] },
+    });
+
+    it("asks instead of silently booking twelve months out", () => {
+      const s = beginSession("book Room A August 25th at 3pm", c());
+      expect(s.status).toBe("awaiting");
+      expect(s.question?.slot).toBe("when");
+      expect(s.question?.text).toContain("already passed");
+      expect(s.question?.text).toContain("2026-08-25");
+    });
+
+    it("offers next year alongside other dates", () => {
+      const s = beginSession("book Room A August 25th at 3pm", c());
+      const labels = s.question!.choices.map((x) => x.label);
+      expect(labels.some((l) => l.includes("2027-08-25"))).toBe(true);
+      expect(labels).toContain("Tomorrow");
+    });
+
+    /**
+     * REGRESSION — every offered choice used to lose the stated hour.
+     *
+     * The chip values were built as ` at ${localTime}`, a 24-hour string. The
+     * frozen clock pattern requires a meridiem, so "at 15:00" parsed as
+     * nothing and the hour fell back to the 09:00 default — answering
+     * "Tomorrow" to a question about a 3pm booking silently moved it to 9am,
+     * and then asked for the time it had just discarded.
+     */
+    it.each([
+      ["2027-08-25 (next year)", "2027-08-25"],
+      ["Today", "2026-08-30"],
+      ["Tomorrow", "2026-08-31"],
+    ])("choosing %s keeps 3pm and resolves to %s", (label, date) => {
+      const s = beginSession("book Room A August 25th at 3pm", c());
+      const choice = s.question!.choices.find((x) => x.label === label)!;
+      const answered = provideAnswer(s, choice.value, c());
+
+      expect(answered.draft?.time?.localTime).toBe("15:00");
+      expect(answered.draft?.time?.localDate).toBe(date);
+      // And it is done in ONE turn — no follow-up asking for the hour again.
+      expect(answered.status).toBe("ready");
+    });
+
+    /**
+     * REGRESSION — the chip's value has to actually carry its date.
+     *
+     * It was built as an ISO string, "2027-08-25 at 3:00 pm". No mention
+     * pattern matches an ISO date, so the value contributed only a CLOCK;
+     * `provideAnswer` saw clock-only input, took its append branch instead of
+     * splicing, and the original "August 25th" survived in the utterance. The
+     * result looked right — but only because the text still said what it had
+     * always said, and the merged sentence read "August 25th at 3pm 3:00 pm".
+     */
+    it("replaces the original date rather than appending beside it", () => {
+      const s = beginSession("book Room A August 25th at 3pm", c());
+      const choice = s.question!.choices[0];
+      const answered = provideAnswer(s, choice.value, c());
+
+      expect(answered.text).not.toMatch(/August 25th/);
+      expect(answered.text).toContain("August 25 2027");
+      // One time phrase, not two.
+      expect(answered.text.match(/pm/gi)).toHaveLength(1);
+    });
+
+    it("does not ask when the date is still ahead", () => {
+      const s = beginSession("book Room A August 31st at 3pm", c());
+      expect(s.question?.text ?? "").not.toContain("already passed");
+    });
+
+    it("does not ask twice once the user has answered", () => {
+      const s = beginSession("book Room A August 25th at 3pm", c());
+      const answered = provideAnswer(s, s.question!.choices[0].value, c());
+      expect(answered.question?.text ?? "").not.toContain("already passed");
+    });
+  });
+
+  it("still re-asks when the duration answer carries no duration at all", () => {
+    const strictCtx: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["duration"] },
+    };
+    const s1 = beginSession("schedule a meeting tomorrow at 5pm", strictCtx);
+    const s2 = provideAnswer(s1, "not sure yet", strictCtx);
+    expect(s2.status).toBe("awaiting");
+    expect(s2.question?.slot).toBe("duration");
+    expect(s2.unresolved).toBe("duration");
+  });
+
   it("handles conversational leads like 'Need to book MRI Scanner A today' and asks for specific time", () => {
     const customCatalog: EntityCatalog = {
       resources: [
@@ -1027,5 +1556,711 @@ describe("session contract", () => {
     expect(s1.status).toBe("awaiting");
     expect(s1.draft?.resources.map((r) => r.id)).toEqual(["mri-a"]);
     expect(s1.question?.slot).toBe("when");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  14. Rewrite layer - Vocabulary mapping for unknown verbs
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("vocabulary rewrite layer", () => {
+  it("rewrites unknown verbs like 'timetable' to 'schedule a meeting with' internally", () => {
+    // Original bug: "timetable maths tomorrow at 9am" fails because "timetable" is unknown
+    const state = beginSession("timetable maths tomorrow at 9am", ctx);
+    // It should now confidently route to add_event and ask for missing slots
+    // (gate2_intent or gate5_missing_slot depending on how much was extracted)
+    expect(state.route.intent).toBe("add_event");
+    // Crucially, the original word "timetable" shouldn't be lost if it were a participant/resource name
+    // (Though "maths" is not in our catalog, we check the route intent)
+  });
+
+  it("rewrites 'cancel' synonyms", () => {
+    const state = beginSession("drop the meeting with Priya", ctx);
+    expect(state.route.intent).toBe("delete_event");
+  });
+
+  it("rewrites 'reschedule' synonyms", () => {
+    const state = beginSession("bump my 3pm with Sarah to 4pm", ctx);
+    expect(state.route.intent).toBe("modify_event");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  14b. A clock is only an end time when the answer says so
+//
+//  The duration question offers two shapes — "45 mins" or "until 4pm" — and
+//  the clock branch used to fire on ANY clock in the answer, then roll a whole
+//  day whenever that clock was at or before the start. So answering with a
+//  bare time, or re-typing the original request, silently produced an event of
+//  18 to 24 hours and reported success. Silent wrong data on the calendar is
+//  the worst failure mode this layer has.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("duration answers that contain a clock", () => {
+  // A function, not a constant: `ctx` is only assigned in `beforeAll`, which
+  // runs after the describe body is evaluated.
+  const durationCtx = (): SessionContext => ({
+    ...ctx,
+    requires: { add_event: ["duration", "title"] },
+  });
+  const OPENING = "book Room A tomorrow at 3pm";
+
+  const answered = (answer: string): SessionState =>
+    provideAnswer(beginSession(OPENING, durationCtx()), answer, durationCtx());
+
+  const minutes = (answer: string): number | undefined =>
+    answered(answer).draft?.time?.durationMinutes;
+
+  const reAsked = (answer: string): boolean =>
+    answered(answer).unresolved === "duration";
+
+  it.each([
+    ["for 45 minutes", 45],
+    ["45 mins", 45],
+    ["1 hour", 60],
+    ["until 6pm", 180],
+    ["till 5:30pm", 150],
+    ["to 4pm", 60],
+    ["ends at 5pm", 120],
+    ["at 4pm", 60],
+  ])("still understands %s", (answer, expected) => {
+    expect(minutes(answer as string)).toBe(expected);
+  });
+
+  it.each([
+    // Equal to the start: a contradiction, and the reported 24-hour bug.
+    "3pm",
+    // Before the start with no cue — this became an 18-hour event.
+    "9am",
+    "2pm",
+    // The exact reproduction: the user re-typed their whole request.
+    "book Room A tomorrow at 3pm",
+    // A clock that is plainly not an end time.
+    "the 3pm one",
+    "sometime around 3pm",
+  ])("re-asks rather than inventing a duration from %s", (answer) => {
+    expect(reAsked(answer)).toBe(true);
+  });
+
+  it("never turns a clock answer into a day-long event", () => {
+    // The invariant, over every shape at once: whatever the user types, this
+    // question cannot produce an absurd event without them seeing it.
+    const answers = [
+      "3pm",
+      "2pm",
+      "9am",
+      "at 3pm",
+      "until 3pm",
+      "the 3pm one",
+      "book Room A tomorrow at 3pm",
+      "noon",
+      "midnight",
+    ];
+    for (const a of answers) {
+      const d = minutes(a);
+      if (d !== undefined) expect(d).toBeLessThan(12 * 60);
+    }
+  });
+
+  it("still allows a deliberate overnight booking", () => {
+    // The day-roll is not removed, only made conditional on an explicit cue —
+    // a night shift is a real thing to schedule.
+    const late = provideAnswer(
+      beginSession("book Room A tomorrow at 10pm", durationCtx()),
+      "until 2am",
+      durationCtx(),
+    );
+    expect(late.draft?.time?.durationMinutes).toBe(240);
+  });
+
+  it("re-asks for an earlier clock with no overnight cue", () => {
+    const late = provideAnswer(
+      beginSession("book Room A tomorrow at 10pm", durationCtx()),
+      "2am",
+      durationCtx(),
+    );
+    expect(late.unresolved).toBe("duration");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  14bb. A guessed meridiem is not a missing time  (Tier 3 · A6 follow-up)
+//
+//  "half past two" resolves by guessing which half of the day is meant, which
+//  is an assumption and is disclosed. Recording it as `assumed.timeOfDay`
+//  though — the obvious place — made `slotIsFilled("when")` treat the time as
+//  never given, so a booking that plainly said "half past two" was asked what
+//  time it should be. The user stated a time of day; only the meridiem was
+//  invented, and the two need separate flags.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("a clock phrase satisfies the “when” requirement", () => {
+  const requiring = (): SessionContext => ({
+    ...ctx,
+    requires: { add_event: ["when", "duration", "resource", "title"] },
+  });
+
+  it("does not re-ask for a time it already resolved", () => {
+    const s = beginSession(
+      "book Room A tomorrow at half past two",
+      requiring(),
+    );
+    expect(s.draft?.time?.localTime).toBe("14:30");
+    expect(s.question?.slot).not.toBe("when");
+  });
+
+  it("reaches the same question a plain clock time would", () => {
+    const phrase = beginSession(
+      "book Room A tomorrow at half past two",
+      requiring(),
+    );
+    const plain = beginSession("book Room A tomorrow at 3pm", requiring());
+    expect(phrase.question?.slot).toBe(plain.question?.slot);
+  });
+
+  it("records the guess without calling the time missing", () => {
+    const s = beginSession(
+      "book Room A tomorrow at half past two",
+      requiring(),
+    );
+    expect(s.draft?.time?.assumed.meridiem).toBe(true);
+    expect(s.draft?.time?.assumed.timeOfDay).toBe(false);
+    expect(s.draft?.time?.assumptions.join(" ")).toContain("half past two");
+  });
+
+  it("marks nothing assumed when the meridiem was stated", () => {
+    const s = beginSession(
+      "book Room A tomorrow at half past two pm",
+      requiring(),
+    );
+    expect(s.draft?.time?.assumed.meridiem).toBe(false);
+    expect(s.draft?.time?.localTime).toBe("14:30");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  14ba. Zero-length events and negation cues  (Tier 3 · B8 + D7)
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("a zero-length event is not a booking (B8)", () => {
+  const booking = (): SessionContext => ({
+    ...ctx,
+    requires: { add_event: ["when", "duration", "resource", "title"] },
+  });
+
+  it.each(["for 0 minutes", "for 0 hours", "for 0.0 hours"])(
+    "refuses %s instead of creating an empty event",
+    (phrase) => {
+      const s = beginSession(
+        `book Room A tomorrow at 3pm ${phrase}`,
+        booking(),
+      );
+      expect(s.draft?.time?.durationMinutes).not.toBe(0);
+      expect(s.draft?.time?.assumed.duration).toBe(true);
+    },
+  );
+
+  it("asks for a real length when the host requires one", () => {
+    const s = beginSession(
+      "book Room A tomorrow at 3pm for 0 minutes",
+      booking(),
+    );
+    expect(s.question?.slot).toBe("duration");
+  });
+
+  it("still claims the words, so they cannot become the title", () => {
+    // An unclaimed phrase falls through to `titleFromRemainder` — the same
+    // route by which "half past two" once became an event name.
+    const s = beginSession(
+      "book Room A tomorrow at 3pm for 0 minutes",
+      booking(),
+    );
+    expect(s.draft?.title).toBeUndefined();
+  });
+
+  it("leaves real durations alone", () => {
+    const s = beginSession(
+      "book Room A tomorrow at 3pm for 30 minutes",
+      booking(),
+    );
+    expect(s.draft?.time?.durationMinutes).toBe(30);
+    expect(s.draft?.time?.assumed.duration).toBe(false);
+  });
+});
+
+describe("a negation cue is never the event name (D7)", () => {
+  it.each([
+    "don't book Room A tomorrow at 3pm",
+    "do not book Room A tomorrow at 3pm",
+    "no longer need Room A tomorrow at 3pm",
+  ])("keeps the cue out of the title of %s", (text) => {
+    const title = beginSession(text, ctx).draft?.title ?? "";
+    expect(title).not.toMatch(/don'?t|\bnot\b|no longer/i);
+  });
+
+  it("drops the whole verb phrase when a cue precedes it", () => {
+    // "don't book …" left "don't book" as the event name — the cue AND the
+    // verb, describing the opposite of what would have been created.
+    expect(
+      beginSession("don't book Room A tomorrow at 3pm", ctx).draft?.title,
+    ).toBeUndefined();
+  });
+
+  it("never leaves the blanked cue behind as whitespace", () => {
+    // Blanking preserves offsets, so a removed cue leaves its width in the
+    // slice: "do     book". No title may contain a run of spaces.
+    for (const text of [
+      "don't book Room A tomorrow at 3pm",
+      "do not book Room A tomorrow at 3pm",
+      "no longer need Room A tomorrow at 3pm",
+    ]) {
+      const title = beginSession(text, ctx).draft?.title;
+      if (title !== undefined) expect(title).not.toMatch(/\s{2,}/);
+    }
+  });
+
+  it("leaves ordinary titles untouched", () => {
+    expect(
+      beginSession("book Room A tomorrow at 3pm for the design sync", ctx).draft
+        ?.title,
+    ).toBe("design sync");
+    expect(
+      beginSession("schedule standup with Alex tomorrow at 10am", ctx).draft
+        ?.title,
+    ).toBe("standup");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  14bc. Answering "when" must not eat the duration
+//
+//  `timeSpan` covers EVERY time mention, durations included, and the when
+//  answer replaced the whole span. "book ICU Bay 9 for 30 minutes" answered
+//  with "tomorrow" became "book ICU Bay 9 for tomorrow": the stated length was
+//  destroyed and the event silently created at the 60-minute default. The
+//  count was wrong for the same reason — `slotIsFilled("duration")` read the
+//  RESOLVED time, which is null until something anchors the event in the
+//  calendar, so a duration the user could see in their own message was
+//  reported as missing.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("a stated duration survives the “when” question", () => {
+  const booking = (): SessionContext => ({
+    ...ctx,
+    requires: { add_event: ["when", "duration", "resource", "title"] },
+  });
+
+  it("counts a duration stated before any date", () => {
+    const s = beginSession("book Room A for 30 minutes", booking());
+    expect(s.draft?.timeSpan?.durationMinutes).toBe(30);
+    expect(s.outstanding).not.toContain("duration");
+  });
+
+  it("keeps the duration when the date arrives separately", () => {
+    const c = booking();
+    const s = provideAnswer(
+      beginSession("book Room A for 30 minutes", c),
+      "tomorrow at 3pm",
+      c,
+    );
+    expect(s.draft?.time?.durationMinutes).toBe(30);
+    expect(s.draft?.time?.assumed.duration).toBe(false);
+  });
+
+  it("never asks for a length the user already gave", () => {
+    const c = booking();
+    let s = beginSession("book Room A for 2 hours", c);
+    for (let i = 0; i < 4 && s.status === "awaiting"; i++) {
+      expect(s.question?.slot).not.toBe("duration");
+      s = provideAnswer(s, ["tomorrow at 10am", "Surgery"][i] ?? "dunno", c);
+    }
+    expect(s.draft?.time?.durationMinutes).toBe(120);
+  });
+
+  it("rescues a duration caught inside the replaced range", () => {
+    // The when answer replaces the date/clock region surgically. A duration
+    // sitting inside that region is not an answer to "when?", so it survives.
+    const c = booking();
+    const s = provideAnswer(
+      beginSession("book Room A next monday for 30 minutes", c),
+      "next friday",
+      c,
+    );
+    expect(s.text).toContain("30 minutes");
+    expect(s.draft?.time?.durationMinutes).toBe(30);
+  });
+
+  it("still replaces a wrong date rather than appending to it", () => {
+    // The reason surgical replacement exists in the first place.
+    const c = booking();
+    const s = provideAnswer(
+      beginSession("book Room A next monday for 2 hours", c),
+      "next friday at 10am",
+      c,
+    );
+    expect(s.text).not.toContain("next monday");
+    expect(s.draft?.time?.localTime).toBe("10:00");
+    expect(s.draft?.time?.durationMinutes).toBe(120);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  14c. Skipped slots leave the count  (Tier 2 · F2)
+//
+//  `outstanding` filtered on "is it filled?" alone. A skipped slot is not
+//  filled, so it stayed outstanding for ever: a session could reach `ready`
+//  still reporting two slots to go, and the "N more to go" label never came
+//  down. The label had its own off-by-one on top — it counted the question the
+//  user was currently looking at, so the last one read "1 more to go".
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("outstanding requirements and the progress label", () => {
+  const booking = (): SessionContext => ({
+    ...ctx,
+    requires: { add_event: ["when", "duration", "resource", "title"] },
+  });
+  const shortForm = (): SessionContext => ({
+    ...ctx,
+    requires: { add_event: ["duration", "title"] },
+  });
+
+  const progressOf = (state: SessionState): string | undefined => {
+    const msg = presentSession(state, "m");
+    return msg?.kind === "clarify" ? msg.progress : undefined;
+  };
+
+  it("drops a skipped slot from outstanding", () => {
+    const c = shortForm();
+    const opened = beginSession("book Room A tomorrow at 3pm", c);
+    expect(opened.question?.slot).toBe("duration");
+    expect(opened.outstanding).toEqual(["duration", "title"]);
+
+    const skipped = provideAnswer(opened, SKIP_ANSWER, c);
+    expect(skipped.skipped).toContain("duration");
+    expect(skipped.outstanding).not.toContain("duration");
+  });
+
+  it("never leaves a slot in both skipped and outstanding", () => {
+    // The exact defect: the two lists contradicted each other.
+    const c = shortForm();
+    let s = beginSession("book Room A tomorrow at 3pm", c);
+    for (let i = 0; i < 4 && s.status === "awaiting"; i++) {
+      s = provideAnswer(s, SKIP_ANSWER, c);
+      for (const slot of s.skipped) {
+        expect(s.outstanding ?? []).not.toContain(slot);
+      }
+    }
+    expect(s.status).toBe("ready");
+    expect(s.outstanding).toEqual([]);
+  });
+
+  it("shrinks by exactly one per slot filled", () => {
+    const c = booking();
+    let s = beginSession("book Room A", c);
+    const sizes = [(s.outstanding ?? []).length];
+    for (const a of ["tomorrow at 3pm", "for 1 hour", "Standup"]) {
+      if (s.status !== "awaiting") break;
+      s = provideAnswer(s, a, c);
+      sizes.push((s.outstanding ?? []).length);
+    }
+    for (let i = 1; i < sizes.length; i++) {
+      expect(sizes[i]).toBe(sizes[i - 1] - 1);
+    }
+    expect(sizes[sizes.length - 1]).toBe(0);
+  });
+
+  it("never asks a skipped slot again", () => {
+    const c = shortForm();
+    let s = provideAnswer(
+      beginSession("book Room A tomorrow at 3pm", c),
+      SKIP_ANSWER,
+      c,
+    );
+    for (let i = 0; i < 5 && s.status === "awaiting"; i++) {
+      expect(s.question?.slot).not.toBe("duration");
+      s = provideAnswer(s, "dunno", c);
+    }
+  });
+
+  it("counts what is left AFTER the question on screen", () => {
+    // Was: the final question read "1 more to go" and then the session ended.
+    const c = booking();
+    let s = beginSession("book Room A", c);
+    const labels = [progressOf(s)];
+    for (const a of ["tomorrow at 3pm", "for 1 hour", "Standup"]) {
+      if (s.status !== "awaiting") break;
+      s = provideAnswer(s, a, c);
+      labels.push(progressOf(s));
+    }
+    expect(labels).toEqual([
+      "2 more to go",
+      "1 more to go",
+      "last one",
+      undefined,
+    ]);
+  });
+
+  it("says “last one” on the final requirement", () => {
+    const c = shortForm();
+    const s = provideAnswer(
+      beginSession("book Room A tomorrow at 3pm", c),
+      "for 1 hour",
+      c,
+    );
+    expect(s.question?.slot).toBe("title");
+    expect(progressOf(s)).toBe("last one");
+  });
+
+  it("does not subtract for a question that is not a requirement", () => {
+    // An escape/gate question is not one of the required slots, so the whole
+    // count genuinely is still to come and must not be reduced by one.
+    const c = shortForm();
+    let s = beginSession("book Room A tomorrow at 3pm", c);
+    let guard = 0;
+    while (
+      s.status === "awaiting" &&
+      s.question?.slot !== "escape" &&
+      guard++ < 20
+    ) {
+      s = provideAnswer(s, "dunno", c);
+    }
+    expect(s.question?.slot).toBe("escape");
+    expect(s.outstanding).toEqual(["duration", "title"]);
+    expect(progressOf(s)).toBe("2 more to go");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  15. The conversation must be able to end  (Tier 2 · F4)
+//
+//  Being trapped is the worst failure this layer has: every other defect
+//  wastes a click, this one leaves a user with no way forward at all. The
+//  measured bug was ten consecutive unusable answers still returning
+//  `awaiting`, because the only cap counted CONSECUTIVE asks of one slot and
+//  reset the moment the question changed.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("the round cap terminates", () => {
+  const requiring = (): SessionContext => ({
+    ...ctx,
+    requires: { add_event: ["when", "duration", "resource", "title"] },
+  });
+
+  /** Answer repeatedly, collecting every state along the way. */
+  const runTo = (
+    state: SessionState,
+    answer: string,
+    c: SessionContext,
+    limit = 20,
+  ): SessionState[] => {
+    const seen: SessionState[] = [];
+    let s = state;
+    for (let i = 0; i < limit && s.status === "awaiting"; i++) {
+      s = provideAnswer(s, answer, c);
+      seen.push(s);
+    }
+    return seen;
+  };
+
+  /** Drive a session to its escape question. */
+  const toEscape = (opening: string, c: SessionContext): SessionState => {
+    let s = beginSession(opening, c);
+    let guard = 0;
+    while (
+      s.status === "awaiting" &&
+      s.question?.slot !== "escape" &&
+      guard++ < 20
+    ) {
+      s = provideAnswer(s, "dunno", c);
+    }
+    return s;
+  };
+
+  it("ends after ten unusable answers instead of asking forever", () => {
+    // THE headline case. Before this, every one of these was `awaiting`.
+    const c = requiring();
+    const seen = runTo(
+      beginSession("book Conference Room B", c),
+      "dunno",
+      c,
+      10,
+    );
+    expect(seen.map((s) => s.status)).toContain("declined");
+  });
+
+  it("terminates even when the per-slot cap can never fire", () => {
+    // The loop shape the per-slot counter is blind to. With `maxRounds` raised
+    // out of reach, only the total backstop can end this — so if it terminates
+    // here, it terminates for an alternating conversation too.
+    const c: SessionContext = { ...requiring(), maxRounds: 999 };
+    const seen = runTo(
+      beginSession("book Conference Room B", c),
+      "dunno",
+      c,
+      30,
+    );
+    expect(seen.map((s) => s.status)).toContain("declined");
+    // And it spent the whole budget rather than bailing early.
+    const capped = seen.find((s) => s.roundCapReached);
+    expect(capped?.totalRounds).toBe(MAX_TOTAL_ROUNDS);
+  });
+
+  it("never resets totalRounds, even as `rounds` does", () => {
+    const c = requiring();
+    let s = beginSession("book Conference Room B", c);
+    const totals = [s.totalRounds];
+    const perSlot = [s.rounds];
+    for (const a of ["tomorrow at 3pm", "for 1 hour", "Room A", "Standup"]) {
+      if (s.status !== "awaiting") break;
+      s = provideAnswer(s, a, c);
+      totals.push(s.totalRounds);
+      perSlot.push(s.rounds);
+    }
+    // Strictly monotonic, one per answer.
+    expect(totals).toEqual(totals.map((_, i) => i));
+    // Meanwhile the per-slot counter does reset — which is exactly why it
+    // cannot be the backstop.
+    expect(Math.min(...perSlot.slice(1))).toBe(0);
+  });
+
+  it("leaves a productive conversation alone", () => {
+    // The budget must not cut off someone who is actually getting somewhere.
+    const c = requiring();
+    let s = beginSession("book Conference Room B", c);
+    for (const a of ["tomorrow at 3pm", "for 1 hour", "Room A", "Standup"]) {
+      if (s.status !== "awaiting") break;
+      s = provideAnswer(s, a, c);
+    }
+    expect(s.status).toBe("ready");
+    expect(s.roundCapReached).toBeFalsy();
+    expect(s.totalRounds).toBeLessThan(MAX_TOTAL_ROUNDS);
+  });
+
+  it("offers only starting over when a GATE is what is stuck", () => {
+    // The invariant: gates are never skippable. If this ever offers a skip,
+    // the escape hatch has become a way to walk past the classifier.
+    const s = toEscape("schedule a meeting with Alex", ctx);
+    expect(s.question?.slot).toBe("escape");
+    expect(s.question?.skippable).toBe(false);
+    expect(s.question?.choices?.map((choice) => choice.value)).toEqual([
+      ESCAPE_START_OVER,
+    ]);
+  });
+
+  it("offers a skip when a host REQUIREMENT is what is stuck", () => {
+    const c: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["duration", "title"] },
+    };
+    const s = toEscape("book Room A tomorrow at 3pm", c);
+    expect(s.question?.slot).toBe("escape");
+    expect(s.question?.choices?.map((choice) => choice.value)).toEqual([
+      `${ESCAPE_SKIP_PREFIX}duration`,
+      ESCAPE_START_OVER,
+    ]);
+  });
+
+  it("skipping retires the slot and asks the NEXT question, not itself", () => {
+    // The regression this guards: the total cap is still exceeded after a
+    // skip, so without a fresh budget the very next turn was another escape
+    // prompt — offering to skip a question the user had never been asked.
+    const c: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["duration", "title"] },
+    };
+    const escape = toEscape("book Room A tomorrow at 3pm", c);
+    const after = provideAnswer(escape, `${ESCAPE_SKIP_PREFIX}duration`, c);
+
+    expect(after.skipped).toContain("duration");
+    expect(after.status).toBe("awaiting");
+    expect(after.question?.slot).toBe("title");
+    expect(after.roundCapReached).toBeFalsy();
+    // Monotonic still — the budget moved, the counter did not.
+    expect(after.totalRounds).toBe(escape.totalRounds + 1);
+    expect(after.capBaseline).toBe(after.totalRounds);
+  });
+
+  it("never asks a skipped slot again", () => {
+    const c: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["duration", "title"] },
+    };
+    const escape = toEscape("book Room A tomorrow at 3pm", c);
+    let s = provideAnswer(escape, `${ESCAPE_SKIP_PREFIX}duration`, c);
+    for (let i = 0; i < 6 && s.status === "awaiting"; i++) {
+      expect(s.question?.slot).not.toBe("duration");
+      s = provideAnswer(s, "dunno", c);
+    }
+  });
+
+  it("starting over ends the session", () => {
+    const c = requiring();
+    const s = provideAnswer(
+      toEscape("book Conference Room B", c),
+      ESCAPE_START_OVER,
+      c,
+    );
+    expect(s.status).toBe("declined");
+    expect(s.question).toBeNull();
+    expect(s.roundCapReached).toBe(true);
+    expect(s.reason).toMatch(/start over/i);
+  });
+
+  it("is a CLOSED choice - free text ends it rather than looping", () => {
+    // By the time this question is on screen the cap has already proved that
+    // more questions are not working. Re-asking here would rebuild the very
+    // loop the escape exists to break.
+    const c = requiring();
+    const s = provideAnswer(toEscape("book Conference Room B", c), "erm", c);
+    expect(s.status).toBe("declined");
+    expect(s.roundCapReached).toBe(true);
+  });
+
+  it("a declined session still accepts a brand new request", () => {
+    // Terminating must not mean bricked.
+    const c = requiring();
+    const dead = provideAnswer(
+      toEscape("book Conference Room B", c),
+      ESCAPE_START_OVER,
+      c,
+    );
+    expect(dead.status).toBe("declined");
+    const fresh = beginSession("book Room A tomorrow at 3pm for 1 hour", c);
+    expect(fresh.status).not.toBe("declined");
+    expect(fresh.totalRounds).toBe(0);
+    expect(fresh.roundCapReached).toBeFalsy();
+  });
+
+  it("does not acknowledge the answer that caused it", () => {
+    // "Got it — dunno." rendered directly above "I'm still not getting that"
+    // tells the user their reply landed when it is the reason they are here.
+    const c: SessionContext = {
+      ...ctx,
+      requires: { add_event: ["duration", "title"] },
+    };
+    const s = toEscape("book Room A tomorrow at 3pm", c);
+    expect(s.question?.slot).toBe("escape");
+    const msg = presentSession(s, "m");
+    expect(msg?.kind).toBe("clarify");
+    if (msg?.kind === "clarify") {
+      expect(msg.ack).toBeUndefined();
+      expect(msg.question).toMatch(/still not getting that/i);
+      expect(msg.choices.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("cannot be used to walk past a gate", () => {
+    // THE invariant, restated for the escape path: whatever the user taps, a
+    // session that never cleared the gates must not end up `ready`.
+    const c = requiring();
+    let s = beginSession("schedule a meeting with Alex", c);
+    for (let i = 0; i < 12 && s.status === "awaiting"; i++) {
+      const atEscape = s.question?.slot === "escape";
+      const skip = s.question?.choices?.find((choice) =>
+        choice.value.startsWith(ESCAPE_SKIP_PREFIX),
+      );
+      s = provideAnswer(s, atEscape && skip ? skip.value : "dunno", c);
+      expect(s.status).not.toBe("ready");
+    }
   });
 });

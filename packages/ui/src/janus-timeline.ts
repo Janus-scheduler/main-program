@@ -4,6 +4,7 @@ import { timelineStyles } from "./timeline-styles";
 import {
   schedulerStore,
   isoToZonedDisplay,
+  toFakeLocalDate,
   getBrowserTimezone,
   expandEvents,
   computeTimelineConflicts,
@@ -57,12 +58,22 @@ export class JanusTimeline extends LitElement {
   static styles = timelineStyles;
 
   @property({ type: Array }) resources: TimelineResource[] = [];
+  /** Explicit display timezone (defaults to schedulerStore.timezone or browser timezone). */
+  @property({ type: String }) timezone?: string;
   /** When true, dragging on empty row space creates a new event. Default: false */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
   /** When true, renders a + Floating Action Button to add an event. Default: false */
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
   @property({ type: Boolean, attribute: "prevent-conflicts" })
   preventConflicts = true;
+
+  private get _activeTimezone(): string {
+    return (
+      this.timezone ||
+      (schedulerStore.getState().timezone as string) ||
+      getBrowserTimezone()
+    );
+  }
 
   @state() private _showBlockedConflictDialog = false;
   @state() private _blockedConflictMessage = "";
@@ -257,9 +268,7 @@ export class JanusTimeline extends LitElement {
   };
 
   private _syncFromStore(state: SchedulerStore) {
-    const tz =
-      (state.timezone as string) ||
-      Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tz = this._activeTimezone;
 
     // ── Slice-identity early-out ────────────────────────────────────────────
     // The store is subscribed without a selector, so every set() lands here —
@@ -561,6 +570,12 @@ export class JanusTimeline extends LitElement {
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
 
+    if (changedProperties.has("timezone")) {
+      this._vmCache.clear();
+      this._rowCache.clear();
+      this._syncFromStore(schedulerStore.getState());
+    }
+
     // Recompute conflicts only when an actual input changed.
     //
     // The previous guard included `conflictingEventIds.size === 0`, which is
@@ -570,7 +585,7 @@ export class JanusTimeline extends LitElement {
     //
     // `resources` identity is a sound signal because _syncFromStore reassigns it
     // if and only if something visible changed, and never mutates it in place.
-    const tz = schedulerStore.getState().timezone;
+    const tz = this._activeTimezone;
     if (
       this.resources === this._confLastResources &&
       tz === this._confLastTz &&
@@ -750,13 +765,13 @@ export class JanusTimeline extends LitElement {
   private _emitNavChange() {
     const visibleCenter = this._getVisibleCenterMs();
     const level = getActiveZoomLevel(this._pxPerMs);
-    const tz = getBrowserTimezone();
+    const tz = this._activeTimezone;
     const navLabel = formatNavDate(visibleCenter, level, tz);
 
     // `toLocaleDateString` constructs a fresh Intl.DateTimeFormat internally on
     // every call — the memoization in core's time.ts cannot reach it — so hold
     // the two formatters here instead.
-    const d = new Date(visibleCenter);
+    const d = toFakeLocalDate(visibleCenter, tz);
     const dayName = NAV_WEEKDAY_FMT.format(d);
     const shortDate = NAV_SHORT_DATE_FMT.format(d);
 
@@ -1221,7 +1236,7 @@ export class JanusTimeline extends LitElement {
     const viewEndMs = this._getViewEndMs();
     const level = getActiveZoomLevel(pxPerMs);
 
-    const tz = schedulerStore.getState().timezone;
+    const tz = this._activeTimezone;
 
     // Total width of the rendered content (fixed)
     const totalW = this._totalWidth;
@@ -1293,6 +1308,7 @@ export class JanusTimeline extends LitElement {
       resourceLayout,
       pxPerMs,
       viewStartMs,
+      tz,
     );
 
     // ── Vertical Culling Bounds ─────────────────────────────────────────────

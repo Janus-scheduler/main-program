@@ -224,6 +224,7 @@ export interface SchedulerProps {
   error?: string | null;
   allDay?: boolean;
   recurrenceRule?: string;
+  timezone?: string;
   preventConflicts?: boolean;
   showConfirmOnCreate?: boolean;
   onClose?: () => void;
@@ -251,6 +252,7 @@ export const Scheduler: Component<SchedulerProps> = (props) => {
       if (props.allDay !== undefined) el.allDay = props.allDay;
       if (props.recurrenceRule !== undefined)
         el.recurrenceRule = props.recurrenceRule;
+      if (props.timezone !== undefined) el.timezone = props.timezone;
       if (props.preventConflicts !== undefined)
         el.preventConflicts = props.preventConflicts;
       if (props.showConfirmOnCreate !== undefined)
@@ -301,6 +303,7 @@ export interface TimelineProps {
   allowCreate?: boolean;
   showFab?: boolean;
   preventConflicts?: boolean;
+  timezone?: string;
   onEventClick?: (detail: TimelineEvent) => void;
   onAddEvent?: () => void;
   onEventMove?: (detail: EventMoveDetail) => void;
@@ -330,6 +333,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
       if (props.showFab !== undefined) el.showFab = props.showFab;
       if (props.preventConflicts !== undefined)
         el.preventConflicts = props.preventConflicts;
+      if (props.timezone !== undefined) el.timezone = props.timezone;
     }
   });
 
@@ -394,6 +398,7 @@ export const Timeline: Component<TimelineProps> = (props) => {
  */
 export interface MonthGridProps {
   showFab?: boolean;
+  timezone?: string;
   onEventClick?: (detail: TimelineEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
   onAddEvent?: () => void;
@@ -409,6 +414,7 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
     if (ref) {
       const el = ref as unknown as Record<string, unknown>;
       if (props.showFab !== undefined) el.showFab = props.showFab;
+      if (props.timezone !== undefined) el.timezone = props.timezone;
     }
   });
 

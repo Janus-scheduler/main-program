@@ -92,13 +92,14 @@ export function SchedulerView({
 
   // ── Helper to split ISO ────────────────────────────────────────────────
   // Convert a UTC ISO string → local { date, time } for display in the modal.
-  // Uses the store's selected timezone for consistent display.
+  // Uses the event's timezone (or store display timezone) for display.
+  const storeEvent = selectedEventId ? manager.getEvent(selectedEventId) : null;
+  const eventTz = storeEvent?.timezone || schedulerStore.getState().timezone;
   const splitISO = (iso: string) => {
     if (!iso) return { date: "", time: "" };
-    return isoToZonedDisplay(iso, schedulerStore.getState().timezone);
+    return isoToZonedDisplay(iso, eventTz);
   };
 
-  const storeEvent = selectedEventId ? manager.getEvent(selectedEventId) : null;
   const startParts = storeEvent ? splitISO(storeEvent.startTime) : null;
   const endParts = storeEvent ? splitISO(storeEvent.endTime) : null;
 

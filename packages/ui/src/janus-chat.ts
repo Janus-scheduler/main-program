@@ -417,7 +417,13 @@ export class JanusChat extends LitElement {
 
         return this._assistantRow(html`
           <div class="card card--warning">
-            ${m.ack ? html`<div class="card__lead">${m.ack}</div>` : nothing}
+            ${m.lead
+              ? html`<div class="card__lead card__lead--recover">
+                  ${m.lead}
+                </div>`
+              : m.ack
+                ? html`<div class="card__lead">${m.ack}</div>`
+                : nothing}
             ${m.chips && m.chips.length
               ? html`<div class="chips">
                   ${m.chips.map((chip) => this._renderChip(chip))}
@@ -658,6 +664,17 @@ export class JanusChat extends LitElement {
           ? html`<div class="chips">
               ${card.chips.map((chip) => this._renderChip(chip))}
             </div>`
+          : nothing}
+        ${card.warnings?.length
+          ? html`<ul class="warnings" aria-label="Warnings">
+              ${card.warnings.map(
+                (warning) =>
+                  html`<li class="warnings__item">
+                    <span class="warnings__icon" aria-hidden="true">!</span>
+                    <span>${warning}</span>
+                  </li>`,
+              )}
+            </ul>`
           : nothing}
         ${card.notes?.length
           ? html`<ul class="notes" aria-label="Assumptions">

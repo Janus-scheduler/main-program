@@ -108,7 +108,7 @@ import {
 import "@janus-scheduler/ui";
 import { useNlpEngine } from "../chat/useNlpEngine";
 import { useJanusChat } from "../chat/useJanusChat";
-import { catalogFromResources, commitSession } from "../chat/commitToScheduler";
+import { catalogFromResources, commitSession } from "@janus-scheduler/nlp";
 import type { SessionRequirements, SessionState, PresentMessage } from "@janus-scheduler/nlp";
 
 export type { ViewType };
@@ -121,7 +121,7 @@ const INTRO: PresentMessage = {
 };
 
 const REQUIRES: SessionRequirements = {
-  add_event: ["when", "duration", "resource"],
+  add_event: ["when", "duration", "resource", "title"],
   modify_event: ["when"],
 };
 
@@ -139,7 +139,8 @@ const catalog = computed(() => catalogFromResources(props.manager.getAllResource
 const chatOptions = computed(() => ({
   engine: engineState.value.status === "ready" ? engineState.value.engine : null,
   catalog: catalog.value,
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  // Resolved per turn, from the zone the timeline actually renders in.
+      timezone: () => schedulerStore.getState().timezone,
   intro: INTRO,
   requires: REQUIRES,
   fallbackResourceName: props.manager.getAllResources()[0]?.name,

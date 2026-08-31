@@ -153,8 +153,37 @@ function matchCatalog(text: string, entries: CatalogEntry[]): EntityMatch[] {
     }
   }
 
+  // ── a sub-phrase match contradicted by what follows it ──────────────────
+  //
+  // `surfaceForms` deliberately emits continuous sub-phrases, so "book the MRI
+  // Scanner" can match "MRI Scanner A". The cost is that "MRI Scanner C" ALSO
+  // matches it — and silently books Scanner A, an instance the user did not ask
+  // for. With both A and B in the catalog, which one wins is arbitrary.
+  //
+  // If a NON-EXACT match is immediately followed by a designator that does not
+  // appear anywhere in that entry's name, the user named a specific instance we
+  // do not have. Dropping the candidate lets the utterance fall through to the
+  // unknown-resource question, which asks — rather than picking one.
+  const contradicted = (c: EntityMatch): boolean => {
+    if (c.exact) return false;
+    const rest = text.slice(c.end);
+    // An INSTANCE DESIGNATOR: a single letter, digits, or a letter/digit
+    // combination — "A", "2", "1B", "C3". Deliberately NOT "any short token":
+    // that swallowed ordinary function words, so "meet Alex and Priya" and
+    // "a retro with Alex in Room A" lost their Alex, because "and" and "in"
+    // are short too. Existing tests caught it.
+    const next = /^\s+([A-Za-z]|\d{1,3}|\d+[A-Za-z]|[A-Za-z]\d{1,2})\b/.exec(
+      rest,
+    );
+    if (!next) return false;
+    const token = next[1].toLowerCase();
+    const nameTokens = c.name.toLowerCase().split(/\s+/);
+    return !nameTokens.includes(token);
+  };
+  const viable = candidates.filter((c) => !contradicted(c));
+
   // Longest span wins at a given position; exact beats partial on a tie.
-  candidates.sort(
+  viable.sort(
     (a, b) =>
       b.end - b.start - (a.end - a.start) ||
       Number(b.exact) - Number(a.exact) ||
@@ -165,7 +194,7 @@ function matchCatalog(text: string, entries: CatalogEntry[]): EntityMatch[] {
   const claimedIds = new Set<string>();
   const kept: EntityMatch[] = [];
 
-  for (const c of candidates) {
+  for (const c of viable) {
     if (claimedIds.has(c.id)) continue;
     if (taken.some(([s, e]) => c.start < e && c.end > s)) continue;
     kept.push(c);
@@ -205,12 +234,16 @@ export function leadingVerbPrefixLength(text: string): number {
     }
   }
 
+  // Whitespace may sit between the wrapper and the verb because something was
+  // blanked out there — "can you not book …" has its negation cue removed
+  // before this runs, leaving "can you     book …". Without skipping the gap
+  // the verb goes unrecognised and lands in the event title.
   const afterWrapper = lowered.slice(consumed);
+  const gap = afterWrapper.length - afterWrapper.trimStart().length;
+  const afterGap = afterWrapper.slice(gap);
   for (const phrase of ALL_VERB_PHRASES) {
-    if (
-      new RegExp(String.raw`^${escapeRe(phrase)}\b`, "i").test(afterWrapper)
-    ) {
-      consumed += phrase.length;
+    if (new RegExp(String.raw`^${escapeRe(phrase)}\b`, "i").test(afterGap)) {
+      consumed += gap + phrase.length;
       break;
     }
   }
@@ -221,6 +254,10 @@ export function leadingVerbPrefixLength(text: string): number {
 /**
  * Function words that carry no title meaning once their object has been cut
  * out. "with Alex" leaves a dangling "with"; "in Room A" leaves "in".
+ *
+ * The naming verbs are here for a different reason: they INTRODUCE the title
+ * rather than belonging to it. "book Room A ... called standup" was named
+ * "called standup", carrying the user's grammar into the event's name.
  */
 const FUNCTION_WORDS = new Set([
   "with",
@@ -234,6 +271,10 @@ const FUNCTION_WORDS = new Set([
   "about",
   "by",
   "and",
+  "called",
+  "named",
+  "titled",
+  "entitled",
 ]);
 
 /** Determiners stripped from the front of a finished title. */
@@ -355,7 +396,12 @@ function titleFromRemainder(
   if (start >= end) return undefined;
 
   return {
-    text: text.slice(start, end),
+    // Collapsed, because the slice spans blanked-out ground. Anything removed
+    // between two surviving words — a resource name, a time phrase, a negation
+    // cue — leaves its width behind as spaces, and "do     book" is not a name
+    // anyone typed. Inner punctuation is preserved; only runs of whitespace
+    // are squeezed, so "Q3 - planning" survives intact.
+    text: text.slice(start, end).replace(/\s+/g, " "),
     start,
     end,
   };
@@ -372,18 +418,43 @@ function titleFromRemainder(
  * written, and every value the resolver had to invent is listed in
  * `time.assumptions`.
  */
+/**
+ * Replace each span with spaces, preserving the string's length.
+ *
+ * Length preservation is the whole point: every offset computed against the
+ * original text stays valid against the result, so spans found in the blanked
+ * copy can be sliced straight out of the original.
+ */
+function blankSpans(text: string, spans: TextSpan[]): string {
+  if (spans.length === 0) return text;
+  const chars = [...text];
+  for (const span of spans) {
+    for (let i = span.start; i < span.end && i < chars.length; i++) {
+      chars[i] = " ";
+    }
+  }
+  return chars.join("");
+}
+
 export function extractEntities(
   text: string,
   options: ExtractOptions,
 ): ExtractedEntities {
   const catalog: EntityCatalog = options.catalog ?? {};
 
-  const timeSpan = parseTimeSpan(text);
-  const time = resolveTime(timeSpan, {
-    now: options.now,
-    timezone: options.timezone,
-  });
-
+  // ── ORDER IS LOAD-BEARING: catalog first, time second ───────────────────
+  //
+  // Time extraction used to run on the raw text, before anything knew which
+  // words belonged to a resource. It could therefore eat part of a resource
+  // NAME:
+  //
+  //   "book Operating Room 1 August 25th at 9am"
+  //      → monthDate "1 August"   ← the room's number, plus the month
+  //      → booked 1 August, and "25th" fell through and became the title
+  //
+  // Matching the catalog first and blanking those spans removes the ambiguity
+  // at source: the digits in "Operating Room 1" are gone before any date
+  // pattern can see them.
   const resources = matchCatalog(text, catalog.resources ?? []);
   const participants = matchCatalog(text, catalog.participants ?? []);
 
@@ -394,6 +465,21 @@ export function extractEntities(
   const dedupedParticipants = participants.filter(
     (p) => !resourceSpans.some(([s, e]) => p.start < e && p.end > s),
   );
+
+  // Space-fill rather than delete, so every offset still indexes into `text`.
+  // `titleSpan` and the question `replaceSpan` are both slices of the ORIGINAL
+  // string; shortening it here would silently move them. Same technique as
+  // `stripNegationCues` in `session.ts`, for the same reason.
+  const withoutEntities = blankSpans(text, [
+    ...resources,
+    ...dedupedParticipants,
+  ]);
+
+  const timeSpan = parseTimeSpan(withoutEntities);
+  const time = resolveTime(timeSpan, {
+    now: options.now,
+    timezone: options.timezone,
+  });
 
   const spans: TextSpan[] = [
     ...(timeSpan ? timeSpan.mentions : []),

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
-import { Chat, useJanusChat } from "@janus-scheduler/react";
+import { Chat, useJanusChat, schedulerStore } from "@janus-scheduler/react";
 import type { SchedulerManager } from "@janus-scheduler/react";
+import { catalogFromResources, commitSession } from "@janus-scheduler/nlp";
 import type {
   SessionRequirements,
   SessionState,
@@ -8,7 +9,6 @@ import type {
 } from "@janus-scheduler/nlp";
 
 import { useNlpEngine } from "../chat/useNlpEngine";
-import { catalogFromResources, commitSession } from "../chat/commitToScheduler";
 
 /**
  * ChatDock — the conversation panel, docked over the scheduler.
@@ -43,7 +43,10 @@ const INTRO: PresentMessage = {
  * `Event.isValid()` requires at least one.
  */
 const REQUIRES: SessionRequirements = {
-  add_event: ["when", "duration", "resource"],
+  // `title` is last on purpose: ask for the concrete things first, and only
+  // then the name. Without it an unnamed event was silently created as
+  // "New Event" — a default the user never saw offered and never agreed to.
+  add_event: ["when", "duration", "resource", "title"],
   // Moving an event needs a new time; the target is resolved by title at
   // commit time, which refuses rather than guesses.
   modify_event: ["when"],
@@ -71,10 +74,11 @@ export function ChatSidebar({ manager }: ChatSidebarProps) {
     [rosterKey],
   );
 
-  const timezone = useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-    [],
-  );
+  // Read at the start of each turn, from the SAME zone the timeline renders
+  // in. It used to be the browser's zone, captured once in a `useMemo` with an
+  // empty dependency list — so after changing the display timezone the card
+  // would say 3:00 PM and the timeline would draw the block somewhere else.
+  const timezone = useCallback(() => schedulerStore.getState().timezone, []);
 
   const handleConfirm = useCallback(
     (state: SessionState) => {

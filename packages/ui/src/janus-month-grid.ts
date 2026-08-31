@@ -16,6 +16,8 @@ import { PlusIcon } from "./timeline-icons"; // reuse existing icons
 import {
   schedulerStore,
   expandEvents,
+  isoToZonedDisplay,
+  getBrowserTimezone,
   type EventColor,
   type SchedulerState,
 } from "@janus-scheduler/core";
@@ -26,24 +28,22 @@ interface WeekEventBar extends MonthEvent {
   track: number;
 }
 
-/** "YYYY-MM-DD" from a Date using local components */
-function toLocalDateStr(d: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** "HH:MM" from a Date using UTC components */
-function toUtcTimeStr(d: Date): string {
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
-}
-
 @customElement("janus-month-grid")
 export class JanusMonthGrid extends LitElement {
   static readonly styles = monthGridStyles;
 
   /** When true, renders a + Floating Action Button to add an event. Default: false */
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
+  /** Explicit display timezone (defaults to schedulerStore.timezone or browser timezone). */
+  @property({ type: String }) timezone?: string;
+
+  private get _activeTimezone(): string {
+    return (
+      this.timezone ||
+      (schedulerStore.getState().timezone as string) ||
+      getBrowserTimezone()
+    );
+  }
 
   // ── Internal state ────────────────────────────────────────────────────
   @property({ type: Array }) events: MonthEvent[] = [];
@@ -65,7 +65,19 @@ export class JanusMonthGrid extends LitElement {
     if (this._resizeObserver) this._resizeObserver.disconnect();
   }
 
+  willUpdate(changedProperties: Map<string, unknown>) {
+    super.willUpdate(changedProperties);
+    if (
+      changedProperties.has("timezone") ||
+      changedProperties.has("_year") ||
+      changedProperties.has("_month")
+    ) {
+      this._syncFromStore(schedulerStore.getState());
+    }
+  }
+
   private _syncFromStore(state: SchedulerState) {
+    const tz = this._activeTimezone;
     const rawEvents = Object.values(state.events);
     const startRange = new Date(this._year, this._month - 1, 1).getTime();
     const endRange = new Date(
@@ -82,44 +94,24 @@ export class JanusMonthGrid extends LitElement {
     const newEvents: MonthEvent[] = [];
 
     for (const e of coreEvents) {
-      const startD = new Date(e.startTime);
-      const endD = new Date(e.endTime);
+      const startDisplay = isoToZonedDisplay(e.startTime, tz);
+      const endDisplay = isoToZonedDisplay(e.endTime, tz);
 
-      const startDateStr = toLocalDateStr(startD);
-      const endDateStr = toLocalDateStr(endD);
-      const startTimeStr = toUtcTimeStr(startD);
-      const endTimeStr = toUtcTimeStr(endD);
+      const startDateStr = startDisplay.date;
+      const endDateStr = endDisplay.date;
+      const startTimeStr = startDisplay.time;
+      const endTimeStr = endDisplay.time;
 
-      // Clamp loop bounds to the visible month window [startRange, endRange]
-      const loopStartMs = Math.max(startD.getTime(), startRange);
-      const loopEndMs = Math.min(endD.getTime(), endRange);
+      const [sY, sM, sD] = startDateStr.split("-").map(Number);
+      const [eY, eM, eD] = endDateStr.split("-").map(Number);
 
-      if (loopStartMs > loopEndMs) continue;
+      const current = new Date(sY, sM - 1, sD, 12, 0, 0);
+      const endLimit = new Date(eY, eM - 1, eD, 12, 0, 0);
 
-      const loopStartD = new Date(loopStartMs);
-      const loopEndD = new Date(loopEndMs);
-
-      // Create a local midnight/noon safe cursor to iterate through all calendar dates.
-      // Setting time to 12:00:00 avoids timezone/DST boundary jump errors.
-      const current = new Date(
-        loopStartD.getFullYear(),
-        loopStartD.getMonth(),
-        loopStartD.getDate(),
-        12,
-        0,
-        0,
-      );
-      const endLimit = new Date(
-        loopEndD.getFullYear(),
-        loopEndD.getMonth(),
-        loopEndD.getDate(),
-        12,
-        0,
-        0,
-      );
+      const pad = (n: number) => n.toString().padStart(2, "0");
 
       while (current <= endLimit) {
-        const currentDateStr = toLocalDateStr(current);
+        const currentDateStr = `${current.getFullYear()}-${pad(current.getMonth() + 1)}-${pad(current.getDate())}`;
         const isMultiDay = startDateStr !== endDateStr;
 
         let spanPosition: MonthEvent["spanPosition"] = "single";
@@ -197,12 +189,6 @@ export class JanusMonthGrid extends LitElement {
     this._year = now.getFullYear();
     this._month = now.getMonth();
     this._emitNavChange();
-  }
-
-  willUpdate(changedProperties: Map<string, unknown>) {
-    if (changedProperties.has("_year") || changedProperties.has("_month")) {
-      this._syncFromStore(schedulerStore.getState());
-    }
   }
 
   override firstUpdated() {

@@ -75,6 +75,15 @@ export interface ChatParseCard {
    * that hides its own guesses is not a verification surface.
    */
   notes?: string[];
+  /**
+   * Things about the WORLD worth a second look before confirming — the
+   * calendar is showing a timezone you are not in, the room is already booked.
+   *
+   * Distinct from `notes`, which is about values the system invented, and
+   * rendered more prominently. Never disables Confirm: the point is to inform
+   * the decision, not to take it.
+   */
+  warnings?: string[];
 }
 
 /** One tappable answer to a clarification question. */
@@ -130,6 +139,14 @@ export interface ChatClarifyMessage extends ChatMessageBase {
   role: "assistant";
   /** "Got it — Room A." Acknowledges the previous answer. */
   ack?: string;
+  /**
+   * Shown instead of `ack` when the previous answer could not be used —
+   * "I didn't catch a time in that — try 'tomorrow at 2pm'".
+   *
+   * Mutually exclusive with `ack`: the assistant either acknowledges what the
+   * user said or explains why it did not land, never both.
+   */
+  lead?: string;
   /** What is understood so far, same shapes as a parse card. */
   chips?: ChatChip[];
   question: string;
