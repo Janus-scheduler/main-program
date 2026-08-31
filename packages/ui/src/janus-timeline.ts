@@ -184,6 +184,7 @@ export class JanusTimeline extends LitElement {
       name: string;
       type: string;
       avatar: string;
+      subtitle: string;
       groupLabel: string | undefined;
       resource: TimelineResource;
       track: { trackCount: number; eventTracks: Map<string, number> };
@@ -471,6 +472,10 @@ export class JanusTimeline extends LitElement {
         groupLabel = typeLabel;
       }
       const avatarSrc = res.avatar ?? "";
+      const subtitleSrc =
+        res.subtitle ||
+        typeConfig?.subtitle ||
+        type.charAt(0).toUpperCase() + type.slice(1);
 
       // ── Reuse the whole row when nothing about it changed ────────────────
       // Fields are compared individually rather than via a concatenated
@@ -486,7 +491,8 @@ export class JanusTimeline extends LitElement {
         prevRow.name === res.name &&
         prevRow.type === type &&
         prevRow.avatar === avatarSrc &&
-        prevRow.groupLabel === groupLabel
+        prevRow.groupLabel === groupLabel &&
+        prevRow.subtitle === subtitleSrc
       ) {
         prevRow.gen = this._syncGen;
         newResources.push(prevRow.resource);
@@ -535,10 +541,7 @@ export class JanusTimeline extends LitElement {
       const resource: TimelineResource = {
         id: res.id,
         name: res.name,
-        subtitle:
-          (res as any).subtitle ||
-          typeConfig?.subtitle ||
-          type.charAt(0).toUpperCase() + type.slice(1),
+        subtitle: subtitleSrc,
         avatarType,
         avatarIcon,
         groupLabel,
@@ -552,6 +555,7 @@ export class JanusTimeline extends LitElement {
         name: res.name,
         type,
         avatar: avatarSrc,
+        subtitle: subtitleSrc,
         groupLabel,
         resource,
         track,
