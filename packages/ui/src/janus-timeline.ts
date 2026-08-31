@@ -110,10 +110,9 @@ export class JanusTimeline extends LitElement {
   private _unsubStore?: () => void;
   /** Suppress scroll handler during programmatic scroll adjustments */
   private _suppressScroll = false;
-  private _isScrollingGrid = false;
-  private _isScrollingRes = false;
-  private _rafGridScroll: number | null = null;
-  private _rafResScroll: number | null = null;
+  private _activeScrollSource: "grid" | "res" | null = null;
+  private _scrollRafId: number | null = null;
+  @state() private _failedAvatars = new Set<string>();
 
   @state() private _scrollLeft = 0;
   @state() private _scrollTop = 0;
@@ -184,8 +183,10 @@ export class JanusTimeline extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
-    if (this._rafGridScroll !== null) cancelAnimationFrame(this._rafGridScroll);
-    if (this._rafResScroll !== null) cancelAnimationFrame(this._rafResScroll);
+    if (this._scrollRafId !== null) {
+      cancelAnimationFrame(this._scrollRafId);
+      this._scrollRafId = null;
+    }
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
     }
@@ -693,19 +694,18 @@ export class JanusTimeline extends LitElement {
   private _onGridScroll() {
     // Sync vertical scroll between resource column and time grid
     if (this.resColRef && this.gridScrollRef) {
-      if (!this._isScrollingRes) {
-        this._isScrollingGrid = true;
+      if (this._activeScrollSource !== "res") {
+        this._activeScrollSource = "grid";
         if (
           Math.abs(this.resColRef.scrollTop - this.gridScrollRef.scrollTop) >
           0.5
         ) {
           this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
         }
-        if (this._rafGridScroll !== null)
-          cancelAnimationFrame(this._rafGridScroll);
-        this._rafGridScroll = requestAnimationFrame(() => {
-          this._isScrollingGrid = false;
-          this._rafGridScroll = null;
+        if (this._scrollRafId !== null) cancelAnimationFrame(this._scrollRafId);
+        this._scrollRafId = requestAnimationFrame(() => {
+          this._activeScrollSource = null;
+          this._scrollRafId = null;
         });
       }
     }
@@ -768,19 +768,18 @@ export class JanusTimeline extends LitElement {
 
   private _onResScroll() {
     if (this.resColRef && this.gridScrollRef) {
-      if (!this._isScrollingGrid) {
-        this._isScrollingRes = true;
+      if (this._activeScrollSource !== "grid") {
+        this._activeScrollSource = "res";
         if (
           Math.abs(this.gridScrollRef.scrollTop - this.resColRef.scrollTop) >
           0.5
         ) {
           this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
         }
-        if (this._rafResScroll !== null)
-          cancelAnimationFrame(this._rafResScroll);
-        this._rafResScroll = requestAnimationFrame(() => {
-          this._isScrollingRes = false;
-          this._rafResScroll = null;
+        if (this._scrollRafId !== null) cancelAnimationFrame(this._scrollRafId);
+        this._scrollRafId = requestAnimationFrame(() => {
+          this._activeScrollSource = null;
+          this._scrollRafId = null;
         });
       }
     }
@@ -1187,28 +1186,21 @@ export class JanusTimeline extends LitElement {
               >${getInitials(r.name)}</span
             >`;
 
-    if (r.avatarType === "image" && r.avatar) {
+    const hasFailed = r.avatar ? this._failedAvatars.has(r.avatar) : true;
+    if (r.avatarType === "image" && r.avatar && !hasFailed) {
       return html`
-        <div
-          class="tl-avatar-wrap"
-          style="position: relative; display: inline-flex; flex-shrink: 0;"
-        >
-          ${fallback}
-          <img
-            class="tl-avatar tl-avatar--image"
-            src="${r.avatar}"
-            alt="${r.name}"
-            style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: ${borderRadius};"
-            @load=${(e: Event) => {
-              const img = e.currentTarget as HTMLImageElement;
-              img.style.display = "";
-            }}
-            @error=${(e: Event) => {
-              const img = e.currentTarget as HTMLImageElement;
-              img.style.display = "none";
-            }}
-          />
-        </div>
+        <img
+          class="tl-avatar tl-avatar--image"
+          src="${r.avatar}"
+          alt="${r.name}"
+          style="border-radius: ${borderRadius};"
+          @error=${() => {
+            if (r.avatar) {
+              this._failedAvatars.add(r.avatar);
+              this.requestUpdate();
+            }
+          }}
+        />
       `;
     }
 

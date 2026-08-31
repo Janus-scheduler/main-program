@@ -24,7 +24,10 @@ export class Event {
         : data.resourceId
           ? [data.resourceId]
           : [];
-    this.resourceId = this.resourceIds[0] || data.resourceId || "";
+    this.resourceId =
+      data.resourceId && this.resourceIds.includes(data.resourceId)
+        ? data.resourceId
+        : this.resourceIds[0] || data.resourceId || "";
     this.status = data.status || "draft";
     this.description = data.description || "";
     this.color = data.color;

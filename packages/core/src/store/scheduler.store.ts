@@ -107,14 +107,18 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
     const event = state.events[id];
     if (!event) throw new Error(`Event ${id} not found`);
 
-    let resourceIds = event.resourceIds;
+    let resourceIds = [...event.resourceIds];
     let resourceId = event.resourceId;
-    if (updates.resourceIds) {
+
+    if (updates.resourceIds !== undefined) {
       resourceIds = updates.resourceIds;
-      resourceId = updates.resourceIds[0] || "";
-    } else if (updates.resourceId) {
+      resourceId =
+        updates.resourceId !== undefined
+          ? updates.resourceId
+          : resourceIds[0] || "";
+    } else if (updates.resourceId !== undefined) {
       resourceId = updates.resourceId;
-      resourceIds = [updates.resourceId];
+      resourceIds = resourceId ? [resourceId] : [];
     }
 
     const updatedEvent = new Event({

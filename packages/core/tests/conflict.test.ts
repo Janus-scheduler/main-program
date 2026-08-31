@@ -184,5 +184,41 @@ describe("Conflict Utilities", () => {
       expect(result.messages[0]).toContain("Product Sync");
       expect(result.messages[0]).toContain("9:30 AM");
     });
+
+    it("should append overflow notice when unique conflict count exceeds 50", () => {
+      const resources: ConflictResource[] = [];
+      for (let i = 0; i < 55; i++) {
+        resources.push({
+          id: `res_${i}`,
+          name: `Resource ${i}`,
+          events: [
+            {
+              id: `ev_${i}_a`,
+              title: `Meeting A ${i}`,
+              startMs: Date.UTC(2026, 5, 2, 9, 0, 0),
+              endMs: Date.UTC(2026, 5, 2, 10, 0, 0),
+              startTime: "09:00:00",
+              endTime: "10:00:00",
+            },
+            {
+              id: `ev_${i}_b`,
+              title: `Meeting B ${i}`,
+              startMs: Date.UTC(2026, 5, 2, 9, 30, 0),
+              endMs: Date.UTC(2026, 5, 2, 10, 30, 0),
+              startTime: "09:30:00",
+              endTime: "10:30:00",
+            },
+          ],
+        });
+      }
+
+      const result = computeTimelineConflicts(resources, "UTC");
+      expect(result.hasConflict).toBe(true);
+      expect(result.conflictingEventIds.size).toBe(110);
+      expect(result.messages.length).toBe(51); // 50 detailed + 1 summary
+      expect(result.messages[50]).toContain(
+        "... and 5 more conflict(s) detected across resources.",
+      );
+    });
   });
 });

@@ -115,6 +115,27 @@ describe("Scheduler Store", () => {
       expect(event.resourceIds).toEqual(["r4"]);
       expect(event.resourceId).toBe("r4");
 
+      // Update with both resourceIds and explicit primary resourceId
+      store.updateEvent("evt-1", {
+        resourceIds: ["r5", "r6"],
+        resourceId: "r6",
+      });
+      event = schedulerStore.getState().events["evt-1"];
+      expect(event.resourceIds).toEqual(["r5", "r6"]);
+      expect(event.resourceId).toBe("r6");
+
+      // Clear with empty resourceId
+      store.updateEvent("evt-1", { resourceId: "" });
+      event = schedulerStore.getState().events["evt-1"];
+      expect(event.resourceIds).toEqual([]);
+      expect(event.resourceId).toBe("");
+
+      // Clear with empty resourceIds
+      store.updateEvent("evt-1", { resourceIds: [] });
+      event = schedulerStore.getState().events["evt-1"];
+      expect(event.resourceIds).toEqual([]);
+      expect(event.resourceId).toBe("");
+
       // Test event update throw on missing event
       expect(() => {
         store.updateEvent("non-existent", { title: "New" });

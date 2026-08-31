@@ -88,12 +88,17 @@ export class JanusMonthGrid extends LitElement {
 
       if (origEndMs > origStartMs) {
         const endDCheck = new Date(origEndMs);
-        if (
+        const isUtcMidnight =
+          endDCheck.getUTCHours() === 0 &&
+          endDCheck.getUTCMinutes() === 0 &&
+          endDCheck.getUTCSeconds() === 0 &&
+          endDCheck.getUTCMilliseconds() === 0;
+        const isLocalMidnight =
           endDCheck.getHours() === 0 &&
           endDCheck.getMinutes() === 0 &&
           endDCheck.getSeconds() === 0 &&
-          endDCheck.getMilliseconds() === 0
-        ) {
+          endDCheck.getMilliseconds() === 0;
+        if (isUtcMidnight || isLocalMidnight) {
           origEndMs -= 1;
         }
       }
@@ -217,9 +222,16 @@ export class JanusMonthGrid extends LitElement {
 
   public goToDate(date: string | number | Date) {
     let d: Date;
-    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      const [y, m, day] = date.split("-").map(Number);
-      d = new Date(y, m - 1, day, 12, 0, 0);
+    if (typeof date === "string") {
+      const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const y = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10) - 1;
+        const day = parseInt(match[3], 10);
+        d = new Date(y, m, day, 12, 0, 0);
+      } else {
+        d = new Date(date);
+      }
     } else {
       d = new Date(date);
     }

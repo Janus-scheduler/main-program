@@ -85,9 +85,16 @@ export class JanusYearGrid extends LitElement {
 
   public goToDate(date: string | number | Date) {
     let d: Date;
-    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}/.test(date)) {
-      const parts = date.split("-").map(Number);
-      d = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+    if (typeof date === "string") {
+      const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const y = parseInt(match[1], 10);
+        const m = parseInt(match[2], 10) - 1;
+        const day = parseInt(match[3], 10);
+        d = new Date(y, m, day, 12, 0, 0);
+      } else {
+        d = new Date(date);
+      }
     } else {
       d = new Date(date);
     }
@@ -148,16 +155,21 @@ export class JanusYearGrid extends LitElement {
       const origStartMs = new Date(e.startTime).getTime();
       let origEndMs = new Date(e.endTime).getTime();
 
-      // Handle midnight end boundary: if event ends exactly at 00:00:00.000,
+      // Handle midnight end boundary: if event ends exactly at 00:00:00.000 (UTC or local),
       // subtract 1ms to stay on preceding day before range clamping.
       if (origEndMs > origStartMs) {
         const endDCheck = new Date(origEndMs);
-        if (
+        const isUtcMidnight =
+          endDCheck.getUTCHours() === 0 &&
+          endDCheck.getUTCMinutes() === 0 &&
+          endDCheck.getUTCSeconds() === 0 &&
+          endDCheck.getUTCMilliseconds() === 0;
+        const isLocalMidnight =
           endDCheck.getHours() === 0 &&
           endDCheck.getMinutes() === 0 &&
           endDCheck.getSeconds() === 0 &&
-          endDCheck.getMilliseconds() === 0
-        ) {
+          endDCheck.getMilliseconds() === 0;
+        if (isUtcMidnight || isLocalMidnight) {
           origEndMs -= 1;
         }
       }
@@ -167,12 +179,12 @@ export class JanusYearGrid extends LitElement {
 
       if (startMs > endMs) continue;
 
-      // Iterate day-by-day using local calendar date increments
+      // Iterate day-by-day anchored at midday to avoid DST transitions drifting across days
       const cur = new Date(startMs);
-      cur.setHours(0, 0, 0, 0);
+      cur.setHours(12, 0, 0, 0);
 
       const endD = new Date(endMs);
-      endD.setHours(0, 0, 0, 0);
+      endD.setHours(12, 0, 0, 0);
       const endCurMs = endD.getTime();
 
       while (cur.getTime() <= endCurMs) {
@@ -202,8 +214,8 @@ export class JanusYearGrid extends LitElement {
 
   private _renderMonth(monthIndex: number) {
     const today = new Date();
-    const isCurrentMonth =
-      today.getFullYear() === this.viewYear && today.getMonth() === monthIndex;
+    const isCurrentYear = today.getFullYear() === this.viewYear;
+    const isCurrentMonth = isCurrentYear && today.getMonth() === monthIndex;
 
     const firstDay = new Date(this.viewYear, monthIndex, 1).getDay();
     const totalDays = new Date(this.viewYear, monthIndex + 1, 0).getDate();
@@ -218,6 +230,8 @@ export class JanusYearGrid extends LitElement {
     // Actual days
     for (let day = 1; day <= totalDays; day++) {
       const isToday = isCurrentMonth && today.getDate() === day;
+      const isDefaultFocus = !isCurrentYear && monthIndex === 0 && day === 1;
+      const isAccessibleTarget = isToday || isDefaultFocus;
       const dateStr = toLocalDateStr(this.viewYear, monthIndex, day);
       const hasEvent = this._eventsMap.has(dateStr);
 
@@ -225,7 +239,7 @@ export class JanusYearGrid extends LitElement {
         <div
           class="yg-day-cell"
           role="button"
-          tabindex=${isToday ? "0" : "-1"}
+          tabindex=${isAccessibleTarget ? "0" : "-1"}
           aria-label="${MONTH_NAMES[monthIndex]} ${day}, ${this.viewYear}"
           @click=${() => this._handleDayClick(this.viewYear, monthIndex, day)}
           @keydown=${(e: KeyboardEvent) => {

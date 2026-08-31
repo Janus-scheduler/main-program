@@ -32,6 +32,8 @@ export function computeTimelineConflicts(
 } {
   const conflictingEventIds = new Set<string>();
   const messagesSet = new Set<string>();
+  const MAX_MESSAGES = 50;
+  let totalConflictsCount = 0;
 
   for (const r of resources) {
     if (!r.events || r.events.length <= 1) continue;
@@ -53,8 +55,9 @@ export function computeTimelineConflicts(
         // Overlap detected!
         conflictingEventIds.add(evA.id);
         conflictingEventIds.add(evB.id);
+        totalConflictsCount++;
 
-        if (messagesSet.size < 50) {
+        if (messagesSet.size < MAX_MESSAGES) {
           const overlapStartMs = Math.max(evA.startMs, evB.startMs);
           const overlapEndMs = Math.min(evA.endMs, evB.endMs);
           const { dateLabel, startTimeLabel, endTimeLabel } =
@@ -71,9 +74,17 @@ export function computeTimelineConflicts(
     }
   }
 
+  const messages = Array.from(messagesSet);
+  if (totalConflictsCount > messagesSet.size) {
+    const overflowCount = totalConflictsCount - messagesSet.size;
+    messages.push(
+      `... and ${overflowCount} more conflict(s) detected across resources.`,
+    );
+  }
+
   return {
     hasConflict: conflictingEventIds.size > 0,
-    messages: Array.from(messagesSet),
+    messages,
     conflictingEventIds,
   };
 }

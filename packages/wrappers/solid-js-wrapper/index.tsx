@@ -212,41 +212,44 @@ export const Timeline: Component<TimelineProps> = (props) => {
   });
 
   onMount(() => {
-    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
-      if (handler) {
-        const listener = (e: Event) => handler((e as CustomEvent).detail);
-        ref?.addEventListener(eventName, listener);
-        onCleanup(() => ref?.removeEventListener(eventName, listener));
-      }
+    const attach = <T,>(
+      eventName: string,
+      getHandler: () => ((detail: T) => void) | undefined,
+    ) => {
+      const listener = (e: Event) => {
+        const handler = getHandler();
+        handler?.((e as CustomEvent).detail);
+      };
+      ref?.addEventListener(eventName, listener);
+      onCleanup(() => ref?.removeEventListener(eventName, listener));
     };
 
     const attachMoveResizeCreate = <
       T extends EventMoveDetail | EventResizeDetail | EventCreateDetail,
     >(
       eventName: string,
-      handler?: (detail: T) => void,
+      getHandler: () => ((detail: T) => void) | undefined,
     ) => {
-      if (handler) {
-        const listener = (e: Event) => {
-          const detail = (e as CustomEvent).detail as T;
-          if (props.preventConflicts && detail.hasConflict) {
-            return;
-          }
-          handler(detail);
-        };
-        ref?.addEventListener(eventName, listener);
-        onCleanup(() => ref?.removeEventListener(eventName, listener));
-      }
+      const listener = (e: Event) => {
+        const detail = (e as CustomEvent).detail as T;
+        if (props.preventConflicts && detail.hasConflict) {
+          return;
+        }
+        const handler = getHandler();
+        handler?.(detail);
+      };
+      ref?.addEventListener(eventName, listener);
+      onCleanup(() => ref?.removeEventListener(eventName, listener));
     };
 
-    attach("event-click", props.onEventClick);
-    attach("add-event", props.onAddEvent);
-    attachMoveResizeCreate("event-move", props.onEventMove);
-    attachMoveResizeCreate("event-resize", props.onEventResize);
-    attachMoveResizeCreate("event-create", props.onEventCreate);
-    attach("view-change", props.onViewChange);
-    attach("nav-change", props.onNavChange);
-    attach("conflict-detected", props.onConflictDetected);
+    attach("event-click", () => props.onEventClick);
+    attach("add-event", () => props.onAddEvent);
+    attachMoveResizeCreate("event-move", () => props.onEventMove);
+    attachMoveResizeCreate("event-resize", () => props.onEventResize);
+    attachMoveResizeCreate("event-create", () => props.onEventCreate);
+    attach("view-change", () => props.onViewChange);
+    attach("nav-change", () => props.onNavChange);
+    attach("conflict-detected", () => props.onConflictDetected);
   });
 
   return (
@@ -291,18 +294,22 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
   });
 
   onMount(() => {
-    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
-      if (handler) {
-        const listener = (e: Event) => handler((e as CustomEvent).detail);
-        ref?.addEventListener(eventName, listener);
-        onCleanup(() => ref?.removeEventListener(eventName, listener));
-      }
+    const attach = <T,>(
+      eventName: string,
+      getHandler: () => ((detail: T) => void) | undefined,
+    ) => {
+      const listener = (e: Event) => {
+        const handler = getHandler();
+        handler?.((e as CustomEvent).detail);
+      };
+      ref?.addEventListener(eventName, listener);
+      onCleanup(() => ref?.removeEventListener(eventName, listener));
     };
-    attach("event-click", props.onEventClick);
-    attach("day-click", props.onDayClick);
-    attach("add-event", props.onAddEvent);
-    attach("view-change", props.onViewChange);
-    attach("nav-change", props.onNavChange);
+    attach("event-click", () => props.onEventClick);
+    attach("day-click", () => props.onDayClick);
+    attach("add-event", () => props.onAddEvent);
+    attach("view-change", () => props.onViewChange);
+    attach("nav-change", () => props.onNavChange);
   });
 
   return (
@@ -334,16 +341,20 @@ export const YearGrid: Component<YearGridProps> = (props) => {
   });
 
   onMount(() => {
-    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
-      if (handler) {
-        const listener = (e: Event) => handler((e as CustomEvent).detail);
-        ref?.addEventListener(eventName, listener);
-        onCleanup(() => ref?.removeEventListener(eventName, listener));
-      }
+    const attach = <T,>(
+      eventName: string,
+      getHandler: () => ((detail: T) => void) | undefined,
+    ) => {
+      const listener = (e: Event) => {
+        const handler = getHandler();
+        handler?.((e as CustomEvent).detail);
+      };
+      ref?.addEventListener(eventName, listener);
+      onCleanup(() => ref?.removeEventListener(eventName, listener));
     };
-    attach("day-click", props.onDayClick);
-    attach("view-change", props.onViewChange);
-    attach("nav-change", props.onNavChange);
+    attach("day-click", () => props.onDayClick);
+    attach("view-change", () => props.onViewChange);
+    attach("nav-change", () => props.onNavChange);
   });
 
   return (
@@ -367,15 +378,19 @@ export const AiBar: Component<AiBarProps> = (props) => {
   let ref!: HTMLElement;
 
   onMount(() => {
-    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
-      if (handler) {
-        const listener = (e: Event) => handler((e as CustomEvent).detail);
-        ref?.addEventListener(eventName, listener);
-        onCleanup(() => ref?.removeEventListener(eventName, listener));
-      }
+    const attach = <T,>(
+      eventName: string,
+      getHandler: () => ((detail: T) => void) | undefined,
+    ) => {
+      const listener = (e: Event) => {
+        const handler = getHandler();
+        handler?.((e as CustomEvent).detail);
+      };
+      ref?.addEventListener(eventName, listener);
+      onCleanup(() => ref?.removeEventListener(eventName, listener));
     };
-    attach("ai-submit", props.onAiSubmit);
-    attach("ai-input", props.onAiInput);
+    attach("ai-submit", () => props.onAiSubmit);
+    attach("ai-input", () => props.onAiInput);
   });
 
   return (
@@ -421,18 +436,22 @@ export const Topbar: Component<TopbarProps> = (props) => {
   });
 
   onMount(() => {
-    const attach = <T,>(eventName: string, handler?: (detail: T) => void) => {
-      if (handler) {
-        const listener = (e: Event) => handler((e as CustomEvent).detail);
-        ref?.addEventListener(eventName, listener);
-        onCleanup(() => ref?.removeEventListener(eventName, listener));
-      }
+    const attach = <T,>(
+      eventName: string,
+      getHandler: () => ((detail: T) => void) | undefined,
+    ) => {
+      const listener = (e: Event) => {
+        const handler = getHandler();
+        handler?.((e as CustomEvent).detail);
+      };
+      ref?.addEventListener(eventName, listener);
+      onCleanup(() => ref?.removeEventListener(eventName, listener));
     };
-    attach("prev-click", props.onPrevClick);
-    attach("next-click", props.onNextClick);
-    attach("today-click", props.onTodayClick);
-    attach("view-switch", props.onViewSwitch);
-    attach("toggle-create", props.onToggleCreate);
+    attach("prev-click", () => props.onPrevClick);
+    attach("next-click", () => props.onNextClick);
+    attach("today-click", () => props.onTodayClick);
+    attach("view-switch", () => props.onViewSwitch);
+    attach("toggle-create", () => props.onToggleCreate);
   });
 
   return (

@@ -5,10 +5,10 @@ import {
   ElementRef,
   AfterViewInit,
   OnDestroy,
+  OnChanges,
   input,
   viewChild,
   ChangeDetectionStrategy,
-  effect,
 } from "@angular/core";
 // Side-effect import: ensures the <janus-year-grid> custom element is registered
 import { JanusYearGrid } from "@janus-scheduler/ui";
@@ -31,7 +31,7 @@ import { type ViewType } from "@janus-scheduler/core";
     `,
   ],
 })
-export class YearGridComponent implements AfterViewInit, OnDestroy {
+export class YearGridComponent implements AfterViewInit, OnDestroy, OnChanges {
   private readonly _elRef =
     viewChild.required<ElementRef<HTMLElement>>("yearGridEl");
 
@@ -40,12 +40,6 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
   readonly dayClick = output<{ date: string }>();
   readonly viewChange = output<{ view: ViewType }>();
   readonly navChange = output<Record<string, unknown>>();
-
-  constructor() {
-    effect(() => {
-      this._syncProps();
-    });
-  }
 
   private _dayClickHandler = (e: Event) => {
     e.stopPropagation();
@@ -102,16 +96,16 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
     this._syncProps();
   }
 
+  ngOnChanges(): void {
+    this._syncProps();
+  }
+
   private _syncProps(): void {
-    try {
-      const el = this._elRef()?.nativeElement as
-        | (HTMLElement & { viewYear?: number })
-        | undefined;
-      if (el && this.viewYear() !== undefined) {
-        el.viewYear = this.viewYear()!;
-      }
-    } catch {
-      // ViewChild might not be initialized yet before first view init
+    const el = this._elRef()?.nativeElement as
+      | (HTMLElement & { viewYear?: number })
+      | undefined;
+    if (el && this.viewYear() !== undefined) {
+      el.viewYear = this.viewYear()!;
     }
   }
 
