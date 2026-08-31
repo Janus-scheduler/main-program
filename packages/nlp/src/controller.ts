@@ -175,24 +175,21 @@ export class ChatController {
       return;
     }
 
-    const CORRECTION_RE =
-      /^\s*(actually|instead|no,|no |change it to|make it)\b\s*(.*)/i;
-    const correctionMatch = text.match(CORRECTION_RE);
+    const CORRECTION_PREFIX_RE =
+      /^\s*(?:actually|instead|no,|no|change it to|make it)\b\s*/i;
+    const correctionPrefixMatch = CORRECTION_PREFIX_RE.exec(text);
 
     // If it's a correction and we have a draft, we'll try to apply it.
     // reviseSlot will re-evaluate with the new text. We'll pass undefined for span
     // to just append the correction and re-evaluate, since the entities extractor
     // will pick up the new span and override.
     // We do this by intercepting before provideAnswer.
-    let isCorrection = false;
-    if (
-      correctionMatch &&
+    const isCorrection = Boolean(
+      correctionPrefixMatch &&
       this.session &&
       this.session.draft &&
-      this.session.status !== "declined"
-    ) {
-      isCorrection = true;
-    }
+      this.session.status !== "declined",
+    );
 
     const ctx: SessionContext = {
       artifacts: this.options.engine.artifacts,
@@ -211,10 +208,10 @@ export class ChatController {
       let next: SessionState | null = null;
       try {
         if (isCorrection && this.session) {
-          const payload =
-            correctionMatch && correctionMatch[2].trim().length > 0
-              ? correctionMatch[2].trim()
-              : text;
+          const stripped = correctionPrefixMatch
+            ? text.slice(correctionPrefixMatch[0].length).trim()
+            : "";
+          const payload = stripped.length > 0 ? stripped : text;
           const parsed = parseTimeSpan(payload);
           if (parsed && this.session.draft?.timeSpan) {
             const originalSpan = this.session.draft.timeSpan;

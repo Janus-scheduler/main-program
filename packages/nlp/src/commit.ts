@@ -191,8 +191,15 @@ function newEventId(): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   if (uuid) return `nlp_${uuid}`;
   idCounter = (idCounter + 1) % Number.MAX_SAFE_INTEGER;
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `nlp_${Date.now()}_${idCounter}_${rand}`;
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    const bytes = new Uint8Array(6);
+    globalThis.crypto.getRandomValues(bytes);
+    const rand = Array.from(bytes, (b) => b.toString(36))
+      .join("")
+      .slice(0, 8);
+    return `nlp_${Date.now()}_${idCounter}_${rand}`;
+  }
+  return `nlp_${Date.now()}_${idCounter}`;
 }
 
 /** How many times to re-roll an id before giving up. */
