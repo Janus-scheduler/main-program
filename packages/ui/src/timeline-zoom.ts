@@ -8,7 +8,10 @@
  * Zero DOM / Lit dependency — fully testable in isolation.
  */
 
-import { toFakeLocalDate } from "@janus-scheduler/core";
+import {
+  toFakeLocalDate,
+  getUtcMsForZonedDatetime,
+} from "@janus-scheduler/core";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -253,54 +256,126 @@ export function snapTimestamp(tsMs: number, snapMs: number): number {
 }
 
 /**
- * Snap a timestamp DOWN to the start of the given unit.
+ * Snap a timestamp DOWN to the start of the given unit in the target timezone.
  * For calendar-aware units (day, week, month, year), this aligns to
- * midnight / start-of-week / start-of-month / start-of-year.
+ * midnight / start-of-week / start-of-month / start-of-year in that timezone.
  */
-export function floorToUnit(tsMs: number, unit: ZoomUnit): number {
-  const d = new Date(tsMs);
+export function floorToUnit(
+  tsMs: number,
+  unit: ZoomUnit,
+  timezone?: string,
+): number {
+  if (!timezone) {
+    const d = new Date(tsMs);
+    switch (unit) {
+      case "5min":
+        d.setMinutes(Math.floor(d.getMinutes() / 5) * 5, 0, 0);
+        return d.getTime();
+      case "15min":
+        d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0);
+        return d.getTime();
+      case "30min":
+        d.setMinutes(Math.floor(d.getMinutes() / 30) * 30, 0, 0);
+        return d.getTime();
+      case "1hour":
+        d.setMinutes(0, 0, 0);
+        return d.getTime();
+      case "4hour":
+        d.setHours(Math.floor(d.getHours() / 4) * 4, 0, 0, 0);
+        return d.getTime();
+      case "1day":
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      case "1week": {
+        d.setHours(0, 0, 0, 0);
+        const dayOfWeek = d.getDay(); // 0=Sun
+        d.setDate(d.getDate() - dayOfWeek); // floor to Sunday
+        return d.getTime();
+      }
+      case "1month":
+        d.setDate(1);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      case "1year":
+        d.setMonth(0, 1);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+    }
+  }
+
+  const d = toFakeLocalDate(tsMs, timezone);
   switch (unit) {
     case "5min":
       d.setMinutes(Math.floor(d.getMinutes() / 5) * 5, 0, 0);
-      return d.getTime();
+      break;
     case "15min":
       d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0);
-      return d.getTime();
+      break;
     case "30min":
       d.setMinutes(Math.floor(d.getMinutes() / 30) * 30, 0, 0);
-      return d.getTime();
+      break;
     case "1hour":
       d.setMinutes(0, 0, 0);
-      return d.getTime();
+      break;
     case "4hour":
       d.setHours(Math.floor(d.getHours() / 4) * 4, 0, 0, 0);
-      return d.getTime();
+      break;
     case "1day":
       d.setHours(0, 0, 0, 0);
-      return d.getTime();
+      break;
     case "1week": {
       d.setHours(0, 0, 0, 0);
       const dayOfWeek = d.getDay(); // 0=Sun
       d.setDate(d.getDate() - dayOfWeek); // floor to Sunday
-      return d.getTime();
+      break;
     }
     case "1month":
       d.setDate(1);
       d.setHours(0, 0, 0, 0);
-      return d.getTime();
+      break;
     case "1year":
       d.setMonth(0, 1);
       d.setHours(0, 0, 0, 0);
-      return d.getTime();
+      break;
   }
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return getUtcMsForZonedDatetime(dateStr, timeStr, timezone);
 }
 
 /**
  * Advance a timestamp by one unit.
  * Calendar-aware: adding 1 month to Jan 31 → Feb 28, etc.
  */
-export function advanceByUnit(tsMs: number, unit: ZoomUnit): number {
-  const d = new Date(tsMs);
+export function advanceByUnit(
+  tsMs: number,
+  unit: ZoomUnit,
+  timezone?: string,
+): number {
+  if (unit === "1month" || unit === "1year") {
+    if (timezone) {
+      const d = toFakeLocalDate(tsMs, timezone);
+      if (unit === "1month") {
+        d.setMonth(d.getMonth() + 1);
+      } else {
+        d.setFullYear(d.getFullYear() + 1);
+      }
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      return getUtcMsForZonedDatetime(dateStr, timeStr, timezone);
+    }
+    const d = new Date(tsMs);
+    if (unit === "1month") {
+      d.setMonth(d.getMonth() + 1);
+    } else {
+      d.setFullYear(d.getFullYear() + 1);
+    }
+    return d.getTime();
+  }
+
   switch (unit) {
     case "5min":
       return tsMs + 5 * MS_MIN;
@@ -316,18 +391,12 @@ export function advanceByUnit(tsMs: number, unit: ZoomUnit): number {
       return tsMs + MS_DAY;
     case "1week":
       return tsMs + MS_WEEK;
-    case "1month":
-      d.setMonth(d.getMonth() + 1);
-      return d.getTime();
-    case "1year":
-      d.setFullYear(d.getFullYear() + 1);
-      return d.getTime();
   }
 }
 
 /**
  * Generate column ticks from viewStart to viewEnd at the given zoom level.
- * Caps at 300 columns for safety.
+ * Caps at 2500 columns for safety.
  */
 export function generateColumns(
   viewStartMs: number,
@@ -337,10 +406,10 @@ export function generateColumns(
   timezone?: string,
 ): ColumnTick[] {
   const columns: ColumnTick[] = [];
-  let cursor = floorToUnit(viewStartMs, level.unit);
+  let cursor = floorToUnit(viewStartMs, level.unit, timezone);
   let safety = 0;
   while (cursor < viewEndMs && safety < 2500) {
-    const nextCursor = advanceByUnit(cursor, level.unit);
+    const nextCursor = advanceByUnit(cursor, level.unit, timezone);
     const px = (cursor - viewStartMs) * pxPerMs;
     const width = (nextCursor - cursor) * pxPerMs;
     if (width > 0.5) {
@@ -369,10 +438,10 @@ export function generateSuperLabels(
   if (!parentUnit) return [];
 
   const labels: SuperLabel[] = [];
-  let cursor = floorToUnit(viewStartMs, parentUnit);
+  let cursor = floorToUnit(viewStartMs, parentUnit, timezone);
   let safety = 0;
   while (cursor < viewEndMs && safety < 2500) {
-    const nextCursor = advanceByUnit(cursor, parentUnit);
+    const nextCursor = advanceByUnit(cursor, parentUnit, timezone);
     const clippedStart = Math.max(cursor, viewStartMs);
     const clippedEnd = Math.min(nextCursor, viewEndMs);
     const px = (clippedStart - viewStartMs) * pxPerMs;

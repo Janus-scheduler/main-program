@@ -22,6 +22,8 @@ export { DayGridComponent, WeekGridComponent } from "./lib/time-grid.component";
 export { YearGridComponent } from "./lib/year-grid.component";
 export { AiBarComponent } from "./lib/ai-bar.component";
 export { TopbarComponent } from "./lib/topbar.component";
+export { ChatComponent } from "./lib/chat.component";
+export { JanusChatService } from "./lib/chat.service";
 
 // Core Utilities — Facade Pattern
 export {
@@ -32,6 +34,21 @@ export {
   schedulerStore,
 } from "@janus-scheduler/core";
 export type { SchedulerHooks, SchedulerConfig } from "@janus-scheduler/core";
+
+export {
+  presentSession,
+  summarise,
+  beginSession,
+  provideAnswer,
+  ChatController,
+  type EntityCatalog,
+  type SessionContext,
+  type SessionRequirements,
+  type SessionState,
+  type JanusChatOptions,
+  type ConfirmOutcome,
+  type NlpEngine,
+} from "@janus-scheduler/nlp";
 
 // Types — re-exported so consumers don't need to import from @janus-scheduler/core directly
 export type {
@@ -53,6 +70,28 @@ export type {
   EventData,
   ResourceData,
   AssignmentData,
+} from "./lib/types";
+
+// <janus-chat> view-model types — from @janus-scheduler/ui, see lib/types.ts
+export type {
+  ChatRole,
+  ChatChipKind,
+  ChatChip,
+  ChatChange,
+  ChatParseCard,
+  ChatChoice,
+  ChatSuggestion,
+  ChatMessage,
+  ChatTextMessage,
+  ChatThinkingMessage,
+  ChatParseMessage,
+  ChatClarifyMessage,
+  ChatSuccessMessage,
+  ChatDividerMessage,
+  ChatSubmitDetail,
+  ChatActionDetail,
+  ChatClarifyResponseDetail,
+  ChatSuggestionDetail,
 } from "./lib/types";
 
 // Domain model classes — re-exported for use in hook consumers (Option B)

@@ -5,7 +5,18 @@ import {
   signal,
   computed,
   viewChild,
+  inject,
+  effect,
 } from '@angular/core';
+import { NlpEngineService } from './chat/nlp-engine.service';
+import { JanusChatService } from './chat/janus-chat.service';
+import {
+  catalogFromResources,
+  commitSession,
+  type SessionRequirements,
+  type SessionState,
+  type PresentMessage,
+} from '@janus-scheduler/nlp';
 import {
   SchedulerComponent,
   TimelineComponent,
@@ -13,8 +24,8 @@ import {
   DayGridComponent,
   WeekGridComponent,
   YearGridComponent,
-  AiBarComponent,
   TopbarComponent,
+  ChatComponent,
   type TimelineEvent,
   type SchedulerSaveData,
   type EventMoveDetail,
@@ -31,6 +42,18 @@ import {
   isoToZonedDisplay,
   schedulerStore,
 } from '@janus-scheduler/angular';
+
+const INTRO: PresentMessage = {
+  id: 'intro',
+  role: 'assistant',
+  kind: 'text',
+  text: "Tell me what to schedule. I'll show you what I understood before anything is added.",
+};
+
+const REQUIRES: SessionRequirements = {
+  add_event: ['when', 'duration', 'resource', 'title'],
+  modify_event: ['when'],
+};
 
 export interface NavData {
   navLabel: string;
@@ -50,8 +73,8 @@ export interface NavData {
     DayGridComponent,
     WeekGridComponent,
     YearGridComponent,
-    AiBarComponent,
     TopbarComponent,
+    ChatComponent,
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './app.html',
@@ -76,6 +99,9 @@ export class App {
   readonly dayGridEl = viewChild<DayGridComponent>('dayGridEl');
   readonly weekGridEl = viewChild<WeekGridComponent>('weekGridEl');
   readonly yearGridEl = viewChild<YearGridComponent>('yearGridEl');
+
+  engineService = inject(NlpEngineService);
+  chatService = inject(JanusChatService);
 
   tempEventData = signal<{
     startDate?: string;
@@ -136,6 +162,27 @@ export class App {
 
   constructor() {
     this.seedInitialData();
+    effect(() => {
+      const state = this.engineService.state();
+      const catalog = catalogFromResources(this.manager.getAllResources());
+      const resources = this.manager.getAllResources();
+      this.chatService.initialize({
+        engine: state.status === 'ready' ? state.engine : null,
+        catalog,
+        // Resolved per turn, from the zone the timeline actually renders in.
+        timezone: () => schedulerStore.getState().timezone,
+        intro: INTRO,
+        requires: REQUIRES,
+        fallbackResourceName: resources[0]?.name,
+        onConfirm: (sessionState: SessionState) => {
+          const res = this.manager.getAllResources();
+          const result = commitSession(this.manager, sessionState, res[0]?.id);
+          return result.ok
+            ? { ok: true, message: result.summary, undo: result.undo }
+            : { ok: false, message: result.message };
+        },
+      });
+    });
   }
 
   private seedInitialData() {

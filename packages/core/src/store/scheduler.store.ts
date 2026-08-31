@@ -136,6 +136,8 @@ export const schedulerStore = createStore<SchedulerStore>((set, get) => ({
         updates.recurrenceRule !== undefined
           ? updates.recurrenceRule
           : event.recurrenceRule,
+      timezone:
+        updates.timezone !== undefined ? updates.timezone : event.timezone,
     });
 
     // To ensure reactivity in zustand, we create a new object reference for the events record.

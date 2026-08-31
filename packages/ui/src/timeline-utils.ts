@@ -5,6 +5,8 @@
  * All zoom/positioning math is now in timeline-zoom.ts.
  */
 
+import { isoToZonedDisplay } from "@janus-scheduler/core";
+
 // ── Constants ─────────────────────────────────────────────────────────
 export const AVATAR_PALETTE = [
   "#f97316",
@@ -70,8 +72,11 @@ export function formatDateShort(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-/** Convert a timestamp to "HH:MM" string */
-export function msToTimeStr(ms: number): string {
+/** Convert a timestamp to "HH:MM" string in the given timezone (or browser local time) */
+export function msToTimeStr(ms: number, timezone?: string): string {
+  if (timezone) {
+    return isoToZonedDisplay(new Date(ms).toISOString(), timezone).time;
+  }
   const d = new Date(ms);
   const h = d.getHours();
   const m = d.getMinutes();

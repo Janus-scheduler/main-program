@@ -989,7 +989,7 @@ describe("SchedulerManager", () => {
   describe("Recurrence occurrence shifting in updateEvent", () => {
     it("adjusts parent duration when occurrence is resized via endTime only", () => {
       const manager = new SchedulerManager();
-      const parent = manager.addEvent({
+      manager.addEvent({
         id: "rec-1",
         title: "Daily Standup",
         startTime: "2026-06-01T09:00:00.000Z",
