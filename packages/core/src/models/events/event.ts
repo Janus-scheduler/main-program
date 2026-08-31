@@ -12,6 +12,7 @@ export class Event {
   color?: string;
   allDay?: boolean;
   recurrenceRule?: string;
+  timezone?: string;
 
   constructor(data: EventData) {
     this.id = data.id;
@@ -30,6 +31,7 @@ export class Event {
     this.color = data.color;
     this.allDay = data.allDay;
     this.recurrenceRule = data.recurrenceRule;
+    this.timezone = data.timezone;
   }
 
   // Check if event data is valid

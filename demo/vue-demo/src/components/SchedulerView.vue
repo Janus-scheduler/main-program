@@ -5,7 +5,9 @@
     Functionally identical to React's SchedulerView.tsx and Angular's app.html.
   -->
 
-  <janus-topbar
+  <div style="display: flex; flex-direction: row; height: 100%; width: 100%;">
+    <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; height: 100%;">
+      <janus-topbar
     .navLabel="navData.navLabel"
     .dayName="navData.dayName"
     .shortDate="navData.shortDate"
@@ -28,6 +30,7 @@
     ref="timelineEl"
     .showFab="true"
     .allowCreate="allowCreate"
+    .resourceTypeConfig="TIMELINE_RESOURCE_CONFIG"
     @event-click="handleEventClick"
     @add-event="handleAddEvent"
     @event-move="handleEventMove"
@@ -108,9 +111,26 @@
     @close="$emit('close-scheduler')"
   />
 
-  <janus-ai-bar
-    @ai-submit="handleAiSubmit"
-  />
+    </div>
+
+    <div class="chat-sidebar">
+      <div class="chat-sidebar__panel">
+        <janus-chat
+          .messages="chat.thread"
+          :busy="chat.busy || engineState.status === 'loading'"
+          :disabled="chat.busy || engineState.status === 'loading'"
+          theme="light"
+          show-close
+          :placeholder="engineState.status === 'ready' ? 'Ask me to schedule something…' : 'Loading the language model…'"
+          @chatSubmit="(e: CustomEvent) => chat.submit(e.detail.prompt)"
+          @chatClarifyResponse="(e: CustomEvent) => chat.choose(e.detail.label)"
+          @chatConfirm="chat.confirm"
+          @chatUndo="(e: CustomEvent) => chat.undo(e.detail.messageId)"
+          @chatEdit="chat.edit ? chat.edit() : chat.reset()"
+        ></janus-chat>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -131,8 +151,36 @@ import {
 
 // Side-effect import: registers the custom elements
 import "@janus-scheduler/ui";
+import { useNlpEngine } from "../chat/useNlpEngine";
+import { useJanusChat } from "../chat/useJanusChat";
+import { catalogFromResources, commitSession } from "@janus-scheduler/nlp";
+import type { SessionRequirements, SessionState, PresentMessage } from "@janus-scheduler/nlp";
 
 export type { ViewType };
+
+const TIMELINE_RESOURCE_CONFIG = {
+  person: { label: "STAFF", subtitle: "Staff", order: 1 },
+  room: { label: "ROOMS", subtitle: "Facility", order: 2 },
+  equipment: { label: "EQUIPMENT", subtitle: "Equipment", order: 3 },
+  vehicle: {
+    label: "VEHICLES",
+    subtitle: "Fleet",
+    order: 4,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11h12Zm0 0h2.5a2.5 2.5 0 0 0 2.5-2.5V11l-4-3v10Z"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="18" r="2"/></svg>`,
+  },
+};
+
+const INTRO: PresentMessage = {
+  id: "intro",
+  role: "assistant",
+  kind: "text",
+  text: "Tell me what to schedule. I'll show you what I understood before anything is added.",
+};
+
+const REQUIRES: SessionRequirements = {
+  add_event: ["when", "duration", "resource", "title"],
+  modify_event: ["when"],
+};
 
 const props = defineProps<{
   currentView: ViewType;
@@ -143,6 +191,28 @@ const props = defineProps<{
   /** Whether Google Calendar is currently connected — shown on the topbar's connect button. */
   isGoogleCalendarConnected: boolean;
 }>();
+
+const engineState = useNlpEngine();
+const catalog = computed(() => catalogFromResources(props.manager.getAllResources()));
+
+const chatOptions = computed(() => ({
+  engine: engineState.value.status === "ready" ? engineState.value.engine : null,
+  catalog: catalog.value,
+  // Resolved per turn, from the zone the timeline actually renders in.
+      timezone: () => schedulerStore.getState().timezone,
+  intro: INTRO,
+  requires: REQUIRES,
+  fallbackResourceName: props.manager.getAllResources()[0]?.name,
+  onConfirm: (state: SessionState) => {
+    const resources = props.manager.getAllResources();
+    const result = commitSession(props.manager, state, resources[0]?.id);
+    return result.ok
+      ? { ok: true, message: result.summary, undo: result.undo }
+      : { ok: false, message: result.message };
+  }
+}));
+
+const chat = useJanusChat(() => chatOptions.value);
 
 const emit = defineEmits<{
   "view-change": [view: ViewType];
@@ -397,9 +467,5 @@ function handleEventCreate(e: Event) {
   });
 }
 
-function handleAiSubmit(e: Event) {
-  const { prompt } = (e as CustomEvent<{ prompt: string }>).detail;
-  console.log("AI prompt submitted:", prompt);
-  // TODO: NLP integration
-}
+
 </script>

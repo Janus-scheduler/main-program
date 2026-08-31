@@ -7,7 +7,17 @@ import {
   viewChild,
   effect,
   OnDestroy,
+  inject,
 } from '@angular/core';
+import { NlpEngineService } from './chat/nlp-engine.service';
+import { JanusChatService } from './chat/janus-chat.service';
+import {
+  catalogFromResources,
+  commitSession,
+  type SessionRequirements,
+  type SessionState,
+  type PresentMessage,
+} from '@janus-scheduler/nlp';
 import {
   SchedulerComponent,
   TimelineComponent,
@@ -15,8 +25,8 @@ import {
   DayGridComponent,
   WeekGridComponent,
   YearGridComponent,
-  AiBarComponent,
   TopbarComponent,
+  ChatComponent,
   type TimelineEvent,
   type SchedulerSaveData,
   type EventMoveDetail,
@@ -41,6 +51,18 @@ import {
 
 const BACKEND_URL = 'http://localhost:3001';
 
+const INTRO: PresentMessage = {
+  id: 'intro',
+  role: 'assistant',
+  kind: 'text',
+  text: "Tell me what to schedule. I'll show you what I understood before anything is added.",
+};
+
+const REQUIRES: SessionRequirements = {
+  add_event: ['when', 'duration', 'resource', 'title'],
+  modify_event: ['when'],
+};
+
 export interface NavData {
   navLabel: string;
   dayName: string;
@@ -59,8 +81,8 @@ export interface NavData {
     DayGridComponent,
     WeekGridComponent,
     YearGridComponent,
-    AiBarComponent,
     TopbarComponent,
+    ChatComponent,
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   templateUrl: './app.html',
@@ -80,11 +102,26 @@ export class App implements OnDestroy {
     zoomUnit: '',
   });
 
+  TIMELINE_RESOURCE_CONFIG = {
+    person: { label: 'STAFF', subtitle: 'Staff', order: 1 },
+    room: { label: 'ROOMS', subtitle: 'Facility', order: 2 },
+    equipment: { label: 'EQUIPMENT', subtitle: 'Equipment', order: 3 },
+    vehicle: {
+      label: 'VEHICLES',
+      subtitle: 'Fleet',
+      order: 4,
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11h12Zm0 0h2.5a2.5 2.5 0 0 0 2.5-2.5V11l-4-3v10Z"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="18" r="2"/></svg>`,
+    },
+  };
+
   readonly timelineEl = viewChild<TimelineComponent>('timelineEl');
   readonly monthGridEl = viewChild<MonthGridComponent>('monthGridEl');
   readonly dayGridEl = viewChild<DayGridComponent>('dayGridEl');
   readonly weekGridEl = viewChild<WeekGridComponent>('weekGridEl');
   readonly yearGridEl = viewChild<YearGridComponent>('yearGridEl');
+
+  engineService = inject(NlpEngineService);
+  chatService = inject(JanusChatService);
 
   tempEventData = signal<{
     startDate?: string;
@@ -185,6 +222,28 @@ export class App implements OnDestroy {
         this.stopRealtimeSync = undefined;
       });
     });
+
+    effect(() => {
+      const state = this.engineService.state();
+      const catalog = catalogFromResources(this.manager.getAllResources());
+      const resources = this.manager.getAllResources();
+      this.chatService.initialize({
+        engine: state.status === 'ready' ? state.engine : null,
+        catalog,
+        // Resolved per turn, from the zone the timeline actually renders in.
+        timezone: () => schedulerStore.getState().timezone,
+        intro: INTRO,
+        requires: REQUIRES,
+        fallbackResourceName: resources[0]?.name,
+        onConfirm: (sessionState: SessionState) => {
+          const res = this.manager.getAllResources();
+          const result = commitSession(this.manager, sessionState, res[0]?.id);
+          return result.ok
+            ? { ok: true, message: result.summary, undo: result.undo }
+            : { ok: false, message: result.message };
+        },
+      });
+    });
   }
 
   ngOnDestroy(): void {
@@ -214,6 +273,7 @@ export class App implements OnDestroy {
       name: 'Dr. Sarah Chen',
       type: 'person',
       email: 'sarah.chen@example.com',
+      subtitle: 'Specialist',
       avatar:
         'https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
     });
@@ -222,6 +282,7 @@ export class App implements OnDestroy {
       name: 'Dr. Michael Ross',
       type: 'person',
       email: 'michael.ross@example.com',
+      subtitle: 'Medical Officer',
       avatar:
         'https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000',
     });
@@ -229,6 +290,7 @@ export class App implements OnDestroy {
       id: 'r3',
       name: 'Dr. Ann sherin',
       type: 'person',
+      email: 'ann.sherin@example.com',
       avatar: 'https://westernsydneydiabetes.com.au/uploads/2021/06/Rona-scaled.jpg',
     });
     this.manager.addResource({
@@ -256,6 +318,7 @@ export class App implements OnDestroy {
       id: 'r7',
       name: 'Dr. Alan Turing',
       type: 'person',
+      email: 'alan.turing@example.com',
       avatar:
         'https://tse4.mm.bing.net/th/id/OIP.kqx_nQhmMAt1EtXnbBhOBwHaK0?r=0&w=832&h=1216&rs=1&pid=ImgDetMain&o=7&rm=3',
     });

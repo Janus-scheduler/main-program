@@ -11,6 +11,7 @@ import {
   type EventMoveDetail,
   type EventResizeDetail,
 } from "./timeline-types";
+import { isoToZonedDisplay } from "@janus-scheduler/core";
 import {
   ROW_HEIGHT,
   DRAG_THRESHOLD,
@@ -89,6 +90,7 @@ export class TimelineDragController {
   private _requestUpdate: () => void;
   private _pxPerMs = 0;
   private _viewStartMs = 0;
+  private _timezone = "";
   private _originalRowTopOffset = 8;
 
   // Bound handler for cleanup
@@ -132,11 +134,13 @@ export class TimelineDragController {
     resourceLayout: ResourceLayout[],
     pxPerMs: number,
     viewStartMs: number,
+    timezone?: string,
   ) {
     this._scrollContainer = scrollContainer;
     this._resourceLayout = resourceLayout;
     this._pxPerMs = pxPerMs;
     this._viewStartMs = viewStartMs;
+    if (timezone) this._timezone = timezone;
   }
 
   /** True if an event is the one currently being dragged */
@@ -335,8 +339,8 @@ export class TimelineDragController {
     const targetRow = this._findRowFromPointerY(e.clientY);
     this._targetResourceId = targetRow.id;
 
-    const startLabel = msToTimeStr(newStartMs);
-    const endLabel = msToTimeStr(newEndMs);
+    const startLabel = msToTimeStr(newStartMs, this._timezone);
+    const endLabel = msToTimeStr(newEndMs, this._timezone);
 
     const ghostTopOffset =
       this._targetResourceId === this._originResourceId
@@ -371,7 +375,7 @@ export class TimelineDragController {
       (r) => r.id === this._originResourceId,
     );
 
-    const startLabel = msToTimeStr(newStartMs);
+    const startLabel = msToTimeStr(newStartMs, this._timezone);
 
     this.ghost = {
       left: timestampToPx(newStartMs, this._viewStartMs, this._pxPerMs),
@@ -400,7 +404,7 @@ export class TimelineDragController {
       (r) => r.id === this._originResourceId,
     );
 
-    const endLabel = msToTimeStr(newEndMs);
+    const endLabel = msToTimeStr(newEndMs, this._timezone);
 
     this.ghost = {
       left: timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
@@ -437,8 +441,8 @@ export class TimelineDragController {
       (r) => r.id === this._originResourceId,
     );
 
-    const startLabel = msToTimeStr(startMs);
-    const endLabel = msToTimeStr(endMs);
+    const startLabel = msToTimeStr(startMs, this._timezone);
+    const endLabel = msToTimeStr(endMs, this._timezone);
 
     this.ghost = {
       left: timestampToPx(startMs, this._viewStartMs, this._pxPerMs),
@@ -536,13 +540,20 @@ export class TimelineDragController {
         let snappedEnd = snapTimestamp(ghostEndMs, snapMs);
         if (snappedEnd <= snappedStart) snappedEnd = snappedStart + snapMs;
 
+        const dateStr = this._timezone
+          ? isoToZonedDisplay(
+              new Date(snappedStart).toISOString(),
+              this._timezone,
+            ).date
+          : new Date(snappedStart).toISOString().split("T")[0];
+
         return {
           type: "event-create",
           detail: {
             resourceId: this._originResourceId,
             startTime: new Date(snappedStart).toISOString(),
             endTime: new Date(snappedEnd).toISOString(),
-            date: new Date(snappedStart).toISOString().split("T")[0],
+            date: dateStr,
           },
         };
       }

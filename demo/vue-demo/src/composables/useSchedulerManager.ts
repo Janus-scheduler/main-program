@@ -57,6 +57,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       name: "Dr. Sarah Chen",
       type: "person",
       email: "sarah.chen@example.com",
+      subtitle: "Specialist",
       avatar:
         "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
     });
@@ -65,6 +66,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       name: "Dr. Michael Ross",
       type: "person",
       email: "michael.ross@example.com",
+      subtitle: "Manager",
       avatar:
         "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
     });

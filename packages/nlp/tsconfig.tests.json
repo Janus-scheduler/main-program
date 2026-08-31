@@ -1,0 +1,21 @@
+/*
+ * Type-checking for the test suite.
+ *
+ * `tsconfig.json` deliberately excludes `tests/` — it is the BUILD config, and
+ * tests must not end up in `dist`. But that left the tests type-checked by
+ * nothing: `jest.config.cjs` sets ts-jest's `diagnostics: false`, so the suite
+ * only ever transpiles.
+ *
+ * Mirrors `packages/core/tsconfig.tests.json` for the same reason, and is run
+ * by `npm test` before Jest.
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "types": ["jest", "node"]
+  },
+  "include": ["src/**/*", "tests/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

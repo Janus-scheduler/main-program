@@ -278,5 +278,65 @@ describe("Scheduler Store", () => {
       store.setTimezone("UTC");
       expect(schedulerStore.getState().timezone).toBe("UTC");
     });
+
+    /**
+     * REGRESSION — picking a timezone in the event modal did not stick when
+     * creating a new event, though it did when editing one.
+     *
+     * `<janus-scheduler>` subscribes to the store and resets its local
+     * `_selectedTz` from `eventDraft.timezone` on EVERY store write. The
+     * timezone picker only ever set the component field, never the draft — so
+     * the next of the 15 `updateDraft` call sites (any keystroke in the title,
+     * any date change) read back the STALE draft timezone and silently
+     * reverted the user's choice. Editing an existing event appeared to work
+     * only because nothing else was edited afterwards.
+     *
+     * The fix writes the pick into the draft. This pins the behaviour the fix
+     * depends on: a timezone stored on the draft survives later edits.
+     */
+    it("keeps a draft timezone across subsequent draft edits", () => {
+      const store = schedulerStore.getState();
+      store.startDraft(null, { title: "", timezone: "UTC" });
+
+      store.updateDraft({ timezone: "Asia/Tokyo" });
+      expect(schedulerStore.getState().eventDraft?.timezone).toBe("Asia/Tokyo");
+
+      // Simulate the keystrokes and field edits that follow, each of which is
+      // a separate store write that used to clobber the picked zone.
+      store.updateDraft({ title: "K" });
+      store.updateDraft({ title: "Kn" });
+      store.updateDraft({ title: "Knee surgery" });
+      store.updateDraft({ startTime: "15:00" });
+      store.updateDraft({ participants: ["r1"] });
+
+      expect(schedulerStore.getState().eventDraft?.timezone).toBe("Asia/Tokyo");
+      expect(schedulerStore.getState().eventDraft?.title).toBe("Knee surgery");
+    });
+
+    it("updates event timezone via updateEvent and leaves store timezone intact", () => {
+      const store = schedulerStore.getState();
+      store.setTimezone("America/New_York");
+
+      const evt = store.addEvent({
+        id: "evt-tz-1",
+        title: "Conference",
+        startTime: "2026-06-02T10:00:00Z",
+        endTime: "2026-06-02T11:00:00Z",
+        resourceId: "r1",
+        timezone: "America/New_York",
+      });
+
+      expect(evt.timezone).toBe("America/New_York");
+      expect(schedulerStore.getState().timezone).toBe("America/New_York");
+
+      store.updateEvent("evt-tz-1", {
+        timezone: "Asia/Colombo",
+      });
+
+      const updated = schedulerStore.getState().events["evt-tz-1"];
+      expect(updated.timezone).toBe("Asia/Colombo");
+      // The timeline display timezone remains unaffected
+      expect(schedulerStore.getState().timezone).toBe("America/New_York");
+    });
   });
 });

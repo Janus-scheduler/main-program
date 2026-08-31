@@ -64,6 +64,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         name: "Dr. Sarah Chen",
         type: "person",
         email: "viduminisudeepa221@gmail.com",
+        subtitle: "Specialist",
         avatar:
           "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
       });
@@ -72,6 +73,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         name: "Dr. Michael Ross",
         type: "person",
         email: "michael.ross@example.com",
+        subtitle: "Surgeon",
         avatar:
           "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
       });
@@ -80,6 +82,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         name: "Dr. Ann sherin",
         type: "person",
         email: "ann.sherin@example.com",
+        subtitle: "Medical Officer",
         avatar:
           "https://westernsydneydiabetes.com.au/uploads/2021/06/Rona-scaled.jpg",
       });
@@ -111,6 +114,28 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         email: "alan.turing@example.com",
         avatar:
           "https://tse4.mm.bing.net/th/id/OIP.kqx_nQhmMAt1EtXnbBhOBwHaK0?r=0&w=832&h=1216&rs=1&pid=ImgDetMain&o=7&rm=3",
+      });
+      mgr.addResource({
+        id: "r8",
+        name: "Ambulance 01",
+        type: "vehicle",
+      });
+      mgr.addResource({
+        id: "r9",
+        name: "Mobile Clinic Van",
+        type: "vehicle",
+      });
+      mgr.addResource({
+        id: "r10",
+        name: "Resource 10",
+        type: "book",
+        avatar:
+          "https://tse4.mm.bing.net/th/id/OIP.kqx_nQhmMAt1EtXnbBhOBwHaK0?r=0&w=832&h=1216&rs=1&pid=ImgDetMain&o=7&rm=3",
+      });
+      mgr.addResource({
+        id: "r11",
+        name: "Harry Potter",
+        type: "car",
       });
 
       console.log("Assignments", mgr.getAssignmentsByEvent("e1"));

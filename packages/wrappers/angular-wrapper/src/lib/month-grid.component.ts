@@ -45,6 +45,9 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** When true, renders a + Floating Action Button */
   readonly showFab = input<boolean>(false);
 
+  /** Explicit display timezone */
+  readonly timezone = input<string | undefined>(undefined);
+
   readonly eventClick = output<TimelineEvent>();
   readonly dayClick = output<{ date: string }>();
   readonly addEvent = output<void>();
@@ -115,13 +118,9 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("add-event", this._addEventHandler);
     el.addEventListener("view-change", this._viewChangeHandler);
     el.addEventListener("nav-change", this._navChangeHandler);
-
-    if (this.events() !== undefined) {
-      this._syncEvents();
-    } else {
-      this._subscribeToStore();
-    }
     this._syncProps();
+    this._syncEvents();
+    this._subscribeToStore();
   }
 
   ngOnChanges(): void {
@@ -131,10 +130,11 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private _syncProps(): void {
     const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { showFab: boolean })
+      | (HTMLElement & { showFab: boolean; timezone?: string })
       | undefined;
     if (el) {
       el.showFab = this.showFab();
+      if (this.timezone() !== undefined) el.timezone = this.timezone();
     }
   }
 

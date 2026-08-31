@@ -252,7 +252,12 @@ export abstract class JanusTimeGridBase extends LitElement {
     const resourceMap = new Map<string, TimeGridEventResource>(
       Object.values(state.resources).map((r) => [
         r.id,
-        { id: r.id, name: r.name, avatar: r.avatar, type: r.type },
+        {
+          id: r.id,
+          name: r.name,
+          avatar: r.avatar,
+          type: r.type as TimeGridEventResource["type"],
+        },
       ]),
     );
 

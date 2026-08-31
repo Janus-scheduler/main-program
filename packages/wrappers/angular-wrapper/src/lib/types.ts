@@ -23,6 +23,36 @@ export type {
   EventData,
   ResourceData,
   AssignmentData,
+  ResourceTypeConfig,
 } from "@janus-scheduler/core";
 
 export { Event, Resource, Assignment } from "@janus-scheduler/core";
+
+/**
+ * `<janus-chat>` view-model types.
+ *
+ * These come from `@janus-scheduler/ui`, not `core`: they describe what the
+ * component RENDERS — bubbles, chips, cards — rather than domain state, and
+ * nothing in `core` produces or consumes them. Re-exported here so the facade
+ * rule still holds and host apps import only from `@janus-scheduler/angular`.
+ */
+export type {
+  ChatRole,
+  ChatChipKind,
+  ChatChip,
+  ChatChange,
+  ChatParseCard,
+  ChatChoice,
+  ChatSuggestion,
+  ChatMessage,
+  ChatTextMessage,
+  ChatThinkingMessage,
+  ChatParseMessage,
+  ChatClarifyMessage,
+  ChatSuccessMessage,
+  ChatDividerMessage,
+  ChatSubmitDetail,
+  ChatActionDetail,
+  ChatClarifyResponseDetail,
+  ChatSuggestionDetail,
+} from "@janus-scheduler/ui";

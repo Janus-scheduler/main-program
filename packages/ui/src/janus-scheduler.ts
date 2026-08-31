@@ -402,6 +402,8 @@ export class JanusScheduler extends LitElement {
   @property({ type: String }) error: string | null = null;
   @property({ type: Boolean }) allDay = false;
   @property({ type: String }) recurrenceRule = "";
+  @property({ type: String }) timezone?: string;
+  @state() private activeTab: "general" | "participants" | "notes" = "general";
   /**
    * The ID of the event being edited.
    * - `null` / omitted → creation mode (onSave should call addEvent)
@@ -541,13 +543,24 @@ export class JanusScheduler extends LitElement {
   // ─── Lifecycle ─────────────────────────────────────────────────────────────
 
   willUpdate(changedProperties: Map<string, unknown>) {
-    if (changedProperties.has("eventId")) {
+    if (
+      changedProperties.has("eventId") ||
+      changedProperties.has("timezone") ||
+      (this.eventId !== null && changedProperties.has("startDate"))
+    ) {
       this._isEditing = this.eventId === null;
       this._showCreateConfirm = false;
       this._titleTouched = false;
       this._participantsTouched = false;
 
       const todayStr = new Date().toISOString().split("T")[0];
+      const initialTz =
+        this.timezone ||
+        (this.eventId
+          ? schedulerStore.getState().events[this.eventId]?.timezone
+          : undefined) ||
+        schedulerStore.getState().timezone;
+
       const defaults = {
         title: this.title,
         startDate: this.startDate || todayStr,
@@ -557,7 +570,7 @@ export class JanusScheduler extends LitElement {
         participants: this._participants,
         description: this.description,
         activeColor: this.activeColor || "primary",
-        timezone: schedulerStore.getState().timezone,
+        timezone: initialTz,
         allDay: this.allDay,
         recurrenceRule: this.recurrenceRule,
       };
@@ -566,7 +579,7 @@ export class JanusScheduler extends LitElement {
 
       const draft = schedulerStore.getState().eventDraft;
       if (draft) {
-        this._selectedTz = draft.timezone || schedulerStore.getState().timezone;
+        this._selectedTz = draft.timezone || initialTz;
         if (draft.recurrenceRule) {
           const parsed = parseRRule(draft.recurrenceRule);
           this._recurrenceFreq = parsed.freq as
@@ -686,9 +699,6 @@ export class JanusScheduler extends LitElement {
   private _onSave() {
     const draft = schedulerStore.getState().eventDraft;
     if (!draft || this._invalid) return;
-
-    // Persist the chosen timezone to the store so all components stay in sync
-    schedulerStore.getState().setTimezone(this._selectedTz);
 
     // Clear draft
     schedulerStore.getState().clearDraft(true);
@@ -1131,6 +1141,16 @@ export class JanusScheduler extends LitElement {
                   : ""}"
                 @click=${() => {
                   this._selectedTz = tz;
+                  // LOAD-BEARING: the draft is the source of truth for the
+                  // store subscription in `connectedCallback`, which resets
+                  // `_selectedTz` from `draft.timezone` on EVERY store write.
+                  // There are 15 `updateDraft` call sites — every keystroke in
+                  // the title, each date, each participant — so without this
+                  // line the picked zone survived only until the user touched
+                  // another field, then silently snapped back to the old one.
+                  // That is why editing an existing event appeared to work
+                  // (nothing else was edited) while creating a new one did not.
+                  schedulerStore.getState().updateDraft({ timezone: tz });
                   this._tzSearch = "";
                   this.openPicker = null;
                 }}

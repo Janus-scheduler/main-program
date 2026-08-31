@@ -1,0 +1,22 @@
+node_modules
+dist
+coverage
+package-lock.json
+
+# @janus-scheduler/nlp — generated data, not source.
+#
+# artifacts/ is byte-identical to the research repo; reformatting would break
+# the `cmp` provenance check. fixtures/*.json are Python-generated golden files
+# (parity.json is 1.3 MB minified — reformatting balloons it into tens of MB).
+#
+# Scoped to the data files only, so fixtures/README.md and any future source
+# alongside it are still formatted normally.
+packages/nlp/artifacts/
+packages/nlp/fixtures/*.json
+
+# ALGORITHM.md is the NORMATIVE frozen spec, copied from the research repo, and
+# PROJECT.md is its working log. They are upstream documents, not this repo's
+# prose — reformatting them would make future diffs against the research repo
+# meaningless. The root `npm run format` script globs `**/*.md`, so without this
+# entry a routine format run would silently rewrite the spec.
+packages/nlp/docs/
