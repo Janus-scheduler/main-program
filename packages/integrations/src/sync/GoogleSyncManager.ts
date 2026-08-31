@@ -838,7 +838,7 @@ export class GoogleSyncManager {
           if (googleId) {
             try {
               await this.pushUpdateOrRecreate(event, googleId);
-            } catch (err) {
+            } catch {
               console.error(
                 `[Janus Integrations] Transient error processing queued update for ${mutation.eventId}, re-queueing.`,
               );
@@ -878,7 +878,7 @@ export class GoogleSyncManager {
 
     try {
       await this.pushUpdateOrRecreate(event, googleId);
-    } catch (err) {
+    } catch {
       this.queueUpdate(event.id);
     }
   }
@@ -923,9 +923,10 @@ export class GoogleSyncManager {
       this.persistMapping();
       console.log(`[Janus Integrations] Updated in Google: ${event.title}`);
       return "success";
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
       const isNotFound =
-        err?.message?.includes("404") || err?.message?.includes("410");
+        errorMessage.includes("404") || errorMessage.includes("410");
       if (isNotFound) {
         console.warn(
           `[Janus Integrations] Event not found in Google (404), will recreate: ${googleId}`,

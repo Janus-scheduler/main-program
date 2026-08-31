@@ -21,8 +21,9 @@ export class FileCalendarStateStore implements CalendarStateStore {
     try {
       const raw = await fs.readFile(this.file, "utf-8");
       return JSON.parse(raw) as CalendarState;
-    } catch (err: any) {
-      if (err.code !== "ENOENT") {
+    } catch (err: unknown) {
+      const error = err as { code?: string };
+      if (error.code !== "ENOENT") {
         console.error(
           "[FileCalendarStateStore] Failed to read calendar state:",
           err,
@@ -39,8 +40,9 @@ export class FileCalendarStateStore implements CalendarStateStore {
   async clear(): Promise<void> {
     try {
       await fs.unlink(this.file);
-    } catch (err: any) {
-      if (err.code !== "ENOENT") {
+    } catch (err: unknown) {
+      const error = err as { code?: string };
+      if (error.code !== "ENOENT") {
         throw err;
       }
     }

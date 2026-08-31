@@ -106,11 +106,12 @@ export class FileTokenStore implements TokenStore {
       const raw = await fs.readFile(this.file, "utf-8");
       const envelope = JSON.parse(raw) as EncryptedEnvelope;
       return JSON.parse(decrypt(envelope)) as TokenData;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Missing/corrupt file, a rotated encryption key, or a plaintext file
       // left over from before encryption — all treated as "not connected",
       // prompting a clean reconnect.
-      if (err.code !== "ENOENT") {
+      const error = err as { code?: string };
+      if (error.code !== "ENOENT") {
         console.error(
           "[FileTokenStore] Failed to read or decrypt tokens:",
           err,
@@ -128,8 +129,9 @@ export class FileTokenStore implements TokenStore {
   async clear(): Promise<void> {
     try {
       await fs.unlink(this.file);
-    } catch (err: any) {
-      if (err.code !== "ENOENT") {
+    } catch (err: unknown) {
+      const error = err as { code?: string };
+      if (error.code !== "ENOENT") {
         throw err;
       }
     }
