@@ -26,10 +26,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Run Jest with --coverage to produce packages/core/coverage/lcov.info
-      # This is the file sonar.javascript.lcov.reportPaths points to.
+      # Run Jest with --coverage to produce packages/core/coverage/lcov.info & packages/nlp/coverage/lcov.info
+      # These files are referenced in sonar-project.properties reportPaths.
       - name: Run tests with coverage
-        run: npm test --workspace=packages/core
+        run: |
+          npm test --workspace=packages/core
+          npm test --workspace=@janus-scheduler/nlp
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6

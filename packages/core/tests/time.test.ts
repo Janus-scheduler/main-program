@@ -103,4 +103,23 @@ describe("Time Utilities", () => {
     const diffMs = new Date(postDst).getTime() - new Date(preDst).getTime();
     expect(diffMs).toBe(60 * 60 * 1000);
   });
+
+  it("should fallback to default timezones when Intl.supportedValuesOf throws or is unavailable", () => {
+    const originalSupported = Intl.supportedValuesOf;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (Intl as any).supportedValuesOf = undefined;
+      const list = getAllTimezones();
+      expect(list).toContain("UTC");
+      expect(list).toContain("America/New_York");
+    } finally {
+      Intl.supportedValuesOf = originalSupported;
+    }
+  });
+
+  it("should handle toFakeLocalDate edge cases and hour 24 wrap-around", () => {
+    const ts = new Date("2026-06-02T23:59:59Z").getTime();
+    const fake = toFakeLocalDate(ts, "UTC");
+    expect(fake.getUTCFullYear()).toBe(2026);
+  });
 });

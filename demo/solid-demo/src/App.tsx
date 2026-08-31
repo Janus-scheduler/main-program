@@ -129,6 +129,7 @@ function App() {
     goToNext: () => void;
     goToToday: () => void;
     toggleCreate: () => void;
+    goToDate?: (date: string | number | Date) => void;
   };
   let monthGridRef: HTMLElement & {
     goToPrev: () => void;
@@ -408,9 +409,7 @@ function App() {
               onDayClick={(detail) => {
                 setCurrentView("Timeline");
                 setTimeout(() => {
-                  if (timelineRef && (timelineRef as any).goToDate) {
-                    (timelineRef as any).goToDate(detail.date);
-                  }
+                  timelineRef?.goToDate?.(detail.date);
                 }, 100);
               }}
             />
@@ -431,9 +430,7 @@ function App() {
               onDayClick={(detail) => {
                 setCurrentView("Timeline");
                 setTimeout(() => {
-                  if (timelineRef && (timelineRef as any).goToDate) {
-                    (timelineRef as any).goToDate(detail.date);
-                  }
+                  timelineRef?.goToDate?.(detail.date);
                 }, 100);
               }}
             />
