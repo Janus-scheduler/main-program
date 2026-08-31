@@ -8,7 +8,8 @@
  * easy to use with Angular bindings and signals.
  *
  * Public API surface:
- *  – Components   : SchedulerComponent, TimelineComponent, MonthGridComponent
+ *  – Components   : SchedulerComponent, TimelineComponent, MonthGridComponent,
+ *                   DayGridComponent, WeekGridComponent
  *  – Types        : TimelineEvent, TimelineResource, EventColor, ViewType, etc.
  *                   (re-exported from @janus-scheduler/core)
  */
@@ -17,6 +18,7 @@
 export { SchedulerComponent } from "./lib/scheduler.component";
 export { TimelineComponent } from "./lib/timeline.component";
 export { MonthGridComponent } from "./lib/month-grid.component";
+export { DayGridComponent, WeekGridComponent } from "./lib/time-grid.component";
 export { YearGridComponent } from "./lib/year-grid.component";
 export { AiBarComponent } from "./lib/ai-bar.component";
 export { TopbarComponent } from "./lib/topbar.component";
@@ -29,7 +31,7 @@ export {
   zonedInputToISO,
   schedulerStore,
 } from "@janus-scheduler/core";
-export type { SchedulerHooks } from "@janus-scheduler/core";
+export type { SchedulerHooks, SchedulerConfig } from "@janus-scheduler/core";
 
 // Types — re-exported so consumers don't need to import from @janus-scheduler/core directly
 export type {
@@ -37,6 +39,12 @@ export type {
   TimelineResource,
   SchedulerSaveData,
   SchedulerDeleteData,
+  MonthEvent,
+  TimeGridEvent,
+  TimeGridEventResource,
+  SlotSelectDetail,
+  TimeGridEventMoveDetail,
+  TimeGridEventResizeDetail,
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,

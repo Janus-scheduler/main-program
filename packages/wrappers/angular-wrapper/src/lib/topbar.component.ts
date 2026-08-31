@@ -39,6 +39,8 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly dayName = input<string | undefined>(undefined);
   readonly shortDate = input<string | undefined>(undefined);
   readonly view = input<ViewType | undefined>(undefined);
+  /** Which view tabs to show, in order. Default: Day, Week, Month, Timeline. */
+  readonly views = input<ViewType[] | undefined>(undefined);
   readonly allowCreate = input<boolean>(false);
   readonly zoomPercent = input<number>(100);
   readonly zoomUnit = input<string | undefined>(undefined);
@@ -124,11 +126,13 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     // Props
     const element = el as HTMLElement & {
       view?: string;
+      views?: ViewType[];
       allowCreate?: boolean;
       zoomPercent?: number;
       isGoogleCalendarConnected?: boolean;
     };
     element.view = this.view();
+    if (this.views() !== undefined) element.views = this.views();
     element.allowCreate = this.allowCreate();
     element.zoomPercent = this.zoomPercent();
     element.isGoogleCalendarConnected = this.isGoogleCalendarConnected();

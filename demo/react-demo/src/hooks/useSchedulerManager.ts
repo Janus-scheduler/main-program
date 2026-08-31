@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore, useCallback } from "react";
 import {
   SchedulerManager,
   getBrowserTimezone,
@@ -38,32 +38,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     const syncManager = new GoogleSyncManager(client, mapper);
 
     const mgr = new SchedulerManager({
-      // ── onEventAdd ────────────────────────────────────────────────────
-      // Fires AFTER the store is updated (optimistic). If this throws,
-      // SchedulerManager automatically rolls back the store and calls onError.
-      //
       ...syncManager.getHooks(),
-
-      // Replace with a real fetch() in production:
-      //   await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) })
-      // onEventAdd: async (_event) => {
-      //   await new Promise((r) => setTimeout(r, 400)); // simulate network latency
-      //   console.log(_event);
-      //   return; // ← success path
-      //   // throw new Error("HTTP 500 (simulated)"); // ← uncomment to test rollback
-      // },
-
-      // onEventUpdate: async (event) => {
-      //   const res = await fetch(`/api/events/${event.id}`, {
-      //     method: 'PATCH',
-      //     body: JSON.stringify(event),
-      //   });
-      //   if (!res.ok) throw new Error(`Server error ${res.status}`);
-      // },
-
-      // onEventDelete: async (id) => {
-      //   await fetch(`/api/events/${id}`, { method: 'DELETE' });
-      // },
 
       // ── onError ───────────────────────────────────────────────────────
       // The store has already been rolled back before this fires.
@@ -166,5 +141,89 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // manager is intentionally created once
 
-  return { manager, syncManager };
+  // Derived reactively from the manager's undo stack — no manual callback
+  // wiring needed. Re-renders whenever the stack grows or shrinks.
+  const canUndo = useSyncExternalStore(
+    (onStoreChange) => manager.subscribeUndo(onStoreChange),
+    () => manager.canUndo(),
+  );
+
+  const handleUndo = useCallback(() => manager.undo(), [manager]);
+
+  const syncBulkEvents = async () => {
+    try {
+      // 1. Authenticate and fetch from the external API
+      // We mock the fetch response here since https://api.theirlms.com is a placeholder.
+      // In production you would do: const response = await fetch('https://api.theirlms.com/v1/courses', { ... })
+      console.log("Fetching from LMS...");
+      await new Promise((r) => setTimeout(r, 800)); // Simulate API latency
+
+      // Mocked LMS Response Data
+      const lmsData = {
+        courses: [
+          {
+            id: "course_101",
+            courseName: "Advanced Physiology",
+            teacherId: "lms_t1",
+            teacherName: "Dr. Gregory House",
+            startDate: new Date(new Date().setHours(9, 0, 0, 0)).toISOString(),
+            endDate: new Date(new Date().setHours(12, 0, 0, 0)).toISOString(),
+          },
+          {
+            id: "course_102",
+            courseName: "Neurology Seminar",
+            teacherId: "lms_t2",
+            teacherName: "Dr. Eric Foreman",
+            startDate: new Date(new Date().setHours(14, 0, 0, 0)).toISOString(),
+            endDate: new Date(new Date().setHours(16, 30, 0, 0)).toISOString(),
+          },
+        ],
+      };
+
+      // 2. Ensure resources exist, then collect new events for batch import
+      const eventsToAdd: {
+        id: string;
+        title: string;
+        startTime: string;
+        endTime: string;
+        resourceIds: string[];
+        status: "confirmed";
+      }[] = [];
+
+      lmsData.courses.forEach((course) => {
+        // Ensure the teacher (resource) exists before adding the event
+        if (!manager.getResource(course.teacherId)) {
+          manager.addResource({
+            id: course.teacherId,
+            name: course.teacherName,
+            type: "person",
+          });
+        }
+
+        // Collect new events (skip duplicates)
+        if (!manager.getEvent(course.id)) {
+          eventsToAdd.push({
+            id: course.id,
+            title: course.courseName,
+            startTime: course.startDate,
+            endTime: course.endDate,
+            resourceIds: [course.teacherId],
+            status: "confirmed" as const,
+          });
+        }
+      });
+
+      // 3. Batch-add all new events in one transactional call
+      if (eventsToAdd.length > 0) {
+        manager.batchAddEvents(eventsToAdd);
+      }
+
+      console.log(`Successfully synced ${eventsToAdd.length} events from LMS!`);
+    } catch (error) {
+      console.error("Failed to sync from LMS:", error);
+      alert("Synchronization failed. Please check the logs.");
+    }
+  };
+
+  return { manager, syncManager, canUndo, handleUndo, syncBulkEvents };
 }

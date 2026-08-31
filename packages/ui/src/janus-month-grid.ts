@@ -46,8 +46,16 @@ export class JanusMonthGrid extends LitElement {
   /** When true, renders a + Floating Action Button to add an event. Default: false */
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
 
+  /**
+   * Optional externally supplied events. When set (non-null), these take
+   * precedence over events derived from the shared scheduler store, letting
+   * consumers drive the grid directly via the `events` property. Leave unset
+   * (null) to use the default store-subscription behavior.
+   */
+  @property({ attribute: false }) events: MonthEvent[] | null = null;
+
   // ── Internal state ────────────────────────────────────────────────────
-  @property({ type: Array }) events: MonthEvent[] = [];
+  @state() private _events: MonthEvent[] = [];
   @state() private _gridHeight = 0;
   private _unsubStore?: () => void;
   private _resizeObserver?: ResizeObserver;
@@ -79,6 +87,12 @@ export class JanusMonthGrid extends LitElement {
       999,
     ).getTime();
     const coreEvents = expandEvents(rawEvents, startRange, endRange);
+    console.log("MonthGrid sync:", {
+      rawEvents: rawEvents.length,
+      coreEvents: coreEvents.length,
+      startRange: new Date(startRange),
+      endRange: new Date(endRange),
+    });
 
     const newEvents: MonthEvent[] = [];
 
@@ -167,7 +181,13 @@ export class JanusMonthGrid extends LitElement {
       }
     }
 
-    this.events = newEvents;
+    console.log("MonthGrid newEvents length:", newEvents.length);
+    this._events = newEvents;
+  }
+
+  /** External `events` property wins over store-derived events when set. */
+  private get _effectiveEvents(): MonthEvent[] {
+    return this.events ?? this._events;
   }
 
   // ── Internal state ────────────────────────────────────────────────────
@@ -238,7 +258,11 @@ export class JanusMonthGrid extends LitElement {
   }
 
   override firstUpdated() {
-    const grid = buildCalendarGrid(this._year, this._month, this.events);
+    const grid = buildCalendarGrid(
+      this._year,
+      this._month,
+      this._effectiveEvents,
+    );
     const todayCell = grid.flat().find((d) => d.isToday) ?? grid[0][0];
     this._selectedDateStr = todayCell.dateStr;
 
@@ -367,7 +391,11 @@ export class JanusMonthGrid extends LitElement {
 
   // ── Main render ───────────────────────────────────────────────────────
   render() {
-    const grid = buildCalendarGrid(this._year, this._month, this.events);
+    const grid = buildCalendarGrid(
+      this._year,
+      this._month,
+      this._effectiveEvents,
+    );
     const rowCount = grid.length;
     const selectedDay =
       grid.flat().find((d) => d.dateStr === this._selectedDateStr) ?? null;

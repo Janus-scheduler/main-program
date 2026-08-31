@@ -3,7 +3,8 @@ import "./App.css";
 
 import { Sidebar } from "./components/Sidebar";
 import { SchedulerView } from "./components/SchedulerView";
-import type { ViewType } from "@janus-scheduler/react";
+import type { ViewType, UndoAction, EventDraft } from "@janus-scheduler/react";
+import { ConfirmDialog, isoToZonedDisplay } from "@janus-scheduler/react";
 import { ErrorToast } from "./components/ErrorToast";
 import { useSchedulerManager } from "./hooks/useSchedulerManager";
 import type { HookError } from "./hooks/useSchedulerManager";
@@ -24,6 +25,9 @@ function App() {
   const [showScheduler, setShowScheduler] = useState(false);
   const [hookError, setHookError] = useState<HookError | null>(null);
   const [googleConnected, setGoogleConnected] = useState(false);
+  const [undoConfirmAction, setUndoConfirmAction] = useState<UndoAction | null>(
+    null,
+  );
 
   // Set to true to strictly block resource scheduling conflicts, or false to allow double-booking with visual warning banners.
   const preventConflicts = false;
@@ -38,7 +42,8 @@ function App() {
   }, []);
 
   // SchedulerManager is stable (created once via useMemo inside the hook)
-  const { manager, syncManager } = useSchedulerManager(handleHookError);
+  const { manager, syncManager, syncBulkEvents, canUndo } =
+    useSchedulerManager(handleHookError);
 
   // ── Detect OAuth redirect / pick up an already-connected backend ────────────
   // handleOAuthRedirect() detects `?google_connected=true|false` (present
@@ -91,9 +96,152 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept Ctrl+Z when the user is typing in a form control
+      // or contentEditable element — let the browser handle standard text undo.
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      const isEditable =
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        document.activeElement?.getAttribute("contenteditable") === "true";
+
+      if (isEditable) return;
+
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        e.preventDefault();
+        const action = manager.peekUndo();
+        if (action) {
+          setUndoConfirmAction(action);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [manager]);
+
+  const handleUndoRequest = () => {
+    const action = manager.peekUndo();
+    if (action) setUndoConfirmAction(action);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const eventToEventDraft = (e: any, overrideTz?: string): EventDraft => {
+    // Use the provided timezone, or fall back to the scheduler's configured
+    // display timezone so the undo dialog matches what the calendar shows
+    // (getTimezone defaults to the browser timezone if none was forced).
+    const tz = overrideTz || manager.getTimezone();
+    const startObj = e.startTime
+      ? isoToZonedDisplay(e.startTime, tz)
+      : { date: "", time: "" };
+    const endObj = e.endTime
+      ? isoToZonedDisplay(e.endTime, tz)
+      : { date: "", time: "" };
+
+    return {
+      id: e.id || null,
+      title: e.title || "",
+      startDate: startObj.date,
+      startTime: startObj.time,
+      endDate: endObj.date,
+      endTime: endObj.time,
+      participants: e.resourceIds || (e.resourceId ? [e.resourceId] : []),
+      activeColor: e.color || "orange",
+      allDay: e.allDay || false,
+      description: e.description || "",
+      timezone: tz,
+    };
+  };
+
+  const getUndoFromTo = (
+    action: UndoAction | null,
+  ): { fromDraft: EventDraft | null; toDraft: EventDraft | null } => {
+    if (!action) return { fromDraft: null, toDraft: null };
+
+    if (action.type === "addEvent") {
+      // The event currently EXISTS → it will be DELETED after undo
+      const current = manager.getEvent(action.id);
+      return {
+        fromDraft: current ? eventToEventDraft(current) : null,
+        toDraft: null,
+      };
+    }
+
+    if (action.type === "deleteEvent") {
+      // The event currently DOESN'T EXIST → it will be RESTORED after undo
+      return {
+        fromDraft: null,
+        toDraft: eventToEventDraft(action.previous),
+      };
+    }
+
+    if (action.type === "batchAddEvents") {
+      // Batch undo — show count of events that will be removed.
+      // fromDraft shows a summary placeholder, toDraft is null (all deleted).
+      const count = action.ids.length;
+      return {
+        fromDraft: {
+          id: null,
+          title: `${count} imported event${count !== 1 ? "s" : ""}`,
+          startDate: "",
+          startTime: "",
+          endDate: "",
+          endTime: "",
+          participants: [],
+          activeColor: "orange",
+          allDay: false,
+          description: "All events from this bulk import will be removed.",
+          timezone: manager.getTimezone(),
+        },
+        toDraft: null,
+      };
+    }
+
+    // updateEvent — show the current state vs. what it will revert to
+    const current = manager.getEvent(action.id);
+    return {
+      fromDraft: current ? eventToEventDraft(current) : null,
+      toDraft: current
+        ? eventToEventDraft({ ...current, ...action.previous })
+        : null,
+    };
+  };
+
+  const { fromDraft: undoFromDraft, toDraft: undoToDraft } =
+    getUndoFromTo(undoConfirmAction);
+
+  const getUndoDialogText = (
+    type: string,
+  ): { title: string; subtitle: string } => {
+    if (type === "addEvent") {
+      return {
+        title: "Undo: Remove Event",
+        subtitle: "This event will be permanently deleted.",
+      };
+    }
+    if (type === "deleteEvent") {
+      return {
+        title: "Undo: Restore Event",
+        subtitle: "This deleted event will be restored to the calendar.",
+      };
+    }
+    if (type === "batchAddEvents") {
+      return {
+        title: "Undo: Remove Imported Events",
+        subtitle:
+          "All events from this bulk import will be removed from the calendar.",
+      };
+    }
+    return {
+      title: "Undo: Revert Changes",
+      subtitle: "The event will revert to its previous state.",
+    };
+  };
+
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar onSync={syncBulkEvents} />
 
       <main className="app-main">
         <SchedulerView
@@ -114,6 +262,8 @@ function App() {
             setSelectedEventId(null);
           }}
           onConnectCalendar={handleConnectCalendar}
+          canUndo={canUndo}
+          onUndo={handleUndoRequest}
         />
 
         {hookError && (
@@ -121,6 +271,23 @@ function App() {
             operation={hookError.operation}
             message={hookError.message}
             onDismiss={() => setHookError(null)}
+          />
+        )}
+
+        {undoConfirmAction && (undoFromDraft || undoToDraft) && (
+          <ConfirmDialog
+            title={getUndoDialogText(undoConfirmAction.type).title}
+            subtitle={getUndoDialogText(undoConfirmAction.type).subtitle}
+            confirmText="Undo"
+            cancelText="Cancel"
+            accentColor="orange"
+            fromDraft={undoFromDraft}
+            toDraft={undoToDraft}
+            onConfirm={() => {
+              manager.undo();
+              setUndoConfirmAction(null);
+            }}
+            onCancel={() => setUndoConfirmAction(null)}
           />
         )}
       </main>
