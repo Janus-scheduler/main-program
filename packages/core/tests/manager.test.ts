@@ -635,7 +635,11 @@ describe("SchedulerManager", () => {
         onError,
       });
 
-      manager.addResource({ id: "r-async-1", name: "Async Resource" });
+      manager.addResource({
+        id: "r-async-1",
+        name: "Async Resource",
+        type: "room",
+      });
 
       await new Promise((r) => setTimeout(r, 0));
 
