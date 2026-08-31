@@ -22,6 +22,10 @@ export type RemoteEventChange =
   | { type: "updated"; event: Event }
   | { type: "deleted"; id: string };
 
+export type QueuedMutation =
+  | { type: "update"; eventId: string }
+  | { type: "delete"; googleId: string };
+
 export interface GoogleSyncManagerOptions {
   /**
    * Called after sync applies a Google-originated change to the store. Use it to
@@ -206,6 +210,7 @@ export class GoogleSyncManager {
       const events = await this.client.fetchInitialEvents();
       await this.loadInitialEvents(events);
       await this.pushUnsyncedLocalEvents();
+      await this.processMutationQueue();
     } catch (err) {
       console.error(
         "[Janus Integrations] Failed to load initial Google events:",
@@ -239,7 +244,10 @@ export class GoogleSyncManager {
   // can restore it under the right resource instead of "google-calendar")
   private readonly resourceIdsTable = new Map<string, string[]>();
 
+  private readonly mutationQueue: QueuedMutation[] = [];
+
   private static readonly STORAGE_KEY = "janus-google-sync-map";
+  private static readonly QUEUE_STORAGE_KEY = "janus-google-sync-queue";
 
   constructor(
     client: GoogleCalendarClient,
@@ -250,6 +258,52 @@ export class GoogleSyncManager {
     this.mapper = mapper;
     this.onRemoteChange = options.onRemoteChange;
     this.loadPersistedMapping();
+    this.loadPersistedQueue();
+  }
+
+  private loadPersistedQueue(): void {
+    try {
+      const raw = localStorage.getItem(GoogleSyncManager.QUEUE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        this.mutationQueue.push(...parsed);
+      }
+    } catch (err) {
+      console.error("[Janus Integrations] Failed to load mutation queue:", err);
+    }
+  }
+
+  private persistQueue(): void {
+    try {
+      localStorage.setItem(
+        GoogleSyncManager.QUEUE_STORAGE_KEY,
+        JSON.stringify(this.mutationQueue),
+      );
+    } catch (err) {
+      console.error(
+        "[Janus Integrations] Failed to persist mutation queue:",
+        err,
+      );
+    }
+  }
+
+  private queueUpdate(eventId: string): void {
+    const existingIndex = this.mutationQueue.findIndex(
+      (m) => m.type === "update" && m.eventId === eventId,
+    );
+    if (existingIndex >= 0) this.mutationQueue.splice(existingIndex, 1);
+    this.mutationQueue.push({ type: "update", eventId });
+    this.persistQueue();
+  }
+
+  private queueDelete(googleId: string): void {
+    const existingIndex = this.mutationQueue.findIndex(
+      (m) => m.type === "delete" && m.googleId === googleId,
+    );
+    if (existingIndex >= 0) return;
+    this.mutationQueue.push({ type: "delete", googleId });
+    this.persistQueue();
   }
 
   private loadPersistedMapping(): void {
@@ -603,6 +657,7 @@ export class GoogleSyncManager {
       schedulerStore.getState().deleteEvent(janusId);
       this.mappingTable.delete(janusId);
       this.reverseTable.delete(event.id);
+      this.resourceIdsTable.delete(janusId);
       this.emitRemoteChange({ type: "deleted", id: janusId });
       console.log("[Janus Integrations] Deleted from Google sync:", janusId);
       return;
@@ -768,43 +823,93 @@ export class GoogleSyncManager {
     );
   }
 
+  private async processMutationQueue(): Promise<void> {
+    if (this.mutationQueue.length === 0) return;
+
+    const queue = [...this.mutationQueue];
+    this.mutationQueue.length = 0;
+    this.persistQueue();
+
+    for (const mutation of queue) {
+      if (mutation.type === "update") {
+        const event = schedulerStore.getState().events[mutation.eventId];
+        if (event) {
+          const googleId = this.mappingTable.get(event.id);
+          if (googleId) {
+            try {
+              await this.pushUpdateOrRecreate(event, googleId);
+            } catch (err) {
+              console.error(
+                `[Janus Integrations] Transient error processing queued update for ${mutation.eventId}, re-queueing.`,
+              );
+              this.queueUpdate(mutation.eventId);
+            }
+          }
+        }
+      } else if (mutation.type === "delete") {
+        try {
+          await this.client.deleteEvent(mutation.googleId);
+          console.log(
+            `[Janus Integrations] Deleted queued event from Google: ${mutation.googleId}`,
+          );
+        } catch (err) {
+          console.error(
+            `[Janus Integrations] Failed to delete queued event from Google: ${mutation.googleId}`,
+            err,
+          );
+          // Re-queue the deletion if it failed
+          this.queueDelete(mutation.googleId);
+        }
+      }
+    }
+  }
+
   private async onJanusEventUpdate(
     event: import("@janus-scheduler/core").Event,
   ): Promise<void> {
     const connected = await this.client.isConnected();
-    if (!connected) return;
+    if (!connected) {
+      this.queueUpdate(event.id);
+      return;
+    }
 
     const googleId = this.mappingTable.get(event.id);
     if (!googleId) return; // event not synced to Google yet
 
-    await this.pushUpdateOrRecreate(event, googleId);
+    try {
+      await this.pushUpdateOrRecreate(event, googleId);
+    } catch (err) {
+      this.queueUpdate(event.id);
+    }
   }
 
   /**
-   * Updates the mapped Google event; if that fails — most commonly because
-   * the remembered Google event (or its calendar) no longer exists, e.g. a
-   * stale mapping left over from a deleted/recreated "Janus Scheduler"
-   * calendar in an earlier session — clears the stale mapping and creates a
-   * fresh Google event instead of leaving this event permanently stuck.
+   * Updates the mapped Google event; if that fails because the event was deleted
+   * on Google (404/410), clears the stale mapping and creates a fresh Google event.
+   * If it fails for other reasons (e.g. network/500), it throws so the caller can queue it.
    */
   private async pushUpdateOrRecreate(
     event: import("@janus-scheduler/core").Event,
     googleId: string,
   ): Promise<void> {
-    const updated = await this.pushUpdateToGoogle(event, googleId);
-    if (updated) return;
+    const status = await this.pushUpdateToGoogle(event, googleId);
+    if (status === "success") return;
+    if (status === "error") {
+      throw new Error("Update failed due to transient error");
+    }
 
+    // status === "not_found": The event was deleted on Google. Recreate it.
     this.mappingTable.delete(event.id);
     this.reverseTable.delete(googleId);
     this.persistMapping();
     await this.pushCreateToGoogle(event);
   }
 
-  /** Shared by pushUpdateOrRecreate and onJanusEventUpdate. Returns success. */
+  /** Shared by pushUpdateOrRecreate and onJanusEventUpdate. Returns specific status. */
   private async pushUpdateToGoogle(
     event: import("@janus-scheduler/core").Event,
     googleId: string,
-  ): Promise<boolean> {
+  ): Promise<"success" | "not_found" | "error"> {
     try {
       const attendees = this.resolveAttendees(event.resourceIds);
       const resourceContext = this.resolveResourceContext(event.resourceIds);
@@ -817,21 +922,40 @@ export class GoogleSyncManager {
       this.resourceIdsTable.set(event.id, event.resourceIds);
       this.persistMapping();
       console.log(`[Janus Integrations] Updated in Google: ${event.title}`);
-      return true;
-    } catch (err) {
+      return "success";
+    } catch (err: any) {
+      const isNotFound =
+        err?.message?.includes("404") || err?.message?.includes("410");
+      if (isNotFound) {
+        console.warn(
+          `[Janus Integrations] Event not found in Google (404), will recreate: ${googleId}`,
+        );
+        return "not_found";
+      }
+
       console.error(
         "[Janus Integrations] Failed to update event in Google:",
         err,
       );
-      return false;
+      return "error";
     }
   }
 
   private async onJanusEventDelete(id: string): Promise<void> {
     const connected = await this.client.isConnected();
-    if (!connected) return;
-
     const googleId = this.mappingTable.get(id);
+
+    if (!connected) {
+      if (googleId) {
+        this.queueDelete(googleId);
+        this.mappingTable.delete(id);
+        this.reverseTable.delete(googleId);
+        this.resourceIdsTable.delete(id);
+        this.persistMapping();
+      }
+      return;
+    }
+
     if (!googleId) return;
 
     try {
@@ -846,7 +970,11 @@ export class GoogleSyncManager {
         "[Janus Integrations] Failed to delete event from Google:",
         err,
       );
-      throw err;
+      this.queueDelete(googleId);
+      this.mappingTable.delete(id);
+      this.reverseTable.delete(googleId);
+      this.resourceIdsTable.delete(id);
+      this.persistMapping();
     }
   }
 }

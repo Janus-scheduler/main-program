@@ -71,6 +71,16 @@ export function createEventsRouter(config: {
       );
       res.json({ updated: true });
     } catch (err) {
+      const status = getGoogleErrorStatus(err);
+      if (status === 404 || status === 410) {
+        console.warn(
+          `[Events] Update warning: Event ${req.params.googleEventId} not found in Google`,
+        );
+        res
+          .status(status)
+          .json({ error: "Event not found in Google Calendar" });
+        return;
+      }
       console.error("[Events] Update error:", err);
       res.status(500).json({ error: "Failed to update event" });
     }

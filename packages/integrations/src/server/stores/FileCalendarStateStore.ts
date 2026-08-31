@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import * as fs from "node:fs/promises";
 import path from "node:path";
 import type { CalendarState } from "../../types/index.js";
 import type { CalendarStateStore } from "./types.js";
@@ -17,24 +17,32 @@ export class FileCalendarStateStore implements CalendarStateStore {
       filePath ?? path.join(process.cwd(), "janus-calendar-state.json");
   }
 
-  get(): Promise<CalendarState | null> {
+  async get(): Promise<CalendarState | null> {
     try {
-      if (!fs.existsSync(this.file)) return Promise.resolve(null);
-      return Promise.resolve(
-        JSON.parse(fs.readFileSync(this.file, "utf-8")) as CalendarState,
-      );
-    } catch {
-      return Promise.resolve(null);
+      const raw = await fs.readFile(this.file, "utf-8");
+      return JSON.parse(raw) as CalendarState;
+    } catch (err: any) {
+      if (err.code !== "ENOENT") {
+        console.error(
+          "[FileCalendarStateStore] Failed to read calendar state:",
+          err,
+        );
+      }
+      return null;
     }
   }
 
-  set(state: CalendarState): Promise<void> {
-    fs.writeFileSync(this.file, JSON.stringify(state, null, 2), "utf-8");
-    return Promise.resolve();
+  async set(state: CalendarState): Promise<void> {
+    await fs.writeFile(this.file, JSON.stringify(state, null, 2), "utf-8");
   }
 
-  clear(): Promise<void> {
-    if (fs.existsSync(this.file)) fs.unlinkSync(this.file);
-    return Promise.resolve();
+  async clear(): Promise<void> {
+    try {
+      await fs.unlink(this.file);
+    } catch (err: any) {
+      if (err.code !== "ENOENT") {
+        throw err;
+      }
+    }
   }
 }

@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import * as fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import type { TokenData } from "../../types/index.js";
@@ -101,28 +101,37 @@ export class FileTokenStore implements TokenStore {
     this.file = filePath ?? path.join(process.cwd(), "janus-tokens.json");
   }
 
-  get(): Promise<TokenData | null> {
+  async get(): Promise<TokenData | null> {
     try {
-      if (!fs.existsSync(this.file)) return Promise.resolve(null);
-      const raw = fs.readFileSync(this.file, "utf-8");
+      const raw = await fs.readFile(this.file, "utf-8");
       const envelope = JSON.parse(raw) as EncryptedEnvelope;
-      return Promise.resolve(JSON.parse(decrypt(envelope)) as TokenData);
-    } catch {
+      return JSON.parse(decrypt(envelope)) as TokenData;
+    } catch (err: any) {
       // Missing/corrupt file, a rotated encryption key, or a plaintext file
       // left over from before encryption — all treated as "not connected",
       // prompting a clean reconnect.
-      return Promise.resolve(null);
+      if (err.code !== "ENOENT") {
+        console.error(
+          "[FileTokenStore] Failed to read or decrypt tokens:",
+          err,
+        );
+      }
+      return null;
     }
   }
 
-  set(tokens: TokenData): Promise<void> {
+  async set(tokens: TokenData): Promise<void> {
     const envelope = encrypt(JSON.stringify(tokens));
-    fs.writeFileSync(this.file, JSON.stringify(envelope, null, 2), "utf-8");
-    return Promise.resolve();
+    await fs.writeFile(this.file, JSON.stringify(envelope, null, 2), "utf-8");
   }
 
-  clear(): Promise<void> {
-    if (fs.existsSync(this.file)) fs.unlinkSync(this.file);
-    return Promise.resolve();
+  async clear(): Promise<void> {
+    try {
+      await fs.unlink(this.file);
+    } catch (err: any) {
+      if (err.code !== "ENOENT") {
+        throw err;
+      }
+    }
   }
 }
