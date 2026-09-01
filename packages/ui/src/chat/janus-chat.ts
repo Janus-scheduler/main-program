@@ -2,7 +2,7 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { chatStyles } from "./chat-styles";
-import { SparkleIcon, MicIcon, SendIcon } from "./timeline-icons";
+import { SparkleIcon, MicIcon, SendIcon } from "../timeline/timeline-icons";
 import type {
   ChatChip,
   ChatChoice,

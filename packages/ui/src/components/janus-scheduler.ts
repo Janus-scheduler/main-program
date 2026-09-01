@@ -11,7 +11,7 @@ import {
   zonedInputToISO,
   isoToZonedDisplay,
 } from "@janus-scheduler/core";
-import { schedulerStyles } from "./styles";
+import { schedulerStyles } from "../styles";
 import "./janus-confirm-dialog";
 
 const COLORS = [

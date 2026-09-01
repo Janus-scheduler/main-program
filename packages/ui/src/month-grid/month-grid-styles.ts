@@ -678,16 +678,16 @@ export const monthGridStyles = css`
 
     .mg-more-btn {
       padding: 1px 4px;
-      margin: 1px 0;
+      margin: 1px 4px;
       border-radius: 99px;
       background: #e4e4e7;
       color: #18181b;
       font-size: 9.5px;
       font-weight: 700;
-      width: auto;
-      max-width: 100%;
+      width: calc(100% - 8px);
       justify-content: center;
       line-height: 1;
+      box-sizing: border-box;
     }
 
     .mg-more-btn__text::after {

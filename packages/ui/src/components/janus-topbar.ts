@@ -10,7 +10,7 @@ import {
   CalendarIcon,
   UndoIcon,
   SearchIcon,
-} from "./timeline-icons";
+} from "../timeline/timeline-icons";
 
 /**
  * `<janus-topbar>` — standalone toolbar for the Janus timeline / month views.

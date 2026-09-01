@@ -1,5 +1,5 @@
 import type { TimeGridEvent, TimeGridEventResource } from "./time-grid-types";
-import { toDateStr, todayStr, fmt12 } from "./month-grid-utils";
+import { toDateStr, todayStr, fmt12 } from "../month-grid/month-grid-utils";
 import {
   isoToZonedDisplay,
   expandEvents,

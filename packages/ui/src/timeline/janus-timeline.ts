@@ -16,7 +16,7 @@ import {
   type Resource,
   type ViewType,
 } from "@janus-scheduler/core";
-import "./janus-ai-bar";
+import "../components/janus-ai-bar";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 type ConflictState = {
   hasConflict: boolean;
