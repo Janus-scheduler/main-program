@@ -2,6 +2,7 @@ import {
   checkSlotConflict,
   checkDraftConflict,
   computeTimelineConflicts,
+  computeSingleResourceConflicts,
   type ConflictResource,
   type ConflictEvent,
 } from "../src/utils/conflict";
@@ -215,6 +216,73 @@ describe("Conflict Utilities", () => {
       expect(result.hasConflict).toBe(false);
       expect(result.messages).toHaveLength(0);
       expect(result.conflictingEventIds.size).toBe(0);
+    });
+  });
+
+  describe("computeSingleResourceConflicts", () => {
+    it("should return empty for resource with 0 or 1 event", () => {
+      expect(
+        computeSingleResourceConflicts(
+          { id: "r1", name: "R1", events: [] },
+          "UTC",
+        ),
+      ).toEqual({
+        conflictingEventIds: new Set(),
+        messages: [],
+      });
+      expect(
+        computeSingleResourceConflicts(
+          {
+            id: "r1",
+            name: "R1",
+            events: [
+              {
+                id: "e1",
+                title: "E1",
+                startMs: 1000,
+                endMs: 2000,
+                startTime: "01:00",
+                endTime: "02:00",
+              },
+            ],
+          },
+          "UTC",
+        ),
+      ).toEqual({
+        conflictingEventIds: new Set(),
+        messages: [],
+      });
+    });
+
+    it("should detect overlaps on a single resource", () => {
+      const res: ConflictResource = {
+        id: "res_single",
+        name: "Doctor 1",
+        events: [
+          {
+            id: "ev_a",
+            title: "Appointment A",
+            startMs: Date.UTC(2026, 5, 2, 9, 0, 0),
+            endMs: Date.UTC(2026, 5, 2, 10, 0, 0),
+            startTime: "09:00:00",
+            endTime: "10:00:00",
+          },
+          {
+            id: "ev_b",
+            title: "Appointment B",
+            startMs: Date.UTC(2026, 5, 2, 9, 30, 0),
+            endMs: Date.UTC(2026, 5, 2, 10, 30, 0),
+            startTime: "09:30:00",
+            endTime: "10:30:00",
+          },
+        ],
+      };
+
+      const result = computeSingleResourceConflicts(res, "UTC");
+      expect(result.conflictingEventIds.has("ev_a")).toBe(true);
+      expect(result.conflictingEventIds.has("ev_b")).toBe(true);
+      expect(result.messages).toHaveLength(1);
+      expect(result.messages[0]).toContain("Doctor 1 has overlapping events");
     });
   });
 

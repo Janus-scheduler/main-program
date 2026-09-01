@@ -19,6 +19,64 @@ export interface ConflictResource {
 }
 
 /**
+ * Perform a sorting sweep to find all overlapping events on a single resource.
+ * Returns timezone-aware overlap warning messages and the set of conflicting event IDs for this resource.
+ */
+export function computeSingleResourceConflicts(
+  resource: ConflictResource,
+  timezone: string,
+  maxMessages = 50,
+): {
+  conflictingEventIds: Set<string>;
+  messages: string[];
+} {
+  const conflictingEventIds = new Set<string>();
+  const messagesSet = new Set<string>();
+
+  if (!resource.events || resource.events.length <= 1) {
+    return { conflictingEventIds, messages: [] };
+  }
+
+  // 1. Sort events chronologically by start time
+  const sorted = [...resource.events].sort((a, b) => a.startMs - b.startMs);
+
+  // 2. Single-pass linear overlap check
+  for (let i = 0; i < sorted.length; i++) {
+    const evA = sorted[i];
+    for (let j = i + 1; j < sorted.length; j++) {
+      const evB = sorted[j];
+
+      // Since sorted, if evB starts after evA ends, no future events can overlap with evA
+      if (evB.startMs >= evA.endMs) {
+        break;
+      }
+
+      // Overlap detected!
+      conflictingEventIds.add(evA.id);
+      conflictingEventIds.add(evB.id);
+
+      if (messagesSet.size < maxMessages) {
+        const overlapStartMs = Math.max(evA.startMs, evB.startMs);
+        const overlapEndMs = Math.min(evA.endMs, evB.endMs);
+        const { dateLabel, startTimeLabel, endTimeLabel } = formatZonedOverlap(
+          new Date(overlapStartMs).toISOString(),
+          new Date(overlapEndMs).toISOString(),
+          timezone,
+        );
+
+        const msg = `Conflict: ${resource.name} has overlapping events "${evA.title}" and "${evB.title}" on ${dateLabel} between ${startTimeLabel} and ${endTimeLabel}.`;
+        messagesSet.add(msg);
+      }
+    }
+  }
+
+  return {
+    conflictingEventIds,
+    messages: Array.from(messagesSet),
+  };
+}
+
+/**
  * Perform an O(N log N) sorting sweep to find all overlapping events on each resource.
  * Returns timezone-aware overlap warning messages and the set of conflicting event IDs.
  */
@@ -34,37 +92,22 @@ export function computeTimelineConflicts(
   const messagesSet = new Set<string>();
 
   for (const r of resources) {
-    if (!r.events || r.events.length <= 1) continue;
-
-    // 1. Sort events chronologically by start time
-    const sorted = [...r.events].sort((a, b) => a.startMs - b.startMs);
-
-    // 2. Single-pass linear overlap check
-    for (let i = 0; i < sorted.length; i++) {
-      const evA = sorted[i];
-      for (let j = i + 1; j < sorted.length; j++) {
-        const evB = sorted[j];
-
-        // Since sorted, if evB starts after evA ends, no future events can overlap with evA
-        if (evB.startMs >= evA.endMs) {
-          break;
-        }
-
-        // Overlap detected!
-        conflictingEventIds.add(evA.id);
-        conflictingEventIds.add(evB.id);
-
+    if (messagesSet.size >= 50 && conflictingEventIds.size > 0) {
+      const resResult = computeSingleResourceConflicts(r, timezone, 0);
+      for (const id of resResult.conflictingEventIds) {
+        conflictingEventIds.add(id);
+      }
+    } else {
+      const resResult = computeSingleResourceConflicts(
+        r,
+        timezone,
+        Math.max(0, 50 - messagesSet.size),
+      );
+      for (const id of resResult.conflictingEventIds) {
+        conflictingEventIds.add(id);
+      }
+      for (const msg of resResult.messages) {
         if (messagesSet.size < 50) {
-          const overlapStartMs = Math.max(evA.startMs, evB.startMs);
-          const overlapEndMs = Math.min(evA.endMs, evB.endMs);
-          const { dateLabel, startTimeLabel, endTimeLabel } =
-            formatZonedOverlap(
-              new Date(overlapStartMs).toISOString(),
-              new Date(overlapEndMs).toISOString(),
-              timezone,
-            );
-
-          const msg = `Conflict: ${r.name} has overlapping events "${evA.title}" and "${evB.title}" on ${dateLabel} between ${startTimeLabel} and ${endTimeLabel}.`;
           messagesSet.add(msg);
         }
       }
