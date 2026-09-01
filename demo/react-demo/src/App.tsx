@@ -65,12 +65,18 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't intercept Ctrl+Z when the user is typing in a form control
       // or contentEditable element — let the browser handle standard text undo.
-      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      // Traverse shadow DOM to find the true active element
+      let active = document.activeElement;
+      while (active?.shadowRoot?.activeElement) {
+        active = active.shadowRoot.activeElement;
+      }
+
+      const tag = (active?.tagName ?? "").toLowerCase();
       const isEditable =
         tag === "input" ||
         tag === "textarea" ||
         tag === "select" ||
-        document.activeElement?.getAttribute("contenteditable") === "true";
+        active?.getAttribute("contenteditable") === "true";
 
       if (isEditable) return;
 
