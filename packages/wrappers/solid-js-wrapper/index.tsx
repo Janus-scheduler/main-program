@@ -665,11 +665,15 @@ export interface TopbarProps {
   allowCreate?: boolean;
   zoomPercent?: number;
   zoomUnit?: string;
+  /** Whether Google Calendar is currently connected — controls the connect button's label/state. */
+  isGoogleCalendarConnected?: boolean;
   onPrevClick?: () => void;
   onNextClick?: () => void;
   onTodayClick?: () => void;
   onViewSwitch?: (detail: { view: ViewType }) => void;
   onToggleCreate?: () => void;
+  /** Fired when the user clicks the Google Calendar connect/disconnect button. */
+  onConnectCalendar?: () => void;
 }
 
 export const Topbar: Component<TopbarProps> = (props) => {
@@ -686,6 +690,8 @@ export const Topbar: Component<TopbarProps> = (props) => {
       if (props.allowCreate !== undefined) el.allowCreate = props.allowCreate;
       if (props.zoomPercent !== undefined) el.zoomPercent = props.zoomPercent;
       if (props.zoomUnit !== undefined) el.zoomUnit = props.zoomUnit;
+      if (props.isGoogleCalendarConnected !== undefined)
+        el.isGoogleCalendarConnected = props.isGoogleCalendarConnected;
     }
   });
 
@@ -702,6 +708,7 @@ export const Topbar: Component<TopbarProps> = (props) => {
     attach("today-click", props.onTodayClick);
     attach("view-switch", props.onViewSwitch);
     attach("toggle-create", props.onToggleCreate);
+    attach("connect-calendar", props.onConnectCalendar);
   });
 
   return (

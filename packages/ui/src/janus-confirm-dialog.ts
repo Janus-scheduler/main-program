@@ -580,42 +580,48 @@ export class JanusConfirmDialog extends LitElement {
             </div>
           </div>
 
-          ${!draft.allDay
-            ? html`
-                <div class="confirm-summary-item">
-                  ${this._clockIcon()}
-                  <div class="confirm-summary-item-val">
-                    ${formatTime(draft.startTime)} –
-                    ${formatTime(draft.endTime)}
+          ${
+            !draft.allDay
+              ? html`
+                  <div class="confirm-summary-item">
+                    ${this._clockIcon()}
+                    <div class="confirm-summary-item-val">
+                      ${formatTime(draft.startTime)} –
+                      ${formatTime(draft.endTime)}
+                    </div>
                   </div>
-                </div>
-              `
-            : html`
-                <div class="confirm-summary-item">
-                  ${this._clockIcon()}
-                  <div class="confirm-summary-item-val">All Day</div>
-                </div>
-              `}
-          ${draft.participants && draft.participants.length > 0
-            ? html`
-                <div class="confirm-summary-item">
-                  ${this._usersIcon()}
-                  <div class="confirm-summary-item-val">
-                    ${draft.participants
-                      .map((pId: string) => this.resolveResourceName(pId))
-                      .join(", ")}
+                `
+              : html`
+                  <div class="confirm-summary-item">
+                    ${this._clockIcon()}
+                    <div class="confirm-summary-item-val">All Day</div>
                   </div>
-                </div>
-              `
-            : nothing}
+                `
+          }
+          ${
+            draft.participants && draft.participants.length > 0
+              ? html`
+                  <div class="confirm-summary-item">
+                    ${this._usersIcon()}
+                    <div class="confirm-summary-item-val">
+                      ${draft.participants
+                        .map((pId: string) => this.resolveResourceName(pId))
+                        .join(", ")}
+                    </div>
+                  </div>
+                `
+              : nothing
+          }
         </div>
 
-        ${draft.description
-          ? html`
-              <hr class="confirm-divider" />
-              <p class="confirm-description">${draft.description}</p>
-            `
-          : nothing}
+        ${
+          draft.description
+            ? html`
+                <hr class="confirm-divider" />
+                <p class="confirm-description">${draft.description}</p>
+              `
+            : nothing
+        }
       </div>
     `;
   }

@@ -185,7 +185,11 @@ describe("SchedulerManager", () => {
         onResourceDelete: onDelete,
       });
 
-      const res = manager.addResource({ id: "r1", name: "Resource 1" });
+      const res = manager.addResource({
+        id: "r1",
+        name: "Resource 1",
+        type: "room",
+      });
       expect(manager.getResource("r1")).toBe(res);
       expect(manager.getAllResources()).toEqual([res]);
       expect(manager.getResourceCount()).toBe(1);
@@ -214,7 +218,7 @@ describe("SchedulerManager", () => {
 
       schedulerStore
         .getState()
-        .addResource({ id: "r1", name: "Original Name" });
+        .addResource({ id: "r1", name: "Original Name", type: "room" });
 
       manager.updateResource("r1", { name: "Failed Name" });
       expect(schedulerStore.getState().resources["r1"].name).toBe(
@@ -236,7 +240,7 @@ describe("SchedulerManager", () => {
         onAssignmentDelete: onDelete,
       });
 
-      manager.addResource({ id: "r1", name: "Resource 1" });
+      manager.addResource({ id: "r1", name: "Resource 1", type: "room" });
       manager.addEvent({
         id: "evt-1",
         title: "Test Event",
@@ -272,7 +276,7 @@ describe("SchedulerManager", () => {
         onError,
       });
 
-      manager.addResource({ id: "r1", name: "Resource 1" });
+      manager.addResource({ id: "r1", name: "Resource 1", type: "room" });
       manager.addEvent({
         id: "evt-1",
         title: "Test Event",
@@ -296,7 +300,7 @@ describe("SchedulerManager", () => {
   describe("Reset", () => {
     it("should clear all elements", () => {
       const manager = new SchedulerManager();
-      manager.addResource({ id: "r1", name: "Resource 1" });
+      manager.addResource({ id: "r1", name: "Resource 1", type: "room" });
       manager.clearAll();
       expect(manager.getResourceCount()).toBe(0);
     });
@@ -631,7 +635,11 @@ describe("SchedulerManager", () => {
         onError,
       });
 
-      manager.addResource({ id: "r-async-1", name: "Async Resource" });
+      manager.addResource({
+        id: "r-async-1",
+        name: "Async Resource",
+        type: "room",
+      });
 
       await new Promise((r) => setTimeout(r, 0));
 

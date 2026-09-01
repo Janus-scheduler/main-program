@@ -11,11 +11,7 @@ export type { SpellingCorrection, SpellingResult } from "./spelling";
 
 /** The closed intent set. `none` means "not a scheduling utterance". */
 export type Intent =
-  | "add_event"
-  | "delete_event"
-  | "modify_event"
-  | "get_details"
-  | "none";
+  "add_event" | "delete_event" | "modify_event" | "get_details" | "none";
 
 /** What the caller should do with the utterance. */
 export type Route = "PROCEED" | "CLARIFY" | "REJECT";

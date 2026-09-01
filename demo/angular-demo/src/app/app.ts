@@ -5,8 +5,9 @@ import {
   signal,
   computed,
   viewChild,
-  inject,
   effect,
+  OnDestroy,
+  inject,
 } from '@angular/core';
 import { NlpEngineService } from './chat/nlp-engine.service';
 import { JanusChatService } from './chat/janus-chat.service';
@@ -42,6 +43,13 @@ import {
   isoToZonedDisplay,
   schedulerStore,
 } from '@janus-scheduler/angular';
+import {
+  GoogleSyncManager,
+  GoogleCalendarClient,
+  GoogleEventMapper,
+} from '@janus-scheduler/integrations';
+
+const BACKEND_URL = 'http://localhost:3001';
 
 const INTRO: PresentMessage = {
   id: 'intro',
@@ -81,7 +89,7 @@ export interface NavData {
   styleUrl: './app.css',
   encapsulation: ViewEncapsulation.None,
 })
-export class App {
+export class App implements OnDestroy {
   currentView: ViewType = 'Month';
   showScheduler = false;
   selectedEventId = signal<string | null>(null);
@@ -165,7 +173,16 @@ export class App {
 
   allowCreate = signal(false);
   schedulerError = signal<string | null>(null);
+  // ── Google Calendar sync ────────────────────────────────────────────────
+  googleConnected = signal(false);
+  private readonly googleClient = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
+  private readonly googleMapper = new GoogleEventMapper();
+  private readonly syncManager = new GoogleSyncManager(this.googleClient, this.googleMapper);
+  private unsubscribeGoogleStatus: (() => void) | undefined;
+  private stopRealtimeSync: (() => void) | undefined;
+
   private readonly manager = new SchedulerManager({
+    ...this.syncManager.getHooks(),
     onError: ({ operation, error }) => {
       console.error(`❌ Manager error [${operation}]:`, error);
       this.schedulerError.set((error as Error).message || 'An unexpected error occurred');
@@ -174,6 +191,38 @@ export class App {
 
   constructor() {
     this.seedInitialData();
+
+    // Detect OAuth redirect / pick up an already-connected backend, same as
+    // the React demo: handleOAuthRedirect() consumes `?google_connected=`
+    // and cleans the URL, onStatusChange fires immediately with the current
+    // status then on every future change, refreshStatus() covers a plain
+    // reload with an already-connected backend from an earlier session.
+    this.syncManager.handleOAuthRedirect();
+    this.unsubscribeGoogleStatus = this.syncManager.onStatusChange((connected) =>
+      this.googleConnected.set(connected),
+    );
+    this.syncManager.refreshStatus();
+
+    // Start real-time sync after connecting; tear it down on disconnect.
+    effect((onCleanup) => {
+      if (!this.googleConnected()) return;
+
+      let cancelled = false;
+      this.syncManager.startRealtimeSync().then((stop) => {
+        if (cancelled) {
+          stop();
+        } else {
+          this.stopRealtimeSync = stop;
+        }
+      });
+
+      onCleanup(() => {
+        cancelled = true;
+        this.stopRealtimeSync?.();
+        this.stopRealtimeSync = undefined;
+      });
+    });
+
     effect(() => {
       const state = this.engineService.state();
       const catalog = catalogFromResources(this.manager.getAllResources());
@@ -197,6 +246,21 @@ export class App {
     });
   }
 
+  ngOnDestroy(): void {
+    this.unsubscribeGoogleStatus?.();
+    this.stopRealtimeSync?.();
+  }
+
+  handleConnectCalendar(): void {
+    if (this.googleConnected()) {
+      // disconnect() calls setConnected(false) internally, which broadcasts
+      // to the onStatusChange subscription above — no need to set it here too.
+      this.syncManager.disconnect();
+    } else {
+      this.syncManager.connect();
+    }
+  }
+
   private seedInitialData() {
     // Only seed if the store is empty to avoid duplicates on re-renders
     if (this.manager.getResourceCount() > 0) return;
@@ -208,6 +272,7 @@ export class App {
       id: 'r1',
       name: 'Dr. Sarah Chen',
       type: 'person',
+      email: 'sarah.chen@example.com',
       subtitle: 'Specialist',
       avatar:
         'https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
@@ -216,6 +281,7 @@ export class App {
       id: 'r2',
       name: 'Dr. Michael Ross',
       type: 'person',
+      email: 'michael.ross@example.com',
       subtitle: 'Medical Officer',
       avatar:
         'https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000',
@@ -224,6 +290,7 @@ export class App {
       id: 'r3',
       name: 'Dr. Ann sherin',
       type: 'person',
+      email: 'ann.sherin@example.com',
       avatar: 'https://westernsydneydiabetes.com.au/uploads/2021/06/Rona-scaled.jpg',
     });
     this.manager.addResource({
@@ -251,6 +318,7 @@ export class App {
       id: 'r7',
       name: 'Dr. Alan Turing',
       type: 'person',
+      email: 'alan.turing@example.com',
       avatar:
         'https://tse4.mm.bing.net/th/id/OIP.kqx_nQhmMAt1EtXnbBhOBwHaK0?r=0&w=832&h=1216&rs=1&pid=ImgDetMain&o=7&rm=3',
     });

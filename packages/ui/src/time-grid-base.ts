@@ -252,7 +252,12 @@ export abstract class JanusTimeGridBase extends LitElement {
     const resourceMap = new Map<string, TimeGridEventResource>(
       Object.values(state.resources).map((r) => [
         r.id,
-        { id: r.id, name: r.name, avatar: r.avatar, type: r.type },
+        {
+          id: r.id,
+          name: r.name,
+          avatar: r.avatar,
+          type: r.type as TimeGridEventResource["type"],
+        },
       ]),
     );
 
@@ -672,16 +677,18 @@ export abstract class JanusTimeGridBase extends LitElement {
         <span class="tg-event__avatar-stack">
           ${shown.map((r) => this._renderAvatar(r))}
         </span>
-        ${overflow > 0
-          ? html`<span
-              class="tg-avatar tg-avatar--more"
-              title="${resources
-                .slice(maxAvatars)
-                .map((r) => r.name)
-                .join(", ")}"
-              >+${overflow}</span
-            >`
-          : nothing}
+        ${
+          overflow > 0
+            ? html`<span
+                class="tg-avatar tg-avatar--more"
+                title="${resources
+                  .slice(maxAvatars)
+                  .map((r) => r.name)
+                  .join(", ")}"
+                >+${overflow}</span
+              >`
+            : nothing
+        }
       </span>
     `;
   }
@@ -733,9 +740,9 @@ export abstract class JanusTimeGridBase extends LitElement {
           left: calc(${pos.left}% + 3px);
           width: calc(${width}% - 6px);
         "
-        title="${formatEventTimeRange(ev)} · ${ev.title}${resourceNames
-          ? ` · ${resourceNames}`
-          : ""}"
+        title="${formatEventTimeRange(ev)} · ${ev.title}${
+          resourceNames ? ` · ${resourceNames}` : ""
+        }"
         @pointerdown=${(e: PointerEvent) =>
           this._onEventPointerDown(e, ev, dateStr)}
         @click=${(e: Event) => {
@@ -749,23 +756,27 @@ export abstract class JanusTimeGridBase extends LitElement {
           this._hoveredEventId = null;
         }}
       >
-        ${draggable
-          ? html`<div
-              class="tg-event-resize-handle tg-event-resize-handle--top"
-              @pointerdown=${(e: PointerEvent) =>
-                this._onResizePointerDown(e, ev, dateStr, "start")}
-            ></div>`
-          : nothing}
+        ${
+          draggable
+            ? html`<div
+                class="tg-event-resize-handle tg-event-resize-handle--top"
+                @pointerdown=${(e: PointerEvent) =>
+                  this._onResizePointerDown(e, ev, dateStr, "start")}
+              ></div>`
+            : nothing
+        }
         <span class="tg-event__title">${ev.title}</span>
         <span class="tg-event__time">${fmt12(ev.startTime)}</span>
         ${showAvatars ? this._renderAvatars(ev, maxAvatars) : nothing}
-        ${draggable
-          ? html`<div
-              class="tg-event-resize-handle tg-event-resize-handle--bottom"
-              @pointerdown=${(e: PointerEvent) =>
-                this._onResizePointerDown(e, ev, dateStr, "end")}
-            ></div>`
-          : nothing}
+        ${
+          draggable
+            ? html`<div
+                class="tg-event-resize-handle tg-event-resize-handle--bottom"
+                @pointerdown=${(e: PointerEvent) =>
+                  this._onResizePointerDown(e, ev, dateStr, "end")}
+              ></div>`
+            : nothing
+        }
       </button>
     `;
   }
@@ -821,11 +832,13 @@ export abstract class JanusTimeGridBase extends LitElement {
     return html`
       <div class="tg-now" style="top: ${top}px">
         <span class="tg-now__dot"></span>
-        ${showLabel
-          ? html`<span class="tg-now__label"
-              >${fmt12(timeStrFromMinutes(nowMin))}</span
-            >`
-          : nothing}
+        ${
+          showLabel
+            ? html`<span class="tg-now__label"
+                >${fmt12(timeStrFromMinutes(nowMin))}</span
+              >`
+            : nothing
+        }
       </div>
     `;
   }
@@ -919,14 +932,16 @@ export abstract class JanusTimeGridBase extends LitElement {
           <div class="tg-grid">
             <div class="tg-head__corner"></div>
             ${days.map((day, i) => this._renderHeaderCell(day, i === lastIdx))}
-            ${hasAllDay
-              ? html`
-                  <div class="tg-allday__label">All-day</div>
-                  ${days.map((day, i) =>
-                    this._renderAllDayCell(day, i === lastIdx),
-                  )}
-                `
-              : nothing}
+            ${
+              hasAllDay
+                ? html`
+                    <div class="tg-allday__label">All-day</div>
+                    ${days.map((day, i) =>
+                      this._renderAllDayCell(day, i === lastIdx),
+                    )}
+                  `
+                : nothing
+            }
             ${this._renderGutter()}
             ${days.map((day, i) =>
               this._renderColumn(day, singleColumn, i === lastIdx),
@@ -934,17 +949,19 @@ export abstract class JanusTimeGridBase extends LitElement {
           </div>
         </div>
 
-        ${this.showFab
-          ? html`
-              <button
-                class="tg-fab"
-                @click=${this._handleAddEvent}
-                aria-label="Add event"
-              >
-                ${PlusIcon()}
-              </button>
-            `
-          : nothing}
+        ${
+          this.showFab
+            ? html`
+                <button
+                  class="tg-fab"
+                  @click=${this._handleAddEvent}
+                  aria-label="Add event"
+                >
+                  ${PlusIcon()}
+                </button>
+              `
+            : nothing
+        }
       </div>
     `;
   }

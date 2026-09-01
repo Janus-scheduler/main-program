@@ -21,6 +21,14 @@ export default defineConfig({
         __dirname,
         "../../packages/ui/src/index.ts",
       ),
+      "@janus-scheduler/integrations": path.resolve(
+        __dirname,
+        "../../packages/integrations/src/index.ts",
+      ),
+      "@janus-scheduler/core": path.resolve(
+        __dirname,
+        "../../packages/core/src/index.ts",
+      ),
     },
   },
 });

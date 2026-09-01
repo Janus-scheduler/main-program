@@ -81,7 +81,12 @@ beforeEach(() => {
   manager = new SchedulerManager();
   manager.addResource({ id: "r1", name: "Operating Room 1", type: "room" });
   manager.addResource({ id: "r2", name: "MRI Scanner A", type: "equipment" });
-  manager.addResource({ id: "p1", name: "Dr. Sarah Chen", type: "person" });
+  manager.addResource({
+    id: "p1",
+    name: "Dr. Sarah Chen",
+    type: "person",
+    email: "sarah.chen@example.com",
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════

@@ -660,6 +660,7 @@ const _Topbar = createComponent({
     onTodayClick: "today-click",
     onViewSwitch: "view-switch",
     onToggleCreate: "toggle-create",
+    onConnectCalendar: "connect-calendar",
     onUndoClick: "undo-click",
     onBenchmarkClick: "benchmark-click",
   },
@@ -676,6 +677,8 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   canUndo?: boolean;
   zoomPercent?: number;
   zoomUnit?: string;
+  /** Whether Google Calendar is currently connected — controls the connect button's label/state. */
+  isGoogleCalendarConnected?: boolean;
   showBenchmarkBtn?: boolean;
   isBenchmarkActive?: boolean;
   benchmarkLabel?: string;
@@ -684,6 +687,8 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   onTodayClick?: () => void;
   onViewSwitch?: (detail: { view: ViewType }) => void;
   onToggleCreate?: () => void;
+  /** Fired when the user clicks the Google Calendar connect/disconnect button. */
+  onConnectCalendar?: () => void;
   onUndoClick?: () => void;
   onBenchmarkClick?: () => void;
 }
@@ -696,6 +701,7 @@ export function Topbar(props: TopbarProps): React.JSX.Element {
     onTodayClick: withVoid(props.onTodayClick),
     onViewSwitch: withDetail(props.onViewSwitch),
     onToggleCreate: withVoid(props.onToggleCreate),
+    onConnectCalendar: withVoid(props.onConnectCalendar),
     onUndoClick: withVoid(props.onUndoClick),
     onBenchmarkClick: withVoid(props.onBenchmarkClick),
   });

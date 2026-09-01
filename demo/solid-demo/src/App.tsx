@@ -1,4 +1,10 @@
-import { createSignal, createMemo, Show } from "solid-js";
+import {
+  createSignal,
+  createMemo,
+  Show,
+  createEffect,
+  onCleanup,
+} from "solid-js";
 import "./App.css";
 import {
   Timeline,
@@ -24,6 +30,13 @@ import {
   type SessionState,
   type PresentMessage,
 } from "@janus-scheduler/nlp";
+import {
+  GoogleSyncManager,
+  GoogleCalendarClient,
+  GoogleEventMapper,
+} from "@janus-scheduler/integrations";
+
+const BACKEND_URL = "http://localhost:3001";
 import { createNlpEngine } from "./chat/createNlpEngine";
 
 const INTRO: PresentMessage = {
@@ -137,6 +150,7 @@ function App() {
     zoomUnit: "",
   });
   const [allowCreate, setAllowCreate] = createSignal(false);
+  const [googleConnected, setGoogleConnected] = createSignal(false);
 
   let timelineRef: HTMLElement & {
     goToPrev: () => void;
@@ -167,14 +181,62 @@ function App() {
     goToToday: () => void;
   };
 
+  const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
+  const mapper = new GoogleEventMapper();
+  const syncManager = new GoogleSyncManager(client, mapper);
+
   // Initialize the core manager once and populate initial data
-  const manager = new SchedulerManager();
+  const manager = new SchedulerManager({
+    ...syncManager.getHooks(),
+  });
+
+  // Detect OAuth redirect / pick up an already-connected backend
+  syncManager.handleOAuthRedirect();
+  const unsubscribeGoogleStatus = syncManager.onStatusChange((connected) =>
+    setGoogleConnected(connected),
+  );
+  syncManager.refreshStatus();
+
+  // Start real-time sync after connecting; tear it down on disconnect.
+  createEffect(() => {
+    if (!googleConnected()) return;
+
+    let stopRealtimeSync: (() => void) | undefined;
+    let cancelled = false;
+
+    syncManager.startRealtimeSync().then((stop) => {
+      if (cancelled) {
+        stop();
+      } else {
+        stopRealtimeSync = stop;
+      }
+    });
+
+    onCleanup(() => {
+      cancelled = true;
+      stopRealtimeSync?.();
+    });
+  });
+
+  onCleanup(() => {
+    unsubscribeGoogleStatus();
+  });
+
+  const handleConnectCalendar = () => {
+    if (googleConnected()) {
+      syncManager.disconnect();
+    } else {
+      syncManager.connect();
+    }
+  };
+
   // Only populate if empty (for hot reloading safety)
   if (manager.getResourceCount() === 0) {
     manager.addResource({
       id: "r1",
       name: "Dr. Sarah Chen",
       type: "person",
+      email: "sarah.chen@example.com",
       subtitle: "Specialist",
       avatar:
         "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
@@ -183,6 +245,7 @@ function App() {
       id: "r2",
       name: "Dr. Michael Ross",
       type: "person",
+      email: "michael.ross@example.com",
       subtitle: "Surgeon",
       avatar:
         "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
@@ -326,6 +389,8 @@ function App() {
             allowCreate={allowCreate()}
             zoomPercent={navData().zoomPercent}
             zoomUnit={navData().zoomUnit}
+            isGoogleCalendarConnected={googleConnected()}
+            onConnectCalendar={handleConnectCalendar}
             onPrevClick={() => {
               if (currentView() === "Timeline") timelineRef?.goToPrev();
               else if (currentView() === "Month") monthGridRef?.goToPrev();
