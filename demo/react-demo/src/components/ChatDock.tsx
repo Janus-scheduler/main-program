@@ -53,10 +53,21 @@ const REQUIRES: SessionRequirements = {
 };
 
 interface ChatSidebarProps {
+  /**
+   * Same policy the timeline enforces.
+   *
+   * Must be passed through: the chat commits via the same manager as a drag,
+   * but `SchedulerManager.addEvent` runs no conflict check, so with this ON
+   * the timeline blocked a double-booking and the chat created it anyway.
+   */
+  preventConflicts?: boolean;
   manager: SchedulerManager;
 }
 
-export function ChatSidebar({ manager }: ChatSidebarProps) {
+export function ChatSidebar({
+  manager,
+  preventConflicts = false,
+}: ChatSidebarProps) {
   const engine = useNlpEngine();
 
   // The LIVE store is the catalog. This is the whole reason `extractEntities`
@@ -82,12 +93,14 @@ export function ChatSidebar({ manager }: ChatSidebarProps) {
 
   const handleConfirm = useCallback(
     (state: SessionState) => {
-      const result = commitSession(manager, state, resources[0]?.id);
+      const result = commitSession(manager, state, resources[0]?.id, {
+        preventConflicts,
+      });
       return result.ok
         ? { ok: true, message: result.summary, undo: result.undo }
         : { ok: false, message: result.message };
     },
-    [manager, resources],
+    [manager, resources, preventConflicts],
   );
 
   const chat = useJanusChat({
@@ -120,7 +133,13 @@ export function ChatSidebar({ manager }: ChatSidebarProps) {
           onChatClarifyResponse={(d) => chat.choose(d.label)}
           onChatConfirm={chat.confirm}
           onChatUndo={(d) => chat.undo(d.messageId)}
-          onChatEdit={() => chat.edit?.() ?? chat.reset()}
+          // NOT `chat.edit?.() ?? chat.reset()`. `edit()` returns void, so the
+          // `??` ALWAYS fell through and reset the thread: pressing Edit did
+          // the edit and then wiped the conversation.
+          onChatEdit={() => {
+            if (chat.edit) chat.edit();
+            else chat.reset();
+          }}
         />
       </div>
     </div>

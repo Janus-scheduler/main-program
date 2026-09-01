@@ -35,6 +35,7 @@ import {
   stripNegationCues,
   SKIP_ANSWER,
   KEEP_TITLE_ANSWER,
+  OTHER_ANSWER,
 } from "../src";
 import { rewriteForClassifier } from "../src/rewrite";
 import { presentSession } from "../src/presentSession";
@@ -664,14 +665,58 @@ describe("host completeness requirements", () => {
     expect(state.question?.text).toBe("Which room or person is “meeting” for?");
   });
 
-  it("offers the live catalog as chips, plus Skip", () => {
+  it("offers the live catalog as chips, and NO escape", () => {
+    // No Skip: a bare Skip asked the user to give up without saying what that
+    // costs. No “Other…” either, and that is the point — this list is the
+    // host's ENTIRE catalog, not a sample. There is no other room, so offering
+    // one would invite a name the calendar does not have and lead straight
+    // back to this question. A long catalog gets `searchable` instead.
     const state = beginSession(INCOMPLETE, strict());
     const labels = state.question!.choices.map((c) => c.label);
     expect(labels).toContain("Room A");
     expect(labels).toContain("Alex Rivera");
-    expect(labels.at(-1)).toBe("Skip");
+    expect(labels).not.toContain("Skip");
+    expect(labels).not.toContain("Other…");
   });
 
+  it("offers “Other…” where the chips are only a SAMPLE", () => {
+    // Six clock chips out of 1,440 minutes; five lengths out of any number.
+    const c = strict({ requires: { add_event: ["duration"] } });
+    const asked = beginSession("book Room A tomorrow at 3pm", c);
+    expect(asked.question?.slot).toBe("duration");
+    const labels = asked.question!.choices.map((x) => x.label);
+    expect(labels.at(-1)).toBe("Other…");
+    expect(labels).not.toContain("Skip");
+  });
+
+  it("“Other…” re-asks the same slot, inviting free text", () => {
+    const c = strict({ requires: { add_event: ["duration"] } });
+    const asked = beginSession("book Room A tomorrow at 3pm", c);
+    const other = provideAnswer(asked, OTHER_ANSWER, c);
+    expect(other.status).toBe("awaiting");
+    expect(other.question?.slot).toBe("duration");
+    expect(other.question?.choices).toEqual([]);
+    expect(other.question?.text).toMatch(/go ahead/i);
+  });
+
+  it("“Other…” does not spend a round", () => {
+    // Asking to type is engaging with the question, not failing to answer it.
+    const c = strict({ requires: { add_event: ["duration"] } });
+    const asked = beginSession("book Room A tomorrow at 3pm", c);
+    const other = provideAnswer(asked, OTHER_ANSWER, c);
+    expect(other.rounds).toBe(asked.rounds);
+  });
+
+  it("a typed answer after “Other…” is understood normally", () => {
+    const c = strict({ requires: { add_event: ["duration"] } });
+    const other = provideAnswer(
+      beginSession("book Room A tomorrow at 3pm", c),
+      OTHER_ANSWER,
+      c,
+    );
+    const done = provideAnswer(other, "45 minutes", c);
+    expect(done.draft?.time?.durationMinutes).toBe(45);
+  });
   it("completes once the resource is supplied, merging it readably", () => {
     const done = provideAnswer(
       beginSession(INCOMPLETE, strict()),
@@ -1828,6 +1873,59 @@ describe("a negation cue is never the event name (D7)", () => {
       beginSession("schedule standup with Alex tomorrow at 10am", ctx).draft
         ?.title,
     ).toBe("standup");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  14bd. Generic nouns and stray verbs are not event names
+//
+//  Found by hand in the Phase K browser run, all three from one cause: a word
+//  that DESCRIBES the thing being scheduled was taken as its NAME.
+//
+//    "...and schedule Dr. Sarah Chen..."          -> title "schedule"
+//    "cancel the event Pre-op Assessment"         -> title "event Pre-op Assessment"
+//    "cancel the Dr. Michael Ross event at 1pm"   -> title "event"
+//
+//  The last two then failed to find the event they had just described.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("generic nouns and stray verbs are not titles", () => {
+  const titleOf = (text: string): string | undefined =>
+    beginSession(text, ctx).draft?.title;
+
+  it("drops a classifier noun that introduces the name", () => {
+    expect(titleOf("cancel the event Room A review")).toBe("review");
+  });
+
+  it("drops a classifier noun left on its own", () => {
+    // Everything else in the sentence was claimed; a bare "event" is not a name.
+    expect(
+      titleOf("cancel the Alex Rivera event today at 1pm"),
+    ).toBeUndefined();
+  });
+
+  it("keeps a classifier noun that is the HEAD of a real name", () => {
+    // "team event" is a name; "the event X" is a description of one.
+    expect(titleOf("book Room A tomorrow at 3pm called team event")).toBe(
+      "team event",
+    );
+  });
+
+  it("drops a command verb stranded mid-sentence", () => {
+    // `leadingVerbPrefixLength` only strips a verb at position 0, so a second
+    // one — "Book X, and schedule Y" — survived into the title.
+    const t = titleOf(
+      "Book Room A and schedule Alex Rivera for tomorrow from 5:00 PM to 6:00 PM",
+    );
+    expect(t).toBeUndefined();
+  });
+
+  it("keeps a verb-like word that is part of a real title", () => {
+    // Restricted to a LONE token on purpose: several intent verbs are
+    // ordinary words, and dropping them inside a title would be worse.
+    expect(titleOf("book Room A tomorrow at 3pm called plan review")).toBe(
+      "plan review",
+    );
   });
 });
 

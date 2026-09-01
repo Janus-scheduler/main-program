@@ -6,8 +6,20 @@ export type SmalltalkKind = "greeting" | "thanks" | "farewell" | "help";
 const GREETING_RE = /^\s*(hi|hello|hey|greetings|morning|afternoon|evening)\b/i;
 const THANKS_RE = /^\s*(thanks|thank you|cheers|appreciate it)\b/i;
 const FAREWELL_RE = /^\s*(bye|goodbye|see you|cya|catch you later)\b/i;
+/**
+ * Help phrases, anchored to the WHOLE utterance.
+ *
+ * Anchoring is what stops a room called “Help Desk” being swallowed: an
+ * earlier version matched only the START of the string, so tapping that room
+ * on a resource question answered it with a help blurb.
+ *
+ * The trailing `[?!.]*` is load-bearing. Without it `\s*$` rejected any
+ * punctuation, so “what can you do” worked and **“what can you do?” did not** —
+ * and the question mark is how most people write it. The other three patterns
+ * are prefix-anchored with `\b`, so they already tolerate it.
+ */
 const HELP_RE =
-  /^\s*(help|what can you do|how does this work|commands|options|stuck)\s*$/i;
+  /^\s*(help|what can you do|what can i say|how does this work|commands|options|stuck)\s*[?!.]*\s*$/i;
 
 export function classifySmalltalk(
   text: string,

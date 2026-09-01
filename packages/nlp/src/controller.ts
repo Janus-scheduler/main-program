@@ -130,7 +130,7 @@ export class ChatController {
     this.notify();
   }
 
-  public submit(text: string) {
+  public submit(text: string, label?: string) {
     if (!this.options.engine || text.trim().length === 0 || this.busy) return;
 
     if (this.timerId) {
@@ -138,7 +138,12 @@ export class ChatController {
       this.timerId = undefined;
     }
 
-    this.append({ id: this.nextId(), role: "user", kind: "text", text });
+    this.append({
+      id: this.nextId(),
+      role: "user",
+      kind: "text",
+      text: label || text,
+    });
     this.busy = true;
     this.notify();
 
@@ -264,7 +269,7 @@ export class ChatController {
     const choice = this.session?.question?.choices?.find(
       (c) => c.label === label,
     );
-    this.submit(choice ? choice.value : label);
+    this.submit(choice ? choice.value : label, label);
   }
 
   public confirm() {
@@ -302,6 +307,9 @@ export class ChatController {
       kind: "success",
       summary: outcome.message,
       canUndo: Boolean(outcome.undo),
+      // No host handles `chat-view` yet, and the UI renders the button unless
+      // this is explicitly false. See `canView` in presentSession.ts.
+      canView: false,
     });
   }
 

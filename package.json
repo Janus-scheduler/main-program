@@ -16,7 +16,7 @@
     "build:packages": "npm run build -w @janus-scheduler/core -w @janus-scheduler/nlp -w @janus-scheduler/ui",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test -w @janus-scheduler/core",
-    "clean": "node -e \"const fs=require('fs');['packages/core/dist','packages/nlp/dist','packages/ui/dist'].forEach(d=>fs.rm(d,{recursive:true,force:true},()=>{}))\"",
+    "clean": "rimraf packages/core/dist packages/nlp/dist packages/ui/dist",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "prepare": "husky install",

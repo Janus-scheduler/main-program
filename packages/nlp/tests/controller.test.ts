@@ -379,4 +379,99 @@ describe("ChatController", () => {
       expect(c.session?.draft?.title).toBe("standup");
     });
   });
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  Editing one field must not forget the others
+  //
+  //  Reported from the browser as "memory forgetting". Two greedy spans, and
+  //  neither was about state persistence:
+  //
+  //    1. the resource edit replaced ONE range from the first named entity to
+  //       the last, so a time phrase sitting between two of them was deleted;
+  //    2. the title was sliced from the first surviving word to the last out
+  //       of the ORIGINAL text, so every room, person and time in between
+  //       reappeared inside the event's name.
+  // ══════════════════════════════════════════════════════════════════════
+
+  describe("editing one field keeps the rest", () => {
+    const CATALOG = {
+      resources: [
+        { id: "r1", name: "Operating Room 1", type: "room" },
+        { id: "r2", name: "MRI Scanner A", type: "equipment" },
+        { id: "r3", name: "Room B", type: "room" },
+      ],
+      participants: [
+        { id: "p1", name: "Dr. Sarah Chen", type: "person" },
+        { id: "p2", name: "Dr. Ann Sherin", type: "person" },
+      ],
+    };
+    const settle = () => new Promise((res) => setTimeout(res, 350));
+
+    const booked = async (opening: string) => {
+      const c = new ChatController({
+        engine,
+        catalog: CATALOG,
+        requires: { add_event: ["when", "duration", "resource", "title"] },
+        timezone: "UTC",
+      });
+      c.submit(opening);
+      await settle();
+      let guard = 0;
+      while (c.session?.status === "awaiting" && guard++ < 4) {
+        c.submit(c.session.question?.slot === "title" ? "Standup" : "1 hour");
+        await settle();
+      }
+      return c;
+    };
+
+    it.each([
+      [
+        "a person AFTER the time",
+        "book Operating Room 1 tomorrow at 3pm with Dr. Sarah Chen",
+      ],
+      [
+        "a room BEFORE the time",
+        "book Operating Room 1 tomorrow at 3pm for 1 hour called standup",
+      ],
+      [
+        "four resources around the time",
+        "Book Operating Room 1, MRI Scanner A, and schedule Dr. Sarah Chen and Dr. Ann Sherin for tomorrow from 5:00 PM to 6:00 PM",
+      ],
+    ])("changing the room keeps the time — %s", async (_label, opening) => {
+      const c = await booked(opening);
+      const before = c.session?.draft?.time;
+      expect(before).toBeTruthy();
+      c.edit();
+      c.submit("Room B");
+      await settle();
+      const after = c.session?.draft?.time;
+      expect(after?.localDate).toBe(before?.localDate);
+      expect(after?.localTime).toBe(before?.localTime);
+      expect(after?.durationMinutes).toBe(before?.durationMinutes);
+      expect(c.session?.draft?.resources.map((r) => r.name)).toEqual([
+        "Room B",
+      ]);
+    });
+
+    it("a title never contains a room, a person or a time", async () => {
+      const c = await booked(
+        "Book Operating Room 1, MRI Scanner A, and schedule Dr. Sarah Chen and Dr. Ann Sherin for tomorrow from 5:00 PM to 6:00 PM",
+      );
+      const title = c.session?.draft?.title ?? "";
+      expect(title).not.toMatch(/Operating Room|MRI Scanner|Sarah|Sherin/i);
+      expect(title).not.toMatch(/tomorrow|5:00|6:00/i);
+      expect(title).toBe("Standup");
+    });
+
+    it("keeps the title when the room is changed", async () => {
+      const c = await booked(
+        "book Operating Room 1 tomorrow at 3pm with Dr. Sarah Chen",
+      );
+      const before = c.session?.draft?.title;
+      c.edit();
+      c.submit("Room B");
+      await settle();
+      expect(c.session?.draft?.title).toBe(before);
+    });
+  });
 });

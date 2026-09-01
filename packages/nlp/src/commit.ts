@@ -298,10 +298,10 @@ function resolveTarget(
         message: `There are ${matches.length} events matching “${title}” (${names}). Open the one you mean on the timeline.`,
       };
     }
-    return {
-      ok: false,
-      message: `I couldn't find an event called “${title}”.`,
-    };
+    // Nothing by that name. Do NOT give up here: the utterance may also have
+    // named a room, a person and a time, which identify the event perfectly
+    // well. “cancel the Dr. Michael Ross event today at 1pm” used to fail on
+    // a title of “event” while holding everything needed to find it.
   }
 
   /**
@@ -320,8 +320,9 @@ function resolveTarget(
   if (targeted.length === 0 || !time) {
     return {
       ok: false,
-      message:
-        "I need to know which event you mean — say the room and time, like “cancel Room A tomorrow at 3pm”.",
+      message: title
+        ? `I couldn't find an event called “${title}”. Try the room and time, like “cancel Room A tomorrow at 3pm”.`
+        : "I need to know which event you mean — say the room and time, like “cancel Room A tomorrow at 3pm”.",
     };
   }
 
@@ -358,11 +359,12 @@ function resolveTarget(
       message: `There are ${matches.length} events on ${where} then (${names}). Open the one you mean on the timeline.`,
     };
   }
+  const named = title ? ` called “${title}”` : "";
   return {
     ok: false,
     message: stated
-      ? `I couldn't find anything booked on ${where} at ${shortWhen(time.localDate, time.localTime)}.`
-      : `I couldn't find anything booked on ${where} that day.`,
+      ? `I couldn't find anything${named} on ${where} at ${shortWhen(time.localDate, time.localTime)}.`
+      : `I couldn't find anything${named} on ${where} that day.`,
   };
 }
 
@@ -372,6 +374,73 @@ function zonedPartsAtLocalDate(iso: string, timezone: string): string {
   if (!Number.isFinite(ms)) return "";
   const p = zonedPartsAt(ms, timezone);
   return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+/** Host policy this module needs to honour. */
+export interface CommitOptions {
+  /**
+   * Refuse a booking that overlaps an existing one on the same row.
+   *
+   * Mirrors the `preventConflicts` prop on `<janus-timeline>`. It has to be
+   * passed in: the chat commits through the same manager as a drag does, but
+   * `SchedulerManager.addEvent` runs no conflict check of its own — so with
+   * the setting ON, the timeline blocked a double-booking and the chat
+   * created it anyway.
+   */
+  preventConflicts?: boolean;
+}
+
+/**
+ * Events on any of `resourceIds` that overlap [startMs, endMs).
+ *
+ * The predicate is `core`'s `checkSlotConflict`, restated rather than
+ * imported — this package must not depend on `@janus-scheduler/core`. Keep
+ * the two in step: half-open overlap, and an `_occ_` recurrence suffix
+ * stripped before comparing ids so an occurrence never clashes with its own
+ * parent.
+ */
+function overlappingEvents(
+  scheduler: SchedulerPort,
+  resourceIds: string[],
+  startMs: number,
+  endMs: number,
+  ignoreEventId?: string,
+): StoredEvent[] {
+  const ignoreBaseId = ignoreEventId
+    ? ignoreEventId.replace(/_occ_\d+$/, "")
+    : null;
+
+  return scheduler.getAllEvents().filter((ev) => {
+    if (ignoreBaseId && ev.id.replace(/_occ_\d+$/, "") === ignoreBaseId) {
+      return false;
+    }
+    if (ev.status === "cancelled") return false;
+    if (!(ev.resourceIds ?? []).some((id) => resourceIds.includes(id))) {
+      return false;
+    }
+    const from = Date.parse(ev.startTime);
+    const to = Date.parse(ev.endTime);
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
+    return startMs < to && endMs > from;
+  });
+}
+
+/** “Operating Room 1 already has “Ward Round” then.” */
+function clashMessage(
+  scheduler: SchedulerPort,
+  clashes: StoredEvent[],
+): string {
+  const names = clashes.map((e) => `“${e.title}”`).join(", ");
+  const rows = [
+    ...new Set(
+      clashes.flatMap((e) =>
+        (e.resourceIds ?? []).map(
+          (id) => scheduler.getResource(id)?.name ?? "that row",
+        ),
+      ),
+    ),
+  ].join(", ");
+  return `That clashes with ${names} on ${rows}. Nothing was scheduled.`;
 }
 
 /**
@@ -386,6 +455,7 @@ export function commitSession(
   scheduler: SchedulerPort,
   state: SessionState,
   fallbackResourceId: string | undefined,
+  options: CommitOptions = {},
 ): CommitResult {
   const draft = state.draft;
   if (state.status !== "ready" || !draft) {
@@ -417,6 +487,23 @@ export function commitSession(
           ok: false,
           message: "There are no resources to schedule against yet.",
         };
+      }
+
+      // The chat must not be able to do what the timeline forbids.
+      if (options.preventConflicts) {
+        // Fall back to the ISO strings rather than comparing `undefined`:
+        // a silently skipped check is worse than no check, because it looks
+        // like protection.
+        const from = Number.isFinite(time.startMs)
+          ? time.startMs
+          : Date.parse(time.startISO);
+        const to = Number.isFinite(time.endMs)
+          ? time.endMs
+          : Date.parse(time.endISO);
+        const clashes = overlappingEvents(scheduler, resourceIds, from, to);
+        if (clashes.length > 0) {
+          return { ok: false, message: clashMessage(scheduler, clashes) };
+        }
       }
 
       const id = freeEventId(scheduler);
@@ -522,6 +609,22 @@ export function commitSession(
       };
       if (named.length > 0) {
         updates.resourceIds = named;
+      }
+
+      // Moving an event INTO an occupied slot is the same hazard as booking
+      // one there. `target.id` is excluded, or an event would clash with the
+      // place it already occupies.
+      if (options.preventConflicts) {
+        const clashes = overlappingEvents(
+          scheduler,
+          named.length > 0 ? named : previous.resourceIds,
+          draft.time.startMs,
+          draft.time.endMs,
+          target.id,
+        );
+        if (clashes.length > 0) {
+          return { ok: false, message: clashMessage(scheduler, clashes) };
+        }
       }
 
       const moved = attempt(

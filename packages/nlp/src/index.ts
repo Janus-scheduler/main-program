@@ -113,6 +113,8 @@ export {
   MAX_TOTAL_ROUNDS,
   SKIP_ANSWER,
   SKIP_CHOICE,
+  OTHER_ANSWER,
+  OTHER_CHOICE,
   ESCAPE_START_OVER,
   ESCAPE_SKIP_PREFIX,
   EDIT_CANCEL,
@@ -217,6 +219,7 @@ export type { JanusChatOptions, ConfirmOutcome, NlpEngine } from "./controller";
 export { commitSession, catalogFromResources } from "./commit";
 export type {
   SchedulerPort,
+  CommitOptions,
   EventInput,
   StoredEvent,
   ResourceLike,

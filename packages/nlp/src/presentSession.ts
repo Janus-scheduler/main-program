@@ -92,6 +92,17 @@ export type PresentMessage =
       summary: string;
       canUndo: boolean;
       title?: string;
+      /**
+       * Offer a “View” button.
+       *
+       * Defaults to FALSE, deliberately. `<janus-chat>` renders the button on
+       * `canView !== false`, so leaving it undefined rendered one on every
+       * success — and it emitted `chat-view`, which nothing listens for. A
+       * button that visibly does nothing is worse than no button.
+       *
+       * A host that handles `chat-view` can set this true to opt back in.
+       */
+      canView?: boolean;
     };
 
 /** "Thu 10:00 AM" — short, and unambiguous about which day. */

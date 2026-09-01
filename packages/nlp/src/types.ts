@@ -523,6 +523,18 @@ export interface SessionQuestion {
    * would be silently ignored (or, for two clock times, read as a range).
    */
   replaceSpan?: TextSpan;
+  /**
+   * Several disjoint spans to replace, when one range would be too greedy.
+   *
+   * A single `replaceSpan` covering the first named entity to the last also
+   * covers everything BETWEEN them. “book Operating Room 1 tomorrow at 3pm
+   * with Dr. Sarah Chen” put the time inside that range, so changing the room
+   * silently deleted the date and time as well.
+   *
+   * Each span is blanked individually and the answer is inserted where the
+   * first one began; anything in the gaps is left exactly where it was.
+   */
+  replaceSpans?: TextSpan[];
 }
 
 /** One answered question, kept so a UI can replay the conversation. */
