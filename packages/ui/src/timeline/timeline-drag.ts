@@ -297,7 +297,9 @@ export class TimelineDragController {
 
     this.mode = "idle";
     this.active = false;
-    this._requestUpdate();
+    if (!result) {
+      this._requestUpdate();
+    }
 
     return result;
   }

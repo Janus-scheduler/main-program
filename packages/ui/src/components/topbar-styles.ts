@@ -467,8 +467,14 @@ export const topbarStyles = css`
     }
 
     .tl-nav__arrow {
+      width: 36px;
+      height: 36px;
       color: #18181b;
       background: transparent;
+      border-radius: 8px;
+    }
+    .tl-nav__arrow:active {
+      background: var(--bg);
     }
     .tl-nav__date {
       display: none;

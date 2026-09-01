@@ -13,7 +13,10 @@ export const timelineStyles = css`
     --orange-lt: var(--janus-primary-bg, #fff7ed);
 
     /* Event colours */
-    --c-primary-bg: var(--janus-primary-bg, color-mix(in srgb, var(--c-primary) 12%, #ffffff));
+    --c-primary-bg: var(
+      --janus-primary-bg,
+      color-mix(in srgb, var(--c-primary) 12%, #ffffff)
+    );
     --c-primary-bd: var(--janus-primary-border, var(--c-primary));
     --c-primary-tx: var(--janus-primary-text, var(--c-primary));
     --c-orange-bg: #fff7ed;
@@ -89,6 +92,7 @@ export const timelineStyles = css`
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    overflow-anchor: none;
     background: var(--white);
   }
 
@@ -97,6 +101,7 @@ export const timelineStyles = css`
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    overflow-anchor: none;
   }
 
   /* Resource names column */
@@ -108,10 +113,15 @@ export const timelineStyles = css`
     border-right: 1px solid var(--border);
     overflow-y: scroll;
     overflow-x: hidden;
+    overflow-anchor: none;
     display: flex;
     flex-direction: column;
     scrollbar-width: none;
     padding-bottom: 8px; /* Offset for timeline's horizontal scrollbar */
+    transition:
+      width 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      min-width 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+      max-width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .tl-res-col::-webkit-scrollbar {
@@ -123,6 +133,7 @@ export const timelineStyles = css`
     min-height: calc(var(--hour-hdr-h) + var(--super-hdr-h));
     display: flex;
     align-items: center;
+    justify-content: space-between;
     padding: 0 4px;
     font-size: 11px;
     font-weight: 600;
@@ -134,6 +145,44 @@ export const timelineStyles = css`
     background: var(--white);
     z-index: 5;
     flex-shrink: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .tl-res-col__header-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tl-res-collapse-btn {
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition:
+      background 0.15s,
+      color 0.15s;
+  }
+  .tl-res-collapse-btn:hover {
+    background: var(--bg);
+    color: var(--text-1);
+  }
+  .tl-res-collapse-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
   }
 
   /* Group label row */
@@ -150,6 +199,9 @@ export const timelineStyles = css`
     border-bottom: 1px solid var(--border);
     background: #fafafa;
     flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Resource row */
@@ -162,6 +214,9 @@ export const timelineStyles = css`
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     overflow: hidden;
+    transition:
+      padding 0.2s ease,
+      gap 0.2s ease;
   }
 
   .tl-res-info {
@@ -169,6 +224,7 @@ export const timelineStyles = css`
     flex-direction: column;
     gap: 2px;
     min-width: 0;
+    overflow: hidden;
   }
 
   .tl-res-name {
@@ -228,6 +284,7 @@ export const timelineStyles = css`
     min-width: 0;
     overflow-x: auto;
     overflow-y: scroll;
+    overflow-anchor: none;
     display: block;
     will-change: scroll-position;
     -webkit-overflow-scrolling: touch;
@@ -256,6 +313,7 @@ export const timelineStyles = css`
     min-height: 100%;
     display: flex;
     flex-direction: column;
+    overflow-anchor: none;
   }
 
   /* Super header (parent-level labels: day name, month, year) */
@@ -574,7 +632,7 @@ export const timelineStyles = css`
      DRAG-AND-DROP
   ══════════════════════════════════════════════════════════════════════════════ */
 
-  /* Resize handles — thin strips on left/right edges */
+  /* Resize handles — thin strips on left/right edges with expanded touch hit target */
   .tl-event-resize-handle {
     touch-action: none;
     position: absolute;
@@ -582,9 +640,21 @@ export const timelineStyles = css`
     bottom: 0;
     width: 6px;
     cursor: col-resize;
-    z-index: 2;
+    z-index: 5;
     border-radius: 2px;
     transition: background 0.15s;
+  }
+
+  /* Expanded invisible hit target for touch accessibility (minimum 32px hit box) */
+  .tl-event-resize-handle::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    bottom: -6px;
+    left: -13px;
+    right: -13px;
+    min-width: 32px;
+    min-height: 44px;
   }
 
   .tl-event-resize-handle--start {
@@ -730,9 +800,11 @@ export const timelineStyles = css`
      FAB
   ══════════════════════════════════════════════════════════════════════════════ */
   .tl-fab {
-    position: absolute; /* changed to absolute so it stays in the component bounds */
-    bottom: calc(var(--aicard-area-h) + 16px);
-    right: 28px;
+    position: absolute; /* stays within the component bounds */
+    bottom: calc(
+      var(--aicard-area-h) + 16px + env(safe-area-inset-bottom, 0px)
+    );
+    right: calc(24px + env(safe-area-inset-right, 0px));
     width: 52px;
     height: 52px;
     border-radius: 50%;
@@ -747,7 +819,7 @@ export const timelineStyles = css`
     transition:
       background 0.18s,
       transform 0.14s,
-      filter 0.18s;
+      filter 0.18s,
       box-shadow 0.18s;
     z-index: 200;
   }
@@ -1129,7 +1201,8 @@ export const timelineStyles = css`
   .tl-alert-dialog__btn:hover {
     filter: brightness(0.95);
     transform: translateY(-1px);
-  }.tl-alert-dialog__btn:active {
+  }
+  .tl-alert-dialog__btn:active {
     transform: scale(0.97);
   }
 
@@ -1151,5 +1224,81 @@ export const timelineStyles = css`
       transform: scale(1);
       opacity: 1;
     }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════════
+     RESPONSIVE & ADAPTIVE RAIL
+  ══════════════════════════════════════════════════════════════════════════════ */
+  @media (max-width: 900px) {
+    .tl-res-col {
+      width: 150px;
+      min-width: 150px;
+      max-width: 150px;
+    }
+    .tl-res-row {
+      padding: 0 8px;
+      gap: 8px;
+    }
+    .tl-avatar {
+      width: 32px;
+      height: 32px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .tl-res-col {
+      width: 60px;
+      min-width: 60px;
+      max-width: 60px;
+    }
+    .tl-res-col__header {
+      padding: 0 4px;
+      justify-content: center;
+    }
+    .tl-res-col__header-text {
+      display: none;
+    }
+    .tl-res-group-label {
+      padding: 0 4px;
+      justify-content: center;
+      font-size: 9px;
+      text-align: center;
+    }
+    .tl-res-row {
+      padding: 0 4px;
+      justify-content: center;
+      gap: 0;
+    }
+    .tl-res-info {
+      display: none;
+    }
+  }
+
+  /* Explicit Collapsed Rail Mode (active when user toggles or programmatic) */
+  .tl-res-col--collapsed {
+    width: 56px !important;
+    min-width: 56px !important;
+    max-width: 56px !important;
+  }
+  .tl-res-col--collapsed .tl-res-col__header {
+    padding: 0 4px;
+    justify-content: center;
+  }
+  .tl-res-col--collapsed .tl-res-col__header-text {
+    display: none;
+  }
+  .tl-res-col--collapsed .tl-res-group-label {
+    padding: 0 4px;
+    justify-content: center;
+    font-size: 9px;
+    text-align: center;
+  }
+  .tl-res-col--collapsed .tl-res-row {
+    padding: 0 4px;
+    justify-content: center;
+    gap: 0;
+  }
+  .tl-res-col--collapsed .tl-res-info {
+    display: none;
   }
 `;
