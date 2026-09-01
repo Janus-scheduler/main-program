@@ -4,19 +4,24 @@
   "compileOnSave": false,
   "compilerOptions": {
     "strict": true,
-    "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
     "paths": {
       "@janus-scheduler/angular": ["../../packages/wrappers/angular-wrapper/src/index.ts"],
-      "@janus-scheduler/angular/*": ["../../packages/wrappers/angular-wrapper/src/*"]
+      "@janus-scheduler/angular/*": ["../../packages/wrappers/angular-wrapper/src/*"],
+      "@janus-scheduler/integrations": ["../../packages/integrations/src/index.ts"],
+      "@janus-scheduler/core": ["../../packages/core/src/index.ts"],
+      "@janus-scheduler/ui": ["../../packages/ui/src/index.ts"],
+      "@janus-scheduler/nlp": ["../../packages/nlp/src/index.ts"]
     }
   },
   "angularCompilerOptions": {

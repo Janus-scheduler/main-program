@@ -179,8 +179,7 @@ export abstract class TimeGridBaseComponent
 
   private _syncProps(): void {
     const el = this.elRef?.nativeElement as
-      | (HTMLElement & Record<string, unknown>)
-      | undefined;
+      (HTMLElement & Record<string, unknown>) | undefined;
     if (!el) return;
 
     // `events` stays undefined unless the host supplies it, so the web
