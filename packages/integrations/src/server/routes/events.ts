@@ -63,7 +63,7 @@ export function createEventsRouter(config: {
     try {
       await updateGoogleEvent(
         calendarId,
-        req.params.googleEventId,
+        req.params.googleEventId as string,
         req.body,
         config.clientId,
         config.clientSecret,
@@ -94,7 +94,7 @@ export function createEventsRouter(config: {
     try {
       await deleteGoogleEvent(
         calendarId,
-        req.params.googleEventId,
+        req.params.googleEventId as string,
         config.clientId,
         config.clientSecret,
         config.redirectUri,

@@ -47,15 +47,15 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private _dayClickHandler = (e: Event) => {
+  private readonly _dayClickHandler = (e: Event) => {
     e.stopPropagation();
     this.dayClick.emit((e as CustomEvent).detail);
   };
-  private _viewChangeHandler = (e: Event) => {
+  private readonly _viewChangeHandler = (e: Event) => {
     e.stopPropagation();
     this.viewChange.emit((e as CustomEvent).detail);
   };
-  private _navChangeHandler = (e: Event) => {
+  private readonly _navChangeHandler = (e: Event) => {
     e.stopPropagation();
     this.navChange.emit((e as CustomEvent).detail);
   };
@@ -105,8 +105,7 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
   private _syncProps(): void {
     try {
       const el = this._elRef()?.nativeElement as
-        | (HTMLElement & { viewYear?: number })
-        | undefined;
+        (HTMLElement & { viewYear?: number }) | undefined;
       if (el && this.viewYear() !== undefined) {
         el.viewYear = this.viewYear()!;
       }

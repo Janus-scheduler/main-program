@@ -89,7 +89,8 @@ function App() {
     let cancelled = false;
     let stop: (() => void) | undefined;
 
-    syncManager.startRealtimeSync().then((stopFn) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    syncManager.startRealtimeSync().then((stopFn: any) => {
       if (cancelled) {
         stopFn();
       } else {

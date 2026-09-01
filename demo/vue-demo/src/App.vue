@@ -76,7 +76,8 @@ let unsubscribeGoogleStatus: (() => void) | undefined;
 
 onMounted(() => {
   syncManager.handleOAuthRedirect();
-  unsubscribeGoogleStatus = syncManager.onStatusChange((connected) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  unsubscribeGoogleStatus = syncManager.onStatusChange((connected: any) => {
     googleConnected.value = connected;
   });
   syncManager.refreshStatus();
@@ -101,7 +102,8 @@ watch(
     let cancelled = false;
     let stop: (() => void) | undefined;
 
-    syncManager.startRealtimeSync().then((stopFn) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    syncManager.startRealtimeSync().then((stopFn: any) => {
       if (cancelled) {
         stopFn();
       } else {

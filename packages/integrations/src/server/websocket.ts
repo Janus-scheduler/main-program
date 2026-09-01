@@ -26,7 +26,10 @@ export class JanusWebSocketHub {
       ws.on("close", () =>
         console.log("[Janus] WebSocket client disconnected"),
       );
-      ws.on("error", (err) => console.error("[Janus] WebSocket error:", err));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ws.on("error", (err: any) =>
+        console.error("[Janus] WebSocket error:", err),
+      );
     });
 
     console.log("[Janus] WebSocket server ready");
