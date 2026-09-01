@@ -2,7 +2,7 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { monthGridStyles } from "./month-grid-styles";
 import { MonthEvent } from "./month-grid-types";
-import "./janus-ai-bar";
+import "../components/janus-ai-bar";
 
 import {
   WEEK_DAYS,
@@ -11,7 +11,7 @@ import {
   formatMonthYear,
   fmt12,
 } from "./month-grid-utils";
-import { PlusIcon } from "./timeline-icons"; // reuse existing icons
+import { PlusIcon } from "../timeline/timeline-icons"; // reuse existing icons
 
 import {
   schedulerStore,
@@ -494,10 +494,10 @@ export class JanusMonthGrid extends LitElement {
               let maxEventsPerDay = 2; // fallback
               if (this._gridHeight > 0) {
                 const weekRowHeight = this._gridHeight / rowCount;
-                // row height - 28px(header) - 26px(more btn + padding). Each track is 26px
+                // row height - 32px(header) - 26px(more btn + padding). Each track is 26px
                 maxEventsPerDay = Math.max(
                   0,
-                  Math.floor((weekRowHeight - 54) / 26),
+                  Math.floor((weekRowHeight - 58) / 26),
                 );
               }
 
@@ -517,7 +517,7 @@ export class JanusMonthGrid extends LitElement {
               return html`
                 <div
                   class="mg-week-row"
-                  style="grid-template-rows: 28px repeat(${visibleTracks}, 26px) 1fr; padding-bottom: 4px;"
+                  style="grid-template-rows: 32px repeat(${visibleTracks}, 26px) 1fr;"
                 >
                   <!-- Background Day Cells -->
                   ${week.map((day, colIdx) => {

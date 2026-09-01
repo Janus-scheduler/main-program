@@ -1,7 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { aiBarStyles } from "./ai-bar-styles";
-import { SparkleIcon, MicIcon, SendIcon } from "./timeline-icons";
+import { SparkleIcon, MicIcon, SendIcon } from "../timeline/timeline-icons";
 
 /**
  * <janus-ai-bar>

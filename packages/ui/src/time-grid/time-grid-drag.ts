@@ -17,7 +17,7 @@
  */
 
 import type { TimeGridEvent } from "./time-grid-types";
-import { DRAG_THRESHOLD } from "./timeline-utils";
+import { DRAG_THRESHOLD } from "../timeline/timeline-utils";
 import {
   fmt12,
   minutesFromTimeStr,

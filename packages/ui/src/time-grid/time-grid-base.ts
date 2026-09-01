@@ -2,8 +2,8 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 // Reuse the timeline's existing icons and avatar helpers so a resource looks
 // identical wherever it appears.
-import { PlusIcon, RoomIcon, EquipmentIcon } from "./timeline-icons";
-import { getInitials, avatarColor } from "./timeline-utils";
+import { PlusIcon, RoomIcon, EquipmentIcon } from "../timeline/timeline-icons";
+import { getInitials, avatarColor } from "../timeline/timeline-utils";
 import type { TimeGridEvent, TimeGridEventResource } from "./time-grid-types";
 import {
   assignEventsToDays,
