@@ -45,7 +45,8 @@ export async function getOrCreateJanusCalendar(
 
   const listResponse = await calendar.calendarList.list();
   const existing = listResponse.data.items?.find(
-    (cal) => cal.summary === "Janus Scheduler",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (cal: any) => cal.summary === "Janus Scheduler",
   );
 
   if (existing?.id) return existing.id;

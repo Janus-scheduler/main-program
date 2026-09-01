@@ -21,7 +21,14 @@ function isInvalidGrantError(err: unknown): boolean {
   const data = (err as { response?: { data?: { error?: string } } })?.response
     ?.data;
   if (data?.error === "invalid_grant") return true;
-  const message = err instanceof Error ? err.message : String(err);
+  let message: string;
+  if (err instanceof Error) {
+    message = err.message;
+  } else if (typeof err === "string") {
+    message = err;
+  } else {
+    message = JSON.stringify(err);
+  }
   return message.includes("invalid_grant");
 }
 
@@ -56,7 +63,8 @@ async function refreshTokens(
   oauth2Client.setCredentials({ refresh_token: currentRefreshToken });
 
   const credentials = await oauth2Client.refreshAccessToken().then(
-    (result) => result.credentials,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (result: any) => result.credentials,
     async (err: unknown) => {
       if (isInvalidGrantError(err)) {
         // This connection can never recover on its own — clear local state
