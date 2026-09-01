@@ -7,36 +7,36 @@ Last updated: 2026-09-01 — **steps 00-08 and 10 pass**; 09 and 11 left
 
 ## Status
 
-| #                                | Step               | Status               | Evidence                                                                                           |
-| -------------------------------- | ------------------ | -------------------- | -------------------------------------------------------------------------------------------------- |
-| [00](00-gates.md)                | Automated gates    | ✅ passed            | build 0 · nlp **1780**/14 · core 134/10 · lint 0 · validate 0 · frozen pristine                    |
-| [01](01-dates-and-times.md)      | Dates & times      | ✅ passed            | 28/28 — full documented table, incl. every clock phrase + the disclosure rule                      |
-| [02](02-durations.md)            | Durations          | ✅ passed            | 40/40 — every end-time answer shape, plus the overnight cues                                       |
-| [03](03-resources-and-people.md) | Rooms & people     | ✅ passed            | 18/18 — both unknown-name paths                                                                    |
-| [04](04-titles.md)               | Titles             | ✅ passed            | 17/17 — cue, time-phrase and naming-verb exclusion                                                 |
-| [05](05-intents-and-refusals.md) | Intents & refusals | ✅ passed            | 29/29 — all 7 gates produce clean copy                                                             |
-| [06](06-conversation-flow.md)    | Conversation flow  | ✅ passed            | 13/13 — 40 answer strategies all terminate, worst 4 turns                                          |
-| [07](07-editing.md)              | Edit button        | ✅ passed            | 21/21 — typed and tapped, all four fields                                                          |
-| [08](08-smalltalk-and-input.md)  | Smalltalk & input  | ✅ passed            | 27/27 — F-1 and F-2 fixed and pinned                                                               |
-| [09](09-timezone.md)             | Timezone           | ⬜ **needs a human** | —                                                                                                  |
-| [10](10-commit-correctness.md)   | Commit correctness | ✅ **passed**        | K1-K8 all confirmed by the user in a browser, 2026-09-01. 11 defects found and fixed along the way |
-| [11](11-cross-framework.md)      | Cross-framework    | ⬜ **needs a human** | —                                                                                                  |
+| #                                | Step               | Status        | Evidence                                                                                                                                   |
+| -------------------------------- | ------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| [00](00-gates.md)                | Automated gates    | ✅ passed     | build 0 · nlp **1791**/14 · core 134/10 · lint 0 · validate 0 · frozen pristine                                                            |
+| [01](01-dates-and-times.md)      | Dates & times      | ✅ passed     | 28/28 — full documented table, incl. every clock phrase + the disclosure rule                                                              |
+| [02](02-durations.md)            | Durations          | ✅ passed     | 40/40 — every end-time answer shape, plus the overnight cues                                                                               |
+| [03](03-resources-and-people.md) | Rooms & people     | ✅ passed     | 18/18 — both unknown-name paths                                                                                                            |
+| [04](04-titles.md)               | Titles             | ✅ passed     | 17/17 — cue, time-phrase and naming-verb exclusion                                                                                         |
+| [05](05-intents-and-refusals.md) | Intents & refusals | ✅ passed     | 29/29 — all 7 gates produce clean copy                                                                                                     |
+| [06](06-conversation-flow.md)    | Conversation flow  | ✅ passed     | 13/13 — 40 answer strategies all terminate, worst 4 turns                                                                                  |
+| [07](07-editing.md)              | Edit button        | ✅ passed     | 21/21 — typed and tapped, all four fields                                                                                                  |
+| [08](08-smalltalk-and-input.md)  | Smalltalk & input  | ✅ passed     | 27/27 — F-1 and F-2 fixed and pinned                                                                                                       |
+| [09](09-timezone.md)             | Timezone           | 🟨 half done  | Naming a zone in the message (`3pm New York time`): **fixed, 11 tests**. The display-zone / rendered-block agreement still needs a browser |
+| [10](10-commit-correctness.md)   | Commit correctness | ✅ **passed** | K1-K8 all confirmed by the user in a browser, 2026-09-01. 11 defects found and fixed along the way                                         |
+| [11](11-cross-framework.md)      | Cross-framework    | ✅ **passed** | Confirmed working by the user, 2026-09-01                                                                                                  |
 
 Legend: ⬜ not run · 🟨 partly · ✅ passed · ❌ failed (see notes)
 
 ## Next action
 
-> **Steps 00-08 and 10 all pass.** Two left, both needing a human:
+> **One half of one step is left.** [09 · timezone](09-timezone.md):
 >
-> 1. [09 · timezone](09-timezone.md) — never run. The card and the timeline
->    are rendered by different code from different sources and must agree.
-> 2. [11 · cross-framework](11-cross-framework.md) — never run. Angular,
->    Solid and Vue share all the logic; only the WIRING differs, and wiring
->    is what has been breaking (the Edit `??` bug was demo-only).
+> - naming a zone in the message (`3pm New York time`) — ✅ fixed, 11 tests
+> - the CALENDAR's display zone agreeing with the rendered block — ⬜ still
+>   needs a browser. Set the display zone hours from your own, book
+>   `tomorrow at 3pm`, and check the card, the amber warning and the block.
 >
-> An agent must NOT mark these passed; record who reported it and when.
+> An agent must NOT mark that passed; record who reported it and when.
 >
-> Also unbanked: ~20 changed files, `HEAD` still at `9bee8ec`.
+> Everything through step 10 is committed as `eae0901`
+> (“feat: improvements in nlp module phase 3”).
 
 ## How to run a step
 
@@ -170,6 +170,8 @@ Worth recording as a working practice, not just a defect:
 
 **Never write a regex through a heredoc.** Construct the backslash explicitly,
 or edit the file directly.
+
+| **K-12** | **A timezone named in the message was ignored, and became the event's name.** `3pm EST` resolved as plain 3pm in the calendar's zone — silent wrong data — and “EST” fell through as unclaimed text to become the title. | `ZONE_LEXICON` + a `zone` mention kind. The wall clock now resolves in the named zone, the card shows the local equivalent, and the conversion is disclosed. Ambiguous abbreviations (IST, CST) are refused rather than guessed. |
 
 ### Still open from that run
 

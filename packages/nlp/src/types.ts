@@ -206,7 +206,15 @@ export interface TimeMention extends TextSpan {
      * duration pattern claimed both, so "book Room A in 30 minutes" produced a
      * 30-minute event with no start time at all.
      */
-    | "relativeOffset";
+    | "relativeOffset"
+    /**
+     * A named timezone: "EST", "New York time", "UTC".
+     *
+     * Matched so it can be HONOURED, and so it stops being unclaimed text.
+     * Before this, "3pm EST" resolved as plain 3pm in the calendar’s zone AND
+     * left "EST" to fall through and become the event’s name.
+     */
+    | "zone";
   clock?: ClockTime;
   endClock?: ClockTime;
   /** 0 = Sunday. */
@@ -220,6 +228,10 @@ export interface TimeMention extends TextSpan {
   durationMinutes?: number;
   /** Minutes from now, for `relativeOffset`. */
   offsetMinutes?: number;
+  /** IANA name for a `zone` mention; absent when the word is ambiguous. */
+  zone?: string;
+  /** True when the word was recognised but could mean several zones. */
+  zoneAmbiguous?: boolean;
   /**
    * The hour was inferred, because the phrase named no meridiem.
    *
@@ -241,6 +253,12 @@ export interface TimeSpan extends TextSpan {
   durationMinutes?: number;
   /** Minutes from now, when the utterance said "in 2 hours". */
   offsetMinutes?: number;
+  /** The zone the user named, if any. Wall-clock times resolve in THIS. */
+  zone?: string;
+  /** The words they used, for the disclosure line. */
+  zonePhrase?: string;
+  /** They named a zone this module cannot pin down. */
+  zoneAmbiguous?: boolean;
   /** `clock`'s hour was inferred — see `TimeMention.meridiemAssumed`. */
   meridiemAssumed?: boolean;
   /** The phrase that produced an inferred hour, for the disclosure line. */
@@ -298,6 +316,12 @@ export interface ResolvedTime {
      * the question is unanswered.
      */
     meridiem: boolean;
+    /**
+     * A zone the user NAMED could not be pinned down, so the calendar's own
+     * zone was used instead. Distinct from the other flags: the user did
+     * state something, it just was not usable.
+     */
+    timeZone: boolean;
   };
   /** Wall-clock date in `timezone`, "YYYY-MM-DD". */
   localDate: string;

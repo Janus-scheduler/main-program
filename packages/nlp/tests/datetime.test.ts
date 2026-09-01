@@ -909,3 +909,61 @@ describe("relative offsets", () => {
     expect(span.mentions.some((m) => m.kind === "duration")).toBe(false);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+//  A named timezone  (found in the Phase 09 browser pass)
+//
+//  “3pm EST” resolved as plain 3pm in the calendar's own zone — the zone word
+//  was never parsed, so it changed nothing AND fell through as unclaimed text
+//  to become the event's NAME (“EST”, “York time”). Silent wrong data with a
+//  perfectly reasonable-looking card.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("a named timezone", () => {
+  // resolve() works in UTC; NOW is 2026-08-05T08:30:00Z.
+  it.each([
+    ["tomorrow at 3pm UTC", "2026-08-06T15:00:00.000Z"],
+    ["tomorrow at 3pm GMT", "2026-08-06T15:00:00.000Z"],
+    ["tomorrow at 3pm New York time", "2026-08-06T19:00:00.000Z"],
+    ["tomorrow at 3pm EST", "2026-08-06T19:00:00.000Z"],
+    ["tomorrow at 3pm London time", "2026-08-06T14:00:00.000Z"],
+    ["tomorrow at 3pm Tokyo time", "2026-08-06T06:00:00.000Z"],
+  ])("%s resolves to the right INSTANT", (text, iso) => {
+    expect(resolve(text)!.startISO).toBe(iso);
+  });
+
+  it("discloses the conversion", () => {
+    const r = resolve("tomorrow at 3pm New York time")!;
+    expect(r.assumptions.join(" ")).toContain("America/New_York");
+    expect(r.assumptions.join(" ")).toContain("New York time");
+  });
+
+  it("refuses to guess an ambiguous abbreviation", () => {
+    // IST is India, Ireland and Israel. A coin-flip is not a reading of
+    // anyone's intent, so the calendar's zone is used AND said out loud.
+    const r = resolve("tomorrow at 3pm IST")!;
+    expect(r.startISO).toBe(resolve("tomorrow at 3pm")!.startISO);
+    expect(r.assumed.timeZone).toBe(true);
+    expect(r.assumptions.join(" ")).toMatch(/could mean several/i);
+  });
+
+  it("says nothing when no zone was named", () => {
+    const r = resolve("tomorrow at 3pm")!;
+    expect(r.assumed.timeZone).toBe(false);
+    expect(r.assumptions.join(" ")).not.toMatch(/timezone|could mean/i);
+  });
+
+  it("claims the zone words, so they cannot become a title", () => {
+    for (const phrase of ["3pm EST", "3pm New York time", "3pm UTC"]) {
+      const span = parseTimeSpan(phrase)!;
+      expect(span.mentions.some((m) => m.kind === "zone")).toBe(true);
+    }
+  });
+
+  it("leaves an unzoned time exactly as it was", () => {
+    expect(resolve("tomorrow at 3pm")!.localTime).toBe("15:00");
+    expect(resolve("tomorrow at 3pm")!.startISO).toBe(
+      "2026-08-06T15:00:00.000Z",
+    );
+  });
+});

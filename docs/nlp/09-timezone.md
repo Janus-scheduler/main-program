@@ -32,6 +32,42 @@ notes below it, which disclose values the system _invented_.
 
 Confirm must stay enabled. A warning that disables the button is a fail.
 
+## Naming a zone in the message
+
+Two different things share the word “timezone”, and only the first is about
+the calendar's setting:
+
+1. **The zone the calendar displays** — what “3pm” means when you say nothing
+   else. Covered above.
+2. **A zone named in the sentence** — “3pm New York time”. Covered here.
+
+| Type this                                            | Expect                                                               |
+| ---------------------------------------------------- | -------------------------------------------------------------------- |
+| `book <Room> tomorrow at 3pm New York time`          | the card shows the LOCAL equivalent, and a note names the conversion |
+| `… at 3pm UTC` / `GMT`                               | resolved in UTC                                                      |
+| `… at 3pm EST` / `PT` / `London time` / `Tokyo time` | resolved in that zone                                                |
+| `… at 3pm IST`                                       | **not guessed** — falls back to the calendar's zone, and says so     |
+| `… at 3pm` (no zone)                                 | unchanged, no note                                                   |
+
+**The card shows the calendar's wall clock, not the one you typed**, because
+that is where the block will appear. Both halves are then visible — what you
+said and where it lands:
+
+> “New York time” is America/New_York — shown here in Asia/Colombo
+
+**Ambiguous abbreviations are refused, not guessed.** IST is India, Ireland and
+Israel; CST is US Central and China. A coin-flip between Chicago and Shanghai
+is not a reading of anyone's intent, so those fall back to the calendar's zone
+with a note saying so.
+
+**PASS: a zone word never becomes the event's name.** Before this existed,
+`3pm EST` resolved as plain 3pm AND left “EST” as the event title — the time
+was silently wrong and the name was nonsense.
+
+The lexicon is curated, in `ZONE_LEXICON` (`datetime.ts`). An unrecognised
+zone word is simply not matched — which means it falls through to the title
+again, so add names there rather than relying on it being ignored.
+
 ## Manual check
 
 1. Set the calendar's display timezone several hours from your own.
