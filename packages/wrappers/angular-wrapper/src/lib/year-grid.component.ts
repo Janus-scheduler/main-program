@@ -105,7 +105,8 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
   private _syncProps(): void {
     try {
       const el = this._elRef()?.nativeElement as
-        (HTMLElement & { viewYear?: number }) | undefined;
+        | (HTMLElement & { viewYear?: number })
+        | undefined;
       if (el && this.viewYear() !== undefined) {
         el.viewYear = this.viewYear()!;
       }

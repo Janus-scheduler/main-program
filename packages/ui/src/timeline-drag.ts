@@ -26,7 +26,11 @@ import {
 } from "./timeline-zoom";
 
 export type DragMode =
-  "idle" | "moving" | "resize-start" | "resize-end" | "creating";
+  | "idle"
+  | "moving"
+  | "resize-start"
+  | "resize-end"
+  | "creating";
 
 export interface ResourceLayout {
   id: string;

@@ -239,7 +239,8 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     const config = this.resourceTypeConfig();
     if (!config) return;
     const el = this._elRef()?.nativeElement as
-      (HTMLElement & { resourceTypeConfig: ResourceTypeConfig }) | undefined;
+      | (HTMLElement & { resourceTypeConfig: ResourceTypeConfig })
+      | undefined;
     if (el) {
       el.resourceTypeConfig = config;
     }
@@ -249,7 +250,8 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     const data = this.resources();
     if (!data) return;
     const el = this._elRef()?.nativeElement as
-      (HTMLElement & { resources: TimelineResource[] }) | undefined;
+      | (HTMLElement & { resources: TimelineResource[] })
+      | undefined;
     if (el) {
       el.resources = data;
     }

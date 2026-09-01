@@ -130,7 +130,8 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private _syncProps(): void {
     const el = this._elRef()?.nativeElement as
-      (HTMLElement & { showFab: boolean; timezone?: string }) | undefined;
+      | (HTMLElement & { showFab: boolean; timezone?: string })
+      | undefined;
     if (el) {
       el.showFab = this.showFab();
       if (this.timezone() !== undefined) el.timezone = this.timezone();
@@ -158,7 +159,8 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     state: ReturnType<typeof schedulerStore.getState>,
   ): void {
     const el = this._elRef()?.nativeElement as
-      (HTMLElement & { events: unknown[] }) | undefined;
+      | (HTMLElement & { events: unknown[] })
+      | undefined;
     if (!el) return;
 
     const coreEvents = Object.values(state.events) as Array<{
@@ -193,7 +195,8 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     const data = this.events();
     if (!data) return;
     const el = this._elRef()?.nativeElement as
-      (HTMLElement & { events: unknown[] }) | undefined;
+      | (HTMLElement & { events: unknown[] })
+      | undefined;
     if (el) {
       el.events = data;
     }

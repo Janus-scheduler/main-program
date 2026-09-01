@@ -25,7 +25,11 @@ import {
 } from "./time-grid-utils";
 
 export type TimeGridDragMode =
-  "idle" | "moving" | "resize-start" | "resize-end" | "creating";
+  | "idle"
+  | "moving"
+  | "resize-start"
+  | "resize-end"
+  | "creating";
 
 /**
  * One day column's horizontal bounds in viewport px — used to find which
@@ -230,7 +234,10 @@ export class TimeGridDragController {
 
   /** Complete the drag and return the result to dispatch, or null if it never became a real drag. */
   completeAndGetResult():
-    TimeGridMoveResult | TimeGridResizeResult | TimeGridCreateResult | null {
+    | TimeGridMoveResult
+    | TimeGridResizeResult
+    | TimeGridCreateResult
+    | null {
     this._removeMoveListener();
     document.body.style.userSelect = "";
     document.body.style.cursor = "";
@@ -356,7 +363,10 @@ export class TimeGridDragController {
   // ── Result computation ─────────────────────────────────────────────────
 
   private _computeResult():
-    TimeGridMoveResult | TimeGridResizeResult | TimeGridCreateResult | null {
+    | TimeGridMoveResult
+    | TimeGridResizeResult
+    | TimeGridCreateResult
+    | null {
     if (this.mode === "moving" && this._event) {
       return {
         type: "event-move",
