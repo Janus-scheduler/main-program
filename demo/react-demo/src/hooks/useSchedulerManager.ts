@@ -1,14 +1,21 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore, useCallback } from "react";
 import {
   SchedulerManager,
   getBrowserTimezone,
   zonedInputToISO,
 } from "@janus-scheduler/react";
+import {
+  GoogleSyncManager,
+  GoogleCalendarClient,
+  GoogleEventMapper,
+} from "@janus-scheduler/integrations";
 
 export interface HookError {
   operation: string;
   message: string;
 }
+
+const BACKEND_URL = "http://localhost:3001";
 
 /**
  * useSchedulerManager
@@ -18,62 +25,20 @@ export interface HookError {
  * to a backend (simulated here) and handle errors.
  *
  * @param onError - called when any async hook rejects after a store rollback
- * @returns the configured SchedulerManager instance (stable across renders)
+ * @returns `{ manager, syncManager }` — both stable across renders. The caller
+ *   needs `syncManager` too (for the Google Calendar connect/disconnect and
+ *   real-time sync lifecycle), so it's returned directly instead of being
+ *   stashed on `window` for other components to reach into.
  */
 export function useSchedulerManager(onError: (err: HookError) => void) {
-  const manager = useMemo(() => {
+  const { manager, syncManager } = useMemo(() => {
+    // Set up Google sync infrastructure
+    const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
+    const mapper = new GoogleEventMapper();
+    const syncManager = new GoogleSyncManager(client, mapper);
+
     const mgr = new SchedulerManager({
-      onEventAdd: async (event) => {
-        // Example of the actual fetch you would do in production:
-        // const res = await fetch('/api/events', { method: 'POST', body: JSON.stringify(event) });
-        // if (!res.ok) throw new Error(`Server error ${res.status}`);
-
-        // Simulated network latency for demo
-        await new Promise((r) => setTimeout(r, 400));
-        console.log("onEventAdd:", event);
-      },
-
-      onEventUpdate: async (event) => {
-        // Example of the actual fetch you would do in production:
-        // const res = await fetch(`/api/events/${event.id}`, { method: 'PATCH', body: JSON.stringify(event) });
-        // if (!res.ok) throw new Error(`Server error ${res.status}`);
-
-        await new Promise((r) => setTimeout(r, 400));
-        console.log("onEventUpdate:", event);
-      },
-
-      onEventDelete: async (id) => {
-        // Example of the actual fetch you would do in production:
-        // const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
-        // if (!res.ok) throw new Error(`Server error ${res.status}`);
-
-        await new Promise((r) => setTimeout(r, 400));
-        console.log("onEventDelete:", id);
-      },
-
-      onResourceAdd: async (resource) => {
-        // const res = await fetch('/api/resources', { method: 'POST', body: JSON.stringify(resource) });
-        // if (!res.ok) throw new Error(`Server error ${res.status}`);
-
-        await new Promise((r) => setTimeout(r, 400));
-        console.log("onResourceAdd:", resource);
-      },
-
-      onResourceUpdate: async (resource) => {
-        // const res = await fetch(`/api/resources/${resource.id}`, { method: 'PATCH', body: JSON.stringify(resource) });
-        // if (!res.ok) throw new Error(`Server error ${res.status}`);
-
-        await new Promise((r) => setTimeout(r, 400));
-        console.log("onResourceUpdate:", resource);
-      },
-
-      onResourceDelete: async (id) => {
-        // const res = await fetch(`/api/resources/${id}`, { method: 'DELETE' });
-        // if (!res.ok) throw new Error(`Server error ${res.status}`);
-
-        await new Promise((r) => setTimeout(r, 400));
-        console.log("onResourceDelete:", id);
-      },
+      ...syncManager.getHooks(),
 
       // ── onError ───────────────────────────────────────────────────────
       // The store has already been rolled back before this fires.
@@ -91,10 +56,14 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     // Zustand store is a module singleton — this block only runs once
     // even across React hot-reloads.
     if (mgr.getResourceCount() === 0) {
+      // NOTE: email is required for a "person" resource to be synced to Google
+      // Calendar as an attendee — replace these with real test Gmail addresses
+      // to actually validate the Google Calendar integration end-to-end.
       mgr.addResource({
         id: "r1",
         name: "Dr. Sarah Chen",
         type: "person",
+        email: "viduminisudeepa221@gmail.com",
         subtitle: "Specialist",
         avatar:
           "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
@@ -103,6 +72,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         id: "r2",
         name: "Dr. Michael Ross",
         type: "person",
+        email: "michael.ross@example.com",
         subtitle: "Surgeon",
         avatar:
           "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
@@ -111,6 +81,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         id: "r3",
         name: "Dr. Ann sherin",
         type: "person",
+        email: "ann.sherin@example.com",
         subtitle: "Medical Officer",
         avatar:
           "https://westernsydneydiabetes.com.au/uploads/2021/06/Rona-scaled.jpg",
@@ -140,6 +111,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
         id: "r7",
         name: "Dr. Alan Turing",
         type: "person",
+        email: "alan.turing@example.com",
         avatar:
           "https://tse4.mm.bing.net/th/id/OIP.kqx_nQhmMAt1EtXnbBhOBwHaK0?r=0&w=832&h=1216&rs=1&pid=ImgDetMain&o=7&rm=3",
       });
@@ -190,7 +162,7 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
       });
     }
 
-    return mgr;
+    return { manager: mgr, syncManager };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // manager is intentionally created once
 
@@ -200,6 +172,8 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     (onStoreChange) => manager.subscribeUndo(onStoreChange),
     () => manager.canUndo(),
   );
+
+  const handleUndo = useCallback(() => manager.undo(), [manager]);
 
   const syncBulkEvents = async () => {
     try {
@@ -276,5 +250,5 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     }
   };
 
-  return { manager, syncBulkEvents, canUndo };
+  return { manager, syncManager, canUndo, handleUndo, syncBulkEvents };
 }

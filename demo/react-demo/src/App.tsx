@@ -41,6 +41,7 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>("Month");
   const [showScheduler, setShowScheduler] = useState(false);
   const [hookError, setHookError] = useState<HookError | null>(null);
+  const [googleConnected, setGoogleConnected] = useState(false);
   const [undoConfirmAction, setUndoConfirmAction] = useState<UndoAction | null>(
     null,
   );
@@ -58,8 +59,59 @@ function App() {
   }, []);
 
   // SchedulerManager is stable (created once via useMemo inside the hook)
-  const { manager, syncBulkEvents, canUndo } =
+  const { manager, syncManager, syncBulkEvents, canUndo } =
     useSchedulerManager(handleHookError);
+
+  // ── Detect OAuth redirect / pick up an already-connected backend ────────────
+  // handleOAuthRedirect() detects `?google_connected=true|false` (present
+  // right after the OAuth callback) and cleans the URL; onStatusChange fires
+  // immediately with whatever status that just set (or false, if none), then
+  // again on every future change; refreshStatus() asks the backend directly,
+  // covering a plain reload with no redirect in progress but an
+  // already-connected backend from an earlier session.
+  useEffect(() => {
+    syncManager.handleOAuthRedirect();
+    const unsubscribe = syncManager.onStatusChange(setGoogleConnected);
+    syncManager.refreshStatus();
+    return unsubscribe;
+  }, [syncManager]);
+
+  // ── Start real-time sync after connecting ───────────────────────────────────
+  // startRealtimeSync() owns the fetch→load→push sequencing and the
+  // WebSocket lifecycle; this effect just decides *when* (connected) and
+  // owns React's cleanup timing. `cancelled` guards against the effect
+  // tearing down (unmount, or googleConnected flipping again) before the
+  // async startRealtimeSync() call resolves — without it, a fast
+  // disconnect/reconnect could leak a WebSocket from a stale connection.
+  useEffect(() => {
+    if (!googleConnected) return;
+
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+
+    syncManager.startRealtimeSync().then((stopFn) => {
+      if (cancelled) {
+        stopFn();
+      } else {
+        stop = stopFn;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, [googleConnected, syncManager]);
+
+  const handleConnectCalendar = () => {
+    if (googleConnected) {
+      // disconnect() calls setConnected(false) internally, which broadcasts
+      // to the onStatusChange subscription above — no need to set it here too.
+      syncManager.disconnect();
+    } else {
+      syncManager.connect();
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -228,6 +280,7 @@ function App() {
           selectedEventId={selectedEventId}
           manager={manager}
           preventConflicts={preventConflicts}
+          isGoogleCalendarConnected={googleConnected}
           onViewChange={setCurrentView}
           onOpenScheduler={(eventId) => {
             setSelectedEventId(eventId ?? null);
@@ -237,6 +290,7 @@ function App() {
             setShowScheduler(false);
             setSelectedEventId(null);
           }}
+          onConnectCalendar={handleConnectCalendar}
           canUndo={canUndo}
           onUndo={handleUndoRequest}
         />

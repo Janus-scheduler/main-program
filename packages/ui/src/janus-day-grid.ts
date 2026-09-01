@@ -89,9 +89,9 @@ export class JanusDayGrid extends JanusTimeGridBase {
               <span class="tg-strip__dow">${day.dowShort.charAt(0)}</span>
               <span class="tg-strip__num">${day.dayNum}</span>
               <span
-                class="tg-strip__dot ${this.hasEventsOn(day.dateStr)
-                  ? ""
-                  : "tg-strip__dot--empty"}"
+                class="tg-strip__dot ${
+                  this.hasEventsOn(day.dateStr) ? "" : "tg-strip__dot--empty"
+                }"
               ></span>
             </button>
           `;

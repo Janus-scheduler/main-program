@@ -80,12 +80,24 @@ Framework wrapper packages re-export everything a consumer needs (`SchedulerMana
 
 `packages/core/src/utils/recurrence.ts` (`expandEvents`) expands `recurrenceRule` (RRule strings, via the `rrule` package) into concrete event occurrences. Occurrence IDs follow the pattern `<parentId>_occ_<timestampMs>`; `SchedulerManager` methods (`getEvent`, `updateEvent`, `deleteEvent`) parse this suffix to resolve back to the parent event — see the regex handling in `SchedulerManager.service.ts` before changing occurrence ID formats.
 
+### Google Calendar integration (`@janus-scheduler/integrations`)
+
+Two entry points, two build steps (`vite build && tsc -p tsconfig.server.json`):
+
+- **`@janus-scheduler/integrations`** (browser, Vite build from `src/index.ts`) — `GoogleSyncManager`, `GoogleCalendarClient`, `GoogleWebSocketListener`, `GoogleEventMapper`. Server code is never imported here; Vite externalizes `express`/`crypto`/`fs`/… so it can't leak into the bundle.
+- **`@janus-scheduler/integrations/server`** (Node, `tsc` NodeNext build → `dist/server/`, `dist/types/`) — `createJanusApp(config)` returns `{ app, wsHub }` (Express app + `JanusWebSocketHub` — `wsHub.attach(httpServer)` after the server is created). `src/server/server.ts` is a runnable reference (env validation + webhook-renewal cron), started by `npm run start:backend` via ts-node; it is **not** exported.
+
+Persistence is behind `TokenStore` / `CalendarStateStore` interfaces (`src/server/stores/`); the defaults `FileTokenStore` (AES-256-GCM + PBKDF2, back-compat read of legacy SHA-256 envelopes) and `FileCalendarStateStore` write JSON files in `process.cwd()`. A host overrides them via `createJanusApp({ tokenStore, calendarStateStore })`. **Single-tenant by design** — one Google account per process; multi-tenant is the host's job (DB-backed stores + their own auth middleware + webhook `channelId → account` routing). `tokenService.ts` / `calendarService.ts` keep free-function signatures and delegate to a module-level store swapped by `setTokenStore` / `setCalendarStateStore`; their read/write helpers are `async`.
+
+Google → Janus changes (`handleGoogleChange`, `loadInitialEvents`) write directly to `schedulerStore`, bypassing `SchedulerManager` (routing them through it would push them back to Google). They therefore don't fire `SchedulerManager` hooks or `janusEventBus`; a host that persists events elsewhere passes `new GoogleSyncManager(client, mapper, { onRemoteChange })` to observe them (`RemoteEventChange` = `added`/`updated`/`deleted`, errors swallowed, fires during initial import too).
+
 ### Package structure
 
 ```
 packages/
 ├── core/            @janus-scheduler/core   — store, services, models, utils, api types (Jest-tested)
 ├── ui/               @janus-scheduler/ui     — Lit web components + styles (no tests)
+├── integrations/     @janus-scheduler/integrations — Google Calendar sync; browser entry + `/server` Node entry (Jest-tested)
 └── wrappers/
     ├── react-wrapper/       @janus-scheduler/react   (@lit/react createComponent bindings)
     ├── angular-wrapper/     @janus-scheduler/angular (tsc build, not Vite — rebuild manually)

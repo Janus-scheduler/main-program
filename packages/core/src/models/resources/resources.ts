@@ -26,6 +26,8 @@ export class Resource {
 
   // Check if resource data is valid
   isValid(): boolean {
-    return !!(this.id && this.name);
+    if (!this.id || !this.name) return false;
+    if (this.type === "person" && !this.email.trim()) return false;
+    return true;
   }
 }

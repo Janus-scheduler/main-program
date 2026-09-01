@@ -45,6 +45,8 @@ interface SchedulerViewProps {
   /** The SchedulerManager instance — used to mutate store state */
   manager: SchedulerManager;
   preventConflicts: boolean;
+  /** Whether Google Calendar is currently connected — shown on the topbar's connect button. */
+  isGoogleCalendarConnected: boolean;
   /**
    * @param eventId - string when opening in edit mode (event was clicked),
    *                  undefined/null when opening in create mode (FAB was clicked).
@@ -52,6 +54,8 @@ interface SchedulerViewProps {
   onViewChange: (view: ViewType) => void;
   onOpenScheduler: (eventId?: string) => void;
   onCloseScheduler: () => void;
+  /** Fired when the user clicks the topbar's Google Calendar connect/disconnect button. */
+  onConnectCalendar: () => void;
   canUndo?: boolean;
   onUndo?: () => void;
 }
@@ -96,9 +100,11 @@ export function SchedulerView({
   selectedEventId,
   manager,
   preventConflicts,
+  isGoogleCalendarConnected,
   onViewChange,
   onOpenScheduler,
   onCloseScheduler,
+  onConnectCalendar,
   canUndo,
   onUndo,
 }: Readonly<SchedulerViewProps>) {
@@ -334,9 +340,13 @@ export function SchedulerView({
           navLabel={navData.navLabel}
           dayName={navData.dayName}
           shortDate={navData.shortDate}
+          view={currentView}
+          allowCreate={allowCreate}
           canUndo={canUndo}
           zoomPercent={navData.zoomPercent}
           zoomUnit={navData.zoomUnit}
+          isGoogleCalendarConnected={isGoogleCalendarConnected}
+          onConnectCalendar={onConnectCalendar}
           onPrevClick={() => activeNavRef()?.goToPrev()}
           onNextClick={() => activeNavRef()?.goToNext()}
           onTodayClick={() => activeNavRef()?.goToToday()}

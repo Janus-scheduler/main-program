@@ -92,7 +92,7 @@ export class JanusTimeline extends LitElement {
   @property({ type: Array }) resources: TimelineResource[] = [];
   @property({
     type: Object,
-    hasChanged: (newVal: any, oldVal: any) =>
+    hasChanged: (newVal: unknown, oldVal: unknown) =>
       JSON.stringify(newVal) !== JSON.stringify(oldVal),
   })
   resourceTypeConfig?: ResourceTypeConfig;
@@ -632,6 +632,7 @@ export class JanusTimeline extends LitElement {
         subtitle: subtitleSrc,
         avatarType,
         avatarIcon,
+        avatar: res.avatar,
         events: sorted,
         groupLabel,
       };
@@ -1357,15 +1358,17 @@ export class JanusTimeline extends LitElement {
 
     return html`
       <div
-        class="tl-drag-ghost tl-drag-ghost--${g.color} ${hasDragConflict
-          ? "tl-drag-ghost--conflict"
-          : ""}"
+        class="tl-drag-ghost tl-drag-ghost--${g.color} ${
+          hasDragConflict ? "tl-drag-ghost--conflict" : ""
+        }"
         style="left: ${g.left}px; top: ${g.top}px; width: ${g.width}px;"
       >
         <span class="tl-drag-ghost__title">
-          ${hasDragConflict
-            ? html`<span class="tl-drag-ghost__conflict-icon">⚠</span> `
-            : nothing}
+          ${
+            hasDragConflict
+              ? html`<span class="tl-drag-ghost__conflict-icon">⚠</span> `
+              : nothing
+          }
           ${g.title}
         </span>
         <span class="tl-drag-ghost__time">${g.timeLabel}</span>
@@ -1500,15 +1503,14 @@ export class JanusTimeline extends LitElement {
 
     return html`
       <div
-        class="tl-event tl-event--${ev.color} ${this._drag.isDraggingEvent(ev)
-          ? "tl-event--dragging"
-          : ""} ${isTiny
-          ? "tl-event--tiny"
-          : ""} ${conflicts.conflictingEventIds.has(ev.id)
-          ? "tl-event--conflict"
-          : ""}"
-        style="top: ${evTop}px; bottom: auto; height: ${ROW_HEIGHT -
-        16}px; left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
+        class="tl-event tl-event--${ev.color} ${
+          this._drag.isDraggingEvent(ev) ? "tl-event--dragging" : ""
+        } ${isTiny ? "tl-event--tiny" : ""} ${
+          conflicts.conflictingEventIds.has(ev.id) ? "tl-event--conflict" : ""
+        }"
+        style="top: ${evTop}px; bottom: auto; height: ${
+          ROW_HEIGHT - 16
+        }px; left: ${evLeft}px; width: ${displayWidth}px; z-index: ${zIndex};"
         data-tooltip="${tooltipLabel}"
         @pointerdown=${(e: PointerEvent) =>
           this._onEventPointerDown(e, ev, r.id, evTop)}
@@ -1519,20 +1521,26 @@ export class JanusTimeline extends LitElement {
           @pointerdown=${(e: PointerEvent) =>
             this._onResizePointerDown(e, ev, r.id, "start", evTop)}
         ></div>
-        ${!isTiny
-          ? html`<span class="tl-event__title">${ev.title}</span>`
-          : nothing}
-        ${conflicts.conflictingEventIds.has(ev.id)
-          ? html`<span
-              class="tl-event__conflict-dot"
-              title="Conflict overlap detected"
-            ></span>`
-          : nothing}
-        ${showTime
-          ? html`<span class="tl-event__time"
-              >${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}</span
-            >`
-          : nothing}
+        ${
+          !isTiny
+            ? html`<span class="tl-event__title">${ev.title}</span>`
+            : nothing
+        }
+        ${
+          conflicts.conflictingEventIds.has(ev.id)
+            ? html`<span
+                class="tl-event__conflict-dot"
+                title="Conflict overlap detected"
+              ></span>`
+            : nothing
+        }
+        ${
+          showTime
+            ? html`<span class="tl-event__time"
+                >${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}</span
+              >`
+            : nothing
+        }
         <div
           class="tl-event-resize-handle tl-event-resize-handle--end"
           @pointerdown=${(e: PointerEvent) =>
@@ -1704,9 +1712,9 @@ export class JanusTimeline extends LitElement {
 
     return html`
       <div
-        class="tl-component-shell ${this.allowCreate
-          ? "tl-component-shell--draw-mode"
-          : ""}"
+        class="tl-component-shell ${
+          this.allowCreate ? "tl-component-shell--draw-mode" : ""
+        }"
       >
         ${this._renderConflictBanner(conflicts)}
         <div class="tl-panel">
@@ -1732,22 +1740,24 @@ export class JanusTimeline extends LitElement {
               @wheel=${this._handleWheel}
             >
               <div class="tl-time-inner" style="width: ${totalW}px">
-                ${visSuperLabels.length > 0
-                  ? html`
-                      <div class="tl-super-header">
-                        ${visSuperLabels.map(
-                          (sl) => html`
-                            <div
-                              class="tl-super-cell"
-                              style="left: ${sl.px}px; width: ${sl.width}px;"
-                            >
-                              ${sl.label}
-                            </div>
-                          `,
-                        )}
-                      </div>
-                    `
-                  : html`<div class="tl-super-header"></div>`}
+                ${
+                  visSuperLabels.length > 0
+                    ? html`
+                        <div class="tl-super-header">
+                          ${visSuperLabels.map(
+                            (sl) => html`
+                              <div
+                                class="tl-super-cell"
+                                style="left: ${sl.px}px; width: ${sl.width}px;"
+                              >
+                                ${sl.label}
+                              </div>
+                            `,
+                          )}
+                        </div>
+                      `
+                    : html`<div class="tl-super-header"></div>`
+                }
 
                 <div class="tl-hour-header">
                   ${visColumns.map(
@@ -1772,13 +1782,15 @@ export class JanusTimeline extends LitElement {
                   )}
                 </div>
 
-                ${nowPx >= visMinPx && nowPx <= visMaxPx
-                  ? html`
-                      <div class="tl-now-line" style="left: ${nowPx}px">
-                        <span class="tl-now-dot"></span>
-                      </div>
-                    `
-                  : nothing}
+                ${
+                  nowPx >= visMinPx && nowPx <= visMaxPx
+                    ? html`
+                        <div class="tl-now-line" style="left: ${nowPx}px">
+                          <span class="tl-now-dot"></span>
+                        </div>
+                      `
+                    : nothing
+                }
                 ${this._renderResourceEvents({
                   groups,
                   resourceTrackMap,
@@ -1796,45 +1808,49 @@ export class JanusTimeline extends LitElement {
           </div>
         </div>
 
-        ${this.showFab
-          ? html`
-              <button
-                class="tl-fab"
-                @click=${this._handleAddEvent}
-                aria-label="Add event"
-              >
-                ${PlusIcon()}
-              </button>
-            `
-          : nothing}
-        ${this._showBlockedConflictDialog
-          ? html`
-              <div class="tl-alert-dialog-backdrop">
-                <div
-                  class="tl-alert-dialog"
-                  role="alertdialog"
-                  aria-modal="true"
+        ${
+          this.showFab
+            ? html`
+                <button
+                  class="tl-fab"
+                  @click=${this._handleAddEvent}
+                  aria-label="Add event"
                 >
-                  <div class="tl-alert-dialog__header">
-                    <span class="tl-alert-dialog__title"
-                      >Schedule Conflict Blocked</span
-                    >
-                  </div>
-                  <div class="tl-alert-dialog__body">
-                    <p>${this._blockedConflictMessage}</p>
-                  </div>
-                  <div class="tl-alert-dialog__footer">
-                    <button
-                      class="tl-alert-dialog__btn"
-                      @click=${this._closeBlockedConflictDialog}
-                    >
-                      OK
-                    </button>
+                  ${PlusIcon()}
+                </button>
+              `
+            : nothing
+        }
+        ${
+          this._showBlockedConflictDialog
+            ? html`
+                <div class="tl-alert-dialog-backdrop">
+                  <div
+                    class="tl-alert-dialog"
+                    role="alertdialog"
+                    aria-modal="true"
+                  >
+                    <div class="tl-alert-dialog__header">
+                      <span class="tl-alert-dialog__title"
+                        >Schedule Conflict Blocked</span
+                      >
+                    </div>
+                    <div class="tl-alert-dialog__body">
+                      <p>${this._blockedConflictMessage}</p>
+                    </div>
+                    <div class="tl-alert-dialog__footer">
+                      <button
+                        class="tl-alert-dialog__btn"
+                        @click=${this._closeBlockedConflictDialog}
+                      >
+                        OK
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            `
-          : nothing}
+              `
+            : nothing
+        }
       </div>
     `;
   }
