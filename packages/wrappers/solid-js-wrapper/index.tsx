@@ -45,6 +45,10 @@ import type {
   SchedulerSaveData,
   SchedulerDeleteData,
   MonthEvent,
+  DayClickDetail,
+  DayHeaderClickDetail,
+  MonthSlotSelectDetail,
+  MonthMoreClickDetail,
   TimeGridEvent,
   TimeGridEventResource,
   SlotSelectDetail,
@@ -143,6 +147,10 @@ export type {
   SchedulerSaveData,
   SchedulerDeleteData,
   MonthEvent,
+  DayClickDetail,
+  DayHeaderClickDetail,
+  MonthSlotSelectDetail,
+  MonthMoreClickDetail,
   TimeGridEvent,
   TimeGridEventResource,
   SlotSelectDetail,
@@ -430,9 +438,13 @@ export const Timeline: Component<TimelineProps> = (props) => {
  */
 export interface MonthGridProps {
   showFab?: boolean;
+  navLinks?: boolean;
   timezone?: string;
-  onEventClick?: (detail: TimelineEvent) => void;
-  onDayClick?: (detail: { date: string }) => void;
+  onEventClick?: (detail: MonthEvent | TimelineEvent) => void;
+  onDayClick?: (detail: DayClickDetail) => void;
+  onDayHeaderClick?: (detail: DayHeaderClickDetail) => void;
+  onSlotSelect?: (detail: MonthSlotSelectDetail) => void;
+  onMoreClick?: (detail: MonthMoreClickDetail) => void;
   onAddEvent?: () => void;
   onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
@@ -446,6 +458,7 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
     if (ref) {
       const el = ref as unknown as Record<string, unknown>;
       if (props.showFab !== undefined) el.showFab = props.showFab;
+      if (props.navLinks !== undefined) el.navLinks = props.navLinks;
       if (props.timezone !== undefined) el.timezone = props.timezone;
     }
   });
@@ -460,6 +473,9 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
     };
     attach("event-click", props.onEventClick);
     attach("day-click", props.onDayClick);
+    attach("day-header-click", props.onDayHeaderClick);
+    attach("slot-select", props.onSlotSelect);
+    attach("more-click", props.onMoreClick);
     attach("add-event", props.onAddEvent);
     attach("view-change", props.onViewChange);
     attach("nav-change", props.onNavChange);

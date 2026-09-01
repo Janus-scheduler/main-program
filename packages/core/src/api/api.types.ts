@@ -93,6 +93,51 @@ export interface MonthEvent {
   startDate?: string;
   endDate?: string;
 }
+
+/**
+ * Detailed payload emitted when a day cell, header, or overflow link is clicked in Month Grid.
+ */
+export interface DayClickDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  /** Exact click target source */
+  source?: "header" | "cell" | "more";
+  /** All month events occurring on this date */
+  events?: MonthEvent[];
+  /** The native browser click event if available */
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when a day header/number badge is clicked (typically navigates to Day View).
+ */
+export interface DayHeaderClickDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when an empty slot or cell body in the Month Grid is clicked to create an event.
+ */
+export interface MonthSlotSelectDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when the "+N more" overflow indicator on a Month Grid day cell is clicked.
+ */
+export interface MonthMoreClickDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  /** All events occurring on this day */
+  events: MonthEvent[];
+  /** Number of hidden events that could not fit in the cell row */
+  hiddenCount: number;
+  jsEvent?: MouseEvent;
+}
 /**
  * A resource attached to an hour-grid event, resolved down to just what the
  * event card needs to draw an avatar.

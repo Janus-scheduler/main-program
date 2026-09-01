@@ -28,6 +28,9 @@ import {
   TopbarComponent,
   ChatComponent,
   type TimelineEvent,
+  type MonthEvent,
+  type DayHeaderClickDetail,
+  type MonthSlotSelectDetail,
   type SchedulerSaveData,
   type EventMoveDetail,
   type EventResizeDetail,
@@ -359,10 +362,33 @@ export class App implements OnDestroy {
     this.showScheduler = true;
   }
 
-  handleEventClick(event: TimelineEvent | TimeGridEvent): void {
+  handleEventClick(event: TimelineEvent | TimeGridEvent | MonthEvent): void {
     console.log('Clicked event:', event);
     this.selectedEventId.set(event.id);
     this.schedulerError.set(null);
+    this.showScheduler = true;
+  }
+
+  handleDayHeaderClick(detail: DayHeaderClickDetail): void {
+    console.log('Day header clicked, navigating to Day view:', detail.date);
+    this.currentView = 'Day';
+    setTimeout(() => {
+      this.dayGridEl()?.goToDate(detail.date);
+    }, 50);
+  }
+
+  handleMonthSlotSelect(detail: MonthSlotSelectDetail): void {
+    console.log('Month slot selected for event creation:', detail.date);
+    this.selectedEventId.set(null);
+    this.schedulerError.set(null);
+    this.tempEventData.set({
+      startDate: detail.date,
+      startTime: '09:00',
+      endDate: detail.date,
+      endTime: '10:00',
+      activeColor: 'primary',
+      showConfirmOnCreate: true,
+    });
     this.showScheduler = true;
   }
 

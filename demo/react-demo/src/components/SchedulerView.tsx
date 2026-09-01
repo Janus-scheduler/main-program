@@ -432,11 +432,22 @@ export function SchedulerView({
         >
           <MonthGrid
             showFab={true}
+            navLinks={true}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}
-            onDayClick={(detail) => {
+            onDayHeaderClick={(detail) => {
               pendingDate.current = detail.date;
               onViewChange("Day");
+            }}
+            onSlotSelect={(detail) => {
+              setTempEventData({
+                startDate: detail.date,
+                startTime: "09:00",
+                endDate: detail.date,
+                endTime: "10:00",
+                showConfirmOnCreate: true,
+              });
+              onOpenScheduler();
             }}
             onViewChange={(detail) => onViewChange(detail.view)}
             onNavChange={(detail) => {

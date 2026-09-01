@@ -20,6 +20,11 @@ import {
   isoToZonedDisplay,
   type TimelineEvent,
   type ViewType,
+  type MonthEvent,
+  type DayClickDetail,
+  type DayHeaderClickDetail,
+  type MonthSlotSelectDetail,
+  type MonthMoreClickDetail,
 } from "@janus-scheduler/core";
 
 @Component({
@@ -45,11 +50,17 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** When true, renders a + Floating Action Button */
   readonly showFab = input<boolean>(false);
 
+  /** When true (default), day numbers act as navigation links */
+  readonly navLinks = input<boolean>(true);
+
   /** Explicit display timezone */
   readonly timezone = input<string | undefined>(undefined);
 
-  readonly eventClick = output<TimelineEvent>();
-  readonly dayClick = output<{ date: string }>();
+  readonly eventClick = output<TimelineEvent | MonthEvent>();
+  readonly dayClick = output<DayClickDetail>();
+  readonly dayHeaderClick = output<DayHeaderClickDetail>();
+  readonly slotSelect = output<MonthSlotSelectDetail>();
+  readonly moreClick = output<MonthMoreClickDetail>();
   readonly addEvent = output<void>();
   readonly viewChange = output<{ view: ViewType }>();
   readonly navChange = output<Record<string, unknown>>();
@@ -63,6 +74,18 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
   private _dayClickHandler = (e: Event) => {
     e.stopPropagation();
     this.dayClick.emit((e as CustomEvent).detail);
+  };
+  private _dayHeaderClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.dayHeaderClick.emit((e as CustomEvent).detail);
+  };
+  private _slotSelectHandler = (e: Event) => {
+    e.stopPropagation();
+    this.slotSelect.emit((e as CustomEvent).detail);
+  };
+  private _moreClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.moreClick.emit((e as CustomEvent).detail);
   };
   private _addEventHandler = (e: Event) => {
     e.stopPropagation();
@@ -115,6 +138,9 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     const el = this._elRef().nativeElement;
     el.addEventListener("event-click", this._eventClickHandler);
     el.addEventListener("day-click", this._dayClickHandler);
+    el.addEventListener("day-header-click", this._dayHeaderClickHandler);
+    el.addEventListener("slot-select", this._slotSelectHandler);
+    el.addEventListener("more-click", this._moreClickHandler);
     el.addEventListener("add-event", this._addEventHandler);
     el.addEventListener("view-change", this._viewChangeHandler);
     el.addEventListener("nav-change", this._navChangeHandler);
@@ -130,9 +156,15 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private _syncProps(): void {
     const el = this._elRef()?.nativeElement as
-      (HTMLElement & { showFab: boolean; timezone?: string }) | undefined;
+      | (HTMLElement & {
+          showFab: boolean;
+          navLinks?: boolean;
+          timezone?: string;
+        })
+      | undefined;
     if (el) {
       el.showFab = this.showFab();
+      if (this.navLinks() !== undefined) el.navLinks = this.navLinks();
       if (this.timezone() !== undefined) el.timezone = this.timezone();
     }
   }
@@ -141,6 +173,9 @@ export class MonthGridComponent implements AfterViewInit, OnDestroy, OnChanges {
     const el = this._elRef()?.nativeElement;
     el?.removeEventListener("event-click", this._eventClickHandler);
     el?.removeEventListener("day-click", this._dayClickHandler);
+    el?.removeEventListener("day-header-click", this._dayHeaderClickHandler);
+    el?.removeEventListener("slot-select", this._slotSelectHandler);
+    el?.removeEventListener("more-click", this._moreClickHandler);
     el?.removeEventListener("add-event", this._addEventHandler);
     el?.removeEventListener("view-change", this._viewChangeHandler);
     el?.removeEventListener("nav-change", this._navChangeHandler);

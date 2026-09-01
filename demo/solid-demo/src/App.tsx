@@ -586,6 +586,8 @@ function App() {
               ref={(el) =>
                 (monthGridRef = el as unknown as typeof monthGridRef)
               }
+              showFab={true}
+              navLinks={true}
               onAddEvent={() => {
                 setSelectedEventId(null);
                 setSchedulerError(null);
@@ -606,11 +608,16 @@ function App() {
                   zoomUnit: (detail.zoomUnit as string) || "",
                 });
               }}
-              onDayClick={(detail) => {
+              onDayHeaderClick={(detail) => {
                 setCurrentView("Timeline");
                 setTimeout(() => {
                   timelineRef?.goToDate?.(detail.date);
                 }, 100);
+              }}
+              onSlotSelect={() => {
+                setSelectedEventId(null);
+                setSchedulerError(null);
+                setShowScheduler(true);
               }}
             />
           </Show>

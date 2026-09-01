@@ -88,8 +88,11 @@
     @if (currentView === 'Month') {
       <janus-month-grid-ng
         #monthGridEl
+        [navLinks]="true"
         (addEvent)="handleAddEvent()"
         (eventClick)="handleEventClick($event)"
+        (dayHeaderClick)="handleDayHeaderClick($event)"
+        (slotSelect)="handleMonthSlotSelect($event)"
         (viewChange)="handleViewChange($event)"
         (navChange)="handleNavChange($event)"
       />

@@ -41,6 +41,12 @@ export class JanusMonthGrid extends LitElement {
 
   /** When true, renders a + Floating Action Button to add an event. Default: false */
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
+  /**
+   * When true (default), day numbers act as clickable navigation links that emit
+   * `day-header-click` (and `day-click` with source="header") to drill down to Day View.
+   * Default: true
+   */
+  @property({ type: Boolean, attribute: "nav-links" }) navLinks = true;
   /** Explicit display timezone (defaults to schedulerStore.timezone or browser timezone). */
   @property({ type: String }) timezone?: string;
 
@@ -299,11 +305,78 @@ export class JanusMonthGrid extends LitElement {
     );
   }
 
-  private _handleDayClick(day: CalendarDay) {
+  private _handleDayHeaderClick(day: CalendarDay, jsEvent?: MouseEvent) {
     this._selectedDateStr = day.dateStr;
     this.dispatchEvent(
+      new CustomEvent("day-header-click", {
+        detail: { date: day.dateStr, jsEvent },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    this.dispatchEvent(
       new CustomEvent("day-click", {
-        detail: { date: day.dateStr },
+        detail: {
+          date: day.dateStr,
+          source: "header",
+          events: day.events,
+          jsEvent,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _handleCellClick(day: CalendarDay, jsEvent?: MouseEvent) {
+    this._selectedDateStr = day.dateStr;
+    this.dispatchEvent(
+      new CustomEvent("slot-select", {
+        detail: { date: day.dateStr, jsEvent },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    this.dispatchEvent(
+      new CustomEvent("day-click", {
+        detail: {
+          date: day.dateStr,
+          source: "cell",
+          events: day.events,
+          jsEvent,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _handleMoreClick(
+    day: CalendarDay,
+    hiddenCount: number,
+    jsEvent?: MouseEvent,
+  ) {
+    this._selectedDateStr = day.dateStr;
+    this.dispatchEvent(
+      new CustomEvent("more-click", {
+        detail: {
+          date: day.dateStr,
+          events: day.events,
+          hiddenCount,
+          jsEvent,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    this.dispatchEvent(
+      new CustomEvent("day-click", {
+        detail: {
+          date: day.dateStr,
+          source: "more",
+          events: day.events,
+          jsEvent,
+        },
         bubbles: true,
         composed: true,
       }),
@@ -538,20 +611,52 @@ export class JanusMonthGrid extends LitElement {
                         style="grid-column: ${
                           colIdx + 1
                         }; grid-row: 1 / span ${spanRows};"
-                        @click=${() => this._handleDayClick(day)}
+                        @click=${(e: MouseEvent) => this._handleCellClick(day, e)}
                       >
                         <div class="mg-day-cell__top">
                           ${
-                            day.isToday
+                            this.navLinks
                               ? html`
-                                  <span class="mg-today-badge"
-                                    >${day.dayNum}</span
+                                  <button
+                                    type="button"
+                                    class="mg-day-cell__num-btn ${
+                                      day.isToday
+                                        ? "mg-day-cell__num-btn--today"
+                                        : ""
+                                    }"
+                                    @click=${(e: MouseEvent) => {
+                                      e.stopPropagation();
+                                      this._handleDayHeaderClick(day, e);
+                                    }}
+                                    title="Go to ${day.dateStr}"
+                                    aria-label="View ${day.dateStr}"
                                   >
-                                  <span class="mg-today-label">TODAY</span>
+                                    ${
+                                      day.isToday
+                                        ? html`
+                                            <span class="mg-today-badge"
+                                              >${day.dayNum}</span
+                                            >
+                                            <span class="mg-today-label"
+                                              >TODAY</span
+                                            >
+                                          `
+                                        : html`<span class="mg-day-cell__num"
+                                            >${day.dayNum}</span
+                                          >`
+                                    }
+                                  </button>
                                 `
-                              : html`<span class="mg-day-cell__num"
-                                  >${day.dayNum}</span
-                                >`
+                              : day.isToday
+                                ? html`
+                                    <span class="mg-today-badge"
+                                      >${day.dayNum}</span
+                                    >
+                                    <span class="mg-today-label">TODAY</span>
+                                  `
+                                : html`<span class="mg-day-cell__num"
+                                    >${day.dayNum}</span
+                                  >`
                           }
                         </div>
                       </div>
@@ -614,13 +719,14 @@ export class JanusMonthGrid extends LitElement {
                     if (count === 0) return nothing;
                     return html`
                       <button
+                        type="button"
                         class="mg-more-btn"
                         style="grid-column: ${
                           colIdx + 1
                         }; grid-row: ${visibleTracks + 2};"
-                        @click=${(e: Event) => {
+                        @click=${(e: MouseEvent) => {
                           e.stopPropagation();
-                          this._handleDayClick(week[colIdx]);
+                          this._handleMoreClick(week[colIdx], count, e);
                         }}
                       >
                         <span class="mg-more-btn__text">+${count}</span>

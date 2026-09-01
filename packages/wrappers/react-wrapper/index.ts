@@ -61,6 +61,10 @@ import {
   type UndoAction,
   type SchedulerDeleteData,
   type MonthEvent,
+  type DayClickDetail,
+  type DayHeaderClickDetail,
+  type MonthSlotSelectDetail,
+  type MonthMoreClickDetail,
   type TimeGridEventResource,
   type EventData,
   type ResourceData,
@@ -118,6 +122,10 @@ export type {
   UndoAction,
   SchedulerDeleteData,
   MonthEvent,
+  DayClickDetail,
+  DayHeaderClickDetail,
+  MonthSlotSelectDetail,
+  MonthMoreClickDetail,
   TimeGridEventResource,
   EventData,
   ResourceData,
@@ -360,6 +368,9 @@ const _MonthGrid = createComponent({
   events: {
     onEventClick: "event-click",
     onDayClick: "day-click",
+    onDayHeaderClick: "day-header-click",
+    onSlotSelect: "slot-select",
+    onMoreClick: "more-click",
     onAddEvent: "add-event",
     onViewChange: "view-change",
     onNavChange: "nav-change",
@@ -368,9 +379,13 @@ const _MonthGrid = createComponent({
 
 export interface MonthGridProps extends React.HTMLAttributes<HTMLElement> {
   showFab?: boolean;
+  navLinks?: boolean;
   timezone?: string;
-  onEventClick?: (detail: TimelineEvent) => void;
-  onDayClick?: (detail: { date: string }) => void;
+  onEventClick?: (detail: MonthEvent | TimelineEvent) => void;
+  onDayClick?: (detail: DayClickDetail) => void;
+  onDayHeaderClick?: (detail: DayHeaderClickDetail) => void;
+  onSlotSelect?: (detail: MonthSlotSelectDetail) => void;
+  onMoreClick?: (detail: MonthMoreClickDetail) => void;
   onAddEvent?: () => void;
   onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
@@ -383,11 +398,29 @@ export const MonthGrid = React.forwardRef<JanusMonthGridWC, MonthGridProps>(
       ref,
       onEventClick: props.onEventClick
         ? (e: globalThis.Event) =>
-            props.onEventClick!((e as CustomEvent<TimelineEvent>).detail)
+            props.onEventClick!(
+              (e as CustomEvent<MonthEvent | TimelineEvent>).detail,
+            )
         : undefined,
       onDayClick: props.onDayClick
         ? (e: globalThis.Event) =>
-            props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
+            props.onDayClick!((e as CustomEvent<DayClickDetail>).detail)
+        : undefined,
+      onDayHeaderClick: props.onDayHeaderClick
+        ? (e: globalThis.Event) =>
+            props.onDayHeaderClick!(
+              (e as CustomEvent<DayHeaderClickDetail>).detail,
+            )
+        : undefined,
+      onSlotSelect: props.onSlotSelect
+        ? (e: globalThis.Event) =>
+            props.onSlotSelect!(
+              (e as CustomEvent<MonthSlotSelectDetail>).detail,
+            )
+        : undefined,
+      onMoreClick: props.onMoreClick
+        ? (e: globalThis.Event) =>
+            props.onMoreClick!((e as CustomEvent<MonthMoreClickDetail>).detail)
         : undefined,
       onAddEvent: props.onAddEvent ? () => props.onAddEvent!() : undefined,
       onViewChange: props.onViewChange
