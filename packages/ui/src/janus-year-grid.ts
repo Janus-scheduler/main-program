@@ -38,7 +38,7 @@ export class JanusYearGrid extends LitElement {
   @property({ type: Number, attribute: "view-year" })
   viewYear: number = new Date().getFullYear();
 
-  @state() private _eventsMap: Map<string, boolean> = new Map();
+  @state() private _eventsMap: Map<string, string> = new Map();
   private _unsubStore?: () => void;
 
   connectedCallback() {
@@ -142,7 +142,7 @@ export class JanusYearGrid extends LitElement {
       endRange,
     );
 
-    const newEventsMap = new Map<string, boolean>();
+    const newEventsMap = new Map<string, string>();
 
     for (const e of coreEvents) {
       const origStartMs = new Date(e.startTime).getTime();
@@ -181,7 +181,9 @@ export class JanusYearGrid extends LitElement {
           cur.getMonth(),
           cur.getDate(),
         );
-        newEventsMap.set(dateStr, true);
+        if (!newEventsMap.has(dateStr)) {
+          newEventsMap.set(dateStr, e.color || "orange");
+        }
         cur.setDate(cur.getDate() + 1);
       }
     }
@@ -219,7 +221,8 @@ export class JanusYearGrid extends LitElement {
     for (let day = 1; day <= totalDays; day++) {
       const isToday = isCurrentMonth && today.getDate() === day;
       const dateStr = toLocalDateStr(this.viewYear, monthIndex, day);
-      const hasEvent = this._eventsMap.has(dateStr);
+      const eventColor = this._eventsMap.get(dateStr);
+      const hasEvent = !!eventColor;
 
       cells.push(html`
         <div
@@ -241,7 +244,11 @@ export class JanusYearGrid extends LitElement {
           ${
             hasEvent
               ? html`<div
-                  class="yg-density-dot ${isToday ? "yg-density-dot--today" : ""}"
+                  class="yg-density-dot ${
+                    isToday
+                      ? "yg-density-dot--today"
+                      : `yg-density-dot--${eventColor}`
+                  }"
                 ></div>`
               : nothing
           }

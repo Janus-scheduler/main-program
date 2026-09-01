@@ -766,7 +766,13 @@ export abstract class JanusTimeGridBase extends LitElement {
             : nothing
         }
         <span class="tg-event__title">${ev.title}</span>
-        <span class="tg-event__time">${fmt12(ev.startTime)}</span>
+        <span class="tg-event__time"
+          >${
+            pos.height >= 48
+              ? `${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}`
+              : fmt12(ev.startTime)
+          }</span
+        >
         ${showAvatars ? this._renderAvatars(ev, maxAvatars) : nothing}
         ${
           draggable

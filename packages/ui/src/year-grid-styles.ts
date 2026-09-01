@@ -4,12 +4,27 @@ export const yearGridStyles = css`
   /* ── Design tokens ── */
   :host {
     --white: #ffffff;
-    --bg: #ffffff; /* Mockup shows a white background */
+    --bg: #ffffff;
     --border: #e4e4e7;
     --text-1: #18181b;
     --text-2: #71717a;
     --text-3: #a1a1aa;
     --orange: var(--janus-primary-color, #f97316);
+    --orange-lt: var(--janus-primary-bg, #fff7ed);
+    --today-bg: var(--janus-primary-bg, #fff7ed);
+
+    /* Event colours — matching Timeline and Month */
+    --c-primary-bd: var(--janus-primary-border, #f97316);
+    --c-orange-bd: #f97316;
+    --c-blue-bd: #0ea5e9;
+    --c-yellow-bd: #f59e0b;
+    --c-purple-bd: #8b5cf6;
+    --c-green-bd: #10b981;
+    --c-red-bd: #ef4444;
+    --c-pink-bd: #ec4899;
+    --c-indigo-bd: #6366f1;
+    --c-cyan-bd: #06b6d4;
+    --c-teal-bd: #14b8a6;
 
     display: flex;
     flex-direction: column;
@@ -27,32 +42,32 @@ export const yearGridStyles = css`
   }
 
   .yg-container {
-    padding: 12px 16px;
+    padding: 16px 20px;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     display: grid;
     /* Desktop: 4 columns. */
     grid-template-columns: repeat(4, 1fr);
-    column-gap: 16px;
-    row-gap: 16px;
+    column-gap: 20px;
+    row-gap: 20px;
     align-content: start;
   }
 
   @media (max-width: 1024px) {
     .yg-container {
       grid-template-columns: repeat(3, 1fr);
-      padding: 12px;
-      column-gap: 12px;
-      row-gap: 16px;
+      padding: 14px;
+      column-gap: 14px;
+      row-gap: 18px;
     }
   }
 
   @media (max-width: 768px) {
     .yg-container {
       grid-template-columns: repeat(2, 1fr);
-      padding: 8px;
-      column-gap: 8px;
+      padding: 10px;
+      column-gap: 10px;
       row-gap: 16px;
     }
   }
@@ -70,14 +85,18 @@ export const yearGridStyles = css`
     display: flex;
     flex-direction: column;
     background: transparent;
+    padding: 4px;
+    border-radius: 8px;
+    transition: background 0.12s;
   }
 
   .yg-month-header {
     font-size: 13px;
     font-weight: 700;
     color: var(--text-1);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     padding-left: 4px;
+    letter-spacing: 0.2px;
   }
 
   .yg-month-header--current {
@@ -88,16 +107,17 @@ export const yearGridStyles = css`
   .yg-day-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    row-gap: 1px;
+    row-gap: 2px;
   }
 
   /* Weekday Header */
   .yg-weekday {
     text-align: center;
-    font-size: 9px;
+    font-size: 9.5px;
     font-weight: 600;
     color: var(--text-3);
-    margin-bottom: 2px;
+    margin-bottom: 4px;
+    letter-spacing: 0.4px;
   }
 
   /* Day Cell */
@@ -105,11 +125,11 @@ export const yearGridStyles = css`
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    height: 20px;
+    justify-content: center;
+    height: 24px;
     cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.15s ease;
+    border-radius: 6px;
+    transition: background-color 0.12s ease;
     position: relative;
   }
 
@@ -128,15 +148,18 @@ export const yearGridStyles = css`
   }
 
   .yg-day-number {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
     color: var(--text-2);
-    height: 18px;
-    width: 18px;
+    height: 20px;
+    width: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
+    border-radius: 50%;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
   }
 
   .yg-day-cell:hover .yg-day-number {
@@ -146,20 +169,50 @@ export const yearGridStyles = css`
   .yg-day-number--today {
     background: var(--orange);
     color: var(--white) !important;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   /* Density Dot */
   .yg-density-dot {
-    width: 3px;
-    height: 3px;
+    width: 3.5px;
+    height: 3.5px;
     border-radius: 50%;
     background: var(--orange);
     position: absolute;
-    bottom: 2px;
+    bottom: 1px;
+    transition: transform 0.1s ease;
   }
 
   .yg-density-dot--today {
     background: var(--white);
+    bottom: 2px;
+  }
+
+  .yg-density-dot--blue {
+    background: var(--c-blue-bd);
+  }
+  .yg-density-dot--green {
+    background: var(--c-green-bd);
+  }
+  .yg-density-dot--purple {
+    background: var(--c-purple-bd);
+  }
+  .yg-density-dot--red {
+    background: var(--c-red-bd);
+  }
+  .yg-density-dot--yellow {
+    background: var(--c-yellow-bd);
+  }
+  .yg-density-dot--pink {
+    background: var(--c-pink-bd);
+  }
+  .yg-density-dot--indigo {
+    background: var(--c-indigo-bd);
+  }
+  .yg-density-dot--cyan {
+    background: var(--c-cyan-bd);
+  }
+  .yg-density-dot--teal {
+    background: var(--c-teal-bd);
   }
 `;
