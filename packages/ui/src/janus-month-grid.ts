@@ -344,34 +344,40 @@ export class JanusMonthGrid extends LitElement {
       <div class="mg-day-panel">
         <div class="mg-day-panel__header">
           <span class="mg-day-panel__title">${title} EVENTS</span>
-          ${day.isToday
-            ? html`<span class="mg-day-panel__today-badge">TODAY</span>`
-            : nothing}
+          ${
+            day.isToday
+              ? html`<span class="mg-day-panel__today-badge">TODAY</span>`
+              : nothing
+          }
         </div>
 
-        ${day.events.length === 0
-          ? html`<p class="mg-day-panel__empty">No events</p>`
-          : day.events.map(
-              (ev) => html`
-                <div class="mg-day-panel__event">
-                  <div
-                    class="mg-day-panel__color-bar mg-day-panel__color-bar--${ev.color}"
-                  ></div>
-                  <div class="mg-day-panel__event-info">
-                    <span class="mg-day-panel__event-title">${ev.title}</span>
-                    ${ev.allDay
-                      ? html`<span class="mg-day-panel__event-time"
-                          >All-day</span
-                        >`
-                      : ev.startTime && ev.endTime
-                        ? html`<span class="mg-day-panel__event-time">
-                            ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}
-                          </span>`
-                        : nothing}
+        ${
+          day.events.length === 0
+            ? html`<p class="mg-day-panel__empty">No events</p>`
+            : day.events.map(
+                (ev) => html`
+                  <div class="mg-day-panel__event">
+                    <div
+                      class="mg-day-panel__color-bar mg-day-panel__color-bar--${ev.color}"
+                    ></div>
+                    <div class="mg-day-panel__event-info">
+                      <span class="mg-day-panel__event-title">${ev.title}</span>
+                      ${
+                        ev.allDay
+                          ? html`<span class="mg-day-panel__event-time"
+                              >All-day</span
+                            >`
+                          : ev.startTime && ev.endTime
+                            ? html`<span class="mg-day-panel__event-time">
+                                ${fmt12(ev.startTime)} – ${fmt12(ev.endTime)}
+                              </span>`
+                            : nothing
+                      }
+                    </div>
                   </div>
-                </div>
-              `,
-            )}
+                `,
+              )
+        }
       </div>
     `;
   }
@@ -529,21 +535,24 @@ export class JanusMonthGrid extends LitElement {
                     return html`
                       <div
                         class=${classes}
-                        style="grid-column: ${colIdx +
-                        1}; grid-row: 1 / span ${spanRows};"
+                        style="grid-column: ${
+                          colIdx + 1
+                        }; grid-row: 1 / span ${spanRows};"
                         @click=${() => this._handleDayClick(day)}
                       >
                         <div class="mg-day-cell__top">
-                          ${day.isToday
-                            ? html`
-                                <span class="mg-today-badge"
+                          ${
+                            day.isToday
+                              ? html`
+                                  <span class="mg-today-badge"
+                                    >${day.dayNum}</span
+                                  >
+                                  <span class="mg-today-label">TODAY</span>
+                                `
+                              : html`<span class="mg-day-cell__num"
                                   >${day.dayNum}</span
-                                >
-                                <span class="mg-today-label">TODAY</span>
-                              `
-                            : html`<span class="mg-day-cell__num"
-                                >${day.dayNum}</span
-                              >`}
+                                >`
+                          }
                         </div>
                       </div>
                     `;
@@ -576,8 +585,9 @@ export class JanusMonthGrid extends LitElement {
                         <button
                           class=${barClasses}
                           style="
-                            grid-column: ${bar.startIdx +
-                          1} / span ${bar.endIdx - bar.startIdx + 1}; 
+                            grid-column: ${
+                              bar.startIdx + 1
+                            } / span ${bar.endIdx - bar.startIdx + 1}; 
                             grid-row: ${bar.track + 2}; 
                             margin: 1px 4px; 
                             width: calc(100% - 8px);
@@ -605,8 +615,9 @@ export class JanusMonthGrid extends LitElement {
                     return html`
                       <button
                         class="mg-more-btn"
-                        style="grid-column: ${colIdx +
-                        1}; grid-row: ${visibleTracks + 2};"
+                        style="grid-column: ${
+                          colIdx + 1
+                        }; grid-row: ${visibleTracks + 2};"
                         @click=${(e: Event) => {
                           e.stopPropagation();
                           this._handleDayClick(week[colIdx]);
@@ -626,17 +637,19 @@ export class JanusMonthGrid extends LitElement {
         ${this._renderDayPanel(selectedDay)}
 
         <!-- ── FAB ── -->
-        ${this.showFab
-          ? html`
-              <button
-                class="mg-fab"
-                @click=${this._handleAddEvent}
-                aria-label="Add event"
-              >
-                ${PlusIcon()}
-              </button>
-            `
-          : nothing}
+        ${
+          this.showFab
+            ? html`
+                <button
+                  class="mg-fab"
+                  @click=${this._handleAddEvent}
+                  aria-label="Add event"
+                >
+                  ${PlusIcon()}
+                </button>
+              `
+            : nothing
+        }
       </div>
     `;
   }

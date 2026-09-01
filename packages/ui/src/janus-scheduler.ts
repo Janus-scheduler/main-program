@@ -583,10 +583,7 @@ export class JanusScheduler extends LitElement {
         if (draft.recurrenceRule) {
           const parsed = parseRRule(draft.recurrenceRule);
           this._recurrenceFreq = parsed.freq as
-            | "Daily"
-            | "Weekly"
-            | "Monthly"
-            | "Yearly";
+            "Daily" | "Weekly" | "Monthly" | "Yearly";
           this._recurrenceUntilDate = parsed.until;
           if (parsed.until) {
             const [y, m] = parsed.until.split("-").map(Number);
@@ -1006,10 +1003,9 @@ export class JanusScheduler extends LitElement {
             const isToday = d === todD && vm === todM && vy === todY;
             return html`<button
               type="button"
-              class="cal-day ${isSel ? "cal-day--selected" : ""} ${isToday &&
-              !isSel
-                ? "cal-day--today"
-                : ""}"
+              class="cal-day ${isSel ? "cal-day--selected" : ""} ${
+                isToday && !isSel ? "cal-day--today" : ""
+              }"
               @click=${() => this._selectDate(which, vy, vm, d)}
             >
               ${d}
@@ -1136,9 +1132,9 @@ export class JanusScheduler extends LitElement {
           ${visible.map(
             (tz) => html`
               <li
-                class="tz-item ${this._selectedTz === tz
-                  ? "tz-item--active"
-                  : ""}"
+                class="tz-item ${
+                  this._selectedTz === tz ? "tz-item--active" : ""
+                }"
                 @click=${() => {
                   this._selectedTz = tz;
                   // LOAD-BEARING: the draft is the source of truth for the
@@ -1159,9 +1155,11 @@ export class JanusScheduler extends LitElement {
               </li>
             `,
           )}
-          ${visible.length === 0
-            ? html`<li class="tz-item tz-item--empty">No results</li>`
-            : nothing}
+          ${
+            visible.length === 0
+              ? html`<li class="tz-item tz-item--empty">No results</li>`
+              : nothing
+          }
         </ul>
       </div>
     `;
@@ -1268,37 +1266,42 @@ export class JanusScheduler extends LitElement {
             <h2 class="view-hero-title">${draft.title || "Untitled Event"}</h2>
             <div class="view-hero-datetime">
               <span class="view-hero-datetime-icon">${CalendarIcon()}</span>
-              ${draft.allDay
-                ? html`
-                    <span>${displayDate}</span>
-                    <span class="view-hero-sep">·</span>
-                    <span class="view-allday-badge">All-day</span>
-                  `
-                : multiDay
+              ${
+                draft.allDay
                   ? html`
-                      <span>
-                        ${formatDate(displayStartDate)},
-                        ${formatTime(startTimeVal)} –
-                        ${formatDate(displayEndDate)}, ${formatTime(endTimeVal)}
-                      </span>
-                    `
-                  : html`
                       <span>${displayDate}</span>
                       <span class="view-hero-sep">·</span>
-                      <span class="view-hero-datetime-icon"
-                        >${ClockIcon()}</span
-                      >
-                      <span>${displayTime}</span>
-                    `}
+                      <span class="view-allday-badge">All-day</span>
+                    `
+                  : multiDay
+                    ? html`
+                        <span>
+                          ${formatDate(displayStartDate)},
+                          ${formatTime(startTimeVal)} –
+                          ${formatDate(displayEndDate)},
+                          ${formatTime(endTimeVal)}
+                        </span>
+                      `
+                    : html`
+                        <span>${displayDate}</span>
+                        <span class="view-hero-sep">·</span>
+                        <span class="view-hero-datetime-icon"
+                          >${ClockIcon()}</span
+                        >
+                        <span>${displayTime}</span>
+                      `
+              }
             </div>
-            ${draft.recurrenceRule
-              ? html`
-                  <div class="view-hero-recurrence">
-                    ${RepeatIcon()}
-                    <span>${formatRecurrence(draft.recurrenceRule)}</span>
-                  </div>
-                `
-              : nothing}
+            ${
+              draft.recurrenceRule
+                ? html`
+                    <div class="view-hero-recurrence">
+                      ${RepeatIcon()}
+                      <span>${formatRecurrence(draft.recurrenceRule)}</span>
+                    </div>
+                  `
+                : nothing
+            }
           </div>
         </div>
 
@@ -1317,40 +1320,48 @@ export class JanusScheduler extends LitElement {
                     ${avatarHtml(name, res?.avatar)}
                     <div class="view-participant-info">
                       <span class="view-participant-name">${name}</span>
-                      ${isLead
-                        ? html`<span class="view-participant-role-badge"
-                            >Primary</span
-                          >`
-                        : nothing}
+                      ${
+                        isLead
+                          ? html`<span class="view-participant-role-badge"
+                              >Primary</span
+                            >`
+                          : nothing
+                      }
                     </div>
                   </div>
                 `;
               })}
-              ${draft.participants.length === 0
-                ? html`
-                    <div class="view-empty-row">No participants assigned</div>
-                  `
-                : nothing}
+              ${
+                draft.participants.length === 0
+                  ? html`
+                      <div class="view-empty-row">No participants assigned</div>
+                    `
+                  : nothing
+              }
             </div>
           </div>
 
           <!-- Description -->
-          ${draft.description
-            ? html`
-                <div class="view-section">
-                  <div class="view-section-label">Description</div>
-                  <div class="view-desc">${draft.description}</div>
-                </div>
-              `
-            : nothing}
+          ${
+            draft.description
+              ? html`
+                  <div class="view-section">
+                    <div class="view-section-label">Description</div>
+                    <div class="view-desc">${draft.description}</div>
+                  </div>
+                `
+              : nothing
+          }
 
           <!-- Meta row: timezone + color -->
           <div class="view-meta-row">
             <div class="view-meta-chip">
               ${GlobeIcon()}
               <span
-                >${this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
-                this._selectedTz}</span
+                >${
+                  this._selectedTz.split("/").pop()?.replace(/_/g, " ") ??
+                  this._selectedTz
+                }</span
               >
             </div>
             <div class="view-meta-chip">
@@ -1419,761 +1430,869 @@ export class JanusScheduler extends LitElement {
         : `${formatTime(draft.startTime)} – ${formatTime(draft.endTime)}`;
 
     return html`
-      ${this.brandColor
-        ? html`<style>
-            :host {
-              --janus-primary-color: ${this.brandColor};
-            }
-          </style>`
-        : nothing}
+      ${
+        this.brandColor
+          ? html`<style>
+              :host {
+                --janus-primary-color: ${this.brandColor};
+              }
+            </style>`
+          : nothing
+      }
       <div
         class="overlay"
         @click=${(e: Event) =>
           e.target === e.currentTarget && this._onClose(false)}
       >
-        ${this._showCreateConfirm
-          ? this._renderConfirmDialog(draft)
-          : this._showDeleteConfirm
-            ? this._renderDeleteConfirmDialog(draft)
-            : html`
-                <div
-                  class="modal ${this._isEditing ? "" : "modal--view"}"
-                  role="dialog"
-                  aria-modal="true"
-                >
-                  ${!this._isEditing
-                    ? this._renderViewMode(draft)
-                    : html`
-                        <!-- ── Sidebar ─────────────────────────────────────────────────── -->
-                        <aside
-                          class="sidebar ${this.sidebarOpen
-                            ? "sidebar--open"
-                            : ""}"
-                        >
-                          <div
-                            class="sidebar-accent color-${draft.activeColor}"
-                          ></div>
-                          <div class="sidebar-top">
-                            <div class="sidebar-event-badge">Event</div>
-                            <h2 class="sidebar-title">
-                              ${draft.title || "Untitled Event"}
-                            </h2>
-                          </div>
-                          <div class="sidebar-meta">
-                            <div class="meta-item">
-                              <span class="meta-icon">${CalendarIcon()}</span>
-                              <div>
-                                <div class="meta-label">Date</div>
-                                <div class="meta-value">
-                                  ${sidebarDate || "—"}
-                                </div>
+        ${
+          this._showCreateConfirm
+            ? this._renderConfirmDialog(draft)
+            : this._showDeleteConfirm
+              ? this._renderDeleteConfirmDialog(draft)
+              : html`
+                  <div
+                    class="modal ${this._isEditing ? "" : "modal--view"}"
+                    role="dialog"
+                    aria-modal="true"
+                  >
+                    ${
+                      !this._isEditing
+                        ? this._renderViewMode(draft)
+                        : html`
+                            <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+                            <aside
+                              class="sidebar ${
+                                this.sidebarOpen ? "sidebar--open" : ""
+                              }"
+                            >
+                              <div
+                                class="sidebar-accent color-${draft.activeColor}"
+                              ></div>
+                              <div class="sidebar-top">
+                                <div class="sidebar-event-badge">Event</div>
+                                <h2 class="sidebar-title">
+                                  ${draft.title || "Untitled Event"}
+                                </h2>
                               </div>
-                            </div>
-                            <div class="meta-item">
-                              <span class="meta-icon">${ClockIcon()}</span>
-                              <div>
-                                <div class="meta-label">Time</div>
-                                <div class="meta-value">${sidebarTime}</div>
-                              </div>
-                            </div>
-                            ${draft.recurrenceRule
-                              ? html`
-                                  <div class="meta-item">
-                                    <span
-                                      class="meta-icon"
-                                      style="color: var(--c-${draft.activeColor});"
-                                    >
-                                      ${RepeatIcon()}
-                                    </span>
-                                    <div>
-                                      <div class="meta-label">Repeat</div>
-                                      <div class="meta-value">
-                                        ${formatRecurrence(
-                                          draft.recurrenceRule,
-                                        )}
-                                      </div>
+                              <div class="sidebar-meta">
+                                <div class="meta-item">
+                                  <span class="meta-icon"
+                                    >${CalendarIcon()}</span
+                                  >
+                                  <div>
+                                    <div class="meta-label">Date</div>
+                                    <div class="meta-value">
+                                      ${sidebarDate || "—"}
                                     </div>
                                   </div>
-                                `
-                              : nothing}
-                            <div class="meta-item">
-                              <span class="meta-icon">${UsersIcon()}</span>
-                              <div>
-                                <div class="meta-label">Participants</div>
-                                <div class="meta-value">
-                                  ${draft.participants.length}
-                                  ${draft.participants.length === 1
-                                    ? "person"
-                                    : "people"}
                                 </div>
-                                <div class="avatar-stack">
-                                  ${draft.participants
-                                    .slice(0, 4)
-                                    .map((n) =>
-                                      avatarHtml(
-                                        this._resolveResourceName(n),
-                                        schedulerStore.getState().resources[n]
-                                          ?.avatar,
-                                      ),
-                                    )}
-                                  ${draft.participants.length > 4
-                                    ? html`<span class="avatar avatar-more"
-                                        >+${draft.participants.length - 4}</span
-                                      >`
-                                    : nothing}
+                                <div class="meta-item">
+                                  <span class="meta-icon">${ClockIcon()}</span>
+                                  <div>
+                                    <div class="meta-label">Time</div>
+                                    <div class="meta-value">${sidebarTime}</div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                            <div class="meta-item">
-                              <span class="meta-icon">${TagIcon()}</span>
-                              <div class="color-meta-block">
-                                <div class="meta-label">Color</div>
-                                <div class="swatches">
-                                  ${COLORS.map(
-                                    (c) =>
-                                      html`<button
-                                        class="swatch swatch-${c} ${draft.activeColor ===
-                                        c
-                                          ? "active"
-                                          : ""}"
-                                        @click=${() =>
-                                          schedulerStore
-                                            .getState()
-                                            .updateDraft({
-                                              activeColor: c,
-                                            })}
-                                        aria-label="${c} color"
-                                      ></button>`,
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div class="meta-item">
-                              <span class="meta-icon">${BellIcon()}</span>
-                              <div>
-                                <div class="meta-label">Reminder</div>
-                                <div class="meta-value">15 min before</div>
-                              </div>
-                            </div>
-                          </div>
-                          ${this.eventId
-                            ? html`
-                                <div class="sidebar-footer">
-                                  <button
-                                    class="btn-delete"
-                                    @click=${this._onDeleteClick}
-                                  >
-                                    ${TrashIcon()} Delete Event
-                                  </button>
-                                </div>
-                              `
-                            : nothing}
-                        </aside>
-
-                        <!-- ── Panel ───────────────────────────────────────────────────── -->
-                        <div class="panel">
-                          <div class="panel-header">
-                            <div class="panel-header-left">
-                              <button
-                                class="mobile-summary-btn"
-                                @click=${() =>
-                                  (this.sidebarOpen = !this.sidebarOpen)}
-                                aria-label="Toggle event summary"
-                              >
-                                <div class="dot dot-${draft.activeColor}"></div>
-                                <span class="mobile-summary-title"
-                                  >${draft.title || "Untitled"}</span
-                                >
-                                <span
-                                  class="chevron ${this.sidebarOpen
-                                    ? "chevron--up"
-                                    : ""}"
-                                  >${ChevronDownIcon()}</span
-                                >
-                              </button>
-                              <span class="panel-heading"
-                                >${this.eventId
-                                  ? "Edit Event"
-                                  : "Create Event"}</span
-                              >
-                            </div>
-                            <button
-                              class="close-btn"
-                              @click=${() => this._onClose(true)}
-                              aria-label="Close"
-                            >
-                              ${XIcon()}
-                            </button>
-                          </div>
-
-                          <!-- Mobile summary strip -->
-                          <div
-                            class="mobile-summary-panel ${this.sidebarOpen
-                              ? "mobile-summary-panel--open"
-                              : ""}"
-                          >
-                            <div class="mobile-summary-grid">
-                              <div class="msummary-item">
-                                <span class="meta-label">Start</span>
-                                <span class="meta-value"
-                                  >${formatDateShort(draft.startDate)}
-                                  ${draft.allDay
-                                    ? ""
-                                    : formatTime(draft.startTime)}</span
-                                >
-                              </div>
-                              <div class="msummary-item">
-                                <span class="meta-label">End</span>
-                                <span class="meta-value"
-                                  >${formatDateShort(draft.endDate)}
-                                  ${draft.allDay
-                                    ? ""
-                                    : formatTime(draft.endTime)}</span
-                                >
-                              </div>
-                              <div class="msummary-item">
-                                <span class="meta-label">Participants</span>
-                                <span class="meta-value"
-                                  >${draft.participants.length} people</span
-                                >
-                              </div>
-                              ${draft.recurrenceRule
-                                ? html`
-                                    <div class="msummary-item">
-                                      <span class="meta-label">Repeat</span>
-                                      <span class="meta-value"
-                                        >${formatRecurrence(
-                                          draft.recurrenceRule,
-                                        )}</span
-                                      >
-                                    </div>
-                                  `
-                                : nothing}
-                              <div class="msummary-item">
-                                <span class="meta-label">Color</span>
-                                <div class="swatches swatches--sm">
-                                  ${COLORS.map(
-                                    (c) =>
-                                      html`<button
-                                        class="swatch swatch-${c} ${draft.activeColor ===
-                                        c
-                                          ? "active"
-                                          : ""}"
-                                        @click=${() =>
-                                          schedulerStore
-                                            .getState()
-                                            .updateDraft({
-                                              activeColor: c,
-                                            })}
-                                      ></button>`,
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div class="panel-body">
-                            ${this.error
-                              ? html` <div class="error-alert">
-                                  <span class="error-icon">!</span>
-                                  <span class="error-message"
-                                    >${this.error}</span
-                                  >
-                                </div>`
-                              : nothing}
-
-                            <!-- Basic Info -->
-                            <div class="form-section">
-                              <div class="section-label">Basic Info</div>
-                              <div class="form-group">
-                                <label for="event-title">Event Title</label>
-                                <input
-                                  id="event-title"
-                                  type="text"
-                                  .value=${draft.title}
-                                  @input=${(e: Event) => {
-                                    this._titleTouched = true;
-                                    schedulerStore.getState().updateDraft({
-                                      title: (e.target as HTMLInputElement)
-                                        .value,
-                                    });
-                                  }}
-                                  @blur=${() => {
-                                    this._titleTouched = true;
-                                  }}
-                                  placeholder="Add a title…"
-                                />
-                                ${this._titleTouched &&
-                                (!draft.title || !draft.title.trim())
-                                  ? html`<div
-                                      class="dt-invalid-notice"
-                                      style="margin-top: 6px;"
-                                    >
-                                      <span>⚠</span>
-                                      <span>Event Title is required.</span>
-                                    </div>`
-                                  : nothing}
-                              </div>
-                            </div>
-
-                            <!-- Date & Time -->
-                            <div class="form-section">
-                              <div class="section-label">Date &amp; Time</div>
-
-                              <!-- Switches Row -->
-                              <div class="toggle-row">
-                                <div class="toggle-control">
-                                  <span class="toggle-label" id="all-day-label"
-                                    >All-day Event</span
-                                  >
-                                  <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked="${draft.allDay
-                                      ? "true"
-                                      : "false"}"
-                                    aria-labelledby="all-day-label"
-                                    class="switch-btn ${draft.allDay
-                                      ? "switch-btn--active"
-                                      : ""}"
-                                    @click=${this._toggleAllDay}
-                                  >
-                                    <span class="switch-slider"></span>
-                                  </button>
-                                </div>
-                                <div class="toggle-control">
-                                  <span class="toggle-label" id="repeat-label"
-                                    >Repeat Event</span
-                                  >
-                                  <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked="${draft.recurrenceRule
-                                      ? "true"
-                                      : "false"}"
-                                    aria-labelledby="repeat-label"
-                                    class="switch-btn ${draft.recurrenceRule
-                                      ? "switch-btn--active"
-                                      : ""}"
-                                    @click=${this._toggleRepeat}
-                                  >
-                                    <span class="switch-slider"></span>
-                                  </button>
-                                </div>
-                              </div>
-
-                              <!-- Recurrence Options -->
-                              ${draft.recurrenceRule
-                                ? html`
-                                    <div class="recurrence-section">
-                                      <div class="dt-row-label">
-                                        Repeat Frequency
-                                      </div>
-                                      <div class="recurrence-freq-selector">
-                                        ${[
-                                          "Daily",
-                                          "Weekly",
-                                          "Monthly",
-                                          "Yearly",
-                                        ].map(
-                                          (freq) => html`
-                                            <button
-                                              type="button"
-                                              class="freq-pill ${this
-                                                ._recurrenceFreq === freq
-                                                ? "freq-pill--active"
-                                                : ""}"
-                                              @click=${() =>
-                                                this._setRepeatFreq(
-                                                  freq as
-                                                    | "Daily"
-                                                    | "Weekly"
-                                                    | "Monthly"
-                                                    | "Yearly",
-                                                )}
-                                            >
-                                              ${freq}
-                                            </button>
-                                          `,
-                                        )}
-                                      </div>
-                                      <div
-                                        class="dt-row-label"
-                                        style="margin-top: 10px;"
-                                      >
-                                        Repeat Until
-                                      </div>
-                                      <div class="dt-row">
-                                        <div class="dt-cell dt-cell--date">
-                                          ${this._triggerBtn(
-                                            CalendarIcon(),
-                                            this._recurrenceUntilDate
-                                              ? formatDateShort(
-                                                  this._recurrenceUntilDate,
-                                                )
-                                              : "Never Ends",
-                                            this.openPicker ===
-                                              "recurrenceUntil",
-                                            false,
-                                            "recurrenceUntil",
-                                          )}
-                                          ${this.openPicker ===
-                                          "recurrenceUntil"
-                                            ? this._calPicker(
-                                                "recurrenceUntil",
-                                                this._recurrenceUntilDate,
-                                                this.recurrenceCal,
-                                                (d) =>
-                                                  this._navCal(
-                                                    "recurrenceUntil",
-                                                    d,
-                                                  ),
-                                              )
-                                            : nothing}
+                                ${
+                                  draft.recurrenceRule
+                                    ? html`
+                                        <div class="meta-item">
+                                          <span
+                                            class="meta-icon"
+                                            style="color: var(--c-${draft.activeColor});"
+                                          >
+                                            ${RepeatIcon()}
+                                          </span>
+                                          <div>
+                                            <div class="meta-label">Repeat</div>
+                                            <div class="meta-value">
+                                              ${formatRecurrence(
+                                                draft.recurrenceRule,
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
-                                        ${this._recurrenceUntilDate
-                                          ? html`
-                                              <button
-                                                type="button"
-                                                class="btn-clear-until"
-                                                @click=${() => {
-                                                  this._recurrenceUntilDate =
-                                                    "";
-                                                  this._updateRecurrenceRule();
-                                                }}
-                                              >
-                                                Clear End Date
-                                              </button>
-                                            `
-                                          : nothing}
-                                      </div>
+                                      `
+                                    : nothing
+                                }
+                                <div class="meta-item">
+                                  <span class="meta-icon">${UsersIcon()}</span>
+                                  <div>
+                                    <div class="meta-label">Participants</div>
+                                    <div class="meta-value">
+                                      ${draft.participants.length}
+                                      ${
+                                        draft.participants.length === 1
+                                          ? "person"
+                                          : "people"
+                                      }
                                     </div>
-                                  `
-                                : nothing}
-
-                              <!-- START -->
-                              <div class="dt-row-label">Start</div>
-                              <div
-                                class="dt-row ${draft.allDay
-                                  ? "dt-row--all-day"
-                                  : ""}"
-                              >
-                                <!-- Start date trigger + dropdown -->
-                                <div class="dt-cell dt-cell--date">
-                                  ${this._triggerBtn(
-                                    CalendarIcon(),
-                                    formatDateShort(draft.startDate),
-                                    this.openPicker === "startDate",
-                                    false,
-                                    "startDate",
-                                  )}
-                                  ${this.openPicker === "startDate"
-                                    ? this._calPicker(
-                                        "start",
-                                        draft.startDate,
-                                        this.startCal,
-                                        (d) => this._navCal("start", d),
-                                      )
-                                    : nothing}
-                                </div>
-                                <!-- Start time trigger + dropdown -->
-                                ${draft.allDay
-                                  ? nothing
-                                  : html`
-                                      <div class="dt-cell dt-cell--time">
-                                        ${this._triggerBtn(
-                                          ClockIcon(),
-                                          formatTime(draft.startTime),
-                                          this.openPicker === "startTime",
-                                          false,
-                                          "startTime",
+                                    <div class="avatar-stack">
+                                      ${draft.participants
+                                        .slice(0, 4)
+                                        .map((n) =>
+                                          avatarHtml(
+                                            this._resolveResourceName(n),
+                                            schedulerStore.getState().resources[
+                                              n
+                                            ]?.avatar,
+                                          ),
                                         )}
-                                        ${this.openPicker === "startTime"
-                                          ? this._timePicker(
-                                              "start",
-                                              draft.startTime,
-                                            )
-                                          : nothing}
-                                      </div>
-                                    `}
-                              </div>
-
-                              <!-- END -->
-                              <div class="dt-row-label dt-row-label--end">
-                                End
-                              </div>
-                              <div
-                                class="dt-row ${draft.allDay
-                                  ? "dt-row--all-day"
-                                  : ""}"
-                              >
-                                <!-- End date trigger + dropdown -->
-                                <div class="dt-cell dt-cell--date">
-                                  ${this._triggerBtn(
-                                    CalendarIcon(),
-                                    formatDateShort(draft.endDate),
-                                    this.openPicker === "endDate",
-                                    timeInvalid,
-                                    "endDate",
-                                  )}
-                                  ${this.openPicker === "endDate"
-                                    ? this._calPicker(
-                                        "end",
-                                        draft.endDate,
-                                        this.endCal,
-                                        (d) => this._navCal("end", d),
-                                      )
-                                    : nothing}
+                                      ${
+                                        draft.participants.length > 4
+                                          ? html`<span
+                                              class="avatar avatar-more"
+                                              >+${draft.participants.length - 4}</span
+                                            >`
+                                          : nothing
+                                      }
+                                    </div>
+                                  </div>
                                 </div>
-                                <!-- End time trigger + dropdown -->
-                                ${draft.allDay
-                                  ? nothing
-                                  : html`
-                                      <div class="dt-cell dt-cell--time">
-                                        ${this._triggerBtn(
-                                          ClockIcon(),
-                                          formatTime(draft.endTime),
-                                          this.openPicker === "endTime",
-                                          timeInvalid,
-                                          "endTime",
-                                        )}
-                                        ${this.openPicker === "endTime"
-                                          ? this._timePicker(
-                                              "end",
-                                              draft.endTime,
-                                            )
-                                          : nothing}
-                                      </div>
-                                    `}
-                              </div>
-
-                              <!-- Validation warning -->
-                              ${timeInvalid
-                                ? html` <div class="dt-invalid-notice">
-                                    <span>⚠</span>
-                                    <span
-                                      >End must be after start. Please adjust
-                                      the date or time.</span
-                                    >
-                                  </div>`
-                                : nothing}
-
-                              <!-- Conflict warning -->
-                              ${this._resourceConflict.hasConflict
-                                ? html`<div
-                                    class="dt-conflict-warning ${this
-                                      .preventConflicts
-                                      ? "dt-conflict-warning--blocking"
-                                      : ""}"
-                                  >
-                                    <span>⚠</span>
-                                    <span
-                                      >${this._resourceConflict.message}${this
-                                        .preventConflicts
-                                        ? " (Saving disabled due to schedule conflict)"
-                                        : ""}</span
-                                    >
-                                  </div>`
-                                : nothing}
-
-                              <!-- Timezone selector -->
-                              <div class="dt-tz-row">
-                                <div class="dt-row-label">Timezone</div>
-                                <div class="dt-cell dt-cell--tz">
-                                  ${this._triggerBtn(
-                                    GlobeIcon(),
-                                    this._selectedTz
-                                      .split("/")
-                                      .pop()
-                                      ?.replace(/_/g, " ") ?? this._selectedTz,
-                                    this.openPicker === "timezone",
-                                    false,
-                                    "timezone",
-                                  )}
-                                  ${this.openPicker === "timezone"
-                                    ? this._timezonePicker()
-                                    : nothing}
+                                <div class="meta-item">
+                                  <span class="meta-icon">${TagIcon()}</span>
+                                  <div class="color-meta-block">
+                                    <div class="meta-label">Color</div>
+                                    <div class="swatches">
+                                      ${COLORS.map(
+                                        (c) =>
+                                          html`<button
+                                            class="swatch swatch-${c} ${
+                                              draft.activeColor === c
+                                                ? "active"
+                                                : ""
+                                            }"
+                                            @click=${() =>
+                                              schedulerStore
+                                                .getState()
+                                                .updateDraft({
+                                                  activeColor: c,
+                                                })}
+                                            aria-label="${c} color"
+                                          ></button>`,
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div class="meta-item">
+                                  <span class="meta-icon">${BellIcon()}</span>
+                                  <div>
+                                    <div class="meta-label">Reminder</div>
+                                    <div class="meta-value">15 min before</div>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-
-                            <!-- People -->
-                            <div class="form-section">
-                              <div class="section-label">People</div>
-                              <div class="form-group">
-                                <label>Participants</label>
-                                <div
-                                  class="participants-box ${this._shakeInput
-                                    ? "shake"
-                                    : ""}"
-                                  @click=${() =>
-                                    this.shadowRoot
-                                      ?.getElementById("participant-input")
-                                      ?.focus()}
-                                >
-                                  ${draft.participants.map((id) => {
-                                    const name = this._resolveResourceName(id);
-                                    const res =
-                                      schedulerStore.getState().resources[id];
-                                    return html` <span class="chip">
-                                      ${avatarHtml(name, res?.avatar)} ${name}
-                                      <button
-                                        class="chip-remove"
-                                        @click=${(e: Event) => {
-                                          e.stopPropagation();
-                                          this._removeParticipant(id);
-                                        }}
-                                      >
-                                        ${XIcon()}
-                                      </button>
-                                    </span>`;
-                                  })}
-                                  <input
-                                    id="participant-input"
-                                    class="participant-inline-input"
-                                    type="text"
-                                    placeholder="Add people…"
-                                    .value=${this.participantInput}
-                                    @input=${(e: Event) => {
-                                      this.participantInput = (
-                                        e.target as HTMLInputElement
-                                      ).value;
-                                      this.activeSuggestionIndex = -1;
-                                    }}
-                                    @keydown=${this._handleParticipantKey}
-                                  />
-                                  <span class="search-icon-wrap"
-                                    >${SearchIcon()}</span
-                                  >
-                                </div>
-
-                                <!-- Suggestions Dropdown -->
-                                ${this.participantInput.trim()
+                              ${
+                                this.eventId
                                   ? html`
-                                      <div class="suggestions-dropdown">
-                                        ${this._matchingSuggestions.length > 0
-                                          ? html`
-                                              <ul>
-                                                ${this._matchingSuggestions.map(
-                                                  (res, index) => html`
-                                                    <li
-                                                      class="suggestion-item ${index ===
-                                                      this.activeSuggestionIndex
-                                                        ? "active"
-                                                        : ""}"
-                                                      @mousedown=${(
-                                                        e: MouseEvent,
-                                                      ) => {
-                                                        e.preventDefault();
-                                                        this._selectSuggestion(
-                                                          res.id,
-                                                        );
-                                                      }}
-                                                      @mouseenter=${() => {
-                                                        this.activeSuggestionIndex =
-                                                          index;
-                                                      }}
-                                                    >
-                                                      ${avatarHtml(
-                                                        res.name,
-                                                        res.avatar,
-                                                      )}
-                                                      <div
-                                                        class="suggestion-info"
-                                                      >
-                                                        <div
-                                                          class="suggestion-name"
-                                                        >
-                                                          ${res.name}
-                                                        </div>
-                                                        <div
-                                                          class="suggestion-id"
-                                                        >
-                                                          ${res.id}
-                                                        </div>
-                                                      </div>
-                                                    </li>
-                                                  `,
-                                                )}
-                                              </ul>
-                                            `
-                                          : html`
-                                              <div class="suggestions-empty">
-                                                No matching resources found
-                                              </div>
-                                            `}
+                                      <div class="sidebar-footer">
+                                        <button
+                                          class="btn-delete"
+                                          @click=${this._onDeleteClick}
+                                        >
+                                          ${TrashIcon()} Delete Event
+                                        </button>
                                       </div>
                                     `
-                                  : nothing}
-                                ${this._participantsTouched &&
-                                (!draft.participants ||
-                                  draft.participants.length === 0)
-                                  ? html`<div
-                                      class="dt-invalid-notice"
-                                      style="margin-top: 6px;"
+                                  : nothing
+                              }
+                            </aside>
+
+                            <!-- ── Panel ───────────────────────────────────────────────────── -->
+                            <div class="panel">
+                              <div class="panel-header">
+                                <div class="panel-header-left">
+                                  <button
+                                    class="mobile-summary-btn"
+                                    @click=${() =>
+                                      (this.sidebarOpen = !this.sidebarOpen)}
+                                    aria-label="Toggle event summary"
+                                  >
+                                    <div
+                                      class="dot dot-${draft.activeColor}"
+                                    ></div>
+                                    <span class="mobile-summary-title"
+                                      >${draft.title || "Untitled"}</span
                                     >
-                                      <span>⚠</span>
-                                      <span
-                                        >At least one participant is
-                                        required.</span
-                                      >
-                                    </div>`
-                                  : nothing}
-                              </div>
-                            </div>
-
-                            <!-- Details -->
-                            <div class="form-section">
-                              <div class="section-label">Details</div>
-                              <div class="form-group">
-                                <label for="description">Description</label>
-                                <textarea
-                                  id="description"
-                                  rows="4"
-                                  .value=${draft.description}
-                                  @input=${(e: Event) =>
-                                    schedulerStore.getState().updateDraft({
-                                      description: (
-                                        e.target as HTMLTextAreaElement
-                                      ).value,
-                                    })}
-                                  placeholder="Add a description…"
-                                ></textarea>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div class="panel-footer">
-                            ${this.eventId
-                              ? html`<button
-                                  class="btn-delete btn-delete--footer"
-                                  @click=${this._onDeleteClick}
+                                    <span
+                                      class="chevron ${
+                                        this.sidebarOpen ? "chevron--up" : ""
+                                      }"
+                                      >${ChevronDownIcon()}</span
+                                    >
+                                  </button>
+                                  <span class="panel-heading"
+                                    >${
+                                      this.eventId
+                                        ? "Edit Event"
+                                        : "Create Event"
+                                    }</span
+                                  >
+                                </div>
+                                <button
+                                  class="close-btn"
+                                  @click=${() => this._onClose(true)}
+                                  aria-label="Close"
                                 >
-                                  ${TrashIcon()} Delete
-                                </button>`
-                              : nothing}
-                            <div class="footer-right">
-                              <button
-                                class="btn-cancel"
-                                @click=${this._handleCancel}
+                                  ${XIcon()}
+                                </button>
+                              </div>
+
+                              <!-- Mobile summary strip -->
+                              <div
+                                class="mobile-summary-panel ${
+                                  this.sidebarOpen
+                                    ? "mobile-summary-panel--open"
+                                    : ""
+                                }"
                               >
-                                Cancel
-                              </button>
-                              <button
-                                class="btn-save"
-                                ?disabled=${this._titleTouched &&
-                                this._participantsTouched &&
-                                invalid}
-                                @click=${this._handleSaveClick}
-                              >
-                                ${this.eventId ? "Save" : "Create"}
-                              </button>
+                                <div class="mobile-summary-grid">
+                                  <div class="msummary-item">
+                                    <span class="meta-label">Start</span>
+                                    <span class="meta-value"
+                                      >${formatDateShort(draft.startDate)}
+                                      ${
+                                        draft.allDay
+                                          ? ""
+                                          : formatTime(draft.startTime)
+                                      }</span
+                                    >
+                                  </div>
+                                  <div class="msummary-item">
+                                    <span class="meta-label">End</span>
+                                    <span class="meta-value"
+                                      >${formatDateShort(draft.endDate)}
+                                      ${
+                                        draft.allDay
+                                          ? ""
+                                          : formatTime(draft.endTime)
+                                      }</span
+                                    >
+                                  </div>
+                                  <div class="msummary-item">
+                                    <span class="meta-label">Participants</span>
+                                    <span class="meta-value"
+                                      >${draft.participants.length} people</span
+                                    >
+                                  </div>
+                                  ${
+                                    draft.recurrenceRule
+                                      ? html`
+                                          <div class="msummary-item">
+                                            <span class="meta-label"
+                                              >Repeat</span
+                                            >
+                                            <span class="meta-value"
+                                              >${formatRecurrence(
+                                                draft.recurrenceRule,
+                                              )}</span
+                                            >
+                                          </div>
+                                        `
+                                      : nothing
+                                  }
+                                  <div class="msummary-item">
+                                    <span class="meta-label">Color</span>
+                                    <div class="swatches swatches--sm">
+                                      ${COLORS.map(
+                                        (c) =>
+                                          html`<button
+                                            class="swatch swatch-${c} ${
+                                              draft.activeColor === c
+                                                ? "active"
+                                                : ""
+                                            }"
+                                            @click=${() =>
+                                              schedulerStore
+                                                .getState()
+                                                .updateDraft({
+                                                  activeColor: c,
+                                                })}
+                                          ></button>`,
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div class="panel-body">
+                                ${
+                                  this.error
+                                    ? html` <div class="error-alert">
+                                        <span class="error-icon">!</span>
+                                        <span class="error-message"
+                                          >${this.error}</span
+                                        >
+                                      </div>`
+                                    : nothing
+                                }
+
+                                <!-- Basic Info -->
+                                <div class="form-section">
+                                  <div class="section-label">Basic Info</div>
+                                  <div class="form-group">
+                                    <label for="event-title">Event Title</label>
+                                    <input
+                                      id="event-title"
+                                      type="text"
+                                      .value=${draft.title}
+                                      @input=${(e: Event) => {
+                                        this._titleTouched = true;
+                                        schedulerStore.getState().updateDraft({
+                                          title: (e.target as HTMLInputElement)
+                                            .value,
+                                        });
+                                      }}
+                                      @blur=${() => {
+                                        this._titleTouched = true;
+                                      }}
+                                      placeholder="Add a title…"
+                                    />
+                                    ${
+                                      this._titleTouched &&
+                                      (!draft.title || !draft.title.trim())
+                                        ? html`<div
+                                            class="dt-invalid-notice"
+                                            style="margin-top: 6px;"
+                                          >
+                                            <span>⚠</span>
+                                            <span
+                                              >Event Title is required.</span
+                                            >
+                                          </div>`
+                                        : nothing
+                                    }
+                                  </div>
+                                </div>
+
+                                <!-- Date & Time -->
+                                <div class="form-section">
+                                  <div class="section-label">
+                                    Date &amp; Time
+                                  </div>
+
+                                  <!-- Switches Row -->
+                                  <div class="toggle-row">
+                                    <div class="toggle-control">
+                                      <span
+                                        class="toggle-label"
+                                        id="all-day-label"
+                                        >All-day Event</span
+                                      >
+                                      <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked="${
+                                          draft.allDay ? "true" : "false"
+                                        }"
+                                        aria-labelledby="all-day-label"
+                                        class="switch-btn ${
+                                          draft.allDay
+                                            ? "switch-btn--active"
+                                            : ""
+                                        }"
+                                        @click=${this._toggleAllDay}
+                                      >
+                                        <span class="switch-slider"></span>
+                                      </button>
+                                    </div>
+                                    <div class="toggle-control">
+                                      <span
+                                        class="toggle-label"
+                                        id="repeat-label"
+                                        >Repeat Event</span
+                                      >
+                                      <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked="${
+                                          draft.recurrenceRule
+                                            ? "true"
+                                            : "false"
+                                        }"
+                                        aria-labelledby="repeat-label"
+                                        class="switch-btn ${
+                                          draft.recurrenceRule
+                                            ? "switch-btn--active"
+                                            : ""
+                                        }"
+                                        @click=${this._toggleRepeat}
+                                      >
+                                        <span class="switch-slider"></span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <!-- Recurrence Options -->
+                                  ${
+                                    draft.recurrenceRule
+                                      ? html`
+                                          <div class="recurrence-section">
+                                            <div class="dt-row-label">
+                                              Repeat Frequency
+                                            </div>
+                                            <div
+                                              class="recurrence-freq-selector"
+                                            >
+                                              ${[
+                                                "Daily",
+                                                "Weekly",
+                                                "Monthly",
+                                                "Yearly",
+                                              ].map(
+                                                (freq) => html`
+                                                  <button
+                                                    type="button"
+                                                    class="freq-pill ${
+                                                      this._recurrenceFreq ===
+                                                      freq
+                                                        ? "freq-pill--active"
+                                                        : ""
+                                                    }"
+                                                    @click=${() =>
+                                                      this._setRepeatFreq(
+                                                        freq as
+                                                          | "Daily"
+                                                          | "Weekly"
+                                                          | "Monthly"
+                                                          | "Yearly",
+                                                      )}
+                                                  >
+                                                    ${freq}
+                                                  </button>
+                                                `,
+                                              )}
+                                            </div>
+                                            <div
+                                              class="dt-row-label"
+                                              style="margin-top: 10px;"
+                                            >
+                                              Repeat Until
+                                            </div>
+                                            <div class="dt-row">
+                                              <div
+                                                class="dt-cell dt-cell--date"
+                                              >
+                                                ${this._triggerBtn(
+                                                  CalendarIcon(),
+                                                  this._recurrenceUntilDate
+                                                    ? formatDateShort(
+                                                        this
+                                                          ._recurrenceUntilDate,
+                                                      )
+                                                    : "Never Ends",
+                                                  this.openPicker ===
+                                                    "recurrenceUntil",
+                                                  false,
+                                                  "recurrenceUntil",
+                                                )}
+                                                ${
+                                                  this.openPicker ===
+                                                  "recurrenceUntil"
+                                                    ? this._calPicker(
+                                                        "recurrenceUntil",
+                                                        this
+                                                          ._recurrenceUntilDate,
+                                                        this.recurrenceCal,
+                                                        (d) =>
+                                                          this._navCal(
+                                                            "recurrenceUntil",
+                                                            d,
+                                                          ),
+                                                      )
+                                                    : nothing
+                                                }
+                                              </div>
+                                              ${
+                                                this._recurrenceUntilDate
+                                                  ? html`
+                                                      <button
+                                                        type="button"
+                                                        class="btn-clear-until"
+                                                        @click=${() => {
+                                                          this._recurrenceUntilDate =
+                                                            "";
+                                                          this._updateRecurrenceRule();
+                                                        }}
+                                                      >
+                                                        Clear End Date
+                                                      </button>
+                                                    `
+                                                  : nothing
+                                              }
+                                            </div>
+                                          </div>
+                                        `
+                                      : nothing
+                                  }
+
+                                  <!-- START -->
+                                  <div class="dt-row-label">Start</div>
+                                  <div
+                                    class="dt-row ${
+                                      draft.allDay ? "dt-row--all-day" : ""
+                                    }"
+                                  >
+                                    <!-- Start date trigger + dropdown -->
+                                    <div class="dt-cell dt-cell--date">
+                                      ${this._triggerBtn(
+                                        CalendarIcon(),
+                                        formatDateShort(draft.startDate),
+                                        this.openPicker === "startDate",
+                                        false,
+                                        "startDate",
+                                      )}
+                                      ${
+                                        this.openPicker === "startDate"
+                                          ? this._calPicker(
+                                              "start",
+                                              draft.startDate,
+                                              this.startCal,
+                                              (d) => this._navCal("start", d),
+                                            )
+                                          : nothing
+                                      }
+                                    </div>
+                                    <!-- Start time trigger + dropdown -->
+                                    ${
+                                      draft.allDay
+                                        ? nothing
+                                        : html`
+                                            <div class="dt-cell dt-cell--time">
+                                              ${this._triggerBtn(
+                                                ClockIcon(),
+                                                formatTime(draft.startTime),
+                                                this.openPicker === "startTime",
+                                                false,
+                                                "startTime",
+                                              )}
+                                              ${
+                                                this.openPicker === "startTime"
+                                                  ? this._timePicker(
+                                                      "start",
+                                                      draft.startTime,
+                                                    )
+                                                  : nothing
+                                              }
+                                            </div>
+                                          `
+                                    }
+                                  </div>
+
+                                  <!-- END -->
+                                  <div class="dt-row-label dt-row-label--end">
+                                    End
+                                  </div>
+                                  <div
+                                    class="dt-row ${
+                                      draft.allDay ? "dt-row--all-day" : ""
+                                    }"
+                                  >
+                                    <!-- End date trigger + dropdown -->
+                                    <div class="dt-cell dt-cell--date">
+                                      ${this._triggerBtn(
+                                        CalendarIcon(),
+                                        formatDateShort(draft.endDate),
+                                        this.openPicker === "endDate",
+                                        timeInvalid,
+                                        "endDate",
+                                      )}
+                                      ${
+                                        this.openPicker === "endDate"
+                                          ? this._calPicker(
+                                              "end",
+                                              draft.endDate,
+                                              this.endCal,
+                                              (d) => this._navCal("end", d),
+                                            )
+                                          : nothing
+                                      }
+                                    </div>
+                                    <!-- End time trigger + dropdown -->
+                                    ${
+                                      draft.allDay
+                                        ? nothing
+                                        : html`
+                                            <div class="dt-cell dt-cell--time">
+                                              ${this._triggerBtn(
+                                                ClockIcon(),
+                                                formatTime(draft.endTime),
+                                                this.openPicker === "endTime",
+                                                timeInvalid,
+                                                "endTime",
+                                              )}
+                                              ${
+                                                this.openPicker === "endTime"
+                                                  ? this._timePicker(
+                                                      "end",
+                                                      draft.endTime,
+                                                    )
+                                                  : nothing
+                                              }
+                                            </div>
+                                          `
+                                    }
+                                  </div>
+
+                                  <!-- Validation warning -->
+                                  ${
+                                    timeInvalid
+                                      ? html` <div class="dt-invalid-notice">
+                                          <span>⚠</span>
+                                          <span
+                                            >End must be after start. Please
+                                            adjust the date or time.</span
+                                          >
+                                        </div>`
+                                      : nothing
+                                  }
+
+                                  <!-- Conflict warning -->
+                                  ${
+                                    this._resourceConflict.hasConflict
+                                      ? html`<div
+                                          class="dt-conflict-warning ${
+                                            this.preventConflicts
+                                              ? "dt-conflict-warning--blocking"
+                                              : ""
+                                          }"
+                                        >
+                                          <span>⚠</span>
+                                          <span
+                                            >${this._resourceConflict.message}${
+                                              this.preventConflicts
+                                                ? " (Saving disabled due to schedule conflict)"
+                                                : ""
+                                            }</span
+                                          >
+                                        </div>`
+                                      : nothing
+                                  }
+
+                                  <!-- Timezone selector -->
+                                  <div class="dt-tz-row">
+                                    <div class="dt-row-label">Timezone</div>
+                                    <div class="dt-cell dt-cell--tz">
+                                      ${this._triggerBtn(
+                                        GlobeIcon(),
+                                        this._selectedTz
+                                          .split("/")
+                                          .pop()
+                                          ?.replace(/_/g, " ") ??
+                                          this._selectedTz,
+                                        this.openPicker === "timezone",
+                                        false,
+                                        "timezone",
+                                      )}
+                                      ${
+                                        this.openPicker === "timezone"
+                                          ? this._timezonePicker()
+                                          : nothing
+                                      }
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <!-- People -->
+                                <div class="form-section">
+                                  <div class="section-label">People</div>
+                                  <div class="form-group">
+                                    <label>Participants</label>
+                                    <div
+                                      class="participants-box ${
+                                        this._shakeInput ? "shake" : ""
+                                      }"
+                                      @click=${() =>
+                                        this.shadowRoot
+                                          ?.getElementById("participant-input")
+                                          ?.focus()}
+                                    >
+                                      ${draft.participants.map((id) => {
+                                        const name =
+                                          this._resolveResourceName(id);
+                                        const res =
+                                          schedulerStore.getState().resources[
+                                            id
+                                          ];
+                                        return html` <span class="chip">
+                                          ${avatarHtml(name, res?.avatar)}
+                                          ${name}
+                                          <button
+                                            class="chip-remove"
+                                            @click=${(e: Event) => {
+                                              e.stopPropagation();
+                                              this._removeParticipant(id);
+                                            }}
+                                          >
+                                            ${XIcon()}
+                                          </button>
+                                        </span>`;
+                                      })}
+                                      <input
+                                        id="participant-input"
+                                        class="participant-inline-input"
+                                        type="text"
+                                        placeholder="Add people…"
+                                        .value=${this.participantInput}
+                                        @input=${(e: Event) => {
+                                          this.participantInput = (
+                                            e.target as HTMLInputElement
+                                          ).value;
+                                          this.activeSuggestionIndex = -1;
+                                        }}
+                                        @keydown=${this._handleParticipantKey}
+                                      />
+                                      <span class="search-icon-wrap"
+                                        >${SearchIcon()}</span
+                                      >
+                                    </div>
+
+                                    <!-- Suggestions Dropdown -->
+                                    ${
+                                      this.participantInput.trim()
+                                        ? html`
+                                            <div class="suggestions-dropdown">
+                                              ${
+                                                this._matchingSuggestions
+                                                  .length > 0
+                                                  ? html`
+                                                      <ul>
+                                                        ${this._matchingSuggestions.map(
+                                                          (res, index) => html`
+                                                            <li
+                                                              class="suggestion-item ${
+                                                                index ===
+                                                                this
+                                                                  .activeSuggestionIndex
+                                                                  ? "active"
+                                                                  : ""
+                                                              }"
+                                                              @mousedown=${(
+                                                                e: MouseEvent,
+                                                              ) => {
+                                                                e.preventDefault();
+                                                                this._selectSuggestion(
+                                                                  res.id,
+                                                                );
+                                                              }}
+                                                              @mouseenter=${() => {
+                                                                this.activeSuggestionIndex =
+                                                                  index;
+                                                              }}
+                                                            >
+                                                              ${avatarHtml(
+                                                                res.name,
+                                                                res.avatar,
+                                                              )}
+                                                              <div
+                                                                class="suggestion-info"
+                                                              >
+                                                                <div
+                                                                  class="suggestion-name"
+                                                                >
+                                                                  ${res.name}
+                                                                </div>
+                                                                <div
+                                                                  class="suggestion-id"
+                                                                >
+                                                                  ${res.id}
+                                                                </div>
+                                                              </div>
+                                                            </li>
+                                                          `,
+                                                        )}
+                                                      </ul>
+                                                    `
+                                                  : html`
+                                                      <div
+                                                        class="suggestions-empty"
+                                                      >
+                                                        No matching resources
+                                                        found
+                                                      </div>
+                                                    `
+                                              }
+                                            </div>
+                                          `
+                                        : nothing
+                                    }
+                                    ${
+                                      this._participantsTouched &&
+                                      (!draft.participants ||
+                                        draft.participants.length === 0)
+                                        ? html`<div
+                                            class="dt-invalid-notice"
+                                            style="margin-top: 6px;"
+                                          >
+                                            <span>⚠</span>
+                                            <span
+                                              >At least one participant is
+                                              required.</span
+                                            >
+                                          </div>`
+                                        : nothing
+                                    }
+                                  </div>
+                                </div>
+
+                                <!-- Details -->
+                                <div class="form-section">
+                                  <div class="section-label">Details</div>
+                                  <div class="form-group">
+                                    <label for="description">Description</label>
+                                    <textarea
+                                      id="description"
+                                      rows="4"
+                                      .value=${draft.description}
+                                      @input=${(e: Event) =>
+                                        schedulerStore.getState().updateDraft({
+                                          description: (
+                                            e.target as HTMLTextAreaElement
+                                          ).value,
+                                        })}
+                                      placeholder="Add a description…"
+                                    ></textarea>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div class="panel-footer">
+                                ${
+                                  this.eventId
+                                    ? html`<button
+                                        class="btn-delete btn-delete--footer"
+                                        @click=${this._onDeleteClick}
+                                      >
+                                        ${TrashIcon()} Delete
+                                      </button>`
+                                    : nothing
+                                }
+                                <div class="footer-right">
+                                  <button
+                                    class="btn-cancel"
+                                    @click=${this._handleCancel}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    class="btn-save"
+                                    ?disabled=${
+                                      this._titleTouched &&
+                                      this._participantsTouched &&
+                                      invalid
+                                    }
+                                    @click=${this._handleSaveClick}
+                                  >
+                                    ${this.eventId ? "Save" : "Create"}
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      `}
-                </div>
-              `}
+                          `
+                    }
+                  </div>
+                `
+        }
       </div>
     `;
   }

@@ -238,11 +238,13 @@ export class JanusYearGrid extends LitElement {
           <div class="yg-day-number ${isToday ? "yg-day-number--today" : ""}">
             ${day}
           </div>
-          ${hasEvent
-            ? html`<div
-                class="yg-density-dot ${isToday ? "yg-density-dot--today" : ""}"
-              ></div>`
-            : nothing}
+          ${
+            hasEvent
+              ? html`<div
+                  class="yg-density-dot ${isToday ? "yg-density-dot--today" : ""}"
+                ></div>`
+              : nothing
+          }
         </div>
       `);
     }
@@ -250,9 +252,9 @@ export class JanusYearGrid extends LitElement {
     return html`
       <div class="yg-month-card">
         <div
-          class="yg-month-header ${isCurrentMonth
-            ? "yg-month-header--current"
-            : ""}"
+          class="yg-month-header ${
+            isCurrentMonth ? "yg-month-header--current" : ""
+          }"
         >
           ${MONTH_NAMES[monthIndex]}
         </div>

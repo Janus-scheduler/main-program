@@ -23,8 +23,7 @@ export type RemoteEventChange =
   | { type: "deleted"; id: string };
 
 export type QueuedMutation =
-  | { type: "update"; eventId: string }
-  | { type: "delete"; googleId: string };
+  { type: "update"; eventId: string } | { type: "delete"; googleId: string };
 
 export interface GoogleSyncManagerOptions {
   /**

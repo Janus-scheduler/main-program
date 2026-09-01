@@ -170,33 +170,39 @@ export class JanusTopbar extends LitElement {
           </button>
         </nav>
         <div class="tl-topbar__right">
-          ${this.hasConflict && this.isConflictsBannerDismissed
-            ? html`
-                <button
-                  class="tl-warning-badge"
-                  @click=${this._emitRestoreConflicts}
-                  title="Restore conflict warning banner"
-                >
-                  <span>⚠</span>
-                  <span>${this.conflictCount}</span>
-                </button>
-              `
-            : nothing}
-          ${this.zoomPercent !== 100
-            ? html`<span class="tl-zoom-badge"
-                >${this.zoomPercent}% · ${this.zoomUnit}</span
-              >`
-            : nothing}
+          ${
+            this.hasConflict && this.isConflictsBannerDismissed
+              ? html`
+                  <button
+                    class="tl-warning-badge"
+                    @click=${this._emitRestoreConflicts}
+                    title="Restore conflict warning banner"
+                  >
+                    <span>⚠</span>
+                    <span>${this.conflictCount}</span>
+                  </button>
+                `
+              : nothing
+          }
+          ${
+            this.zoomPercent !== 100
+              ? html`<span class="tl-zoom-badge"
+                  >${this.zoomPercent}% · ${this.zoomUnit}</span
+                >`
+              : nothing
+          }
           <button
-            class="tl-gcal-btn ${this.isGoogleCalendarConnected
-              ? "tl-gcal-btn--connected"
-              : ""}"
+            class="tl-gcal-btn ${
+              this.isGoogleCalendarConnected ? "tl-gcal-btn--connected" : ""
+            }"
             @click=${this._emitConnectCalendar}
           >
             ${CalendarIcon()}
-            ${this.isGoogleCalendarConnected
-              ? "Google Calendar Connected"
-              : "Connect Google Calendar"}
+            ${
+              this.isGoogleCalendarConnected
+                ? "Google Calendar Connected"
+                : "Connect Google Calendar"
+            }
           </button>
           <div class="tl-view-toggle">
             ${this.views.map(
@@ -211,27 +217,31 @@ export class JanusTopbar extends LitElement {
             )}
           </div>
 
-          ${this.canUndo
-            ? html`
-                <button
-                  class="tl-icon-btn"
-                  aria-label="Undo"
-                  data-tooltip="Undo last action (Cmd+Z)"
-                  @click=${this._emitUndo}
-                >
-                  ${UndoIcon()}
-                </button>
-              `
-            : nothing}
+          ${
+            this.canUndo
+              ? html`
+                  <button
+                    class="tl-icon-btn"
+                    aria-label="Undo"
+                    data-tooltip="Undo last action (Cmd+Z)"
+                    @click=${this._emitUndo}
+                  >
+                    ${UndoIcon()}
+                  </button>
+                `
+              : nothing
+          }
 
           <button
-            class="tl-icon-btn tl-draw-toggle ${this.allowCreate
-              ? "tl-draw-toggle--active"
-              : ""}"
+            class="tl-icon-btn tl-draw-toggle ${
+              this.allowCreate ? "tl-draw-toggle--active" : ""
+            }"
             aria-label="Toggle draw-to-create"
-            data-tooltip="${this.allowCreate
-              ? "Draw Event ON — click to disable"
-              : "Draw Event OFF — drag on empty space to create an event"}"
+            data-tooltip="${
+              this.allowCreate
+                ? "Draw Event ON — click to disable"
+                : "Draw Event OFF — drag on empty space to create an event"
+            }"
             @click=${this._emitToggleCreate}
           >
             ${PencilRulerIcon()}

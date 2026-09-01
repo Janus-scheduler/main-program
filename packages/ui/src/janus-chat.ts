@@ -301,17 +301,19 @@ export class JanusChat extends LitElement {
             @input=${this._onInput}
             @keydown=${this._onKeydown}
           />
-          ${this.showVoice
-            ? html`<button
-                class="icon-btn"
-                type="button"
-                aria-label="Voice input"
-                ?disabled=${this.disabled}
-                @click=${() => this._emit("chat-voice", {})}
-              >
-                ${MicIcon()}
-              </button>`
-            : nothing}
+          ${
+            this.showVoice
+              ? html`<button
+                  class="icon-btn"
+                  type="button"
+                  aria-label="Voice input"
+                  ?disabled=${this.disabled}
+                  @click=${() => this._emit("chat-voice", {})}
+                >
+                  ${MicIcon()}
+                </button>`
+              : nothing
+          }
           <button
             class="send"
             type="button"
@@ -332,20 +334,24 @@ export class JanusChat extends LitElement {
         <div class="header__badge">${SparkleIcon()}</div>
         <div class="header__titles">
           <div class="header__title">${this.heading}</div>
-          ${this.subheading
-            ? html`<div class="header__subtitle">${this.subheading}</div>`
-            : nothing}
+          ${
+            this.subheading
+              ? html`<div class="header__subtitle">${this.subheading}</div>`
+              : nothing
+          }
         </div>
-        ${this.showClose
-          ? html`<button
-              class="header__close"
-              type="button"
-              aria-label="Close chat"
-              @click=${() => this._emit("chat-close", {})}
-            >
-              ${CloseIcon()}
-            </button>`
-          : nothing}
+        ${
+          this.showClose
+            ? html`<button
+                class="header__close"
+                type="button"
+                aria-label="Close chat"
+                @click=${() => this._emit("chat-close", {})}
+              >
+                ${CloseIcon()}
+              </button>`
+            : nothing
+        }
       </div>
     `;
   }
@@ -417,111 +423,127 @@ export class JanusChat extends LitElement {
 
         return this._assistantRow(html`
           <div class="card card--warning">
-            ${m.lead
-              ? html`<div class="card__lead card__lead--recover">
-                  ${m.lead}
-                </div>`
-              : m.ack
-                ? html`<div class="card__lead">${m.ack}</div>`
-                : nothing}
-            ${m.chips && m.chips.length
-              ? html`<div class="chips">
-                  ${m.chips.map((chip) => this._renderChip(chip))}
-                </div>`
-              : nothing}
+            ${
+              m.lead
+                ? html`<div class="card__lead card__lead--recover">
+                    ${m.lead}
+                  </div>`
+                : m.ack
+                  ? html`<div class="card__lead">${m.ack}</div>`
+                  : nothing
+            }
+            ${
+              m.chips && m.chips.length
+                ? html`<div class="chips">
+                    ${m.chips.map((chip) => this._renderChip(chip))}
+                  </div>`
+                : nothing
+            }
             <div class="card__question">${m.question}</div>
             ${m.hint ? html`<div class="card__hint">${m.hint}</div>` : nothing}
-            ${m.searchable && !isAnswered
-              ? html`
-                  <div class="clarify-search">
-                    <input
-                      class="clarify-search__input"
-                      type="text"
-                      placeholder="🔍 Search rooms & people…"
-                      .value=${this._searchQueries[m.id] ?? ""}
-                      ?disabled=${isDisabled}
-                      @input=${(e: Event) => {
-                        const val = (e.target as HTMLInputElement).value;
-                        this._searchQueries = {
-                          ...this._searchQueries,
-                          [m.id]: val,
-                        };
-                      }}
-                    />
-                  </div>
-                `
-              : nothing}
-            ${m.multiselect && selectedSet.size > 0 && !isAnswered
-              ? html`
-                  <div class="clarify-selected-tags">
-                    ${Array.from(selectedSet).map((choiceId) => {
-                      const c = allChoices.find((ch) => ch.id === choiceId);
-                      return html`
-                        <span class="clarify-selected-tag">
-                          ${c?.label ?? choiceId}
-                          <button
-                            class="clarify-selected-tag__remove"
-                            type="button"
-                            ?disabled=${isDisabled}
-                            @click=${() => this._toggleChoice(m.id, choiceId)}
-                          >
-                            ×
-                          </button>
-                        </span>
-                      `;
-                    })}
-                  </div>
-                `
-              : nothing}
+            ${
+              m.searchable && !isAnswered
+                ? html`
+                    <div class="clarify-search">
+                      <input
+                        class="clarify-search__input"
+                        type="text"
+                        placeholder="🔍 Search rooms & people…"
+                        .value=${this._searchQueries[m.id] ?? ""}
+                        ?disabled=${isDisabled}
+                        @input=${(e: Event) => {
+                          const val = (e.target as HTMLInputElement).value;
+                          this._searchQueries = {
+                            ...this._searchQueries,
+                            [m.id]: val,
+                          };
+                        }}
+                      />
+                    </div>
+                  `
+                : nothing
+            }
+            ${
+              m.multiselect && selectedSet.size > 0 && !isAnswered
+                ? html`
+                    <div class="clarify-selected-tags">
+                      ${Array.from(selectedSet).map((choiceId) => {
+                        const c = allChoices.find((ch) => ch.id === choiceId);
+                        return html`
+                          <span class="clarify-selected-tag">
+                            ${c?.label ?? choiceId}
+                            <button
+                              class="clarify-selected-tag__remove"
+                              type="button"
+                              ?disabled=${isDisabled}
+                              @click=${() => this._toggleChoice(m.id, choiceId)}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        `;
+                      })}
+                    </div>
+                  `
+                : nothing
+            }
 
             <div
-              class="${allChoices.length > 6 || hasGroups
-                ? "clarify-scroll"
-                : "choices"}"
+              class="${
+                allChoices.length > 6 || hasGroups
+                  ? "clarify-scroll"
+                  : "choices"
+              }"
             >
-              ${hasGroups
-                ? Object.entries(groups).map(
-                    ([groupName, groupChoices]) => html`
-                      <div class="clarify-group-title">${groupName}</div>
-                      <div class="choices">
-                        ${groupChoices.map((c) =>
-                          this._renderChoiceButton(
-                            m,
-                            c,
-                            isDisabled,
-                            selectedSet,
-                          ),
-                        )}
-                      </div>
-                    `,
-                  )
-                : filteredChoices.map((c) =>
-                    this._renderChoiceButton(m, c, isDisabled, selectedSet),
-                  )}
+              ${
+                hasGroups
+                  ? Object.entries(groups).map(
+                      ([groupName, groupChoices]) => html`
+                        <div class="clarify-group-title">${groupName}</div>
+                        <div class="choices">
+                          ${groupChoices.map((c) =>
+                            this._renderChoiceButton(
+                              m,
+                              c,
+                              isDisabled,
+                              selectedSet,
+                            ),
+                          )}
+                        </div>
+                      `,
+                    )
+                  : filteredChoices.map((c) =>
+                      this._renderChoiceButton(m, c, isDisabled, selectedSet),
+                    )
+              }
             </div>
 
-            ${m.multiselect && !isAnswered
-              ? html`
-                  <div class="clarify-footer">
-                    <button
-                      class="btn btn--primary"
-                      type="button"
-                      ?disabled=${isDisabled || selectedCount === 0}
-                      @click=${() => this._submitMultiSelect(m)}
-                    >
-                      Confirm ${selectedCount > 0 ? `(${selectedCount})` : ""}
-                    </button>
-                  </div>
-                `
-              : nothing}
-            ${m.progress
-              ? html`<div
-                  class="progress"
-                  style="font-size: 0.8em; opacity: 0.7; margin-top: 8px;"
-                >
-                  ${m.progress}
-                </div>`
-              : nothing}
+            ${
+              m.multiselect && !isAnswered
+                ? html`
+                    <div class="clarify-footer">
+                      <button
+                        class="btn btn--primary"
+                        type="button"
+                        ?disabled=${isDisabled || selectedCount === 0}
+                        @click=${() => this._submitMultiSelect(m)}
+                      >
+                        Confirm ${selectedCount > 0 ? `(${selectedCount})` : ""}
+                      </button>
+                    </div>
+                  `
+                : nothing
+            }
+            ${
+              m.progress
+                ? html`<div
+                    class="progress"
+                    style="font-size: 0.8em; opacity: 0.7; margin-top: 8px;"
+                  >
+                    ${m.progress}
+                  </div>`
+                : nothing
+            }
           </div>
         `);
       }
@@ -533,30 +555,36 @@ export class JanusChat extends LitElement {
               ${CheckIcon(15, 2.4)}${m.title ?? "Scheduled"}
             </div>
             <div class="success__summary">${m.summary}</div>
-            ${m.canView !== false || m.canUndo
-              ? html`<div class="actions">
-                  ${m.canView !== false
-                    ? html`<button
-                        class="btn btn--small"
-                        type="button"
-                        @click=${() =>
-                          this._emit("chat-view", { messageId: m.id })}
-                      >
-                        View
-                      </button>`
-                    : nothing}
-                  ${m.canUndo
-                    ? html`<button
-                        class="btn btn--small btn--link"
-                        type="button"
-                        @click=${() =>
-                          this._emit("chat-undo", { messageId: m.id })}
-                      >
-                        Undo
-                      </button>`
-                    : nothing}
-                </div>`
-              : nothing}
+            ${
+              m.canView !== false || m.canUndo
+                ? html`<div class="actions">
+                    ${
+                      m.canView !== false
+                        ? html`<button
+                            class="btn btn--small"
+                            type="button"
+                            @click=${() =>
+                              this._emit("chat-view", { messageId: m.id })}
+                          >
+                            View
+                          </button>`
+                        : nothing
+                    }
+                    ${
+                      m.canUndo
+                        ? html`<button
+                            class="btn btn--small btn--link"
+                            type="button"
+                            @click=${() =>
+                              this._emit("chat-undo", { messageId: m.id })}
+                          >
+                            Undo
+                          </button>`
+                        : nothing
+                    }
+                  </div>`
+                : nothing
+            }
           </div>
         `);
     }
@@ -653,54 +681,66 @@ export class JanusChat extends LitElement {
           ${lead}${card.title ? html` <strong>${card.title}</strong>` : nothing}
         </div>
 
-        ${card.change
-          ? html`<div class="change">
-              <span class="change__from">${card.change.from}</span>
-              ${ArrowIcon()}
-              <span class="change__to">${card.change.to}</span>
-            </div>`
-          : nothing}
-        ${card.chips.length
-          ? html`<div class="chips">
-              ${card.chips.map((chip) => this._renderChip(chip))}
-            </div>`
-          : nothing}
-        ${card.warnings?.length
-          ? html`<ul class="warnings" aria-label="Warnings">
-              ${card.warnings.map(
-                (warning) =>
-                  html`<li class="warnings__item">
-                    <span class="warnings__icon" aria-hidden="true">!</span>
-                    <span>${warning}</span>
-                  </li>`,
-              )}
-            </ul>`
-          : nothing}
-        ${card.notes?.length
-          ? html`<ul class="notes" aria-label="Assumptions">
-              ${card.notes.map(
-                (note) => html`<li class="notes__item">${note}</li>`,
-              )}
-            </ul>`
-          : nothing}
-        ${typeof card.confidence === "number"
-          ? html`<div class="confidence">
-              <span
-                class="confidence__pill"
-                title=${card.confidenceLabel ??
-                "How sure the classifier is that this is the right kind of request. It says nothing about the details above."}
-              >
-                ${CheckIcon()}${Math.round(card.confidence * 100)}%
-                ${card.confidenceLabel ?? "sure what you meant"}
-              </span>
-            </div>`
-          : nothing}
+        ${
+          card.change
+            ? html`<div class="change">
+                <span class="change__from">${card.change.from}</span>
+                ${ArrowIcon()}
+                <span class="change__to">${card.change.to}</span>
+              </div>`
+            : nothing
+        }
+        ${
+          card.chips.length
+            ? html`<div class="chips">
+                ${card.chips.map((chip) => this._renderChip(chip))}
+              </div>`
+            : nothing
+        }
+        ${
+          card.warnings?.length
+            ? html`<ul class="warnings" aria-label="Warnings">
+                ${card.warnings.map(
+                  (warning) =>
+                    html`<li class="warnings__item">
+                      <span class="warnings__icon" aria-hidden="true">!</span>
+                      <span>${warning}</span>
+                    </li>`,
+                )}
+              </ul>`
+            : nothing
+        }
+        ${
+          card.notes?.length
+            ? html`<ul class="notes" aria-label="Assumptions">
+                ${card.notes.map(
+                  (note) => html`<li class="notes__item">${note}</li>`,
+                )}
+              </ul>`
+            : nothing
+        }
+        ${
+          typeof card.confidence === "number"
+            ? html`<div class="confidence">
+                <span
+                  class="confidence__pill"
+                  title=${
+                    card.confidenceLabel ??
+                    "How sure the classifier is that this is the right kind of request. It says nothing about the details above."
+                  }
+                >
+                  ${CheckIcon()}${Math.round(card.confidence * 100)}%
+                  ${card.confidenceLabel ?? "sure what you meant"}
+                </span>
+              </div>`
+            : nothing
+        }
 
         <div class="actions">
           <button
-            class="btn btn--primary ${card.destructive
-              ? "btn--destructive"
-              : ""}"
+            class="btn btn--primary ${
+              card.destructive ? "btn--destructive" : ""
+            }"
             type="button"
             ?disabled=${isDisabled}
             @click=${() => {
@@ -712,21 +752,23 @@ export class JanusChat extends LitElement {
           >
             ${card.confirmLabel ?? "Confirm & schedule"}
           </button>
-          ${card.editLabel === null
-            ? nothing
-            : html`<button
-                class="btn"
-                type="button"
-                ?disabled=${isDisabled}
-                @click=${() => {
-                  this._answeredMessageIds = new Set(
-                    this._answeredMessageIds,
-                  ).add(id);
-                  this._emit("chat-edit", { messageId: id });
-                }}
-              >
-                ${card.editLabel ?? "Edit"}
-              </button>`}
+          ${
+            card.editLabel === null
+              ? nothing
+              : html`<button
+                  class="btn"
+                  type="button"
+                  ?disabled=${isDisabled}
+                  @click=${() => {
+                    this._answeredMessageIds = new Set(
+                      this._answeredMessageIds,
+                    ).add(id);
+                    this._emit("chat-edit", { messageId: id });
+                  }}
+                >
+                  ${card.editLabel ?? "Edit"}
+                </button>`
+          }
         </div>
       </div>
     `;
@@ -770,9 +812,11 @@ export class JanusChat extends LitElement {
             >
               <span class="suggestion__icon">${icon(14)}</span>
               <span class="suggestion__label">${s.label}</span>
-              ${s.badge
-                ? html`<span class="suggestion__badge">${s.badge}</span>`
-                : nothing}
+              ${
+                s.badge
+                  ? html`<span class="suggestion__badge">${s.badge}</span>`
+                  : nothing
+              }
             </button>
           `;
         })}
