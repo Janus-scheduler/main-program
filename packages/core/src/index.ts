@@ -37,6 +37,7 @@ export {
 export { expandEvents } from "./utils/recurrence";
 export {
   computeTimelineConflicts,
+  computeSingleResourceConflicts,
   checkSlotConflict,
   checkDraftConflict,
 } from "./utils/conflict";

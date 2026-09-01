@@ -263,6 +263,7 @@ const _Timeline = createComponent({
     onViewChange: "view-change",
     onNavChange: "nav-change",
     onConflictDetected: "conflict-detected",
+    onCollapsedResourcesChange: "collapsed-resources-change",
   },
 });
 
@@ -275,6 +276,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   allowCreate?: boolean;
   showFab?: boolean;
   preventConflicts?: boolean;
+  collapsedResources?: boolean;
   timezone?: string;
   onEventClick?: (detail: TimelineEvent) => void;
   onEventMove?: (detail: EventMoveDetail) => void;
@@ -283,6 +285,7 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
   onAddEvent?: () => void;
   onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
+  onCollapsedResourcesChange?: (detail: { collapsed: boolean }) => void;
   onConflictDetected?: (detail: {
     message: string;
     action: string;
@@ -338,6 +341,12 @@ export const Timeline = React.forwardRef<JanusTimelineWC, TimelineProps>(
         ? (e: globalThis.Event) =>
             props.onNavChange!(
               (e as CustomEvent<Record<string, unknown>>).detail,
+            )
+        : undefined,
+      onCollapsedResourcesChange: props.onCollapsedResourcesChange
+        ? (e: globalThis.Event) =>
+            props.onCollapsedResourcesChange!(
+              (e as CustomEvent<{ collapsed: boolean }>).detail,
             )
         : undefined,
     });

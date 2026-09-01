@@ -7,7 +7,7 @@ import {
   toFakeLocalDate,
   getBrowserTimezone,
   expandEvents,
-  computeTimelineConflicts,
+  computeSingleResourceConflicts,
   checkSlotConflict,
   type ConflictResource,
   type SchedulerStore,
@@ -59,6 +59,16 @@ import {
 } from "./timeline-zoom";
 import { TimelineDragController, ResourceLayout } from "./timeline-drag";
 
+interface VirtualRowItem {
+  type: "group" | "resource";
+  y: number;
+  height: number;
+  label?: string;
+  resource?: TimelineResource;
+  trackCount?: number;
+  eventTracks?: Map<string, number>;
+}
+
 /** Shared empty result for the no-recurring-events fast path in _syncFromStore. */
 const EMPTY_EVENT_LIST: ReturnType<typeof expandEvents> = [];
 
@@ -104,6 +114,8 @@ export class JanusTimeline extends LitElement {
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
   @property({ type: Boolean, attribute: "prevent-conflicts" })
   preventConflicts = true;
+  @property({ type: Boolean, reflect: true, attribute: "collapsed-resources" })
+  collapsedResources = false;
 
   private get _activeTimezone(): string {
     return (
@@ -125,6 +137,14 @@ export class JanusTimeline extends LitElement {
   private _confLastResources: TimelineResource[] | null = null;
   private _confLastTz = "";
   private _confLastPrevent: boolean | null = null;
+  private _resourceConflictMap = new Map<
+    string,
+    {
+      eventsRef: TimelineEvent[];
+      conflictingEventIds: Set<string>;
+      messages: string[];
+    }
+  >();
   @state() private _cachedConflicts = {
     hasConflict: false,
     messages: [] as string[],
@@ -172,10 +192,7 @@ export class JanusTimeline extends LitElement {
   /** Identifies the latest centering attempt so stale retries can bail out. */
   private readonly _centerToken = 0;
 
-  private _isScrollingGrid = false;
-  private _isScrollingRes = false;
-  private _rafGridScroll: number | null = null;
-  private _rafResScroll: number | null = null;
+  private _isSyncingScroll = false;
 
   @state() private _scrollLeft = 0;
   @state() private _scrollTop = 0;
@@ -191,6 +208,19 @@ export class JanusTimeline extends LitElement {
   private _lastEventsRef: SchedulerStore["events"] | null = null;
   private _lastResourcesRef: SchedulerStore["resources"] | null = null;
   private _lastTz = "";
+
+  private _lastEventsMap = new Map<string, CoreEvent>();
+  private _rawEventsByResource = new Map<string, (CoreEvent | EventData)[]>();
+  private _coreResourcesMap = new Map<string, Resource>();
+  private _resourceMapById = new Map<string, TimelineResource>();
+
+  private _cachedVirtualRows: VirtualRowItem[] = [];
+  private _cachedResourceLayout: ResourceLayout[] = [];
+  private _cachedTotalRowContentHeight = 0;
+  private _layoutLastResources: TimelineResource[] | null = null;
+  private _layoutLastTrackMap: Map<string, unknown> | null = null;
+
+  private _activeConflictingIds = new Set<string>();
 
   /**
    * Derived-view-model caches: `_vmCache` by a length-prefixed
@@ -247,8 +277,6 @@ export class JanusTimeline extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._unsubStore) this._unsubStore();
-    if (this._rafGridScroll !== null) cancelAnimationFrame(this._rafGridScroll);
-    if (this._rafResScroll !== null) cancelAnimationFrame(this._rafResScroll);
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
     }
@@ -262,6 +290,7 @@ export class JanusTimeline extends LitElement {
     }
     if (this._activeDragUpHandler) {
       document.removeEventListener("pointerup", this._activeDragUpHandler);
+      document.removeEventListener("pointercancel", this._activeDragUpHandler);
       this._activeDragUpHandler = null;
     }
     this._drag.cancel();
@@ -316,7 +345,7 @@ export class JanusTimeline extends LitElement {
     }
 
     const resource = targetResourceId
-      ? this.resources.find((r) => r.id === targetResourceId)
+      ? this._resourceMapById.get(targetResourceId)
       : null;
     const hasDragConflict = resource
       ? checkSlotConflict(resource.events, ghostStartMs, ghostEndMs, eventId)
@@ -499,12 +528,12 @@ export class JanusTimeline extends LitElement {
     vmCount: number,
     resourceCount: number,
   ): void {
-    if (this._vmCache.size !== vmCount) {
+    if (this._vmCache.size > vmCount * 1.5) {
       for (const [k, v] of this._vmCache) {
         if (v.gen !== this._syncGen) this._vmCache.delete(k);
       }
     }
-    if (this._rowCache.size !== resourceCount) {
+    if (this._rowCache.size > resourceCount * 1.5) {
       for (const [k, v] of this._rowCache) {
         if (v.gen !== this._syncGen) this._rowCache.delete(k);
       }
@@ -519,6 +548,73 @@ export class JanusTimeline extends LitElement {
     return false;
   }
 
+  private _buildSingleResource(
+    res: Resource,
+    resEventsRaw: (CoreEvent | EventData)[],
+    tz: string,
+    typeConfig: Record<string, unknown> | undefined,
+    groupLabel: string | undefined,
+  ): {
+    resource: TimelineResource;
+    track: { trackCount: number; eventTracks: Map<string, number> };
+    vmCount: number;
+  } {
+    const prevRow = this._rowCache.get(res.id);
+    const processResult = this._processResourceEvents(
+      res,
+      resEventsRaw,
+      tz,
+      prevRow?.raw,
+    );
+    const { resEvents } = processResult;
+
+    const type = res.type || "person";
+    const avatarSrc = res.avatar ?? "";
+    const subtitleSrc =
+      res.subtitle ||
+      (typeConfig?.subtitle as string) ||
+      type.charAt(0).toUpperCase() + type.slice(1);
+
+    const sorted = resEvents.slice().sort((a, b) => a.startMs - b.startMs);
+    const track = this._computeEventTracks(sorted);
+
+    let avatarType: "initials" | "icon" | "image" = "initials";
+    let avatarIcon: string | undefined = undefined;
+
+    if (typeConfig?.icon) {
+      avatarType = "icon";
+      avatarIcon = typeConfig.icon as string;
+    }
+    if (res.avatar) {
+      avatarType = "image";
+    }
+
+    const resource: TimelineResource = {
+      id: res.id,
+      name: res.name,
+      subtitle: subtitleSrc,
+      avatarType,
+      avatarIcon,
+      avatar: res.avatar,
+      events: sorted,
+      groupLabel,
+    };
+
+    this._rowCache.set(res.id, {
+      raw: resEvents,
+      name: res.name,
+      type,
+      avatar: avatarSrc,
+      subtitle: subtitleSrc,
+      groupLabel,
+      resource,
+      track,
+      gen: this._syncGen,
+    });
+
+    return { resource, track, vmCount: processResult.vmCount };
+  }
+
   private _syncFromStore(state: SchedulerStore) {
     const tz = this._activeTimezone;
 
@@ -530,133 +626,198 @@ export class JanusTimeline extends LitElement {
       return;
     }
     const previousTz = this._lastTz;
-    this._lastEventsRef = state.events;
-    this._lastResourcesRef = state.resources;
-    this._lastTz = tz;
+    const isInitialOrStructureChange =
+      this._lastEventsRef === null ||
+      state.resources !== this._lastResourcesRef ||
+      tz !== previousTz;
 
-    if (tz !== previousTz) {
-      this._vmCache.clear();
-      this._rowCache.clear();
-    }
+    this._lastTz = tz;
     this._syncGen++;
 
-    const newResources: TimelineResource[] = [];
-    const rawEvents = Object.values(state.events);
-    const centerMs = this._viewStartMs || Date.now();
+    if (isInitialOrStructureChange) {
+      this._lastEventsRef = state.events;
+      this._lastResourcesRef = state.resources;
+      if (tz !== previousTz) {
+        this._vmCache.clear();
+        this._rowCache.clear();
+      }
 
-    const occurrences = this._expandOccurrences(rawEvents, centerMs);
-    const coreResources = Object.values(state.resources);
+      this._lastEventsMap.clear();
+      for (const id in state.events) {
+        this._lastEventsMap.set(id, state.events[id]);
+      }
+
+      const rawEvents = Object.values(state.events);
+      const centerMs = this._getVisibleCenterMs();
+      const occurrences = this._expandOccurrences(rawEvents, centerMs);
+      const coreResources = Object.values(state.resources);
+      const config = this.resourceTypeConfig || DEFAULT_CONFIG;
+
+      coreResources.sort((a, b) => {
+        const orderA = config[a.type || "person"]?.order ?? 99;
+        const orderB = config[b.type || "person"]?.order ?? 99;
+        return orderA - orderB;
+      });
+
+      this._coreResourcesMap.clear();
+      for (const r of coreResources) {
+        this._coreResourcesMap.set(r.id, r);
+      }
+
+      const eventsByResource = this._groupEventsByResource(
+        rawEvents,
+        occurrences,
+      );
+      this._rawEventsByResource = eventsByResource;
+
+      let currentGroupType = "";
+      const newTrackMap = new Map<
+        string,
+        { trackCount: number; eventTracks: Map<string, number> }
+      >();
+      const newResources: TimelineResource[] = [];
+      this._resourceMapById.clear();
+      let vmCount = 0;
+
+      for (const res of coreResources) {
+        const resEventsRaw = eventsByResource.get(res.id) || [];
+        const type = res.type || "person";
+        const typeConfig = config[type];
+        const typeLabel = typeConfig?.label || type.toUpperCase();
+
+        let groupLabel: string | undefined = undefined;
+        if (type !== currentGroupType) {
+          currentGroupType = type;
+          groupLabel = typeLabel;
+        }
+
+        const {
+          resource,
+          track,
+          vmCount: c,
+        } = this._buildSingleResource(
+          res,
+          resEventsRaw,
+          tz,
+          typeConfig,
+          groupLabel,
+        );
+        vmCount += c;
+        newTrackMap.set(res.id, track);
+        newResources.push(resource);
+        this._resourceMapById.set(res.id, resource);
+      }
+
+      this._evictStaleCacheEntries(vmCount, coreResources.length);
+      this._cachedTrackMap = newTrackMap;
+      this.resources = newResources;
+      return;
+    }
+
+    // Fast Incremental Sync: state.resources and tz are unchanged; only events changed
+    const dirtyResourceIds = new Set<string>();
+    const currentEvents = state.events;
+    const lastMap = this._lastEventsMap;
+
+    for (const id in currentEvents) {
+      const cur = currentEvents[id];
+      const prev = lastMap.get(id);
+      if (prev !== cur) {
+        if (prev) {
+          const pIds =
+            prev.resourceIds || (prev.resourceId ? [prev.resourceId] : []);
+          for (const rid of pIds) {
+            const arr = this._rawEventsByResource.get(rid);
+            if (arr) {
+              this._rawEventsByResource.set(
+                rid,
+                arr.filter(
+                  (e) => e.id !== id && !e.id.startsWith(`${id}_occ_`),
+                ),
+              );
+            }
+            dirtyResourceIds.add(rid);
+          }
+        }
+        if (cur) {
+          const cIds =
+            cur.resourceIds || (cur.resourceId ? [cur.resourceId] : []);
+          let occs: (CoreEvent | EventData)[] = [cur];
+          if (cur.recurrenceRule) {
+            const centerMs = this._getVisibleCenterMs();
+            occs = this._expandOccurrences([cur], centerMs);
+          }
+          for (const rid of cIds) {
+            const arr = this._rawEventsByResource.get(rid) || [];
+            arr.push(...occs);
+            this._rawEventsByResource.set(rid, arr);
+            dirtyResourceIds.add(rid);
+          }
+        }
+        lastMap.set(id, cur);
+      }
+    }
+
+    for (const [id, prev] of lastMap) {
+      if (!currentEvents[id]) {
+        const pIds =
+          prev.resourceIds || (prev.resourceId ? [prev.resourceId] : []);
+        for (const rid of pIds) {
+          const arr = this._rawEventsByResource.get(rid);
+          if (arr) {
+            this._rawEventsByResource.set(
+              rid,
+              arr.filter((e) => e.id !== id && !e.id.startsWith(`${id}_occ_`)),
+            );
+          }
+          dirtyResourceIds.add(rid);
+        }
+        lastMap.delete(id);
+      }
+    }
+
+    this._lastEventsRef = state.events;
+
+    if (dirtyResourceIds.size === 0) return;
 
     const config = this.resourceTypeConfig || DEFAULT_CONFIG;
-
-    coreResources.sort((a, b) => {
-      const orderA = config[a.type || "person"]?.order ?? 99;
-      const orderB = config[b.type || "person"]?.order ?? 99;
-      return orderA - orderB;
-    });
-
-    let currentGroupType = "";
-    const newTrackMap = new Map<
-      string,
-      { trackCount: number; eventTracks: Map<string, number> }
-    >();
-
-    const eventsByResource = this._groupEventsByResource(
-      rawEvents,
-      occurrences,
-    );
-
+    const newTrackMap = new Map(this._cachedTrackMap);
     let vmCount = 0;
 
-    for (const res of coreResources) {
-      const resEventsRaw = eventsByResource.get(res.id) || [];
-      const prevRow = this._rowCache.get(res.id);
+    for (const rid of dirtyResourceIds) {
+      const coreRes = this._coreResourcesMap.get(rid);
+      if (!coreRes) continue;
+      const type = coreRes.type || "person";
+      const typeConfig = config[type];
+      const prevRow = this._rowCache.get(rid);
+      const groupLabel = prevRow?.groupLabel;
 
-      const processResult = this._processResourceEvents(
-        res,
-        resEventsRaw,
-        tz,
-        prevRow?.raw,
-      );
-      const { resEvents, eventsChanged } = processResult;
-      vmCount += processResult.vmCount;
-
-      const type = res.type || "person";
-      const typeConfig = (this.resourceTypeConfig || DEFAULT_CONFIG)[type];
-      const typeLabel = typeConfig?.label || type.toUpperCase();
-
-      let groupLabel: string | undefined = undefined;
-      if (type !== currentGroupType) {
-        currentGroupType = type;
-        groupLabel = typeLabel;
-      }
-      const avatarSrc = res.avatar ?? "";
-      const subtitleSrc =
-        res.subtitle ||
-        typeConfig?.subtitle ||
-        type.charAt(0).toUpperCase() + type.slice(1);
-
-      if (
-        !eventsChanged &&
-        prevRow?.name === res.name &&
-        prevRow.type === type &&
-        prevRow.avatar === avatarSrc &&
-        prevRow.groupLabel === groupLabel &&
-        prevRow.subtitle === subtitleSrc
-      ) {
-        prevRow.gen = this._syncGen;
-        newResources.push(prevRow.resource);
-        newTrackMap.set(res.id, prevRow.track);
-        continue;
-      }
-
-      const sorted = resEvents.slice().sort((a, b) => a.startMs - b.startMs);
-      const track = this._computeEventTracks(sorted);
-      newTrackMap.set(res.id, track);
-
-      let avatarType: "initials" | "icon" | "image" = "initials";
-      let avatarIcon: string | undefined = undefined;
-
-      if (typeConfig?.icon) {
-        avatarType = "icon";
-        avatarIcon = typeConfig.icon;
-      }
-
-      if (res.avatar) {
-        avatarType = "image";
-      }
-
-      const resource: TimelineResource = {
-        id: res.id,
-        name: res.name,
-        subtitle: subtitleSrc,
-        avatarType,
-        avatarIcon,
-        avatar: res.avatar,
-        events: sorted,
-        groupLabel,
-      };
-
-      newResources.push(resource);
-      this._rowCache.set(res.id, {
-        raw: resEvents,
-        name: res.name,
-        type,
-        avatar: avatarSrc,
-        subtitle: subtitleSrc,
-        groupLabel,
+      const rawList = this._rawEventsByResource.get(rid) || [];
+      const {
         resource,
         track,
-        gen: this._syncGen,
-      });
+        vmCount: c,
+      } = this._buildSingleResource(
+        coreRes,
+        rawList,
+        tz,
+        typeConfig,
+        groupLabel,
+      );
+      vmCount += c;
+      newTrackMap.set(rid, track);
+      this._resourceMapById.set(rid, resource);
     }
 
-    this._evictStaleCacheEntries(vmCount, coreResources.length);
+    const newResources = this.resources
+      .map((r) =>
+        dirtyResourceIds.has(r.id) ? this._resourceMapById.get(r.id) : r,
+      )
+      .filter((r): r is TimelineResource => r !== undefined);
+
+    this._evictStaleCacheEntries(vmCount, this._coreResourcesMap.size);
     this._cachedTrackMap = newTrackMap;
-
-    if (this._hasResourceListChanged(newResources) && newResources.length > 0) {
-      this.resources = newResources;
-    }
+    this.resources = newResources;
   }
 
   willUpdate(changedProperties: Map<string, unknown>) {
@@ -668,6 +829,8 @@ export class JanusTimeline extends LitElement {
     ) {
       this._vmCache.clear();
       this._rowCache.clear();
+      this._rawEventsByResource.clear();
+      this._lastEventsMap.clear();
       this._lastEventsRef = null;
       this._lastResourcesRef = null;
       this._syncFromStore(schedulerStore.getState());
@@ -683,10 +846,13 @@ export class JanusTimeline extends LitElement {
     // `resources` identity is a sound signal because _syncFromStore reassigns it
     // if and only if something visible changed, and never mutates it in place.
     const tz = this._activeTimezone;
+    const tzChanged = tz !== this._confLastTz;
+    const preventChanged = this.preventConflicts !== this._confLastPrevent;
+
     if (
       this.resources === this._confLastResources &&
-      tz === this._confLastTz &&
-      this.preventConflicts === this._confLastPrevent
+      !tzChanged &&
+      !preventChanged
     ) {
       return;
     }
@@ -694,12 +860,77 @@ export class JanusTimeline extends LitElement {
     this._confLastTz = tz;
     this._confLastPrevent = this.preventConflicts;
 
-    const conflictResources = this.resources as unknown as ConflictResource[];
-    this._cachedConflicts = computeTimelineConflicts(conflictResources, tz);
+    if (tzChanged) {
+      this._resourceConflictMap.clear();
+      this._activeConflictingIds.clear();
+    }
 
-    const currentIdsKey = Array.from(this._cachedConflicts.conflictingEventIds)
-      .sort((a, b) => a.localeCompare(b))
-      .join(",");
+    const currentResIds = new Set<string>();
+
+    for (const res of this.resources) {
+      currentResIds.add(res.id);
+      let cached = this._resourceConflictMap.get(res.id);
+      if (!cached || cached.eventsRef !== res.events) {
+        if (cached) {
+          for (const oldId of cached.conflictingEventIds) {
+            this._activeConflictingIds.delete(oldId);
+          }
+        }
+        const conflictRes: ConflictResource = {
+          id: res.id,
+          name: res.name,
+          events: res.events,
+        };
+        const singleResult = computeSingleResourceConflicts(conflictRes, tz);
+        cached = {
+          eventsRef: res.events,
+          conflictingEventIds: singleResult.conflictingEventIds,
+          messages: singleResult.messages,
+        };
+        this._resourceConflictMap.set(res.id, cached);
+        for (const newId of cached.conflictingEventIds) {
+          this._activeConflictingIds.add(newId);
+        }
+      }
+    }
+
+    if (this._resourceConflictMap.size > currentResIds.size) {
+      for (const [k, v] of this._resourceConflictMap) {
+        if (!currentResIds.has(k)) {
+          for (const id of v.conflictingEventIds) {
+            this._activeConflictingIds.delete(id);
+          }
+          this._resourceConflictMap.delete(k);
+        }
+      }
+    }
+
+    const allMessages: string[] = [];
+    if (this._activeConflictingIds.size > 0) {
+      for (const cached of this._resourceConflictMap.values()) {
+        for (const msg of cached.messages) {
+          if (allMessages.length < 50) {
+            allMessages.push(msg);
+          } else {
+            break;
+          }
+        }
+        if (allMessages.length >= 50) break;
+      }
+    }
+
+    this._cachedConflicts = {
+      hasConflict: this._activeConflictingIds.size > 0,
+      messages: allMessages,
+      conflictingEventIds: this._activeConflictingIds,
+    };
+
+    const currentIdsKey =
+      this._activeConflictingIds.size === 0
+        ? ""
+        : Array.from(this._activeConflictingIds)
+            .sort((a, b) => a.localeCompare(b))
+            .join(",");
     if (currentIdsKey !== this._lastConflictIdsKey) {
       this._isConflictsBannerDismissed = false;
       this._lastConflictIdsKey = currentIdsKey;
@@ -729,11 +960,23 @@ export class JanusTimeline extends LitElement {
       this._resizeObserver = new ResizeObserver((entries) => {
         for (const entry of entries) {
           const w = entry.contentRect.width;
+          const h = entry.contentRect.height;
+          let changed = false;
+          if (w > 0 && w !== this._viewportWidth) {
+            this._viewportWidth = w;
+            changed = true;
+          }
+          if (h > 0 && h !== this._viewportHeight) {
+            this._viewportHeight = h;
+            changed = true;
+          }
           if (w > 0) {
             if (this._pendingCenterMs !== null) {
               const target = this._pendingCenterMs;
               this._pendingCenterMs = null;
               this._initializeView(target);
+            } else if (changed) {
+              this.requestUpdate();
             }
           }
         }
@@ -790,23 +1033,11 @@ export class JanusTimeline extends LitElement {
   private _onGridScroll() {
     if (!this.gridScrollRef) return;
 
-    // Sync vertical scroll between resource column and time grid
-    if (this.resColRef && this.gridScrollRef) {
-      if (!this._isScrollingRes) {
-        this._isScrollingGrid = true;
-        if (
-          Math.abs(this.resColRef.scrollTop - this.gridScrollRef.scrollTop) >
-          0.5
-        ) {
-          this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
-        }
-        if (this._rafGridScroll !== null)
-          cancelAnimationFrame(this._rafGridScroll);
-        this._rafGridScroll = requestAnimationFrame(() => {
-          this._isScrollingGrid = false;
-          this._rafGridScroll = null;
-        });
-      }
+    // Sync vertical scroll between resource column and time grid without reciprocal feedback
+    if (this.resColRef && !this._isSyncingScroll) {
+      this._isSyncingScroll = true;
+      this.resColRef.scrollTop = this.gridScrollRef.scrollTop;
+      this._isSyncingScroll = false;
     }
 
     if (this._scrollLeft !== this.gridScrollRef.scrollLeft) {
@@ -814,14 +1045,6 @@ export class JanusTimeline extends LitElement {
     }
     if (this._scrollTop !== this.gridScrollRef.scrollTop) {
       this._scrollTop = this.gridScrollRef.scrollTop;
-    }
-    const cw = this.gridScrollRef.clientWidth;
-    const ch = this.gridScrollRef.clientHeight;
-    if (cw && this._viewportWidth !== cw) {
-      this._viewportWidth = cw;
-    }
-    if (ch && this._viewportHeight !== ch) {
-      this._viewportHeight = ch;
     }
 
     // Skip re-centering during programmatic scroll adjustments
@@ -831,7 +1054,7 @@ export class JanusTimeline extends LitElement {
     // Skipped until the initial centering lands — see _hasCentered.
     if (this._hasCentered) {
       const sl = this.gridScrollRef.scrollLeft;
-      const maxScroll = this._totalWidth - cw;
+      const maxScroll = this._totalWidth - this._viewportWidth;
 
       // If within 15% of either edge, re-center
       const edgeThreshold = maxScroll * 0.15;
@@ -860,22 +1083,11 @@ export class JanusTimeline extends LitElement {
   }
 
   private _onResScroll() {
-    if (this.resColRef && this.gridScrollRef) {
-      if (!this._isScrollingGrid) {
-        this._isScrollingRes = true;
-        if (
-          Math.abs(this.gridScrollRef.scrollTop - this.resColRef.scrollTop) >
-          0.5
-        ) {
-          this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
-        }
-        if (this._rafResScroll !== null)
-          cancelAnimationFrame(this._rafResScroll);
-        this._rafResScroll = requestAnimationFrame(() => {
-          this._isScrollingRes = false;
-          this._rafResScroll = null;
-        });
-      }
+    if (!this.resColRef) return;
+    if (this.gridScrollRef && !this._isSyncingScroll) {
+      this._isSyncingScroll = true;
+      this.gridScrollRef.scrollTop = this.resColRef.scrollTop;
+      this._isSyncingScroll = false;
     }
   }
 
@@ -978,6 +1190,17 @@ export class JanusTimeline extends LitElement {
     this.dispatchEvent(
       new CustomEvent("allow-create-change", {
         detail: { allowCreate: this.allowCreate },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  public toggleCollapseResources() {
+    this.collapsedResources = !this.collapsedResources;
+    this.dispatchEvent(
+      new CustomEvent("collapsed-resources-change", {
+        detail: { collapsed: this.collapsedResources },
         bubbles: true,
         composed: true,
       }),
@@ -1100,7 +1323,7 @@ export class JanusTimeline extends LitElement {
       const startMs = new Date(newStartTime).getTime();
       const endMs = new Date(newEndTime).getTime();
 
-      const resource = this.resources.find((r) => r.id === newResourceId);
+      const resource = this._resourceMapById.get(newResourceId);
       if (resource) {
         hasConflict = checkSlotConflict(
           resource.events,
@@ -1179,22 +1402,30 @@ export class JanusTimeline extends LitElement {
   private _addDragUpListener() {
     if (this._activeDragUpHandler) {
       document.removeEventListener("pointerup", this._activeDragUpHandler);
+      document.removeEventListener("pointercancel", this._activeDragUpHandler);
       this._activeDragUpHandler = null;
     }
-    const handler = (_e: PointerEvent) => {
+    const handler = (e: PointerEvent) => {
       document.removeEventListener("pointerup", handler);
+      document.removeEventListener("pointercancel", handler);
       if (this._activeDragUpHandler === handler) {
         this._activeDragUpHandler = null;
+      }
+      if (e.type === "pointercancel") {
+        this._drag.cancel();
+        this.requestUpdate();
+        return;
       }
       const result = this._drag.completeAndGetResult();
       this._handleDragComplete(result);
     };
     this._activeDragUpHandler = handler;
     document.addEventListener("pointerup", handler);
+    document.addEventListener("pointercancel", handler);
   }
 
   private _resolveResourceName(id: string): string {
-    const res = this.resources.find((r) => r.id === id);
+    const res = this._resourceMapById.get(id);
     return res ? res.name : id;
   }
 
@@ -1435,37 +1666,23 @@ export class JanusTimeline extends LitElement {
   }
 
   private _renderResourceHeaders(
-    groups: { label: string; items: TimelineResource[] }[],
-    resourceTrackMap: Map<
-      string,
-      { trackCount: number; eventTracks: Map<string, number> }
-    >,
-    visMinRowPx: number,
-    visMaxRowPx: number,
+    visibleRows: VirtualRowItem[],
+    topSpacerHeight: number,
+    bottomSpacerHeight: number,
   ) {
-    let resY = 0;
-    return groups.map((g) => {
-      const labelHtml = g.label
-        ? html`<div class="tl-res-group-label">${g.label}</div>`
-        : nothing;
-      if (g.label) resY += GROUP_LABEL_HEIGHT;
-
-      const itemsHtml = g.items.map((r) => {
-        const tracksCount = resourceTrackMap.get(r.id)?.trackCount || 1;
-        const rowHeightPx = tracksCount * ROW_HEIGHT;
-        const isVisible =
-          resY + rowHeightPx >= visMinRowPx && resY <= visMaxRowPx;
-        resY += rowHeightPx;
-
-        if (!isVisible) {
-          return html`<div
-            class="tl-res-row"
-            style="height: ${rowHeightPx}px"
-          ></div>`;
+    return html`
+      <div style="height: ${topSpacerHeight}px; flex-shrink: 0;"></div>
+      ${visibleRows.map((item) => {
+        if (item.type === "group") {
+          return html`<div class="tl-res-group-label">${item.label}</div>`;
         }
-
+        const r = item.resource!;
         return html`
-          <div class="tl-res-row" style="height: ${rowHeightPx}px">
+          <div
+            class="tl-res-row"
+            style="height: ${item.height}px"
+            title="${r.name} · ${r.subtitle}"
+          >
             ${this.renderAvatar(r)}
             <div class="tl-res-info">
               <span class="tl-res-name">${r.name}</span>
@@ -1473,10 +1690,9 @@ export class JanusTimeline extends LitElement {
             </div>
           </div>
         `;
-      });
-
-      return html`<div>${labelHtml}${itemsHtml}</div>`;
-    });
+      })}
+      <div style="height: ${bottomSpacerHeight}px; flex-shrink: 0;"></div>
+    `;
   }
 
   private _renderEvent(
@@ -1551,13 +1767,9 @@ export class JanusTimeline extends LitElement {
   }
 
   private _renderResourceEvents(options: {
-    groups: { label: string; items: TimelineResource[] }[];
-    resourceTrackMap: Map<
-      string,
-      { trackCount: number; eventTracks: Map<string, number> }
-    >;
-    visMinRowPx: number;
-    visMaxRowPx: number;
+    visibleRows: VirtualRowItem[];
+    topSpacerHeight: number;
+    bottomSpacerHeight: number;
     visMinMs: number;
     visMaxMs: number;
     viewStartMs: number;
@@ -1565,54 +1777,35 @@ export class JanusTimeline extends LitElement {
     conflicts: ConflictState;
   }) {
     const {
-      groups,
-      resourceTrackMap,
-      visMinRowPx,
-      visMaxRowPx,
+      visibleRows,
+      topSpacerHeight,
+      bottomSpacerHeight,
       visMinMs,
       visMaxMs,
       viewStartMs,
       pxPerMs,
       conflicts,
     } = options;
-    let rowY = 0;
-    return groups.map((g) => {
-      const spacerHtml = g.label
-        ? html`<div class="tl-group-spacer"></div>`
-        : nothing;
-      if (g.label) rowY += GROUP_LABEL_HEIGHT;
 
-      const itemsHtml = g.items.map((r) => {
-        const trackInfo = resourceTrackMap.get(r.id);
-        const tracksCount = trackInfo?.trackCount || 1;
-        const evTracks = trackInfo?.eventTracks;
-        const rowHeightPx = tracksCount * ROW_HEIGHT;
-
-        const isVisible =
-          rowY + rowHeightPx >= visMinRowPx && rowY <= visMaxRowPx;
-        rowY += rowHeightPx;
-
-        if (!isVisible) {
-          return html`<div
-            class="tl-event-row"
-            style="height: ${rowHeightPx}px"
-            data-resource-id=${r.id}
-          ></div>`;
+    return html`
+      <div style="height: ${topSpacerHeight}px; flex-shrink: 0;"></div>
+      ${visibleRows.map((item) => {
+        if (item.type === "group") {
+          return html`<div class="tl-group-spacer"></div>`;
         }
-
+        const r = item.resource!;
         const sortedEvents = r.events.filter(
           (ev) => ev.endMs >= visMinMs && ev.startMs <= visMaxMs,
         );
-
         return html`
           <div
             class="tl-event-row"
-            style="height: ${rowHeightPx}px"
+            style="height: ${item.height}px"
             data-resource-id=${r.id}
             @pointerdown=${(e: PointerEvent) => this._onRowPointerDown(e, r.id)}
           >
             ${sortedEvents.map((ev, index) => {
-              const trackIndex = evTracks?.get(ev.id) || 0;
+              const trackIndex = item.eventTracks?.get(ev.id) || 0;
               return this._renderEvent(
                 ev,
                 index,
@@ -1625,10 +1818,9 @@ export class JanusTimeline extends LitElement {
             })}
           </div>
         `;
-      });
-
-      return html`<div>${spacerHtml}${itemsHtml}</div>`;
-    });
+      })}
+      <div style="height: ${bottomSpacerHeight}px; flex-shrink: 0;"></div>
+    `;
   }
 
   render() {
@@ -1674,24 +1866,67 @@ export class JanusTimeline extends LitElement {
     const allResources = this.resources;
     const resourceTrackMap = this._cachedTrackMap;
 
-    const groups: { label: string; items: TimelineResource[] }[] = [];
-    let cur: (typeof groups)[0] | null = null;
-    for (const r of allResources) {
-      if (r.groupLabel) {
-        cur = { label: r.groupLabel, items: [r] };
-        groups.push(cur);
-      } else if (cur) {
-        cur.items.push(r);
-      } else {
-        cur = { label: "", items: [r] };
-        groups.push(cur);
+    if (
+      this._layoutLastResources !== allResources ||
+      this._layoutLastTrackMap !== resourceTrackMap
+    ) {
+      this._layoutLastResources = allResources;
+      this._layoutLastTrackMap = resourceTrackMap;
+
+      const groups: { label: string; items: TimelineResource[] }[] = [];
+      let cur: (typeof groups)[0] | null = null;
+      for (const r of allResources) {
+        if (r.groupLabel) {
+          cur = { label: r.groupLabel, items: [r] };
+          groups.push(cur);
+        } else if (cur) {
+          cur.items.push(r);
+        } else {
+          cur = { label: "", items: [r] };
+          groups.push(cur);
+        }
       }
+
+      this._cachedResourceLayout = this._computeResourceLayout(
+        groups,
+        resourceTrackMap,
+      );
+
+      let curRowY = 0;
+      const virtualRows: VirtualRowItem[] = [];
+      for (const g of groups) {
+        if (g.label) {
+          virtualRows.push({
+            type: "group",
+            y: curRowY,
+            height: GROUP_LABEL_HEIGHT,
+            label: g.label,
+          });
+          curRowY += GROUP_LABEL_HEIGHT;
+        }
+        for (const r of g.items) {
+          const trackInfo = resourceTrackMap.get(r.id);
+          const trackCount = trackInfo?.trackCount || 1;
+          const height = ROW_HEIGHT * trackCount;
+          virtualRows.push({
+            type: "resource",
+            y: curRowY,
+            height,
+            resource: r,
+            trackCount,
+            eventTracks: trackInfo?.eventTracks,
+          });
+          curRowY += height;
+        }
+      }
+      this._cachedVirtualRows = virtualRows;
+      this._cachedTotalRowContentHeight = curRowY;
     }
 
-    const resourceLayout = this._computeResourceLayout(
-      groups,
-      resourceTrackMap,
-    );
+    const virtualRows = this._cachedVirtualRows;
+    const totalRowContentHeight = this._cachedTotalRowContentHeight;
+    const resourceLayout = this._cachedResourceLayout;
+
     this._drag.updateLayout(
       this.gridScrollRef,
       resourceLayout,
@@ -1710,6 +1945,48 @@ export class JanusTimeline extends LitElement {
     const visMinRowPx = Math.max(0, scrollTop - OVERSCAN_ROW_PX);
     const visMaxRowPx = scrollTop + clientHeight + OVERSCAN_ROW_PX;
 
+    let startIdx = 0;
+    let endIdx = virtualRows.length - 1;
+
+    if (virtualRows.length > 0) {
+      let low = 0;
+      let high = virtualRows.length - 1;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (virtualRows[mid].y + virtualRows[mid].height >= visMinRowPx) {
+          startIdx = mid;
+          high = mid - 1;
+        } else {
+          low = mid + 1;
+        }
+      }
+
+      low = startIdx;
+      high = virtualRows.length - 1;
+      while (low <= high) {
+        const mid = (low + high) >> 1;
+        if (virtualRows[mid].y <= visMaxRowPx) {
+          endIdx = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+    }
+
+    const visibleSlice =
+      virtualRows.length > 0 && startIdx <= endIdx
+        ? virtualRows.slice(startIdx, endIdx + 1)
+        : [];
+
+    const topSpacerHeight = visibleSlice.length > 0 ? visibleSlice[0].y : 0;
+    const bottomSpacerHeight =
+      visibleSlice.length > 0
+        ? totalRowContentHeight -
+          (visibleSlice[visibleSlice.length - 1].y +
+            visibleSlice[visibleSlice.length - 1].height)
+        : totalRowContentHeight;
+
     return html`
       <div
         class="tl-component-shell ${
@@ -1719,18 +1996,41 @@ export class JanusTimeline extends LitElement {
         ${this._renderConflictBanner(conflicts)}
         <div class="tl-panel">
           <div class="tl-grid-wrap">
-            <div class="tl-res-col" @scroll=${this._onResScroll}>
+            <div
+              class="tl-res-col ${this.collapsedResources ? "tl-res-col--collapsed" : ""}"
+              @scroll=${this._onResScroll}
+            >
               <div
                 class="tl-res-col__header"
                 style="height: ${HOUR_HEADER_HEIGHT + SUPER_HEADER_HEIGHT}px"
               >
-                RESOURCE
+                <span class="tl-res-col__header-text">RESOURCE</span>
+                <button
+                  class="tl-res-collapse-btn"
+                  @click=${() => this.toggleCollapseResources()}
+                  aria-label="${this.collapsedResources ? "Expand resources" : "Collapse resources"}"
+                  title="${this.collapsedResources ? "Expand resources" : "Collapse resources"}"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    ${
+                      this.collapsedResources
+                        ? html`<polyline points="9 18 15 12 9 6"></polyline>`
+                        : html`<polyline points="15 18 9 12 15 6"></polyline>`
+                    }
+                  </svg>
+                </button>
               </div>
               ${this._renderResourceHeaders(
-                groups,
-                resourceTrackMap,
-                visMinRowPx,
-                visMaxRowPx,
+                visibleSlice,
+                topSpacerHeight,
+                bottomSpacerHeight,
               )}
             </div>
 
@@ -1792,10 +2092,9 @@ export class JanusTimeline extends LitElement {
                     : nothing
                 }
                 ${this._renderResourceEvents({
-                  groups,
-                  resourceTrackMap,
-                  visMinRowPx,
-                  visMaxRowPx,
+                  visibleRows: visibleSlice,
+                  topSpacerHeight,
+                  bottomSpacerHeight,
                   visMinMs,
                   visMaxMs,
                   viewStartMs,
