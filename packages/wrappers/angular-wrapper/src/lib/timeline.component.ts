@@ -238,8 +238,10 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   private _syncConfig(): void {
     const config = this.resourceTypeConfig();
     if (!config) return;
-    const el = this._elRef()?.nativeElement as
-      (HTMLElement & { resourceTypeConfig: ResourceTypeConfig }) | undefined;
+    type TimelineElement = HTMLElement & {
+      resourceTypeConfig: ResourceTypeConfig;
+    };
+    const el = this._elRef()?.nativeElement as TimelineElement | undefined;
     if (el) {
       el.resourceTypeConfig = config;
     }
