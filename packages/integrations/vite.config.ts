@@ -7,14 +7,18 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
       name: "JanusSchedulerIntegrations",
-      fileName: (format) => `janus-scheduler-integrations.${format}.js`,
+      // `.cjs`, not `.cjs.js` — see packages/core/vite.config.ts.
+      fileName: (format) =>
+        format === "cjs"
+          ? "janus-scheduler-integrations.cjs"
+          : "janus-scheduler-integrations.es.js",
       formats: ["es", "cjs"],
     },
     rollupOptions: {
       // Externalize node built-ins and heavy server deps
       // so the browser bundle stays clean
       external: [
-        "@janus-scheduler/core",
+        /^@janus-scheduler\//,
         "express",
         "googleapis",
         "cors",
@@ -33,6 +37,10 @@ export default defineConfig({
     },
     sourcemap: true,
     minify: "esbuild",
+    // `npm run build` is `vite build && tsc -p tsconfig.server.json`, and BOTH
+    // write into this same `dist`. Without this, a future reordering (or a
+    // watch rebuild) would wipe the tsc-emitted `dist/server/**`.
+    emptyOutDir: false,
   },
   plugins: [
     dts({

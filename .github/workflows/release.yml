@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write # npm provenance
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+
+      # Gates. `test:pack` is the important one: it installs the real tarballs
+      # into a throwaway app outside the workspace, which is the only thing in
+      # this repo that exercises the packages the way an npm consumer does.
+      - run: npm run build:all
+      - run: npm run check:packages
+      - run: npm test --workspace=@janus-scheduler/core
+      - run: npm test --workspace=@janus-scheduler/nlp
+      - run: npm run test:pack
+
+      # Opens a "Version Packages" PR when changesets are pending; publishes to
+      # npm when that PR is merged.
+      - uses: changesets/action@v1
+        with:
+          version: npm run version-packages
+          publish: npm run release
+          commit: "chore: version packages"
+          title: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

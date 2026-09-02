@@ -112,8 +112,16 @@ export class JanusTimeline extends LitElement {
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = false;
   /** When true, renders a + Floating Action Button to add an event. Default: false */
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
+  /**
+   * When true, conflicting drag/resize/create actions are hard-blocked instead
+   * of merely warned about. Default: false, matching <janus-scheduler>.
+   *
+   * This MUST default to false: a Lit `Boolean` property is set from the
+   * presence of its attribute, so a `true` default could never be turned off
+   * via `prevent-conflicts` — only via a property binding.
+   */
   @property({ type: Boolean, attribute: "prevent-conflicts" })
-  preventConflicts = true;
+  preventConflicts = false;
   @property({ type: Boolean, reflect: true, attribute: "collapsed-resources" })
   collapsedResources = false;
 

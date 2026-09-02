@@ -1,8 +1,27 @@
 {
   "name": "@janus-scheduler/nlp",
-  "version": "0.1.0",
+  "version": "2.0.0",
+  "description": "Intent classifier and entity extractor powering Janus Scheduler's natural-language scheduling.",
+  "keywords": [
+    "nlp",
+    "intent-classification",
+    "entity-extraction",
+    "static-embeddings",
+    "scheduling"
+  ],
+  "license": "ISC",
+  "author": "janus-scheduler-app",
+  "homepage": "https://github.com/Janus-scheduler/main-program#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Janus-scheduler/main-program.git",
+    "directory": "packages/nlp"
+  },
+  "bugs": {
+    "url": "https://github.com/Janus-scheduler/main-program/issues"
+  },
   "type": "module",
-  "description": "Frozen, zero-dependency intent classifier and entity extractor for Janus Scheduler",
+  "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.es.js",
   "types": "./dist/index.d.ts",
@@ -22,25 +41,23 @@
   "files": [
     "dist",
     "artifacts",
-    "docs"
+    "LICENSE"
   ],
   "directories": {
     "test": "tests"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "npm run typecheck && jest --coverage",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
-    "typecheck": "tsc -p tsconfig.tests.json"
+    "typecheck": "tsc -p tsconfig.tests.json",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [
-    "nlp",
-    "intent-classification",
-    "static-embeddings",
-    "zero-dependency"
-  ],
-  "author": "janus-scheduler-app",
-  "license": "ISC",
-  "sideEffects": false,
+  "dependencies": {
+    "chrono-node": "^2.10.1"
+  },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^25.2.3",
@@ -49,7 +66,7 @@
     "vite": "^7.3.1",
     "vite-plugin-dts": "^4.5.4"
   },
-  "dependencies": {
-    "chrono-node": "^2.10.1"
+  "publishConfig": {
+    "access": "public"
   }
 }

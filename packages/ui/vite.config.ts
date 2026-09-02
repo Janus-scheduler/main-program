@@ -7,11 +7,16 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
       name: "JanusSchedulerUI",
-      fileName: (format) => `janus-scheduler-ui.${format}.js`,
+      // `.umd.cjs`, not `.umd.js`: this package is `"type": "module"`, so Node
+      // parses any `.js` as ESM and `require()` of a UMD `.js` file fails.
+      fileName: (format) =>
+        format === "umd"
+          ? "janus-scheduler-ui.umd.cjs"
+          : "janus-scheduler-ui.es.js",
       formats: ["es", "umd"],
     },
     rollupOptions: {
-      external: [/^lit/, "@janus-scheduler/core"],
+      external: [/^lit/, /^@janus-scheduler\//],
       output: {
         globals: {
           lit: "lit",

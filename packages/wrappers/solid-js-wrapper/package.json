@@ -1,35 +1,66 @@
 {
   "name": "@janus-scheduler/solid",
-  "version": "1.0.1",
+  "version": "2.0.0",
+  "description": "SolidJS components for Janus Scheduler — timeline, calendar grids and event editor.",
+  "keywords": [
+    "scheduler",
+    "calendar",
+    "timeline",
+    "events",
+    "scheduling",
+    "solid",
+    "solidjs"
+  ],
+  "license": "ISC",
+  "author": "janus-scheduler-app",
+  "homepage": "https://github.com/Janus-scheduler/main-program#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Janus-scheduler/main-program.git",
+    "directory": "packages/wrappers/solid-js-wrapper"
+  },
+  "bugs": {
+    "url": "https://github.com/Janus-scheduler/main-program/issues"
+  },
   "type": "module",
-  "main": "./dist/janus-scheduler-solid.cjs.js",
+  "sideEffects": false,
+  "main": "./dist/janus-scheduler-solid.cjs",
   "module": "./dist/janus-scheduler-solid.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/janus-scheduler-solid.es.js",
-      "require": "./dist/janus-scheduler-solid.cjs.js"
+      "require": "./dist/janus-scheduler-solid.cjs"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "build": "vite build"
+    "build": "vite build",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "solid-js": "^1.8.0"
   },
   "dependencies": {
-    "@janus-scheduler/core": "^1.0.1",
-    "@janus-scheduler/nlp": "^0.1.0",
-    "@janus-scheduler/ui": "^1.0.0"
+    "@janus-scheduler/core": "^2.0.0",
+    "@janus-scheduler/nlp": "^2.0.0",
+    "@janus-scheduler/ui": "^2.0.0"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
     "vite": "^7.3.1",
     "vite-plugin-dts": "^4.5.4",
     "vite-plugin-solid": "^2.10.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

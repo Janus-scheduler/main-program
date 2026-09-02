@@ -12,3 +12,5 @@ lint_output.txt
 janus-tokens.json
 janus-calendar-state.json
 implementation
+*.tsbuildinfo
+*.tgz

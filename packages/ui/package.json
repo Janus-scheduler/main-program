@@ -1,33 +1,64 @@
 {
   "name": "@janus-scheduler/ui",
-  "version": "1.0.1",
+  "version": "2.0.0",
+  "description": "Lit web components for Janus Scheduler — timeline, day/week/month/year grids, event editor and AI chat, usable from any framework.",
+  "keywords": [
+    "scheduler",
+    "calendar",
+    "timeline",
+    "events",
+    "scheduling",
+    "web-components",
+    "lit",
+    "custom-elements",
+    "shadow-dom"
+  ],
+  "license": "ISC",
+  "author": "janus-scheduler-app",
+  "homepage": "https://github.com/Janus-scheduler/main-program#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Janus-scheduler/main-program.git",
+    "directory": "packages/ui"
+  },
+  "bugs": {
+    "url": "https://github.com/Janus-scheduler/main-program/issues"
+  },
   "type": "module",
-  "main": "./dist/janus-scheduler-ui.umd.js",
+  "sideEffects": true,
+  "main": "./dist/janus-scheduler-ui.umd.cjs",
   "module": "./dist/janus-scheduler-ui.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/janus-scheduler-ui.es.js",
-      "require": "./dist/janus-scheduler-ui.umd.js"
+      "require": "./dist/janus-scheduler-ui.umd.cjs"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
-  "sideEffects": true,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite build --watch",
     "build": "vite build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"@janus-scheduler/ui has no tests\"",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@janus-scheduler/core": "^1.0.0",
+    "@janus-scheduler/core": "^2.0.0",
     "lit": "^3.1.2"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
     "vite": "^7.3.1",
     "vite-plugin-dts": "^4.5.4"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

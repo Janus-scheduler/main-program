@@ -1,36 +1,64 @@
 {
   "name": "@janus-scheduler/core",
-  "version": "1.0.1",
+  "version": "2.0.0",
+  "description": "Framework-agnostic scheduling engine for Janus Scheduler — Zustand state store, domain models, conflict detection, recurrence expansion and timezone utilities.",
+  "keywords": [
+    "scheduler",
+    "calendar",
+    "timeline",
+    "events",
+    "scheduling",
+    "zustand",
+    "state-management",
+    "conflict-detection",
+    "recurrence",
+    "rrule"
+  ],
+  "license": "ISC",
+  "author": "janus-scheduler-app",
+  "homepage": "https://github.com/Janus-scheduler/main-program#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Janus-scheduler/main-program.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/Janus-scheduler/main-program/issues"
+  },
   "type": "module",
-  "main": "./dist/janus-scheduler.cjs.js",
+  "sideEffects": false,
+  "main": "./dist/janus-scheduler.cjs",
   "module": "./dist/janus-scheduler.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/janus-scheduler.es.js",
-      "require": "./dist/janus-scheduler.cjs.js"
+      "require": "./dist/janus-scheduler.cjs"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "directories": {
     "test": "tests"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "npm run typecheck && jest --coverage",
     "build": "vite build",
-    "typecheck": "tsc -p tsconfig.tests.json"
+    "typecheck": "tsc -p tsconfig.tests.json",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [
-    "schedule-core"
-  ],
-  "author": "janus-scheduler-app",
-  "license": "ISC",
-  "description": "",
+  "dependencies": {
+    "rrule": "^2.8.1",
+    "zustand": "^5.0.12"
+  },
   "devDependencies": {
-    "@janus-scheduler/nlp": "^0.1.0",
+    "@janus-scheduler/nlp": "^2.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.2.3",
     "jest": "^30.2.0",
@@ -38,8 +66,7 @@
     "vite": "^7.3.1",
     "vite-plugin-dts": "^4.5.4"
   },
-  "dependencies": {
-    "rrule": "^2.8.1",
-    "zustand": "^5.0.12"
+  "publishConfig": {
+    "access": "public"
   }
 }

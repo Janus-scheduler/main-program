@@ -37,7 +37,17 @@ export default defineConfig({
     rollupOptions: {
       // Node builtins must never be inlined — keeping them external is what
       // lets a bundler tree-shake `./node` away from a browser build.
-      external: ["fs", "path", "url", "node:fs", "node:path", "node:url"],
+      // `chrono-node` is a real runtime dependency and stays external too, so
+      // a host that also uses it does not end up with two copies.
+      external: [
+        "fs",
+        "path",
+        "url",
+        "node:fs",
+        "node:path",
+        "node:url",
+        /^chrono-node/,
+      ],
       output: {
         globals: {},
       },

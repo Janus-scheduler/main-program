@@ -8,11 +8,17 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, "index.tsx"),
       name: "JanusSchedulerSolid",
-      fileName: (format) => `janus-scheduler-solid.${format}.js`,
+      // `.cjs`, not `.cjs.js` — see packages/core/vite.config.ts.
+      fileName: (format) =>
+        format === "cjs"
+          ? "janus-scheduler-solid.cjs"
+          : "janus-scheduler-solid.es.js",
       formats: ["es", "cjs"],
     },
     rollupOptions: {
-      external: ["solid-js", "solid-js/web", "@janus-scheduler/ui"],
+      // All `@janus-scheduler/*` stay external — see the react wrapper's config
+      // for why inlining `/core` here produced a second Zustand store.
+      external: [/^@janus-scheduler\//, "solid-js", "solid-js/web"],
       output: {
         globals: {
           "solid-js": "Solid",

@@ -1,15 +1,39 @@
 {
   "name": "@janus-scheduler/integrations",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "description": "Google Calendar two-way sync for Janus Scheduler — browser client plus an optional Express + WebSocket backend.",
+  "keywords": [
+    "scheduler",
+    "calendar",
+    "timeline",
+    "events",
+    "scheduling",
+    "google-calendar",
+    "sync",
+    "oauth",
+    "webhooks"
+  ],
+  "license": "ISC",
+  "author": "janus-scheduler-app",
+  "homepage": "https://github.com/Janus-scheduler/main-program#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Janus-scheduler/main-program.git",
+    "directory": "packages/integrations"
+  },
+  "bugs": {
+    "url": "https://github.com/Janus-scheduler/main-program/issues"
+  },
   "type": "module",
-  "main": "./dist/janus-scheduler-integrations.cjs.js",
+  "sideEffects": false,
+  "main": "./dist/janus-scheduler-integrations.cjs",
   "module": "./dist/janus-scheduler-integrations.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/janus-scheduler-integrations.es.js",
-      "require": "./dist/janus-scheduler-integrations.cjs.js"
+      "require": "./dist/janus-scheduler-integrations.cjs"
     },
     "./server": {
       "types": "./dist/server/index.d.ts",
@@ -17,15 +41,21 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "vite build && tsc -p tsconfig.server.json",
     "dev": "vite build --watch",
-    "test": "jest"
+    "test": "jest",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@janus-scheduler/core": "*"
+    "@janus-scheduler/core": "^2.0.0"
   },
   "dependencies": {
     "googleapis": "^128.0.0",
@@ -49,5 +79,8 @@
     "typescript": "^5.3.3",
     "vite": "^5.1.0",
     "vite-plugin-dts": "^3.7.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@janus-scheduler/nlp": "^0.1.0",
-    "@janus-scheduler/react": "^1.0.0",
+    "@janus-scheduler/nlp": "^2.0.0",
+    "@janus-scheduler/react": "^2.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
