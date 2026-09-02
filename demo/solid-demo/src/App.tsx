@@ -535,6 +535,12 @@ function App() {
                 setSchedulerError(null);
                 setShowScheduler(true);
               }}
+              onHeaderDateClick={(detail) => {
+                setCurrentView("Day");
+                setTimeout(() => {
+                  dayGridRef?.goToDate?.(detail.date);
+                }, 100);
+              }}
               onEventMove={({
                 event,
                 oldResourceId,
@@ -609,9 +615,9 @@ function App() {
                 });
               }}
               onDayHeaderClick={(detail) => {
-                setCurrentView("Timeline");
+                setCurrentView("Day");
                 setTimeout(() => {
-                  timelineRef?.goToDate?.(detail.date);
+                  dayGridRef?.goToDate?.(detail.date);
                 }, 100);
               }}
               onSlotSelect={() => {
@@ -624,6 +630,7 @@ function App() {
           <Show when={currentView() === "Year"}>
             <YearGrid
               ref={(el) => (yearGridRef = el as unknown as typeof yearGridRef)}
+              navLinks={true}
               onViewChange={(detail) => setCurrentView(detail.view)}
               onNavChange={(detail) => {
                 setNavData({
@@ -634,10 +641,16 @@ function App() {
                   zoomUnit: (detail.zoomUnit as string) || "",
                 });
               }}
-              onDayClick={(detail) => {
-                setCurrentView("Timeline");
+              onMonthHeaderClick={(detail) => {
+                setCurrentView("Month");
                 setTimeout(() => {
-                  timelineRef?.goToDate?.(detail.date);
+                  monthGridRef?.goToDate?.(detail.date);
+                }, 100);
+              }}
+              onDayClick={(detail) => {
+                setCurrentView("Day");
+                setTimeout(() => {
+                  dayGridRef?.goToDate?.(detail.date);
                 }, 100);
               }}
             />

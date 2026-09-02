@@ -3,13 +3,11 @@ import { customElement, property } from "lit/decorators.js";
 import { topbarStyles } from "./topbar-styles";
 import type { ViewType } from "@janus-scheduler/core";
 import {
-  BellIcon,
   ChevronLeft,
   ChevronRight,
   PencilRulerIcon,
   CalendarIcon,
   UndoIcon,
-  SearchIcon,
 } from "../timeline/timeline-icons";
 
 /**
@@ -136,6 +134,20 @@ export class JanusTopbar extends LitElement {
     );
   }
 
+  private _emitDateLabelClick(jsEvent?: MouseEvent) {
+    this.dispatchEvent(
+      new CustomEvent("date-label-click", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          navLabel: this.navLabel,
+          view: this.view,
+          jsEvent,
+        },
+      }),
+    );
+  }
+
   /* ──────────────────────────────────────────────────────────────────────── */
   /*  Render                                                                 */
   /* ──────────────────────────────────────────────────────────────────────── */
@@ -155,11 +167,19 @@ export class JanusTopbar extends LitElement {
             <button class="tl-nav__today" @click=${this._emitToday}>
               Today
             </button>
-            <span class="tl-nav__date">${this.navLabel}</span>
-            <div class="tl-nav__date--short">
-              <span class="tl-nav-day-name">${this.dayName}</span>
-              <span class="tl-nav-date-text">${this.shortDate}</span>
-            </div>
+            <button
+              type="button"
+              class="tl-nav__date-btn"
+              @click=${(e: MouseEvent) => this._emitDateLabelClick(e)}
+              title="Click to jump to date"
+              aria-label="Current date: ${this.navLabel}. Click to select date."
+            >
+              <span class="tl-nav__date">${this.navLabel}</span>
+              <div class="tl-nav__date--short">
+                <span class="tl-nav-day-name">${this.dayName}</span>
+                <span class="tl-nav-date-text">${this.shortDate}</span>
+              </div>
+            </button>
           </div>
           <button
             class="tl-nav__arrow"
@@ -245,16 +265,6 @@ export class JanusTopbar extends LitElement {
             @click=${this._emitToggleCreate}
           >
             ${PencilRulerIcon()}
-          </button>
-          <button class="tl-icon-btn" aria-label="Search">
-            ${SearchIcon()}
-          </button>
-          <button
-            class="tl-icon-btn tl-icon-btn--bell"
-            aria-label="Notifications"
-          >
-            ${BellIcon()}
-            <span class="tl-bell-dot"></span>
           </button>
         </div>
       </header>

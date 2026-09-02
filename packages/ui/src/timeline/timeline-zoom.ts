@@ -52,6 +52,8 @@ export interface ColumnTick {
 }
 
 export interface SuperLabel {
+  /** Start timestamp of this super-label */
+  startMs?: number;
   /** Label text */
   label: string;
   /** Pixel offset from viewStart */
@@ -448,7 +450,12 @@ export function generateSuperLabels(
     const width = (clippedEnd - clippedStart) * pxPerMs;
     if (width > 1) {
       const d = timezone ? toFakeLocalDate(cursor, timezone) : new Date(cursor);
-      labels.push({ label: level.superLabelFormat(d), px, width });
+      labels.push({
+        startMs: cursor,
+        label: level.superLabelFormat(d),
+        px,
+        width,
+      });
     }
     cursor = nextCursor;
     safety++;

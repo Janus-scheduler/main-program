@@ -121,11 +121,8 @@ export const timeGridStyles = css`
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    padding: 8px 6px;
+    padding: 4px 6px;
     border-right: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.12s;
     min-width: 0;
   }
 
@@ -133,16 +130,52 @@ export const timeGridStyles = css`
     border-right: none;
   }
 
-  .tg-head__cell:hover {
-    background: #fafafa;
-  }
-
   .tg-head__cell--today {
     background: var(--today-bg);
   }
 
-  .tg-head__cell--today:hover {
-    background: var(--today-bg);
+  .tg-head__btn {
+    all: unset;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      transform 0.1s ease;
+    font-family: inherit;
+  }
+
+  .tg-head__btn:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  .tg-head__btn:active {
+    transform: scale(0.97);
+  }
+
+  .tg-head__btn:focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: -2px;
+  }
+
+  .tg-head__btn--today:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  .tg-head__static {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    height: 100%;
   }
 
   .tg-head__dow {
@@ -176,7 +209,6 @@ export const timeGridStyles = css`
     font-weight: 700;
   }
 
-  /* ── All-day row (sticky row 2 inside .tg-grid) ── */
   .tg-allday__label,
   .tg-allday__cell {
     position: sticky;
@@ -184,8 +216,22 @@ export const timeGridStyles = css`
     z-index: 15;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+  }
+
+  .tg-allday__cell {
+    border-right: 1px solid var(--border);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     max-height: 96px;
     overflow-y: auto;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+  }
+
+  .tg-allday__cell:hover {
+    background-color: #fafafa;
   }
 
   .tg-allday__label {

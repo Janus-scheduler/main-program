@@ -80,6 +80,7 @@
         (eventMove)="handleEventMove($event)"
         (eventResize)="handleEventResize($event)"
         (eventCreate)="handleEventCreate($event)"
+        (headerDateClick)="handleTimelineHeaderDateClick($event)"
         (viewChange)="handleViewChange($event)"
         (navChange)="handleNavChange($event)"
       />
@@ -101,9 +102,11 @@
     @if (currentView === 'Week') {
       <janus-week-grid-ng
         #weekGridEl
+        [navLinks]="true"
         [allowCreate]="allowCreate()"
         (addEvent)="handleAddEvent()"
         (eventClick)="handleEventClick($event)"
+        (dayHeaderClick)="handleDayHeaderClick($event)"
         (slotSelect)="handleSlotSelect($event)"
         (eventMove)="handleTimeGridMove($event)"
         (eventResize)="handleTimeGridResize($event)"
@@ -115,6 +118,7 @@
     @if (currentView === 'Day') {
       <janus-day-grid-ng
         #dayGridEl
+        [navLinks]="true"
         [allowCreate]="allowCreate()"
         (addEvent)="handleAddEvent()"
         (eventClick)="handleEventClick($event)"
@@ -129,8 +133,10 @@
     @if (currentView === 'Year') {
       <janus-year-grid-ng
         #yearGridEl
+        [navLinks]="true"
         (viewChange)="handleViewChange($event)"
-        (dayClick)="handleDayClick($event)"
+        (monthHeaderClick)="handleMonthHeaderClick($event)"
+        (dayClick)="handleYearDayClick($event)"
         (navChange)="handleNavChange($event)"
       />
     }

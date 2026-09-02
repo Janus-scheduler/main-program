@@ -23,6 +23,9 @@ import type {
   EventCreateDetail,
   ViewType,
   ResourceTypeConfig,
+  TimelineResourceClickDetail,
+  TimelineHeaderDateClickDetail,
+  TimelineConflictClickDetail,
 } from "./types";
 
 /**
@@ -98,6 +101,16 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   /** Emitted when the date/zoom nav state changes */
   readonly navChange = output<Record<string, unknown>>();
+
+  /** Emitted when a resource row/card in the left column is clicked */
+  readonly resourceClick = output<TimelineResourceClickDetail>();
+
+  /** Emitted when a super-header date on the time ruler is clicked */
+  readonly headerDateClick = output<TimelineHeaderDateClickDetail>();
+
+  /** Emitted when a conflict warning banner or badge is clicked */
+  readonly conflictClick = output<TimelineConflictClickDetail>();
+
   /** Emitted when a resource conflict is detected */
   readonly conflictDetected = output<{
     message: string;
@@ -145,6 +158,18 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   private _navChangeHandler = (e: Event) => {
     e.stopPropagation();
     this.navChange.emit((e as CustomEvent).detail);
+  };
+  private _resourceClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.resourceClick.emit((e as CustomEvent).detail);
+  };
+  private _headerDateClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.headerDateClick.emit((e as CustomEvent).detail);
+  };
+  private _conflictClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.conflictClick.emit((e as CustomEvent).detail);
   };
 
   public goToPrev(): void {
@@ -201,6 +226,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("view-change", this._viewChangeHandler);
     el.addEventListener("nav-change", this._navChangeHandler);
     el.addEventListener("conflict-detected", this._conflictDetectedHandler);
+    el.addEventListener("resource-click", this._resourceClickHandler);
+    el.addEventListener("header-date-click", this._headerDateClickHandler);
+    el.addEventListener("conflict-click", this._conflictClickHandler);
 
     this._applyAllowCreate();
 
@@ -219,7 +247,6 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     this._syncResources();
     this._syncConfig();
     this._applyAllowCreate();
-    this._applyAllowCreate();
   }
 
   ngOnDestroy(): void {
@@ -232,6 +259,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("view-change", this._viewChangeHandler);
     el?.removeEventListener("nav-change", this._navChangeHandler);
     el?.removeEventListener("conflict-detected", this._conflictDetectedHandler);
+    el?.removeEventListener("resource-click", this._resourceClickHandler);
+    el?.removeEventListener("header-date-click", this._headerDateClickHandler);
+    el?.removeEventListener("conflict-click", this._conflictClickHandler);
     this._unsubStore?.();
   }
 

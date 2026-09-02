@@ -5,4 +5,7 @@ export type {
   TimeGridEvent,
   TimeGridEventResource,
   SlotSelectDetail,
+  TimeGridEventMoveDetail,
+  TimeGridEventResizeDetail,
+  DayHeaderClickDetail,
 } from "@janus-scheduler/core";

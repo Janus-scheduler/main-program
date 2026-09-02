@@ -376,6 +376,10 @@ export function SchedulerView({
             resourceTypeConfig={TIMELINE_RESOURCE_CONFIG}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onHeaderDateClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
             onEventMove={({
               event,
               oldResourceId,
@@ -462,7 +466,12 @@ export function SchedulerView({
         {currentView === "Year" && (
           <YearGrid
             ref={yearGridRef}
+            navLinks={true}
             onNavChange={handleNavChange}
+            onMonthHeaderClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Month");
+            }}
             onDayClick={(detail) => {
               pendingDate.current = detail.date;
               onViewChange("Day");
@@ -475,9 +484,14 @@ export function SchedulerView({
           <WeekGrid
             ref={weekGridRef}
             showFab={true}
+            navLinks={true}
             allowCreate={allowCreate}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onDayHeaderClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
             onDayClick={(detail) => {
               pendingDate.current = detail.date;
               onViewChange("Day");
@@ -494,6 +508,7 @@ export function SchedulerView({
           <DayGrid
             ref={dayGridRef}
             showFab={true}
+            navLinks={true}
             allowCreate={allowCreate}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}

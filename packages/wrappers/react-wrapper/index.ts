@@ -65,6 +65,12 @@ import {
   type DayHeaderClickDetail,
   type MonthSlotSelectDetail,
   type MonthMoreClickDetail,
+  type YearMonthHeaderClickDetail,
+  type YearDayClickDetail,
+  type TimelineResourceClickDetail,
+  type TimelineHeaderDateClickDetail,
+  type TimelineConflictClickDetail,
+  type TopbarDateLabelClickDetail,
   type TimeGridEventResource,
   type EventData,
   type ResourceData,
@@ -126,6 +132,12 @@ export type {
   DayHeaderClickDetail,
   MonthSlotSelectDetail,
   MonthMoreClickDetail,
+  YearMonthHeaderClickDetail,
+  YearDayClickDetail,
+  TimelineResourceClickDetail,
+  TimelineHeaderDateClickDetail,
+  TimelineConflictClickDetail,
+  TopbarDateLabelClickDetail,
   TimeGridEventResource,
   EventData,
   ResourceData,
@@ -272,6 +284,9 @@ const _Timeline = createComponent({
     onNavChange: "nav-change",
     onConflictDetected: "conflict-detected",
     onCollapsedResourcesChange: "collapsed-resources-change",
+    onResourceClick: "resource-click",
+    onHeaderDateClick: "header-date-click",
+    onConflictClick: "conflict-click",
   },
 });
 
@@ -299,6 +314,9 @@ export interface TimelineProps extends React.HTMLAttributes<HTMLElement> {
     action: string;
     detail: EventMoveDetail | EventResizeDetail | EventCreateDetail;
   }) => void;
+  onResourceClick?: (detail: TimelineResourceClickDetail) => void;
+  onHeaderDateClick?: (detail: TimelineHeaderDateClickDetail) => void;
+  onConflictClick?: (detail: TimelineConflictClickDetail) => void;
 }
 
 function withConflictBypass<T>(
@@ -355,6 +373,24 @@ export const Timeline = React.forwardRef<JanusTimelineWC, TimelineProps>(
         ? (e: globalThis.Event) =>
             props.onCollapsedResourcesChange!(
               (e as CustomEvent<{ collapsed: boolean }>).detail,
+            )
+        : undefined,
+      onResourceClick: props.onResourceClick
+        ? (e: globalThis.Event) =>
+            props.onResourceClick!(
+              (e as CustomEvent<TimelineResourceClickDetail>).detail,
+            )
+        : undefined,
+      onHeaderDateClick: props.onHeaderDateClick
+        ? (e: globalThis.Event) =>
+            props.onHeaderDateClick!(
+              (e as CustomEvent<TimelineHeaderDateClickDetail>).detail,
+            )
+        : undefined,
+      onConflictClick: props.onConflictClick
+        ? (e: globalThis.Event) =>
+            props.onConflictClick!(
+              (e as CustomEvent<TimelineConflictClickDetail>).detail,
             )
         : undefined,
     });
@@ -448,6 +484,7 @@ export interface TimeGridProps extends React.HTMLAttributes<HTMLElement> {
   /** Externally supplied events. Omit to read from the shared store. */
   events?: TimeGridEvent[];
   showFab?: boolean;
+  navLinks?: boolean;
   /** Emit `onSlotSelect` when an empty slot is clicked. Default: true */
   allowCreate?: boolean;
   /** First hour rendered (0–23). Default: 0 */
@@ -464,6 +501,7 @@ export interface TimeGridProps extends React.HTMLAttributes<HTMLElement> {
   weekStartsOn?: number;
   onEventClick?: (detail: TimeGridEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
+  onDayHeaderClick?: (detail: DayHeaderClickDetail) => void;
   onSlotSelect?: (detail: SlotSelectDetail) => void;
   onEventMove?: (detail: TimeGridEventMoveDetail) => void;
   onEventResize?: (detail: TimeGridEventResizeDetail) => void;
@@ -475,6 +513,7 @@ export interface TimeGridProps extends React.HTMLAttributes<HTMLElement> {
 const timeGridEvents = {
   onEventClick: "event-click",
   onDayClick: "day-click",
+  onDayHeaderClick: "day-header-click",
   onSlotSelect: "slot-select",
   onEventMove: "event-move",
   onEventResize: "event-resize",
@@ -488,6 +527,7 @@ function timeGridHandlers(props: TimeGridProps) {
   return {
     onEventClick: withDetail(props.onEventClick),
     onDayClick: withDetail(props.onDayClick),
+    onDayHeaderClick: withDetail(props.onDayHeaderClick),
     onSlotSelect: withDetail(props.onSlotSelect),
     onEventMove: withDetail(props.onEventMove),
     onEventResize: withDetail(props.onEventResize),
@@ -535,6 +575,7 @@ const _YearGrid = createComponent({
   react: React,
   events: {
     onDayClick: "day-click",
+    onMonthHeaderClick: "month-header-click",
     onNavChange: "nav-change",
     onViewChange: "view-change",
   },
@@ -542,7 +583,9 @@ const _YearGrid = createComponent({
 
 export interface YearGridProps extends React.HTMLAttributes<HTMLElement> {
   viewYear?: number;
-  onDayClick?: (detail: { date: string }) => void;
+  navLinks?: boolean;
+  onDayClick?: (detail: YearDayClickDetail) => void;
+  onMonthHeaderClick?: (detail: YearMonthHeaderClickDetail) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   onViewChange?: (detail: { view: ViewType }) => void;
 }
@@ -554,7 +597,13 @@ export const YearGrid = React.forwardRef<any, YearGridProps>((props, ref) => {
     ref,
     onDayClick: props.onDayClick
       ? (e: globalThis.Event) =>
-          props.onDayClick!((e as CustomEvent<{ date: string }>).detail)
+          props.onDayClick!((e as CustomEvent<YearDayClickDetail>).detail)
+      : undefined,
+    onMonthHeaderClick: props.onMonthHeaderClick
+      ? (e: globalThis.Event) =>
+          props.onMonthHeaderClick!(
+            (e as CustomEvent<YearMonthHeaderClickDetail>).detail,
+          )
       : undefined,
     onNavChange: props.onNavChange
       ? (e: globalThis.Event) =>
@@ -705,6 +754,7 @@ const _Topbar = createComponent({
     onConnectCalendar: "connect-calendar",
     onUndoClick: "undo-click",
     onBenchmarkClick: "benchmark-click",
+    onDateLabelClick: "date-label-click",
   },
 });
 
@@ -733,6 +783,7 @@ export interface TopbarProps extends React.HTMLAttributes<HTMLElement> {
   onConnectCalendar?: () => void;
   onUndoClick?: () => void;
   onBenchmarkClick?: () => void;
+  onDateLabelClick?: (detail: TopbarDateLabelClickDetail) => void;
 }
 
 export function Topbar(props: TopbarProps): React.JSX.Element {
@@ -746,6 +797,7 @@ export function Topbar(props: TopbarProps): React.JSX.Element {
     onConnectCalendar: withVoid(props.onConnectCalendar),
     onUndoClick: withVoid(props.onUndoClick),
     onBenchmarkClick: withVoid(props.onBenchmarkClick),
+    onDateLabelClick: withDetail(props.onDateLabelClick),
   });
 }
 

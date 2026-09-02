@@ -66,6 +66,9 @@ export abstract class JanusTimeGridBase extends LitElement {
   /** When true, renders a + Floating Action Button to add an event. Default: false */
   @property({ type: Boolean, attribute: "show-fab" }) showFab = false;
 
+  /** When true, day headers show interactive drilldown button affordances. Default: true */
+  @property({ type: Boolean, attribute: "nav-links" }) navLinks = true;
+
   /** When true, clicking an empty slot emits `slot-select`. Default: true */
   @property({ type: Boolean, attribute: "allow-create" }) allowCreate = true;
 
@@ -359,10 +362,38 @@ export abstract class JanusTimeGridBase extends LitElement {
     );
   }
 
-  protected _handleDayClick(day: TimeGridDay) {
+  protected _handleDayHeaderClick(day: TimeGridDay, jsEvent?: MouseEvent) {
+    this.dispatchEvent(
+      new CustomEvent("day-header-click", {
+        detail: {
+          date: day.dateStr,
+          jsEvent,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
     this.dispatchEvent(
       new CustomEvent("day-click", {
-        detail: { date: day.dateStr },
+        detail: {
+          date: day.dateStr,
+          source: "header",
+          jsEvent,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  protected _handleDayClick(day: TimeGridDay, jsEvent?: MouseEvent) {
+    this.dispatchEvent(
+      new CustomEvent("day-click", {
+        detail: {
+          date: day.dateStr,
+          source: "cell",
+          jsEvent,
+        },
         bubbles: true,
         composed: true,
       }),
@@ -895,9 +926,34 @@ export abstract class JanusTimeGridBase extends LitElement {
       .join(" ");
 
     return html`
-      <div class=${classes} @click=${() => this._handleDayClick(day)}>
-        <span class="tg-head__dow">${day.dowShort}</span>
-        <span class="tg-head__num">${day.dayNum}</span>
+      <div class=${classes}>
+        ${
+          this.navLinks
+            ? html`
+                <button
+                  type="button"
+                  class="tg-head__btn ${day.isToday ? "tg-head__btn--today" : ""}"
+                  @click=${(e: MouseEvent) => {
+                    e.stopPropagation();
+                    this._handleDayHeaderClick(day, e);
+                  }}
+                  title="Go to ${day.dowLong}, ${day.dateStr}"
+                  aria-label="Go to ${day.dowLong}, ${day.dateStr}"
+                >
+                  <span class="tg-head__dow">${day.dowShort}</span>
+                  <span class="tg-head__num">${day.dayNum}</span>
+                </button>
+              `
+            : html`
+                <div
+                  class="tg-head__static"
+                  @click=${(e: MouseEvent) => this._handleDayClick(day, e)}
+                >
+                  <span class="tg-head__dow">${day.dowShort}</span>
+                  <span class="tg-head__num">${day.dayNum}</span>
+                </div>
+              `
+        }
       </div>
     `;
   }
@@ -908,7 +964,25 @@ export abstract class JanusTimeGridBase extends LitElement {
       .join(" ");
 
     return html`
-      <div class=${classes}>
+      <div
+        class=${classes}
+        @click=${(e: MouseEvent) => {
+          if (!this.allowCreate) return;
+          this.dispatchEvent(
+            new CustomEvent("slot-select", {
+              detail: {
+                date: day.dateStr,
+                startTime: "00:00",
+                endTime: "24:00",
+                allDay: true,
+                jsEvent: e,
+              },
+              bubbles: true,
+              composed: true,
+            }),
+          );
+        }}
+      >
         ${day.allDayEvents.map((ev) => this._renderChip(ev))}
       </div>
     `;

@@ -31,6 +31,9 @@ import {
   type MonthEvent,
   type DayHeaderClickDetail,
   type MonthSlotSelectDetail,
+  type YearMonthHeaderClickDetail,
+  type YearDayClickDetail,
+  type TimelineHeaderDateClickDetail,
   type SchedulerSaveData,
   type EventMoveDetail,
   type EventResizeDetail,
@@ -371,6 +374,30 @@ export class App implements OnDestroy {
 
   handleDayHeaderClick(detail: DayHeaderClickDetail): void {
     console.log('Day header clicked, navigating to Day view:', detail.date);
+    this.currentView = 'Day';
+    setTimeout(() => {
+      this.dayGridEl()?.goToDate(detail.date);
+    }, 50);
+  }
+
+  handleMonthHeaderClick(detail: YearMonthHeaderClickDetail): void {
+    console.log('Month header clicked, navigating to Month view:', detail.date);
+    this.currentView = 'Month';
+    setTimeout(() => {
+      this.monthGridEl()?.goToDate(detail.date);
+    }, 50);
+  }
+
+  handleTimelineHeaderDateClick(detail: TimelineHeaderDateClickDetail): void {
+    console.log('Timeline header date clicked, navigating to Day view:', detail.date);
+    this.currentView = 'Day';
+    setTimeout(() => {
+      this.dayGridEl()?.goToDate(detail.date);
+    }, 50);
+  }
+
+  handleYearDayClick(detail: YearDayClickDetail): void {
+    console.log('Year day clicked, navigating to Day view:', detail.date);
     this.currentView = 'Day';
     setTimeout(() => {
       this.dayGridEl()?.goToDate(detail.date);

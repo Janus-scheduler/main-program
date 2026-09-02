@@ -5,4 +5,7 @@ export type {
   EventResizeDetail,
   EventCreateDetail,
   ResourceTypeConfig,
+  TimelineResourceClickDetail,
+  TimelineHeaderDateClickDetail,
+  TimelineConflictClickDetail,
 } from "@janus-scheduler/core";

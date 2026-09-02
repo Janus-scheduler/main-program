@@ -49,6 +49,12 @@ import type {
   DayHeaderClickDetail,
   MonthSlotSelectDetail,
   MonthMoreClickDetail,
+  YearMonthHeaderClickDetail,
+  YearDayClickDetail,
+  TimelineResourceClickDetail,
+  TimelineHeaderDateClickDetail,
+  TimelineConflictClickDetail,
+  TopbarDateLabelClickDetail,
   TimeGridEvent,
   TimeGridEventResource,
   SlotSelectDetail,
@@ -151,6 +157,12 @@ export type {
   DayHeaderClickDetail,
   MonthSlotSelectDetail,
   MonthMoreClickDetail,
+  YearMonthHeaderClickDetail,
+  YearDayClickDetail,
+  TimelineResourceClickDetail,
+  TimelineHeaderDateClickDetail,
+  TimelineConflictClickDetail,
+  TopbarDateLabelClickDetail,
   TimeGridEvent,
   TimeGridEventResource,
   SlotSelectDetail,
@@ -355,6 +367,9 @@ export interface TimelineProps {
     action: string;
     detail: EventMoveDetail | EventResizeDetail | EventCreateDetail;
   }) => void;
+  onResourceClick?: (detail: TimelineResourceClickDetail) => void;
+  onHeaderDateClick?: (detail: TimelineHeaderDateClickDetail) => void;
+  onConflictClick?: (detail: TimelineConflictClickDetail) => void;
 }
 
 export const Timeline: Component<TimelineProps> = (props) => {
@@ -413,6 +428,9 @@ export const Timeline: Component<TimelineProps> = (props) => {
     attach("view-change", props.onViewChange);
     attach("nav-change", props.onNavChange);
     attach("conflict-detected", props.onConflictDetected);
+    attach("resource-click", props.onResourceClick);
+    attach("header-date-click", props.onHeaderDateClick);
+    attach("conflict-click", props.onConflictClick);
   });
 
   return (
@@ -429,10 +447,14 @@ export const Timeline: Component<TimelineProps> = (props) => {
  * <MonthGrid> — Monthly calendar view showing event chips per day.
  *
  * Events:
- *  - onEventClick → CustomEvent<TimelineEvent>                  — user clicked an event chip
- *  - onDayClick   → CustomEvent<{ date: string }>               — user clicked an empty day cell
- *  - onAddEvent   → CustomEvent<void>                           — user clicked the + FAB
- *  - onViewChange → CustomEvent<{ view: ViewType }> — user switched views
+ *  - onEventClick   → CustomEvent<TimelineEvent>                  — user clicked an event chip
+ *  - onDayClick     → CustomEvent<DayClickDetail>                 — user clicked any day target
+ *  - onDayHeaderClick → CustomEvent<DayHeaderClickDetail>         — user clicked the day number badge
+ *  - onSlotSelect   → CustomEvent<MonthSlotSelectDetail>          — user clicked the empty cell body
+ *  - onMoreClick    → CustomEvent<MonthMoreClickDetail>           — user clicked "+N more" overflow
+ *  - onAddEvent     → CustomEvent<void>                           — user clicked the + FAB
+ *  - onViewChange   → CustomEvent<{ view: ViewType }>             — user switched views
+ *  - onNavChange    → CustomEvent<Record<string, unknown>>        — range changed
  *
  * The component reads directly from the Zustand store.
  */
@@ -500,11 +522,13 @@ export const MonthGrid: Component<MonthGridProps> = (props) => {
  * Events:
  *  - onEventClick   → CustomEvent<TimeGridEvent>              — user clicked an event block
  *  - onDayClick     → CustomEvent<{ date: string }>           — user clicked a column header
+ *  - onDayHeaderClick → CustomEvent<DayHeaderClickDetail>     — user clicked the day header
  *  - onSlotSelect   → CustomEvent<SlotSelectDetail>           — user clicked an empty slot
  *  - onEventMove    → CustomEvent<TimeGridEventMoveDetail>    — drag completed (move)
  *  - onEventResize  → CustomEvent<TimeGridEventResizeDetail>  — drag completed (resize)
  *  - onAddEvent     → CustomEvent<void>                       — user clicked the + FAB
  *  - onViewChange   → CustomEvent<{ view: ViewType }>         — user switched views
+ *  - onNavChange    → CustomEvent<Record<string, unknown>>    — range changed
  *
  * The components read directly from the Zustand store unless `events` is set.
  */
@@ -512,6 +536,7 @@ export interface TimeGridProps {
   /** Externally supplied events. Omit to read from the shared store. */
   events?: TimeGridEvent[];
   showFab?: boolean;
+  navLinks?: boolean;
   /** Emit `onSlotSelect` when an empty slot is clicked. Default: true */
   allowCreate?: boolean;
   /** First hour rendered (0–23). Default: 0 */
@@ -528,6 +553,7 @@ export interface TimeGridProps {
   weekStartsOn?: number;
   onEventClick?: (detail: TimeGridEvent) => void;
   onDayClick?: (detail: { date: string }) => void;
+  onDayHeaderClick?: (detail: DayHeaderClickDetail) => void;
   onSlotSelect?: (detail: SlotSelectDetail) => void;
   onEventMove?: (detail: TimeGridEventMoveDetail) => void;
   onEventResize?: (detail: TimeGridEventResizeDetail) => void;
@@ -539,7 +565,9 @@ export interface TimeGridProps {
 
 export interface YearGridProps {
   viewYear?: number;
-  onDayClick?: (detail: { date: string }) => void;
+  navLinks?: boolean;
+  onDayClick?: (detail: YearDayClickDetail) => void;
+  onMonthHeaderClick?: (detail: YearMonthHeaderClickDetail) => void;
   onViewChange?: (detail: { view: ViewType }) => void;
   onNavChange?: (detail: Record<string, unknown>) => void;
   ref?: (el: HTMLElement) => void;
@@ -557,6 +585,7 @@ function createTimeGrid(
       const el = ref as unknown as Record<string, unknown>;
       if (props.events !== undefined) el.events = props.events;
       if (props.showFab !== undefined) el.showFab = props.showFab;
+      if (props.navLinks !== undefined) el.navLinks = props.navLinks;
       if (props.allowCreate !== undefined) el.allowCreate = props.allowCreate;
       if (props.startHour !== undefined) el.startHour = props.startHour;
       if (props.endHour !== undefined) el.endHour = props.endHour;
@@ -579,6 +608,7 @@ function createTimeGrid(
       };
       attach("event-click", props.onEventClick);
       attach("day-click", props.onDayClick);
+      attach("day-header-click", props.onDayHeaderClick);
       attach("slot-select", props.onSlotSelect);
       attach("event-move", props.onEventMove);
       attach("event-resize", props.onEventResize);
@@ -605,6 +635,7 @@ export const DayGrid: Component<TimeGridProps> =
 
 export const WeekGrid: Component<TimeGridProps> =
   createTimeGrid("janus-week-grid");
+
 export const YearGrid: Component<YearGridProps> = (props) => {
   let ref!: HTMLElement;
 
@@ -612,6 +643,7 @@ export const YearGrid: Component<YearGridProps> = (props) => {
     if (ref) {
       const el = ref as unknown as Record<string, unknown>;
       if (props.viewYear !== undefined) el.viewYear = props.viewYear;
+      if (props.navLinks !== undefined) el.navLinks = props.navLinks;
     }
   });
 
@@ -624,6 +656,7 @@ export const YearGrid: Component<YearGridProps> = (props) => {
       }
     };
     attach("day-click", props.onDayClick);
+    attach("month-header-click", props.onMonthHeaderClick);
     attach("view-change", props.onViewChange);
     attach("nav-change", props.onNavChange);
   });
@@ -690,6 +723,7 @@ export interface TopbarProps {
   onToggleCreate?: () => void;
   /** Fired when the user clicks the Google Calendar connect/disconnect button. */
   onConnectCalendar?: () => void;
+  onDateLabelClick?: (detail: TopbarDateLabelClickDetail) => void;
 }
 
 export const Topbar: Component<TopbarProps> = (props) => {
@@ -725,6 +759,7 @@ export const Topbar: Component<TopbarProps> = (props) => {
     attach("view-switch", props.onViewSwitch);
     attach("toggle-create", props.onToggleCreate);
     attach("connect-calendar", props.onConnectCalendar);
+    attach("date-label-click", props.onDateLabelClick);
   });
 
   return (

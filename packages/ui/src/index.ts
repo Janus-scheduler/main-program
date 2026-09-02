@@ -8,6 +8,7 @@ export * from "./time-grid/time-grid-types";
 export * from "./time-grid/janus-day-grid";
 export * from "./time-grid/janus-week-grid";
 
+export * from "./year-grid/year-grid-types";
 export * from "./year-grid/janus-year-grid";
 
 export * from "./chat/chat-types";

@@ -38,6 +38,10 @@ export class JanusYearGrid extends LitElement {
   @property({ type: Number, attribute: "view-year" })
   viewYear: number = new Date().getFullYear();
 
+  /** When true, month headers and day cells show interactive navigation affordances. Default: true */
+  @property({ type: Boolean, attribute: "nav-links" })
+  navLinks = true;
+
   @state() private _eventsMap: Map<string, string> = new Map();
   private _unsubStore?: () => void;
 
@@ -191,11 +195,44 @@ export class JanusYearGrid extends LitElement {
     this._eventsMap = newEventsMap;
   }
 
-  private _handleDayClick(year: number, month: number, day: number) {
-    const dateStr = toLocalDateStr(year, month, day);
+  private _handleMonthHeaderClick(
+    year: number,
+    monthIndex: number,
+    jsEvent?: MouseEvent,
+  ) {
+    const dateStr = toLocalDateStr(year, monthIndex, 1);
+    this.dispatchEvent(
+      new CustomEvent("month-header-click", {
+        detail: {
+          year,
+          month: monthIndex,
+          monthName: MONTH_NAMES[monthIndex],
+          date: dateStr,
+          jsEvent,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _handleDayClick(
+    year: number,
+    monthIndex: number,
+    day: number,
+    jsEvent?: MouseEvent,
+  ) {
+    const dateStr = toLocalDateStr(year, monthIndex, day);
     this.dispatchEvent(
       new CustomEvent("day-click", {
-        detail: { date: dateStr },
+        detail: {
+          date: dateStr,
+          source: "cell",
+          year,
+          month: monthIndex,
+          day,
+          jsEvent,
+        },
         bubbles: true,
         composed: true,
       }),
@@ -230,7 +267,8 @@ export class JanusYearGrid extends LitElement {
           role="button"
           tabindex=${isToday ? "0" : "-1"}
           aria-label="${MONTH_NAMES[monthIndex]} ${day}, ${this.viewYear}"
-          @click=${() => this._handleDayClick(this.viewYear, monthIndex, day)}
+          @click=${(e: MouseEvent) =>
+            this._handleDayClick(this.viewYear, monthIndex, day, e)}
           @keydown=${(e: KeyboardEvent) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
@@ -258,13 +296,34 @@ export class JanusYearGrid extends LitElement {
 
     return html`
       <div class="yg-month-card">
-        <div
-          class="yg-month-header ${
-            isCurrentMonth ? "yg-month-header--current" : ""
-          }"
-        >
-          ${MONTH_NAMES[monthIndex]}
-        </div>
+        ${
+          this.navLinks
+            ? html`
+                <button
+                  type="button"
+                  class="yg-month-header-btn ${
+                    isCurrentMonth ? "yg-month-header-btn--current" : ""
+                  }"
+                  @click=${(e: MouseEvent) => {
+                    e.stopPropagation();
+                    this._handleMonthHeaderClick(this.viewYear, monthIndex, e);
+                  }}
+                  title="Go to ${MONTH_NAMES[monthIndex]} ${this.viewYear}"
+                  aria-label="View ${MONTH_NAMES[monthIndex]} ${this.viewYear}"
+                >
+                  ${MONTH_NAMES[monthIndex]}
+                </button>
+              `
+            : html`
+                <div
+                  class="yg-month-header ${
+                    isCurrentMonth ? "yg-month-header--current" : ""
+                  }"
+                >
+                  ${MONTH_NAMES[monthIndex]}
+                </div>
+              `
+        }
         <div class="yg-day-grid">
           ${WEEK_DAYS.map((wd) => html`<div class="yg-weekday">${wd}</div>`)}
           ${cells}

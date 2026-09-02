@@ -103,6 +103,44 @@ export const yearGridStyles = css`
     color: var(--orange);
   }
 
+  .yg-month-header-btn {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-1);
+    margin-bottom: 6px;
+    padding: 2px 6px;
+    margin-left: -2px;
+    border-radius: 6px;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease,
+      transform 0.1s ease;
+    font-family: inherit;
+  }
+
+  .yg-month-header-btn:hover {
+    background-color: var(--today-bg, rgba(0, 0, 0, 0.05));
+    color: var(--orange);
+  }
+
+  .yg-month-header-btn:active {
+    transform: scale(0.97);
+  }
+
+  .yg-month-header-btn:focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: 1px;
+  }
+
+  .yg-month-header-btn--current {
+    color: var(--orange);
+  }
+
   /* Day Grid */
   .yg-day-grid {
     display: grid;
