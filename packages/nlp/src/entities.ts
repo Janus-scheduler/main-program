@@ -205,9 +205,29 @@ function matchCatalog(text: string, entries: CatalogEntry[]): EntityMatch[] {
   return kept.sort((a, b) => a.start - b.start);
 }
 
-/** The frozen verb lexicon, flattened and longest-first by word count. */
-const ALL_VERB_PHRASES = [...new Set(Object.values(INTENT_VERBS).flat())].sort(
-  (a, b) => b.split(" ").length - a.split(" ").length,
+/**
+ * The frozen verb lexicon, flattened and longest-first by word count.
+ *
+ * Plus the HEAD of every multi-word phrase. The frozen list holds “set up”,
+ * “block off”, “line up”, “take off” — but people drop the particle: “set a
+ * meeting today at 10am”. With only the full phrase known, `set` was not a
+ * verb, so the whole clause fell through and “set a meeting” became the
+ * event's NAME. Worse, that name then spanned the verb, so editing the name
+ * replaced the verb too and the sentence stopped classifying at all.
+ *
+ * Derived from the frozen list rather than hand-written, so the two cannot
+ * drift. Longest first, so “set up” is still preferred over “set”.
+ */
+const ALL_VERB_PHRASES = [
+  ...new Set(
+    Object.values(INTENT_VERBS)
+      .flat()
+      .flatMap((phrase) =>
+        phrase.includes(" ") ? [phrase, phrase.split(" ")[0]] : [phrase],
+      ),
+  ),
+].sort(
+  (a, b) => b.split(" ").length - a.split(" ").length || b.length - a.length,
 );
 
 /**
@@ -276,6 +296,19 @@ const FUNCTION_WORDS = new Set([
   "titled",
   "entitled",
 ]);
+
+/**
+ * Nouns that introduce a name rather than being part of one.
+ *
+ * “cancel the event Pre-op Assessment” was read as an event literally called
+ * “event Pre-op Assessment”, so the lookup found nothing and the
+ * cancellation dead-ended.
+ *
+ * Dropped ONLY when more title words follow — the head-noun rule this file
+ * already applies elsewhere. “team event” keeps its head noun; “the event X”
+ * loses its classifier.
+ */
+const CLASSIFIER_NOUNS = new Set(["event", "appointment", "booking"]);
 
 /** Determiners stripped from the front of a finished title. */
 const LEADING_DETERMINERS = new Set([
@@ -350,32 +383,90 @@ function titleFromRemainder(
     }
   }
 
-  let changed = true;
-  while (changed && tokens.length > 0) {
-    changed = false;
-    const kept = tokens.filter((token, i) => {
-      if (!FUNCTION_WORDS.has(token.text.toLowerCase())) return true;
-      const isFirst = i === 0;
-      const isLast = i === tokens.length - 1;
-      const nextIsFunction =
-        i + 1 < tokens.length &&
-        FUNCTION_WORDS.has(tokens[i + 1].text.toLowerCase());
-      return !(isFirst || isLast || nextIsFunction);
-    });
-    if (kept.length !== tokens.length) {
-      tokens = kept;
-      changed = true;
+  /**
+   * Split into RUNS first, then tidy each one.
+   *
+   * A run is a stretch of surviving words with nothing claimed between them.
+   * The span used to run from the first surviving token to the last and was
+   * sliced out of the ORIGINAL text, so everything blanked in between came
+   * back: “Book Operating Room 1, MRI Scanner A, and schedule Dr. Sarah Chen
+   * … 5:00 PM to 6:00 PM Standup” yielded a title holding both rooms, both
+   * people and the whole time phrase.
+   *
+   * Tidying per run rather than across the whole list matters too: “and” and
+   * “for” are neither first nor last of the WHOLE token list, so they survived
+   * and kept a junk run alive.
+   */
+  const claimedBetween = (from: number, to: number): boolean => {
+    for (let i = from; i < to; i++) {
+      if (!/\s/.test(text[i]) && /\s/.test(chars[i])) return true;
     }
+    return false;
+  };
+
+  type Token = (typeof tokens)[number];
+  const runs: Token[][] = [];
+  for (const token of tokens) {
+    const current = runs[runs.length - 1];
+    const previous = current && current[current.length - 1];
+    if (previous && !claimedBetween(previous.end, token.start))
+      current.push(token);
+    else runs.push([token]);
   }
 
-  while (tokens.length > 0) {
-    const firstLower = tokens[0].text.toLowerCase();
-    if (LEADING_DETERMINERS.has(firstLower) || FUNCTION_WORDS.has(firstLower)) {
-      tokens.shift();
-    } else {
-      break;
+  /** Drop a function word whose object has been cut away. */
+  const tidy = (run: Token[]): Token[] => {
+    let kept = run;
+    let changed = true;
+    while (changed && kept.length > 0) {
+      changed = false;
+      const next = kept.filter((token, i) => {
+        if (!FUNCTION_WORDS.has(token.text.toLowerCase())) return true;
+        const isFirst = i === 0;
+        const isLast = i === kept.length - 1;
+        const nextIsFunction =
+          i + 1 < kept.length &&
+          FUNCTION_WORDS.has(kept[i + 1].text.toLowerCase());
+        return !(isFirst || isLast || nextIsFunction);
+      });
+      if (next.length !== kept.length) {
+        kept = next;
+        changed = true;
+      }
     }
-  }
+    while (kept.length > 0) {
+      const first = kept[0].text.toLowerCase();
+      if (LEADING_DETERMINERS.has(first) || FUNCTION_WORDS.has(first))
+        kept = kept.slice(1);
+      else break;
+    }
+    // A classifier noun INTRODUCING a name is not part of it; as the head of
+    // one (“team event”) it is.
+    while (
+      kept.length > 1 &&
+      CLASSIFIER_NOUNS.has(kept[0].text.toLowerCase())
+    ) {
+      kept = kept.slice(1);
+    }
+    return kept;
+  };
+
+  /** Nothing but command verbs or bare classifiers is not a name. */
+  const isNoise = (run: Token[]): boolean =>
+    run.every((t) => {
+      const w = t.text.toLowerCase();
+      return ALL_VERB_PHRASES.includes(w) || CLASSIFIER_NOUNS.has(w);
+    });
+
+  const candidates = runs
+    .map(tidy)
+    .filter((run) => run.length > 0 && !isNoise(run))
+    .sort(
+      (a, b) =>
+        b[b.length - 1].end - b[0].start - (a[a.length - 1].end - a[0].start),
+    );
+
+  tokens = candidates[0] ?? [];
 
   if (tokens.length === 0) return undefined;
 

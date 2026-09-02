@@ -92,6 +92,17 @@ export type PresentMessage =
       summary: string;
       canUndo: boolean;
       title?: string;
+      /**
+       * Offer a “View” button.
+       *
+       * Defaults to FALSE, deliberately. `<janus-chat>` renders the button on
+       * `canView !== false`, so leaving it undefined rendered one on every
+       * success — and it emitted `chat-view`, which nothing listens for. A
+       * button that visibly does nothing is worse than no button.
+       *
+       * A host that handles `chat-view` can set this true to opt back in.
+       */
+      canView?: boolean;
     };
 
 /** "Thu 10:00 AM" — short, and unambiguous about which day. */
@@ -422,8 +433,24 @@ export function presentSession(
     const stuck = state.question.slot === "escape";
 
     const lastAnswer = state.answers[state.answers.length - 1];
+    /**
+     * Navigation is not content, and must never be read back.
+     *
+     * `edit` and `escape` carry SENTINELS as their answer — `__edit__:title`,
+     * `__start_over__` — because a closed choice needs values a user cannot
+     * accidentally type. Acknowledging one printed the sentinel verbatim:
+     *
+     *     Got it — __edit__:title.
+     *
+     * There is nothing to acknowledge anyway: the question that follows
+     * (“What should I call it instead?”) already says what was chosen.
+     */
+    const isNavigation =
+      lastAnswer !== undefined &&
+      (lastAnswer.slot === "edit" || lastAnswer.slot === "escape");
+
     const ack =
-      rejected || stuck || !lastAnswer
+      rejected || stuck || !lastAnswer || isNavigation
         ? undefined
         : lastAnswer.skipped
           ? "No problem, skipping that."

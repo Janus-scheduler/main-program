@@ -66,6 +66,7 @@ describe("presentSession intent-aware formatting in @janus-scheduler/nlp", () =>
           timeOfDay: true,
           duration: true,
           meridiem: false,
+          timeZone: false,
         },
         assumptions: [
           "no time of day given — assumed 09:00",
@@ -195,6 +196,7 @@ describe("presentSession intent-aware formatting in @janus-scheduler/nlp", () =>
             timeOfDay: true, // assumed!
             duration: true, // assumed!
             meridiem: false,
+            timeZone: false,
           },
           assumptions: ["assumed 09:00"],
         },

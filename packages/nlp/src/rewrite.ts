@@ -43,6 +43,8 @@
  * the frame "<verb> Room A tomorrow at 3pm".
  */
 
+import { INTENT_VERBS } from "./constants";
+import { withinDistance } from "./spelling";
 import type { Intent } from "./types";
 
 /**
@@ -150,7 +152,248 @@ const VERB_RULES: VerbRule[] = [
  * the map only covers verbs the classifier rejects, so ordinary phrasing never
  * reaches a rule at all.
  */
+/**
+ * Padding that says nothing about WHAT to do, only how politely.
+ *
+ * Measured, against the shipped artifacts:
+ *
+ *   “could you please put something in for tomorrow afternoon in OR1”  0.27
+ *   “put something in for tomorrow afternoon in OR1”                    0.85
+ *   “I was hoping to get Lab 3 booked out on friday”                    0.34
+ *   “book Lab 3 on friday”                                             0.86
+ *
+ * The classifier embeds the WHOLE utterance, so these words are not free —
+ * they pull the vector toward nothing in particular and drag confidence
+ * under the 0.45 floor. Every one of them is politeness, not instruction.
+ *
+ * `LEAD` above handles the short forms the frozen `LEADING_WRAPPERS` knows.
+ * This handles the longer ones it does not, and it removes them ENTIRELY
+ * rather than replacing them — there is nothing to preserve.
+ */
+const POLITENESS_RE = new RegExp(
+  "^" +
+    String.raw`\s*` +
+    "(?:" +
+    [
+      // “I was hoping to”, “I am hoping to”, “I’d like to”, “I want to”
+      String.raw`i(?:'d| would| had)? (?:like|want|need|hope|hoping|was hoping|am hoping|would like) to`,
+      String.raw`i(?:'m| am) (?:trying|looking) to`,
+      // “would you mind”, “do you think you could”
+      String.raw`would you mind`,
+      String.raw`do you think you (?:could|can)`,
+      String.raw`(?:can|could|would|will) you (?:please )?(?:go ahead and )?`,
+      String.raw`(?:please|kindly)`,
+      String.raw`(?:let's|lets)`,
+      String.raw`(?:i need|i want|we need|we want)`,
+    ].join("|") +
+    ")" +
+    String.raw`\b\s*`,
+  "i",
+);
+
+/**
+ * Strip politeness, repeatedly.
+ *
+ * Repeatedly because they stack: “could you please…” is two of these, and
+ * “I was hoping you could please…” is three. Bounded so a pathological input
+ * cannot spin.
+ */
+export function stripPoliteness(text: string): string {
+  let out = text;
+  for (let i = 0; i < 4; i++) {
+    const next = out.replace(POLITENESS_RE, "");
+    if (next === out) break;
+    out = next;
+  }
+  // Never hand the classifier an empty string: a bare “please” is not a
+  // request, and it should reach the gates as the nothing it is.
+  return out.trim().length > 0 ? out : text;
+}
+
+/**
+ * Does the utterance already contain a command verb?
+ *
+ * Read from the FROZEN `INTENT_VERBS` rather than a second list, so the
+ * question “is there a verb here?” has one answer in this package.
+ */
+const VERB_ANYWHERE_RE = new RegExp(
+  String.raw`\b(?:` +
+    [...new Set(Object.values(INTENT_VERBS).flat())]
+      .sort((a, b) => b.length - a.length)
+      .map((v) => v.replace(/ /g, String.raw`\s+`))
+      .join("|") +
+    String.raw`)\b`,
+  "i",
+);
+
+/** A clock time, a weekday, or a relative day — enough to anchor an event. */
+const TIME_ISH_RE = new RegExp(
+  String.raw`\b(?:` +
+    [
+      String.raw`\d{1,2}(?::\d{2})?\s*(?:am|pm)`,
+      String.raw`\d{1,2}:\d{2}`,
+      "noon|midnight|today|tomorrow|tmrw|tonight",
+      "mon|tues?|wednes|thurs?|fri|satur|sun",
+    ].join("|") +
+    String.raw`)`,
+  "i",
+);
+
+/**
+ * Give a verbless utterance the verb it obviously implies.
+ *
+ * Measured, against the shipped artifacts:
+ *
+ *   “OR1 3pm tmrw”        0.23  →  “book OR1 3pm tmrw”        0.86
+ *   “lab 3 friday 2pm”    0.18  →  “book lab 3 friday 2pm”    0.86
+ *   “sarah 10am”          0.09  →  “book sarah 10am”          0.92
+ *
+ * The classifier is verb-driven, so a sentence with no verb has nothing to
+ * classify and lands near zero. But a room and a time and nothing else has
+ * exactly one reading to any human, and it is the commonest way people type
+ * when they are in a hurry.
+ *
+ * This is NOT a guess about intent. It only fires when there is no verb at
+ * all — so there is no competing reading to be wrong about — and `book` is
+ * the only thing a bare noun-plus-time can mean. A sentence that names a verb
+ * keeps it, whatever it is.
+ *
+ * As always, the gates still see the ORIGINAL. A synthesised verb cannot
+ * carry anything past an anchor check it would not have cleared alone.
+ */
+/**
+ * Words that mean this is a SENTENCE, not a shorthand booking.
+ *
+ * The rule below fires on a bare noun-phrase-plus-time. Without this guard it
+ * also fired on ordinary sentences that merely lack a command verb —
+ * “I'm free at 2pm, aren't you?”, “arent we meeting today” — turning a
+ * question or a statement into a booking request. Those are the negation
+ * fixtures, and they caught it.
+ */
+const SENTENCE_MARKER_RE = new RegExp(
+  [
+    String.raw`\b(?:` +
+      [
+        "i|we|you|he|she|they|it",
+        String.raw`i'?m|we'?re|you'?re`,
+        "is|are|am|was|were|be|been|do|does|did",
+        String.raw`don'?t|doesn'?t|didn'?t|can'?t|cant`,
+        String.raw`aren'?t|arent|isn'?t|isnt|won'?t|wont`,
+        "not|free|busy|available|maybe|think|about",
+      ].join("|") +
+      String.raw`)\b`,
+    String.raw`\?`,
+  ].join("|"),
+  "i",
+);
+
+/** At most this many words still reads as shorthand rather than prose. */
+const MAX_SHORTHAND_WORDS = 4;
+
+/** Every single word of the frozen verb lexicon, for the typo guard. */
+const VERB_WORDS = [
+  ...new Set(
+    Object.values(INTENT_VERBS)
+      .flat()
+      .flatMap((v) => v.split(" ")),
+  ),
+];
+
+/**
+ * Is any word here a command verb the user simply MISSPELLED?
+ *
+ * The routing fixtures are full of them — “cancle my 3pm”, “scedule a
+ * meeting”, “moev the auditor meeting” — and a misspelled verb looks exactly
+ * like no verb at all. Synthesising `book` in front of one turns a
+ * cancellation into a booking at high confidence, which is the worst failure
+ * this layer can produce.
+ *
+ * Distance 1 only: far enough for a transposition or a dropped letter, close
+ * enough that ordinary short nouns are not swallowed.
+ */
+/**
+ * Words that make an utterance prose or a question, checked with the same
+ * tolerance as the verbs.
+ *
+ * “waht's on tomorrow” is a LOOKUP with a typo, and “theyd prefer friday” is
+ * a statement — neither is a shorthand booking, and both slipped past an
+ * exact-match guard.
+ */
+const PROSE_WORDS = [
+  "what",
+  "when",
+  "where",
+  "who",
+  "why",
+  "how",
+  "which",
+  "they",
+  "them",
+  "their",
+  "theyd",
+  "prefer",
+  "maybe",
+  "about",
+];
+
+/**
+ * Is any word here a command verb, question word or pronoun the user simply
+ * MISSPELLED?
+ *
+ * The routing fixtures are full of them — “cancle my 3pm”, “scedule a
+ * meeting”, “moev the auditor meeting” — and a misspelled verb looks exactly
+ * like no verb at all. Synthesising `book` in front of one turns a
+ * cancellation into a booking at high confidence, which is the worst failure
+ * this layer can produce.
+ *
+ * Distance 1 only: far enough for a transposition or a dropped letter, close
+ * enough that ordinary short nouns are not swallowed.
+ */
+function looksLikeProseOrAVerb(words: string[]): boolean {
+  return words.some((w) => {
+    // Compare the STEM: “waht's” is a typo of “what's”, and stripping the
+    // apostrophe to “wahts” puts it 2 edits from “what” instead of 1.
+    const stem = w.toLowerCase().split(/[’']/)[0];
+    const word = stem.replace(/[^a-z]/g, "");
+    if (word.length < 3) return false;
+    return [...VERB_WORDS, ...PROSE_WORDS].some((v) =>
+      withinDistance(word, v, 1),
+    );
+  });
+}
+
+export function synthesiseVerb(text: string): string {
+  if (VERB_ANYWHERE_RE.test(text)) return text;
+  // A verb this package knows how to REWRITE is still a verb.
+  if (VERB_RULES.some((rule) => rule.pattern.test(text))) return text;
+
+  // Prose, a question, or anything with a subject is not shorthand.
+  if (SENTENCE_MARKER_RE.test(text)) return text;
+
+  // Split without a regex on purpose: a mangled `s` here silently produced
+  // a word count of 1 for a six-word sentence and let this fire on prose.
+  const words = text.trim().split(" ").filter(Boolean);
+  if (words.length === 0 || words.length > MAX_SHORTHAND_WORDS) return text;
+
+  // A misspelled verb is still a verb, and guessing `book` over one inverts
+  // the user's intent. Same for a question word: it makes this a query.
+  if (looksLikeProseOrAVerb(words)) return text;
+
+  if (!TIME_ISH_RE.test(text)) return text;
+
+  // Something has to be BOOKED, not just a bare time. “3pm” alone is a
+  // fragment, and answering it as a booking would invent the subject.
+  const withoutTime = text.replace(new RegExp(TIME_ISH_RE.source, "gi"), " ");
+  if (!/[a-z]{2,}/i.test(withoutTime)) return text;
+
+  return `book ${text.trim()}`;
+}
+
 export function rewriteForClassifier(text: string): string {
+  // Politeness first: a verb rule is anchored to the START, so padding in
+  // front of the verb hides it from every rule below.
+  text = stripPoliteness(text);
+
   for (const rule of VERB_RULES) {
     if (rule.pattern.test(text)) {
       return text.replace(rule.pattern, (m) => {
@@ -163,7 +406,14 @@ export function rewriteForClassifier(text: string): string {
       });
     }
   }
-  return text;
+
+  // LAST, and only if nothing else claimed the sentence.
+  //
+  // Ordering is load-bearing. Run before the rules, a synthesised `book`
+  // lands in front of an unknown domain verb — “book postpone the standup” —
+  // and the rule that would have mapped `postpone` to `reschedule` no longer
+  // matches its anchor. Every domain verb broke that way.
+  return synthesiseVerb(text);
 }
 
 /** The rules, exported so a test can assert each replacement's intent. */

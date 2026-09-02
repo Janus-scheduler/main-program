@@ -35,4 +35,44 @@ describe("classifySmalltalk", () => {
   it("rejects phrases over 4 words", () => {
     expect(classifySmalltalk("hi there how are you")).toBeNull();
   });
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  F-1 / F-2 — the two phrasings the shipped HELP_RE dropped
+  //
+  //  `docs/NLP_TIER1_INSTRUCTIONS.md` §2.1 specified a trailing `[?!.]*` and
+  //  the phrase "what can i say". Neither made it in, so the commonest way
+  //  anyone asks for help — with a question mark — fell through to the
+  //  classifier and was refused.
+  // ══════════════════════════════════════════════════════════════════════
+
+  it.each([
+    "what can you do?",
+    "what can you do!",
+    "what can you do.",
+    "help?",
+    "how does this work?",
+    "stuck?",
+  ])("tolerates trailing punctuation: %s", (text) => {
+    expect(classifySmalltalk(text)).toBe("help");
+  });
+
+  it.each(["what can i say", "what can i say?"])("understands %s", (text) => {
+    expect(classifySmalltalk(text)).toBe("help");
+  });
+
+  it("still refuses a help word with real words after it", () => {
+    // The anchor is what protects a room called “Help Desk”; punctuation
+    // tolerance must not become a prefix match.
+    expect(classifySmalltalk("what can you do about Room A")).toBeNull();
+    expect(classifySmalltalk("help me with this booking")).toBeNull();
+    expect(classifySmalltalk("options for tomorrow")).toBeNull();
+  });
+
+  it("still protects a catalog name", () => {
+    const catalog = {
+      resources: [{ id: "h1", name: "Help Desk", type: "room" }],
+      participants: [],
+    };
+    expect(classifySmalltalk("Help Desk", catalog)).toBeNull();
+  });
 });

@@ -80,6 +80,10 @@ function makeScheduler(seed: StoredEvent[] = []): Stub {
 const TIME = {
   startISO: "2026-08-20T09:30:00.000Z",
   endISO: "2026-08-20T11:00:00.000Z",
+  // Real `ResolvedTime` values always carry these; the stub used to omit
+  // them, which silently disabled the conflict check under test.
+  startMs: Date.parse("2026-08-20T09:30:00.000Z"),
+  endMs: Date.parse("2026-08-20T11:00:00.000Z"),
   localDate: "2026-08-20",
   localTime: "15:00",
 };
@@ -590,5 +594,158 @@ describe("commitSession — target by room and time", () => {
     // The advice has to be a phrasing that actually works when typed back.
     if (!result.ok) expect(result.message).toMatch(/cancel .* at /i);
     expect(scheduler.events.size).toBe(1);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  A title that matches nothing must not end the search
+//
+//  "cancel the Dr. Michael Ross event today at 1pm" produced a title of
+//  "event", and `resolveTarget` gave up on it — while holding the person and
+//  the time that identify the event exactly. Found in the Phase K browser run.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("commitSession — a useless title falls back to room and time", () => {
+  const at = (startISO: string, endISO: string) => ({
+    startISO,
+    endISO,
+    startMs: Date.parse(startISO),
+    endMs: Date.parse(endISO),
+    timezone: "UTC",
+    localDate: "2026-08-20",
+    localTime: "14:00",
+    weekday: "thursday",
+    durationMinutes: 60,
+    assumed: { date: false, timeOfDay: false, duration: true, meridiem: false },
+    assumptions: [],
+  });
+  const time = at("2026-08-20T14:00:00.000Z", "2026-08-20T15:00:00.000Z");
+  const target = stored({
+    id: "e9",
+    title: "Pre-op Assessment",
+    startTime: "2026-08-20T14:00:00.000Z",
+    endTime: "2026-08-20T15:00:00.000Z",
+    resourceIds: ["r1"],
+  });
+  const cancelling = (title: string | undefined): SessionState =>
+    readyState({
+      intent: "delete_event",
+      title,
+      time,
+      resources: [{ id: "r1", name: "Operating Room 1" }],
+      participants: [],
+    } as unknown as Partial<SessionState["draft"]>);
+
+  it("finds the event when the title matches nothing", () => {
+    const scheduler = makeScheduler([target]);
+    const result = commitSession(scheduler, cancelling("event"), undefined);
+    expect(result.ok).toBe(true);
+    expect(scheduler.events.has("e9")).toBe(false);
+  });
+
+  it("still prefers a title that DOES match", () => {
+    const other = stored({
+      id: "e8",
+      title: "Deep Clean",
+      startTime: "2026-08-20T14:00:00.000Z",
+      endTime: "2026-08-20T15:00:00.000Z",
+      resourceIds: ["r1"],
+    });
+    const scheduler = makeScheduler([target, other]);
+    const result = commitSession(
+      scheduler,
+      cancelling("Deep Clean"),
+      undefined,
+    );
+    expect(result.ok).toBe(true);
+    expect(scheduler.events.has("e8")).toBe(false);
+    expect(scheduler.events.has("e9")).toBe(true);
+  });
+
+  it("names the title it could not find when nothing else matches either", () => {
+    const scheduler = makeScheduler([]);
+    const result = commitSession(scheduler, cancelling("Nonesuch"), undefined);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("Nonesuch");
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  Conflict prevention  (Phase K · K3)
+//
+//  Found in the Phase K browser run: with `preventConflicts` ON the timeline
+//  refused a double-booking and the CHAT created it anyway. `commitSession`
+//  had no conflict check at all — the word did not appear in the file.
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("commitSession — preventConflicts", () => {
+  const occupant = stored({
+    id: "busy",
+    title: "Ward Round",
+    // TIME is 09:30–11:00 UTC, so this overlaps it.
+    startTime: "2026-08-20T10:00:00.000Z",
+    endTime: "2026-08-20T10:30:00.000Z",
+    resourceIds: ["r1"],
+  });
+  const booking = () =>
+    readyState({
+      resources: [{ id: "r1", name: "Operating Room 1" }],
+    } as never);
+
+  it("refuses a clashing booking when the host says to", () => {
+    const scheduler = makeScheduler([occupant]);
+    const result = commitSession(scheduler, booking(), undefined, {
+      preventConflicts: true,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("Ward Round");
+      expect(result.message).toContain("Operating Room 1");
+    }
+    // and nothing was written
+    expect(scheduler.events.size).toBe(1);
+  });
+
+  it("allows it when the host has not asked for prevention", () => {
+    // The default posture is warn-not-block, matching `preventConflicts=false`
+    // on the timeline.
+    const scheduler = makeScheduler([occupant]);
+    expect(commitSession(scheduler, booking(), undefined).ok).toBe(true);
+    expect(scheduler.events.size).toBe(2);
+  });
+
+  it("ignores an event on a DIFFERENT row", () => {
+    const elsewhere = stored({ ...occupant, id: "other", resourceIds: ["r2"] });
+    const scheduler = makeScheduler([elsewhere]);
+    const result = commitSession(scheduler, booking(), undefined, {
+      preventConflicts: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("ignores one that merely touches the edge", () => {
+    // Half-open overlap, same as core's `checkSlotConflict`: back-to-back
+    // bookings do not clash.
+    const abutting = stored({
+      id: "abut",
+      title: "Earlier",
+      startTime: "2026-08-20T08:00:00.000Z",
+      endTime: "2026-08-20T09:30:00.000Z",
+      resourceIds: ["r1"],
+    });
+    const scheduler = makeScheduler([abutting]);
+    const result = commitSession(scheduler, booking(), undefined, {
+      preventConflicts: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("ignores a cancelled event", () => {
+    const gone = stored({ ...occupant, id: "gone", status: "cancelled" });
+    const scheduler = makeScheduler([gone]);
+    const result = commitSession(scheduler, booking(), undefined, {
+      preventConflicts: true,
+    });
+    expect(result.ok).toBe(true);
   });
 });

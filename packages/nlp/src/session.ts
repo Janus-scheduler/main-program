@@ -432,6 +432,34 @@ function spliceSpan(text: string, span: TextSpan, replacement: string): string {
 }
 
 /**
+ * Replace several disjoint spans with one string, keeping the gaps.
+ *
+ * Blanks from the end backwards so earlier offsets stay valid, then inserts
+ * the replacement where the FIRST span began. The alternative — one splice
+ * from the first span's start to the last one's end — also swallows whatever
+ * sits between them, which is how changing a room deleted the time.
+ */
+function spliceSpans(
+  text: string,
+  spans: TextSpan[],
+  replacement: string,
+): string {
+  const usable = spans
+    .filter((s) => s.start >= 0 && s.end <= text.length && s.start <= s.end)
+    .sort((a, b) => a.start - b.start);
+  if (usable.length === 0) return `${text} ${replacement}`.trim();
+
+  let out = text;
+  for (let i = usable.length - 1; i >= 0; i--) {
+    out = out.slice(0, usable[i].start) + out.slice(usable[i].end);
+  }
+  const at = usable[0].start;
+  return `${out.slice(0, at)} ${replacement} ${out.slice(at)}`
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
  * Wall-clock "15:00" → "3:00 pm", a form the time parser can actually read.
  *
  * LOAD-BEARING. These strings are merged back into the utterance and re-parsed,
@@ -692,6 +720,10 @@ function requirementQuestion(
   // Every requirement question carries a Skip chip. The host said the field
   // matters, not that it is unobtainable — refusing to let someone past a
   // question they cannot answer turns a helper into an obstacle.
+  //
+  // `skippable` stays TRUE even though no Skip chip is rendered: the round-cap
+  // escape still offers “Skip that and continue”, and that offer is gated on
+  // this flag. What changed is only what the CARD shows.
   const asking = (
     slot: SlotName,
     text: string,
@@ -702,7 +734,16 @@ function requirementQuestion(
     source: "requirement",
     skippable: true,
     text,
-    choices: [...choices, SKIP_CHOICE],
+    // “Other…” belongs only where the chips are a SAMPLE of something
+    // unbounded. Times and lengths are: six clock chips out of 1,440 minutes,
+    // five durations out of any number, so a way to type your own is
+    // essential.
+    //
+    // The room/person list is not a sample — it is the host's entire catalog.
+    // There is no other room. Offering one invites a name the calendar does
+    // not have, which only leads to “I don't have that” and back to the same
+    // question. A long catalog gets a search box instead (`searchable`).
+    choices: OPEN_ENDED_SLOTS.has(slot) ? [...choices, OTHER_CHOICE] : choices,
   });
 
   // ── a name we do not have preempts every other requirement ──────────────
@@ -1428,6 +1469,7 @@ function editQuestion(
         text: `What time should ${subjectOf(draft)} be instead?`,
         choices: TIME_OF_DAY_CHOICES,
         inputPlaceholder: "e.g. 5pm, tomorrow at 10am…",
+        replaceSpan: draft.timeSpan,
       };
 
     case "duration":
@@ -1437,6 +1479,7 @@ function editQuestion(
         text: "How long should it be instead?",
         choices: DURATION_CHOICES,
         inputPlaceholder: "e.g. 45 mins, or until 6:30 PM…",
+        replaceSpan: draft.timeSpan,
       };
 
     case "resource": {
@@ -1449,15 +1492,11 @@ function editQuestion(
         text: "Which room or person instead?",
         choices,
         searchable: choices.length > 5,
-        // Replace every name already claimed, not just the first — otherwise
-        // "Room A" survives and the card ends up listing both.
-        replaceSpan:
+        // Every claimed name, EACH as its own span. One range from the first
+        // to the last would also cover the time phrase between them.
+        replaceSpans:
           named.length > 0
-            ? {
-                text: "",
-                start: Math.min(...named.map((r) => r.start)),
-                end: Math.max(...named.map((r) => r.end)),
-              }
+            ? named.map((r) => ({ text: r.text, start: r.start, end: r.end }))
             : undefined,
       };
     }
@@ -1479,6 +1518,32 @@ export const SKIP_CHOICE: SessionChoice = {
   id: "skip",
   label: "Skip",
   value: SKIP_ANSWER,
+};
+
+/**
+ * The sentinel for “none of these — let me type it”.
+ *
+ * Offered instead of Skip on any question that has concrete options. A bare
+ * Skip asked the user to give up without telling them what giving up costs;
+ * an explicit list plus an escape into free text lets them answer either way
+ * and keeps the question honest.
+ */
+export const OTHER_ANSWER = "__other__";
+
+/**
+ * Slots whose chips are a SAMPLE rather than the whole set of valid answers.
+ *
+ * Only these get an “Other…” escape. A resource question already lists every
+ * room and person the host has, so “Other…” there would offer something that
+ * does not exist.
+ */
+const OPEN_ENDED_SLOTS: ReadonlySet<SlotName> = new Set(["when", "duration"]);
+
+/** The chip a UI renders after the real options. */
+export const OTHER_CHOICE: SessionChoice = {
+  id: "other",
+  label: "Other…",
+  value: OTHER_ANSWER,
 };
 
 /**
@@ -1542,6 +1607,24 @@ export function provideAnswer(
   // Declining a host requirement. Never offered for a gate, so this cannot be
   // used to walk past the classifier — `skippable` is false on every gate
   // question, and a skip on one is treated as an ordinary unparseable answer.
+  // “Other…” is not an answer, it is a request to type one. Re-ask the same
+  // slot with the list withdrawn, and do NOT spend a round: the user is
+  // engaging with the question, not failing to answer it.
+  if (trimmed === OTHER_ANSWER) {
+    return {
+      ...state,
+      answers: record(),
+      corrections,
+      status: "awaiting",
+      question: {
+        ...question,
+        choices: [],
+        text: otherPrompt(question.slot),
+      },
+      reason: "waiting for a typed answer",
+    };
+  }
+
   if (trimmed === SKIP_ANSWER) {
     if (!question.skippable) return next();
     return evaluate(
@@ -1820,9 +1903,11 @@ export function provideAnswer(
       // name they already gave rather than filling an empty slot, so the
       // answer goes OVER that span. Appending would leave "Room A" in the text
       // and it would come straight back as the title.
-      const merged = question.replaceSpan
-        ? spliceSpan(state.text, question.replaceSpan, addition)
-        : `${state.text} ${addition}`.trim();
+      const merged = question.replaceSpans
+        ? spliceSpans(state.text, question.replaceSpans, addition)
+        : question.replaceSpan
+          ? spliceSpan(state.text, question.replaceSpan, addition)
+          : `${state.text} ${addition}`.trim();
 
       return next({
         text: merged,
@@ -1839,14 +1924,40 @@ export function provideAnswer(
       // Unless the question carries a `replaceSpan`, which means the user is
       // changing a name they already gave. Appending then produced
       // "called standup planning" — both names, joined.
+      const appended = `${state.text} ${trimmed}`.trim();
       const merged = question.replaceSpan
         ? spliceSpan(state.text, question.replaceSpan, trimmed)
-        : `${state.text} ${trimmed}`.trim();
-      return next({
+        : appended;
+
+      const spliced = next({
         text: merged,
         utterances: [...state.utterances, trimmed],
         answers: record(trimmed),
       });
+
+      /**
+       * An edit may never leave the user worse off than before it.
+       *
+       * Replacing a title removes words the user wrote, and those can be
+       * load-bearing for the CLASSIFIER even when they are not part of the
+       * name. “set a meeting today at 10am” had a title spanning the verb, so
+       * renaming it deleted “set”, the sentence lost its only verb, and a
+       * finished booking became “I didn't quite follow that”.
+       *
+       * That cause is fixed — verb heads are recognised now — but the SHAPE
+       * can recur for any span carrying more than the name. Falling back to an
+       * append keeps the old words and the new ones, which classifies at least
+       * as well as the text that was already `ready`.
+       */
+      if (question.replaceSpan && spliced.status === "declined") {
+        return next({
+          text: appended,
+          utterances: [...state.utterances, trimmed],
+          answers: record(trimmed),
+        });
+      }
+
+      return spliced;
     }
 
     case "when": {
@@ -1927,6 +2038,22 @@ export function provideAnswer(
         answers: record(addition),
       });
     }
+  }
+}
+
+/** What to say once the user has asked to type their own answer. */
+function otherPrompt(slot: SlotName): string {
+  switch (slot) {
+    case "when":
+      return "Go ahead — when should it be?";
+    case "duration":
+      return "Go ahead — how long, or when should it end?";
+    case "resource":
+      return "Go ahead — which room or person?";
+    case "title":
+      return "Go ahead — what should I call it?";
+    default:
+      return "Go ahead — type your answer.";
   }
 }
 

@@ -576,7 +576,8 @@ export function SchedulerView({
           />
         )}
       </div>
-      <ChatSidebar manager={manager} />
+      {/* The chat must honour the SAME conflict policy as the timeline. */}
+      <ChatSidebar manager={manager} preventConflicts={preventConflicts} />
     </div>
   );
 }

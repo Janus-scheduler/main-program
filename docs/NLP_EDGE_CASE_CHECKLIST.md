@@ -1,6 +1,10 @@
 # NLP Edge-Case Checklist
 
-**Last measured:** 2026-08-29, against the current build.
+> **Step-by-step verification lives in [`docs/nlp/`](nlp/README.md)** — one
+> file per step, each with explicit pass conditions and a manual walkthrough.
+> Start there. This file is the historical record of what was measured and when.
+
+**Last measured:** 2026-09-01, against the current build.
 **Setup:** react demo, hospital catalog (_Operating Room 1_, _MRI Scanner A/B_,
 _Dr. Sarah Chen_, _Dr. Michael Ross_, _Dr. Ann sherin_),
 `REQUIRES = { add_event: ["when","duration","resource","title"], modify_event: ["when"] }`.
@@ -8,9 +12,12 @@ _Dr. Sarah Chen_, _Dr. Michael Ross_, _Dr. Ann sherin_),
 Legend: ✅ measured passing · ❌ measured failing · 🔍 **needs a human** — the
 machine cannot check it
 
-**43 of ~90 cases are now machine-checked: 30 pass, 13 fail.** Those rows do not
+**43 of ~90 cases are machine-checked, and all 43 now pass.** Those rows do not
 need your time. Everything marked 🔍 does — it is UI rendering, real commits, and
 anything where "it looked right" is the only available oracle.
+
+A green sweep has never meant a correct chat: the worst defects in this work
+were all found by hand while it was green.
 
 ---
 
@@ -88,21 +95,37 @@ saying "Got it"
 
 The machine cannot judge these. This is the list worth your time.
 
-### Phase K · commit correctness — **highest value, least covered**
+### Phase K · commit correctness — ✅ **passed**
 
-Nothing here has been checked in a browser. It is the only phase where a defect
-puts wrong data in the calendar.
+**Walked end to end in a browser by the user on 2026-09-01, and reported as
+all passing.** Not machine-verified: this is the one phase where only a human
+and a real calendar can judge the result, so the record is a report, not a
+measurement.
 
-| #   | Do this                                       | Expect                                             |
-| --- | --------------------------------------------- | -------------------------------------------------- |
-| K1  | Confirm an event with 2 rooms + 2 people      | all four attached on the timeline                  |
-| K2  | Compare the card's time to the rendered block | identical                                          |
-| K3  | Book into an occupied slot                    | conflict still flagged on the timeline             |
-| K4  | Confirm, then **Undo**                        | event gone, card marked Undone                     |
-| K5  | **Double-click Confirm**                      | one event, not two                                 |
-| K6  | Skip the resource, confirm                    | lands on the disclosed fallback row                |
-| K7  | Skip the name, confirm                        | created event is called exactly what the card said |
-| K8  | Cancel an event, then **Undo**                | colour, recurrence and resources all restored      |
+That run is also where the seven most damaging defects in the whole effort
+were found — none of them had a row in this table. See
+[`docs/nlp/PROGRESS.md`](nlp/PROGRESS.md) for K-1 … K-11 and their fixes.
+
+| #   | Do this                                       | Expect                                             | Result |
+| --- | --------------------------------------------- | -------------------------------------------------- | ------ |
+| K1  | Confirm an event with 2 rooms + 2 people      | all four attached on the timeline                  | ✅     |
+| K2  | Compare the card's time to the rendered block | identical                                          | ✅     |
+| K3  | Book into an occupied slot                    | refused when `preventConflicts` is on              | ✅     |
+| K4  | Confirm, then **Undo**                        | event gone, card marked Undone                     | ✅     |
+| K5  | **Double-click Confirm**                      | one event, not two                                 | ✅     |
+| K6  | Skip the resource, confirm                    | lands on the disclosed fallback row                | ✅     |
+| K7  | Skip the name, confirm                        | created event is called exactly what the card said | ✅     |
+| K8  | Cancel an event, then **Undo**                | colour, recurrence and resources all restored      | ✅     |
+
+**K3 took three attempts.** The first fix added a conflict check that had never
+existed in `commit.ts`; the second found the demo passing three different
+`preventConflicts` values to three surfaces, so the check was correctly
+honouring `false`. It is one flag now.
+
+**K6 changed shape.** The resource can no longer be skipped from a card at all
+— the Skip chip is gone, on the user's instruction and matching their own note
+that “resource should be there”. The fallback path still exists behind the
+round-cap escape, and lands on the disclosed row.
 
 ### Phase G · editing
 

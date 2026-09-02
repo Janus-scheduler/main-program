@@ -46,8 +46,15 @@ function App() {
     null,
   );
 
-  // Set to true to strictly block resource scheduling conflicts, or false to allow double-booking with visual warning banners.
-  const preventConflicts = false;
+  // ONE conflict policy, for every surface.
+  //
+  // true  = block a double-booking outright (timeline, modal AND chat)
+  // false = allow it, with the timeline's warning banners
+  //
+  // This used to be false here while <Timeline> hard-coded `true`, so the
+  // timeline refused a clashing drag and the chat cheerfully created one.
+  // Three surfaces enforcing three different rules is not a policy.
+  const preventConflicts = true;
 
   // null = creating a new event; string = editing the event with this ID
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);

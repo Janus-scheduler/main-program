@@ -70,6 +70,64 @@ export const DEFAULT_DURATION_MINUTES = 60;
  */
 export const DURATION_ASSUMPTION = `no duration given — assumed ${DEFAULT_DURATION_MINUTES} minutes`;
 
+/**
+ * Zone words a user may type, mapped to IANA names.
+ *
+ * Curated, not exhaustive, and deliberately so. An unknown zone is better
+ * REFUSED than guessed at: booking 3pm in the wrong zone is silent wrong data
+ * of the worst kind, because the card looks perfectly reasonable.
+ *
+ * `null` marks a genuinely AMBIGUOUS abbreviation. IST is India, Ireland and
+ * Israel; CST is US Central and China. Those are asked about, never assumed —
+ * a coin-flip between Chicago and Shanghai is not a reading of anyone's
+ * intent.
+ */
+export const ZONE_LEXICON: Record<string, string | null> = {
+  utc: "UTC",
+  gmt: "UTC",
+  // North America
+  est: "America/New_York",
+  edt: "America/New_York",
+  et: "America/New_York",
+  "eastern time": "America/New_York",
+  "new york time": "America/New_York",
+  pst: "America/Los_Angeles",
+  pdt: "America/Los_Angeles",
+  pt: "America/Los_Angeles",
+  "pacific time": "America/Los_Angeles",
+  "los angeles time": "America/Los_Angeles",
+  mst: "America/Denver",
+  // Europe
+  bst: "Europe/London",
+  "london time": "Europe/London",
+  "uk time": "Europe/London",
+  cet: "Europe/Paris",
+  cest: "Europe/Paris",
+  "paris time": "Europe/Paris",
+  "berlin time": "Europe/Berlin",
+  // Asia-Pacific
+  "india time": "Asia/Kolkata",
+  "kolkata time": "Asia/Kolkata",
+  "colombo time": "Asia/Colombo",
+  "sri lanka time": "Asia/Colombo",
+  jst: "Asia/Tokyo",
+  "tokyo time": "Asia/Tokyo",
+  "singapore time": "Asia/Singapore",
+  "dubai time": "Asia/Dubai",
+  aest: "Australia/Sydney",
+  "sydney time": "Australia/Sydney",
+  // ambiguous — ask, do not guess
+  ist: null,
+  cst: null,
+  cdt: null,
+};
+
+/** Longest first, so “new york time” wins over a bare “time” fragment. */
+const ZONE_ALTERNATION = Object.keys(ZONE_LEXICON)
+  .sort((a, b) => b.length - a.length)
+  .map((z) => z.replace(/ /g, String.raw`\s+`))
+  .join("|");
+
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 86_400_000;
 
@@ -388,6 +446,14 @@ const MENTION_PATTERNS: Array<{
       "gi",
     ),
   },
+  // A named zone, so it is honoured rather than left to become a title.
+  {
+    kind: "zone",
+    re: new RegExp(
+      String.raw`\b(?:` + ZONE_ALTERNATION + String.raw`)\b`,
+      "gi",
+    ),
+  },
   { kind: "noon", re: /\bnoon\b/gi },
   { kind: "midnight", re: /\bmidnight\b/gi },
   // "August 18", "August 18th", "Aug 18", "Aug 18, 2026"
@@ -659,6 +725,13 @@ function buildMention(
       const perUnit = /^h/i.test(m[2]) ? 60 : 1;
       return { ...base, kind, offsetMinutes: Math.round(quantity * perUnit) };
     }
+    case "zone": {
+      const key = m[0].toLowerCase().replace(/\s+/g, " ");
+      const iana = ZONE_LEXICON[key];
+      return iana
+        ? { ...base, kind, zone: iana }
+        : { ...base, kind, zoneAmbiguous: true };
+    }
     case "noon":
       return { ...base, kind, clock: { hour: 12, minute: 0 } };
     case "midnight":
@@ -774,6 +847,13 @@ export function toTimeSpan(mentions: TimeMention[]): TimeSpan | undefined {
           let endTotal = span.endClock.hour * 60 + span.endClock.minute;
           if (endTotal <= startTotal) endTotal += 24 * 60;
           span.durationMinutes ??= endTotal - startTotal;
+        }
+        break;
+      case "zone":
+        if (m.zoneAmbiguous) span.zoneAmbiguous = true;
+        else if (m.zone && !span.zone) {
+          span.zone = m.zone;
+          span.zonePhrase = m.text;
         }
         break;
       case "relativeOffset":
@@ -1005,6 +1085,7 @@ export function resolveTime(
     timeOfDay: false,
     duration: false,
     meridiem: false,
+    timeZone: false,
   };
 
   /**
@@ -1091,21 +1172,60 @@ export function resolveTime(
     }
   }
 
+  // A stated zone is not an INVENTED value, so it is not an `assumed` flag —
+  // but the conversion has to be visible, or the card shows a time the user
+  // never typed with nothing to explain it.
+  if (span.zone && span.zone !== timezone) {
+    assumptions.push(
+      `“${span.zonePhrase}” is ${span.zone} — shown here in ${timezone}`,
+    );
+  }
+
+  // A zone word this module will not guess at. IST is India, Ireland and
+  // Israel; CST is US Central and China. The time falls back to the
+  // calendar's zone — which has to be SAID, or the user reads their own
+  // words back and assumes they were honoured.
+  if (span.zoneAmbiguous && !span.zone) {
+    assumed.timeZone = true;
+    assumptions.push(
+      `that timezone could mean several places — used ${timezone}`,
+    );
+  }
+
   const durationMinutes = span.durationMinutes ?? DEFAULT_DURATION_MINUTES;
   if (span.durationMinutes === undefined) {
     assumed.duration = true;
     assumptions.push(DURATION_ASSUMPTION);
   }
 
+  /**
+   * A stated zone decides which INSTANT the wall-clock time means.
+   *
+   * “3pm New York time” is 3pm in New York, not 3pm on the calendar. Only the
+   * instant changes: `localDate` / `localTime` below still report the event in
+   * the zone the calendar is DISPLAYING, because that is where the user will
+   * see the block. Both halves are then shown — what they said, and where it
+   * lands — and that pairing is the whole point.
+   */
+  const wallZone = span?.zone ?? timezone;
   const startMs = zonedToUtcMs(
     date.year,
     date.month,
     date.day,
     clock.hour,
     clock.minute,
-    timezone,
+    wallZone,
   );
   const endMs = startMs + durationMinutes * MS_PER_MINUTE;
+
+  // Re-derive the calendar-local wall clock from the instant, so a stated
+  // zone is reflected in what the card shows rather than only in the stored
+  // value. Skipped when no zone was named, to keep the existing path exact.
+  if (span?.zone && span.zone !== timezone) {
+    const shown = zonedPartsAt(startMs, timezone);
+    date = { year: shown.year, month: shown.month, day: shown.day };
+    clock = { hour: shown.hour, minute: shown.minute };
+  }
 
   const isPastRelativeWeekday = Boolean(
     span?.date?.kind === "relativeWeekday" &&
