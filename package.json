@@ -25,11 +25,13 @@
     "prepare": "husky install",
     "format": "prettier \"**/*.{ts,tsx,js,json,md}\" --write",
     "validate": "npm run lint && npm run build --workspaces --if-present",
-    "check:packages": "publint packages/core && publint packages/ui && publint packages/nlp && publint packages/integrations && publint packages/wrappers/react-wrapper && publint packages/wrappers/angular-wrapper && publint packages/wrappers/solid-js-wrapper",
-    "build:all": "npm run build --workspace=@janus-scheduler/core --workspace=@janus-scheduler/nlp --workspace=@janus-scheduler/ui --workspace=@janus-scheduler/react --workspace=@janus-scheduler/angular --workspace=@janus-scheduler/solid --workspace=@janus-scheduler/integrations",
+    "check:packages": "publint packages/core && publint packages/ui && publint packages/nlp && publint packages/integrations && publint packages/wrappers/react-wrapper && publint packages/wrappers/angular-wrapper && publint packages/wrappers/solid-js-wrapper && publint packages/app",
+    "build:all": "npm run build --workspace=@janus-scheduler/core --workspace=@janus-scheduler/nlp --workspace=@janus-scheduler/ui --workspace=@janus-scheduler/react --workspace=@janus-scheduler/angular --workspace=@janus-scheduler/solid --workspace=@janus-scheduler/integrations --workspace=@janus-scheduler/app",
     "test:pack": "node scripts/smoke/run.mjs",
     "version-packages": "changeset version && npm install --package-lock-only",
-    "release": "npm run build:all && changeset publish"
+    "release": "npm run build:all && node scripts/publish-packages.mjs",
+    "release:publish": "node scripts/publish-packages.mjs",
+    "release:dry": "node scripts/publish-packages.mjs --dry-run"
   },
   "devDependencies": {
     "@changesets/cli": "2.29.7",

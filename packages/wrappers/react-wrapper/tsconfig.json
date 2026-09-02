@@ -9,6 +9,6 @@
     "jsx": "react",
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["index.ts"],
+  "include": ["index.ts", "use-janus-scheduler.ts"],
   "exclude": ["node_modules", "dist"]
 }

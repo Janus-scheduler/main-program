@@ -1,237 +1,283 @@
 # Janus Scheduler
 
-Janus Scheduler is a modern, **framework-agnostic** scheduling and event management component library. Built on [Lit](https://lit.dev/) Web Components, it follows the **DRY principle** by centralizing all UI in a single `@janus-scheduler/ui` package and providing thin framework adapters that wrap it — rather than duplicating UI logic per framework.
+A framework-agnostic scheduling and event-management component library. All state lives in one vanilla [Zustand](https://zustand-demo.pmnd.rs/) store, all UI is built once as [Lit](https://lit.dev/) web components, and thin per-framework packages expose those components idiomatically - so React, Angular, Solid and Vue all render the exact same code.
 
-## Architecture Overview
+Timeline, day, week, month and year views. Drag, resize and draw-to-create. A timezone-aware conflict detector, RRule recurrence, undo, and natural-language event entry.
 
+---
+
+## Two ways to use it
+
+**Pick the tier that matches how much control you want.** Both are one install.
+
+### Tier 1 - batteries included
+
+One element. It mounts the topbar, all five views and the event editor, and wires every drag, resize, create, save, delete and undo for you.
+
+```bash
+npm install @janus-scheduler/app
 ```
-                    ┌──────────────────────────────────────────────┐
-                    │               @janus-scheduler/core          │
-                    │   (Zustand State Store: Events, Resources)   │
-                    └──────────────────────┬───────────────────────┘
-                                           │ subscribes
-                    ┌──────────────────────┴───────────────────────┐
-                    │               @janus-scheduler/ui            │
-                    │   <janus-scheduler>, <janus-timeline>,       │
-                    │   <janus-month-grid>                         │
-                    └──────────────────────┬───────────────────────┘
-                                           │ wraps
-               ┌───────────────────────────┼───────────────────────────┐
-               ▼                           ▼                           ▼
-    @janus-scheduler/              @janus-scheduler/           @janus-scheduler/
-         react                          angular                       vue
-    (react-wrapper)                 (angular-wrapper)             (vue-wrapper)
-```
-
-The core data (events, resources) lives centrally in `@janus-scheduler/core` using a framework-agnostic **Zustand** store. The Lit Web Components (`<janus-scheduler>`, `<janus-timeline>`, `<janus-month-grid>`) automatically subscribe to this store and react to changes. Finally, each framework wrapper exposes these web components natively using the framework's own adapter (e.g., `@lit/react` for React).
-
-## Project Structure
-
-This project uses **npm workspaces** to manage its multi-package monorepo:
-
-```text
-├── packages/
-│   ├── core/                    # Core business logic, Zustand state, models, services
-│   ├── ui/                      # @janus-scheduler/ui — Lit Web Components library
-│   │   └── src/
-│   │       ├── janus-scheduler.ts   # <janus-scheduler> modal element
-│   │       ├── janus-timeline.ts    # <janus-timeline> grid view element
-│   │       ├── janus-month-grid.ts  # <janus-month-grid> calendar element
-│   │       └── index.ts             # Public package entry point
-│   ├── utils/                   # Shared utility functions and helpers
-│   └── wrappers/
-│       ├── react-wrapper/       # @janus-scheduler/react — React adapter via @lit/react
-│       ├── angular-wrapper/     # Angular integration (planned)
-│       └── vue-wrapper/         # Vue integration (planned)
-├── demo/
-│   ├── react-demo/              # Vite + React demo consuming @janus-scheduler/react
-│   └── angular-demo/            # Angular demo application
-```
-
-## Packages
-
-| Package                           | Name                     | Description                                                                   |
-| --------------------------------- | ------------------------ | ----------------------------------------------------------------------------- |
-| `packages/core`                   | `@janus-scheduler/core`  | Business logic, models, **Zustand reactive store**, and scheduling services   |
-| `packages/ui`                     | `@janus-scheduler/ui`    | Lit Web Components — Timeline, Month Grid, and Scheduling Modal UI components |
-| `packages/wrappers/react-wrapper` | `@janus-scheduler/react` | React adapter wrapping the Lit components via `@lit/react`                    |
-
-## Features
-
-### `@janus-scheduler/core` — Reactive State Management
-
-Instead of each wrapper managing its own state, the core layer implements a framework-agnostic reactive store using **Zustand** (vanilla JS).
-
-- Exposes a robust `SchedulerManager` facade to initialize and interact with the state.
-- Enables single-source-of-truth reactivity: Web Components subscribe directly to the core store.
-
-### `@janus-scheduler/ui` — Lit Web Components
-
-The UI library contains fully self-contained scheduling Web Components built with Lit:
-
-- **`<janus-timeline>`**: A responsive daily/weekly timeline grid supporting drag-and-drop event creation, resizing, and moving. Resources are automatically grouped by type.
-- **`<janus-month-grid>`**: A classic monthly calendar view summarizing events per day.
-- **`<janus-scheduler>`**: A modal component supporting event configuration, participant management, and color tagging.
-
-Features:
-
-- Shadow DOM encapsulation prevents CSS bleeding.
-- Responsive layouts and modern UI aesthetics.
-
-### Conflict Management & Prevention
-
-Janus Scheduler includes a built-in timezone-aware scheduling conflict checker to manage double-bookings of resources (people, rooms, equipment, etc.). Developers can configure how conflicts are handled using the `prevent-conflicts` (or React `preventConflicts`) option:
-
-1. **Visual Conflicts Warning (Default: `preventConflicts = false`)**:
-   - Double-bookings are allowed to be scheduled.
-   - Any resource conflicts trigger a slide-down warning banner displaying timezone-aware overlap details. If multiple overlaps occur, the banner displays a summary alongside a clickable **"Show Details"** bulleted list of all overlaps.
-   - The warning banner can be dismissed, minimizing into a subtle warning count badge in the header. Clicking this badge restores the banner.
-   - If a new conflict is created, the banner automatically slides open.
-   - Overlapping events on the grid are indicated by a subtle red warning dot badge positioned at the top-right corner of their event card.
-
-2. **Hard Blocking Conflicts (Active: `preventConflicts = true`)**:
-   - Double-bookings are completely prevented.
-   - In the **Editor Modal**, saving is disabled when a conflict exists, and the warning banner is colored red stating: `(Saving disabled due to schedule conflict)`.
-   - On the **Timeline Grid**, dragging, resizing, or drawing an event over an occupied slot is intercepted. The custom save/update event is blocked (cancelling the action naturally), and a styled backdrop-blurred modal dialog scales in alerting: _“Cannot move event. [Resource Name] is already scheduled during this time. Double-booking is disabled.”_
-
-3. **Cancelable Conflict Detected Callback Event**:
-   - The `<janus-timeline>` component dispatches a cancelable custom event `"conflict-detected"` (mapped to `onConflictDetected` in React/Solid or `conflictDetected` in Angular) when a scheduling conflict occurs.
-   - Developers can listen to this event and call `e.preventDefault()` to customize warning behaviors, programmatically log conflicts, or suppress the default built-in blocker alert dialog.
-
-### `@janus-scheduler/react` — React Wrapper
-
-Wraps the Lit Web Component into a native React component using `@lit/react`:
 
 ```tsx
-import { Timeline, MonthGrid, Scheduler } from "@janus-scheduler/react";
-import { SchedulerManager } from "@janus-scheduler/core";
+import { JanusApp } from "@janus-scheduler/app/react";
 
-// Initialize core state manager
-const manager = new SchedulerManager();
-manager.addResource({
-  id: "1",
-  name: "Alice",
-  type: "person",
-  email: "alice@example.com",
-});
+const resources = [
+  { id: "r1", name: "Alice", type: "person", email: "alice@example.com" },
+  { id: "r2", name: "Room A", type: "room", email: "" },
+];
 
-function App() {
-  return <Timeline onAddEvent={() => console.log("Add event clicked")} />;
+export default function App() {
+  return (
+    <div style={{ height: "100vh" }}>
+      <JanusApp
+        resources={resources}
+        events={[]}
+        onChange={({ type, id, event }) => console.log(type, id, event?.title)}
+      />
+    </div>
+  );
 }
 ```
 
-The `onClose` prop is automatically mapped to the `close` DOM custom event.
+That is the whole integration. See [`packages/app`](packages/app/README.md).
 
-## Getting Started
+### Tier 2 — your layout, still no wiring
 
-### Prerequisites
-
-- Node.js v18+
-- npm v9+
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone <repository-url>
-   cd main-program
-   ```
-
-2. Install all workspace dependencies from the root:
-   ```bash
-   npm install
-   ```
-
-### Running the React Demo
+Install your framework package and place the pieces yourself. In React,
+`useJanusScheduler` owns the manager, all ~44 event handlers, navigation, the
+editor modal and undo — you write layout only.
 
 ```bash
-# Option 1 — via root script
-npm run dev:react-demo
-
-# Option 2 — directly
-cd demo/react-demo
-npm run dev
+npm install @janus-scheduler/react     # or /angular, /solid
 ```
 
-The demo will be available at `http://localhost:5173`.
+```tsx
+import {
+  useJanusScheduler,
+  Timeline,
+  MonthGrid,
+  DayGrid,
+  WeekGrid,
+  YearGrid,
+  Scheduler,
+  Topbar,
+} from "@janus-scheduler/react";
 
-### Building Packages
+export default function App() {
+  const janus = useJanusScheduler({ resources, events });
 
-Build the `@janus-scheduler/ui` Lit component (watch mode for development):
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      <Topbar {...janus.topbarProps} />
+
+      <div style={{ flex: 1, minHeight: 0 }}>
+        {janus.view === "Timeline" && <Timeline {...janus.timelineProps} />}
+        {janus.view === "Month" && <MonthGrid {...janus.monthGridProps} />}
+        {janus.view === "Day" && <DayGrid {...janus.dayGridProps} />}
+        {janus.view === "Week" && <WeekGrid {...janus.weekGridProps} />}
+        {janus.view === "Year" && <YearGrid {...janus.yearGridProps} />}
+      </div>
+
+      {janus.editor.isOpen && <Scheduler {...janus.editor.props} />}
+    </div>
+  );
+}
+```
+
+Five views, drag, resize, draw-to-create, the editor, prev/next/today and
+Ctrl+Z — with **zero handler props and zero refs**. Override any single prop by
+placing it after the spread, drive navigation from your own buttons via
+`janus.nav`, or reach `janus.manager` directly.
+
+You can still wire every callback by hand if you need to; see the
+[React guide](packages/wrappers/react-wrapper/README.md). Solid and Angular
+currently use that manual approach — an equivalent hook for each is planned.
+
+> **Note on Vue.** There is no `@janus-scheduler/vue` wrapper yet. Vue apps use `@janus-scheduler/app` (a plain custom element, so it just works) or consume `@janus-scheduler/core` + `@janus-scheduler/ui` directly. See [Vue setup](#vue) below.
+
+---
+
+## Packages
+
+| Package                                                         | What it is                                                                         |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [`@janus-scheduler/app`](packages/app)                          | **Tier 1.** `<janus-app>` - the whole scheduler, wired. Plus `/react` bindings.    |
+| [`@janus-scheduler/react`](packages/wrappers/react-wrapper)     | **Tier 2.** React components via `@lit/react`.                                     |
+| [`@janus-scheduler/angular`](packages/wrappers/angular-wrapper) | **Tier 2.** Angular standalone components.                                         |
+| [`@janus-scheduler/solid`](packages/wrappers/solid-js-wrapper)  | **Tier 2.** SolidJS components.                                                    |
+| [`@janus-scheduler/ui`](packages/ui)                            | The Lit web components. Framework-agnostic.                                        |
+| [`@janus-scheduler/core`](packages/core)                        | Store, `SchedulerManager`, models, conflict detection, recurrence, timezone utils. |
+| [`@janus-scheduler/nlp`](packages/nlp)                          | Natural-language event entry. A dependency of every wrapper.                       |
+| [`@janus-scheduler/integrations`](packages/integrations)        | Optional Google Calendar sync (browser client + Node backend).                     |
+
+You normally install exactly one of the first four.
+
+---
+
+## Core concepts
+
+### The store is the single source of truth
+
+`@janus-scheduler/ui` renders; it never mutates. Every change goes through `SchedulerManager`, which writes to the store optimistically and then fires a lifecycle hook. **If the hook throws or its promise rejects, the store change is rolled back** and `onError` fires - so your UI never drifts from your backend.
+
+```tsx
+const manager = new SchedulerManager({
+  onEventAdd: (event) => api.create(event), // reverted if this rejects
+  onEventUpdate: (event) => api.update(event),
+  onEventDelete: (id) => api.remove(id),
+  onError: ({ operation, error }) => toast(`${operation} failed`),
+});
+```
+
+`SchedulerManager` has no `.store` property. To observe state, subscribe to the store directly:
+
+```tsx
+import { schedulerStore } from "@janus-scheduler/react";
+
+// events and resources are Record<string, T>, not arrays.
+const unsubscribe = schedulerStore.subscribe((state) => {
+  console.log(Object.values(state.events));
+});
+```
+
+In React, prefer `useSyncExternalStore(schedulerStore.subscribe, () => schedulerStore.getState().events)`.
+
+### Conflict detection
+
+Timezone-aware double-booking detection is built in, controlled by `preventConflicts` (default `false`):
+
+- **`false`** - conflicts are allowed; a dismissible banner and per-event warning badges appear.
+- **`true`** - the save/drag/resize/create is blocked outright and a dialog explains why.
+
+`<janus-timeline>` also fires a cancelable `conflict-detected` event (`onConflictDetected` in React/Solid, `conflictDetected` in Angular). Call `preventDefault()` on it to replace the built-in blocker with your own handling.
+
+### Theming
+
+There is **no CSS file to import**. Everything is Shadow-DOM scoped, so nothing leaks in or out. Theme via `--janus-*` CSS custom properties - see [`docs/THEMING_GUIDE.md`](docs/THEMING_GUIDE.md).
+
+The components do not load a webfont for you; if you want Roboto, load it in your own app.
+
+---
+
+## Framework notes
+
+### React
+
+Works as shown above. Callbacks receive the unwrapped payload, never a raw `CustomEvent`.
+
+### Angular
+
+Components are standalone, and their selectors end in `-ng` to avoid colliding with the underlying custom element:
+
+```typescript
+import { Component } from "@angular/core";
+import {
+  TimelineComponent,
+  SchedulerManager,
+  type EventMoveDetail,
+} from "@janus-scheduler/angular";
+
+@Component({
+  selector: "app-root",
+  standalone: true,
+  imports: [TimelineComponent],
+  template: `
+    <div style="height: 100vh">
+      <janus-timeline-ng (eventMove)="onMove($event)" />
+    </div>
+  `,
+})
+export class AppComponent {
+  manager = new SchedulerManager();
+
+  onMove(detail: EventMoveDetail) {
+    const current = this.manager.getEvent(detail.event.id);
+    if (!current) return;
+    this.manager.updateEvent(detail.event.id, {
+      resourceIds: current.resourceIds.map((id) =>
+        id === detail.oldResourceId ? detail.newResourceId : id,
+      ),
+      startTime: detail.newStartTime,
+      endTime: detail.newEndTime,
+    });
+  }
+}
+```
+
+The package is ESM-only and expects a bundler - fine for any Angular CLI project.
+
+### Vue
+
+No wrapper package yet. Use `@janus-scheduler/app`, or the web components directly. Either way Vue needs to be told these are custom elements:
+
+```ts
+// vite.config.ts
+vue({
+  template: {
+    compilerOptions: { isCustomElement: (tag) => tag.startsWith("janus-") },
+  },
+});
+```
+
+```vue
+<janus-app
+  :events.prop="events"
+  :resources.prop="resources"
+  @change="onChange"
+/>
+```
+
+Use `.prop` for arrays and objects - plain attributes stringify.
+
+---
+
+## Requirements
+
+- Node.js 18+
+- A bundler (Vite, webpack, the Angular CLI, …). The packages ship ESM and CJS builds.
+- React 18 or 19 · Angular 17–21 · Solid 1.8+ · Vue 3.5+
+
+---
+
+## Documentation
+
+| Doc                                                                            | Covers                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| [`docs/ARCHITECTURE_FACADE.md`](docs/ARCHITECTURE_FACADE.md)                   | Why wrappers re-export everything, and event unwrapping |
+| [`docs/TYPE_GUIDE.md`](docs/TYPE_GUIDE.md)                                     | The two-layer type system and where new types go        |
+| [`docs/THEMING_GUIDE.md`](docs/THEMING_GUIDE.md)                               | CSS custom properties and per-instance branding         |
+| [`docs/resource_configuration_guide.md`](docs/resource_configuration_guide.md) | Grouping and ordering timeline resources                |
+| [`docs/PERFORMANCE_OPTIMIZATIONS.md`](docs/PERFORMANCE_OPTIMIZATIONS.md)       | Benchmarks at 150 resources / 1,500 events              |
+| [`docs/RELEASING.md`](docs/RELEASING.md)                                       | How to cut and publish a release                        |
+
+---
+
+## Contributing
 
 ```bash
-cd packages/ui
-npm run dev      # watch mode
-npm run build    # single build
+git clone https://github.com/Janus-scheduler/main-program.git
+cd main-program
+npm install
+
+npm run dev:react-demo        # or dev:angular-demo, dev:solid-demo, dev:vue-demo
+
+npm run validate              # lint + build every workspace
+npm test                      # core test suite
+npm run check:packages        # publint across all publishable manifests
+npm run test:pack             # installs the real tarballs into a throwaway app
 ```
 
-Build the React wrapper:
+`npm run test:pack` is the one that matters before a release: every demo aliases `@janus-scheduler/*` back to `src`, so it is the only check that exercises the packages the way an npm consumer does.
 
-```bash
-cd packages/wrappers/react-wrapper
-npm run build
-```
+| Change                       | Goes in                          |
+| ---------------------------- | -------------------------------- |
+| Business logic, state, types | `packages/core/src/`             |
+| Anything visual              | `packages/ui/src/`               |
+| Framework bindings only      | `packages/wrappers/<framework>/` |
+| All-in-one wiring            | `packages/app/src/`              |
 
-Build everything at once from the root:
+New visual features belong in `packages/ui` - wrappers must stay thin adapters with no duplicated UI logic.
 
-```bash
-npm run build
-```
-
-## Development
-
-### Code Quality
-
-This repo enforces quality via `eslint`, `prettier`, and `husky` git hooks (commitlint + lint-staged).
-
-```bash
-npm run lint        # Check for lint errors
-npm run lint:fix    # Auto-fix lint errors
-npm run format      # Format all files with Prettier
-npm run test        # Run core tests
-npm run validate    # lint + build all packages
-```
-
-#### ESLint Configuration Notes
-
-- The root `eslint.config.js` uses **flat config** (ESLint v9+).
-- Type-aware parsing (`project: true`) is **intentionally disabled** at the root level to avoid `tsconfigRootDir` ambiguity across multiple workspaces. Each package can define its own ESLint config if type-aware rules are needed.
-- `endOfLine: "auto"` is set in prettier to handle CRLF/LF differences on Windows.
-
-### Adding a New Framework Wrapper
-
-1. Create a new directory under `packages/wrappers/<framework>-wrapper/`.
-2. Import `JanusScheduler` from `@janus-scheduler/ui`.
-3. Use the framework's Web Component adapter (e.g. `@angular/elements` for Angular) to expose it as a native component.
-4. Add a corresponding demo under `demo/<framework>-demo/`.
-
-### Contributing Guidelines
-
-| Area                          | Location                                 |
-| ----------------------------- | ---------------------------------------- |
-| Business logic, models, state | `packages/core/src/`                     |
-| Shared UI component           | `packages/ui/src/janus-scheduler.ts`     |
-| Styles                        | `packages/ui/src/styles.ts`              |
-| Framework bindings            | `packages/wrappers/<framework>-wrapper/` |
-| Visual validation             | `demo/<framework>-demo/`                 |
-
-> **Rule:** Any new visual feature belongs in `packages/ui`. Framework wrappers should remain thin adapters — no UI logic should be duplicated per framework.
-
-## Tech Stack
-
-| Tool                                                                                              | Purpose                                          |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| [Zustand](https://zustand-demo.pmnd.rs/)                                                          | Framework-agnostic centralized state management  |
-| [Lit](https://lit.dev/)                                                                           | Web Component authoring (`@janus-scheduler/ui`)  |
-| [@lit/react](https://github.com/lit/lit/tree/main/packages/react)                                 | React ↔ Web Component bridge                     |
-| [Vite](https://vitejs.dev/) + [vite-plugin-dts](https://github.com/qmhc/vite-plugin-dts)          | Package bundling and type declaration generation |
-| [TypeScript](https://www.typescriptlang.org/)                                                     | Static typing across all packages                |
-| [ESLint](https://eslint.org/) + [Prettier](https://prettier.io/)                                  | Code quality and formatting                      |
-| [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/okonet/lint-staged) | Pre-commit hooks                                 |
-| [Commitlint](https://commitlint.js.org/)                                                          | Conventional commit message enforcement          |
-| npm Workspaces                                                                                    | Monorepo package management                      |
-
-## License
+## Licence
 
 ISC

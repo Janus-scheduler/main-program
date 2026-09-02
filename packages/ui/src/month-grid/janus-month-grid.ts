@@ -111,12 +111,6 @@ export class JanusMonthGrid extends LitElement {
       999,
     ).getTime();
     const coreEvents = expandEvents(rawEvents, startRange, endRange);
-    console.log("MonthGrid sync:", {
-      rawEvents: rawEvents.length,
-      coreEvents: coreEvents.length,
-      startRange: new Date(startRange),
-      endRange: new Date(endRange),
-    });
 
     const newEvents: MonthEvent[] = [];
 
@@ -180,7 +174,6 @@ export class JanusMonthGrid extends LitElement {
       }
     }
 
-    console.log("MonthGrid newEvents length:", newEvents.length);
     this._events = newEvents;
   }
 

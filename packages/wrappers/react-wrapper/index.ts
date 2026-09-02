@@ -839,3 +839,14 @@ export function ConfirmDialog(props: ConfirmDialogProps): React.JSX.Element {
     onCancel: props.onCancel ? () => props.onCancel!() : undefined,
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// useJanusScheduler — all the wiring, none of the layout.
+// ─────────────────────────────────────────────────────────────────────────────
+export { useJanusScheduler } from "./use-janus-scheduler";
+export type {
+  UseJanusSchedulerOptions,
+  JanusSchedulerApi,
+  JanusChangeDetail,
+  JanusChangeType,
+} from "./use-janus-scheduler";

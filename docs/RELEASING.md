@@ -1,18 +1,19 @@
 # Releasing
 
-Janus Scheduler publishes **seven** packages to npm under the `@janus-scheduler` scope.
+Janus Scheduler publishes **eight** packages to npm under the `@janus-scheduler` scope.
 They are versioned **in lockstep** — `.changeset/config.json` puts them all in one
 `fixed` group, so every release bumps every package to the same version.
 
-| Package                         | Notes                                                         |
-| ------------------------------- | ------------------------------------------------------------- |
-| `@janus-scheduler/core`         | Store, services, models, public types                         |
-| `@janus-scheduler/ui`           | Lit web components                                            |
-| `@janus-scheduler/nlp`          | **Not optional** — a runtime dependency of all three wrappers |
-| `@janus-scheduler/integrations` | Google Calendar sync; needs its own Node backend to be useful |
-| `@janus-scheduler/react`        |                                                               |
-| `@janus-scheduler/angular`      | ESM-only (bundler required); `tsc` build, not Vite            |
-| `@janus-scheduler/solid`        |                                                               |
+| Package                         | Notes                                                            |
+| ------------------------------- | ---------------------------------------------------------------- |
+| `@janus-scheduler/app`          | **Tier 1** — the all-in-one `<janus-app>` + its `/react` binding |
+| `@janus-scheduler/core`         | Store, services, models, public types                            |
+| `@janus-scheduler/ui`           | Lit web components                                               |
+| `@janus-scheduler/nlp`          | **Not optional** — a runtime dependency of all three wrappers    |
+| `@janus-scheduler/integrations` | Google Calendar sync; needs its own Node backend to be useful    |
+| `@janus-scheduler/react`        |                                                                  |
+| `@janus-scheduler/angular`      | ESM-only (bundler required); `tsc` build, not Vite               |
+| `@janus-scheduler/solid`        |                                                                  |
 
 There is no `@janus-scheduler/vue`. The Vue demo consumes `core` + `ui` directly.
 

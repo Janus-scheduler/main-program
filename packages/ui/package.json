@@ -1,6 +1,6 @@
 {
   "name": "@janus-scheduler/ui",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Lit web components for Janus Scheduler — timeline, day/week/month/year grids, event editor and AI chat, usable from any framework.",
   "keywords": [
     "scheduler",
@@ -38,7 +38,8 @@
   },
   "files": [
     "dist",
-    "LICENSE"
+    "LICENSE",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"
@@ -50,7 +51,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@janus-scheduler/core": "^2.0.0",
+    "@janus-scheduler/core": "^2.1.0",
     "lit": "^3.1.2"
   },
   "devDependencies": {

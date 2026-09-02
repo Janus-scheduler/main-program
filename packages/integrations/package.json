@@ -1,6 +1,6 @@
 {
   "name": "@janus-scheduler/integrations",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Google Calendar two-way sync for Janus Scheduler — browser client plus an optional Express + WebSocket backend.",
   "keywords": [
     "scheduler",
@@ -55,7 +55,7 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@janus-scheduler/core": "^2.0.0"
+    "@janus-scheduler/core": "^2.1.0"
   },
   "dependencies": {
     "googleapis": "^128.0.0",

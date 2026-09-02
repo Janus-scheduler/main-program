@@ -1,6 +1,6 @@
 {
   "name": "@janus-scheduler/nlp",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Intent classifier and entity extractor powering Janus Scheduler's natural-language scheduling.",
   "keywords": [
     "nlp",
@@ -41,7 +41,8 @@
   "files": [
     "dist",
     "artifacts",
-    "LICENSE"
+    "LICENSE",
+    "README.md"
   ],
   "directories": {
     "test": "tests"

@@ -31,6 +31,7 @@ const PACKAGES = [
   "packages/ui",
   "packages/nlp",
   "packages/wrappers/react-wrapper",
+  "packages/app",
 ];
 
 const run = (cmd, args, cwd) =>
@@ -40,12 +41,44 @@ const run = (cmd, args, cwd) =>
     shell: process.platform === "win32",
   });
 
+/**
+ * On Windows, a build that starts while the previous one's output is still
+ * being scanned by the virus scanner fails with
+ * `EPERM: operation not permitted` on the dist files. The handles clear on
+ * their own, so wait and retry rather than failing the whole smoke run.
+ */
+const runWithRetry = (cmd, args, cwd, attempts = 4, waitMs = 15000) => {
+  for (let i = 1; ; i++) {
+    try {
+      return run(cmd, args, cwd);
+    } catch (err) {
+      if (i >= attempts) throw err;
+      console.log(
+        `\n  … attempt ${i} failed, retrying in ${waitMs / 1000}s (locked dist?)\n`,
+      );
+      // Deliberately synchronous: this script is a linear pipeline.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, waitMs);
+    }
+  }
+};
+
+/**
+ * `--no-build` skips the rebuild, for callers that have just built (CI runs
+ * `build:all` as its own step). Building twice back-to-back is the main way to
+ * trip the Windows file-lock problem above.
+ */
+const skipBuild = process.argv.includes("--no-build");
+
 const app = mkdtempSync(join(tmpdir(), "janus-smoke-"));
 console.log(`\n▶ smoke app: ${app}\n`);
 
 try {
-  console.log("▶ building packages…");
-  run("npm", ["run", "build:all"], repo);
+  if (skipBuild) {
+    console.log("▶ skipping build (--no-build)");
+  } else {
+    console.log("▶ building packages…");
+    runWithRetry("npm", ["run", "build:all"], repo);
+  }
 
   console.log("\n▶ packing tarballs…");
   const tars = join(app, "tars");

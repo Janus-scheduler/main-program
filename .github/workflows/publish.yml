@@ -1,0 +1,90 @@
+name: Publish to npm
+
+# Manual trigger. Publishing from CI avoids the interactive 2FA prompt entirely:
+# there is no TTY, so npm cannot ask for a one-time password — it either
+# authenticates with NPM_TOKEN or fails cleanly.
+#
+# This deliberately calls `npm publish` per package rather than
+# `changeset publish`, because changesets first calls GET /-/npm/v1/user to
+# decide whether an OTP is needed. That endpoint is an account-administration
+# route, which npm now blocks for 2FA-bypass tokens (403), after which
+# changesets falls back to prompting. Publishing directly skips that check.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — build, verify and pack, but do NOT publish"
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Node 22 so a modern npm ships with it — also the floor for npm's
+      # trusted publishing (OIDC), which is where this should move once every
+      # package exists on the registry.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Show toolchain
+        run: node -v && npm -v
+
+      - run: npm ci
+
+      # ---- gates -------------------------------------------------------------
+      - run: npm run build:all
+      - run: npm run check:packages
+      - run: npm test --workspace=@janus-scheduler/core
+      - run: npm test --workspace=@janus-scheduler/nlp
+      - run: npm run test:pack -- --no-build
+
+      # ---- publish -----------------------------------------------------------
+      # Dependency order. `--ignore-scripts` skips each package's
+      # `prepublishOnly` rebuild: `build:all` above already produced the dist,
+      # and rebuilding once per package is slow and redundant.
+      #
+      # Each package is skipped if that exact version is already on the
+      # registry, so re-running this workflow after a partial failure is safe.
+      - name: Publish packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            npm run release:dry
+          else
+            npm run release:publish
+          fi
+
+      - name: Summary
+        if: always()
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          {
+            echo "### npm publish"
+            echo
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "**Dry run** — nothing was published."
+            else
+              echo "Registry state:"
+            fi
+            echo
+            echo '| Package | On npm |'
+            echo '| --- | --- |'
+            for p in core nlp ui react angular solid integrations app; do
+              v=$(npm view "@janus-scheduler/$p" version 2>/dev/null || echo "not published")
+              echo "| \`@janus-scheduler/$p\` | $v |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

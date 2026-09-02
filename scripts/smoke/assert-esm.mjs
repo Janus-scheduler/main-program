@@ -14,7 +14,6 @@ for (const k of [
   "Node",
   "CustomEvent",
   "Event",
-  "navigator",
   "requestAnimationFrame",
   "cancelAnimationFrame",
   "getComputedStyle",
@@ -93,6 +92,57 @@ check(
   "janus-timeline preventConflicts defaults to false",
   el.preventConflicts === false,
   `got ${el.preventConflicts}`,
+);
+
+// --- 5. Tier B: @janus-scheduler/app, the batteries-included package --------
+const app = await import("@janus-scheduler/app");
+const appReact = await import("@janus-scheduler/app/react");
+
+check(
+  "<janus-app> is registered",
+  typeof customElements.get("janus-app") === "function",
+);
+check(
+  "app's exported JanusApp is the registered element",
+  customElements.get("janus-app") === app.JanusApp,
+);
+check(
+  "@janus-scheduler/app/react exports a JanusApp component",
+  typeof appReact.JanusApp === "object" ||
+    typeof appReact.JanusApp === "function",
+);
+check(
+  "app re-exports the facade (SchedulerManager) as the SAME class as core",
+  app.SchedulerManager === core.SchedulerManager,
+);
+
+// The whole point of Tier B: mount it, hand it data, and it wires itself to the
+// store with no host code. Reset first so the counts below are unambiguous.
+manager.clearAll();
+const appEl = document.createElement("janus-app");
+appEl.resources = [{ id: "r9", name: "Room A", type: "room", email: "" }];
+appEl.events = [
+  {
+    id: "e9",
+    title: "Seeded",
+    startTime: "2026-09-02T11:00:00.000Z",
+    endTime: "2026-09-02T12:00:00.000Z",
+    resourceIds: ["r9"],
+    status: "confirmed",
+  },
+];
+document.body.appendChild(appEl);
+await appEl.updateComplete;
+
+const appEvents = Object.values(core.schedulerStore.getState().events);
+check(
+  "<janus-app> seeds its events prop into the shared store",
+  appEvents.some((e) => e.title === "Seeded"),
+  `store sees: ${appEvents.map((e) => e.title).join(",") || "(none)"}`,
+);
+check(
+  "<janus-app>.schedulerManager writes to that same store",
+  appEl.schedulerManager instanceof core.SchedulerManager,
 );
 
 // --- report -----------------------------------------------------------------

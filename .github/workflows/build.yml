@@ -19,7 +19,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       # Install all workspace dependencies (core, ui, wrappers, demos)
@@ -47,7 +47,7 @@ jobs:
       # Every demo aliases @janus-scheduler/* back to src, so this is the only
       # check that exercises the packages the way an npm consumer does.
       - name: Smoke-test published artifacts
-        run: npm run test:pack
+        run: npm run test:pack -- --no-build
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6

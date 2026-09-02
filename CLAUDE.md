@@ -74,7 +74,7 @@ Framework wrapper packages re-export everything a consumer needs (`SchedulerMana
 
 ### Conflict detection
 
-`packages/core/src/utils/conflict.ts` implements timezone-aware double-booking detection (`computeTimelineConflicts`, `checkSlotConflict`, `checkDraftConflict`). Behavior is controlled by the `preventConflicts` prop/option on `<janus-timeline>`/`<janus-scheduler>` (and the React `preventConflicts` prop): `false` (default) shows a dismissible warning banner and per-event warning badges; `true` hard-blocks the save/drag/resize/create action and shows a blocking dialog. `<janus-timeline>` fires a cancelable `conflict-detected` custom event (`onConflictDetected` in React/Solid) that consumers can `preventDefault()` on to override the built-in blocker.
+`packages/core/src/utils/conflict.ts` implements timezone-aware double-booking detection (`computeTimelineConflicts`, `checkSlotConflict`, `checkDraftConflict`). Behavior is controlled by the `preventConflicts` prop/option on `<janus-timeline>`/`<janus-scheduler>` (and the React `preventConflicts` prop): `false` (the default on both `<janus-timeline>` and `<janus-scheduler>`) shows a dismissible warning banner and per-event warning badges; `true` hard-blocks the save/drag/resize/create action and shows a blocking dialog. `<janus-timeline>` fires a cancelable `conflict-detected` custom event (`onConflictDetected` in React/Solid) that consumers can `preventDefault()` on to override the built-in blocker.
 
 ### Recurrence
 
@@ -98,6 +98,9 @@ packages/
 ├── core/            @janus-scheduler/core   — store, services, models, utils, api types (Jest-tested)
 ├── ui/               @janus-scheduler/ui     — Lit web components + styles (no tests)
 ├── integrations/     @janus-scheduler/integrations — Google Calendar sync; browser entry + `/server` Node entry (Jest-tested)
+├── app/              @janus-scheduler/app     — Tier 1 all-in-one: `<janus-app>` composes ui + core and owns ALL the
+│                     event->SchedulerManager wiring. Subpath `/react` adds the @lit/react binding. New visual
+│                     features still belong in packages/ui; this package adds composition only, no new visuals.
 └── wrappers/
     ├── react-wrapper/       @janus-scheduler/react   (@lit/react createComponent bindings)
     ├── angular-wrapper/     @janus-scheduler/angular (tsc build, not Vite — rebuild manually)
@@ -107,7 +110,7 @@ demo/
 ├── react-demo/ angular-demo/ solid-demo/ vue-demo/   — one demo app per framework wrapper
 ```
 
-Note: `packages/utils` mentioned in the root README does not currently exist — ignore that reference.
+Note: there is no `packages/utils` and no `@janus-scheduler/vue` wrapper. Vue apps use `@janus-scheduler/app` or consume `core` + `ui` directly.
 
 ## Conventions
 

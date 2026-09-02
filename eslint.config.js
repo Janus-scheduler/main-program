@@ -57,6 +57,21 @@ export default [
     },
   },
 
+  // Library code that ships to npm must not log. Two stray `console.log`
+  // calls in janus-month-grid.ts reached the published 2.0.0 and spammed
+  // every consumer's console on each month-grid sync. `console.warn` and
+  // `console.error` stay allowed — those are deliberate diagnostics.
+  {
+    files: [
+      "packages/core/src/**/*.ts",
+      "packages/ui/src/**/*.ts",
+      "packages/app/src/**/*.ts",
+    ],
+    rules: {
+      "no-console": ["error", { allow: ["warn", "error"] }],
+    },
+  },
+
   // Prettier formatting
   {
     plugins: {
