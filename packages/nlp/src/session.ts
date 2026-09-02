@@ -1924,14 +1924,40 @@ export function provideAnswer(
       // Unless the question carries a `replaceSpan`, which means the user is
       // changing a name they already gave. Appending then produced
       // "called standup planning" — both names, joined.
+      const appended = `${state.text} ${trimmed}`.trim();
       const merged = question.replaceSpan
         ? spliceSpan(state.text, question.replaceSpan, trimmed)
-        : `${state.text} ${trimmed}`.trim();
-      return next({
+        : appended;
+
+      const spliced = next({
         text: merged,
         utterances: [...state.utterances, trimmed],
         answers: record(trimmed),
       });
+
+      /**
+       * An edit may never leave the user worse off than before it.
+       *
+       * Replacing a title removes words the user wrote, and those can be
+       * load-bearing for the CLASSIFIER even when they are not part of the
+       * name. “set a meeting today at 10am” had a title spanning the verb, so
+       * renaming it deleted “set”, the sentence lost its only verb, and a
+       * finished booking became “I didn't quite follow that”.
+       *
+       * That cause is fixed — verb heads are recognised now — but the SHAPE
+       * can recur for any span carrying more than the name. Falling back to an
+       * append keeps the old words and the new ones, which classifies at least
+       * as well as the text that was already `ready`.
+       */
+      if (question.replaceSpan && spliced.status === "declined") {
+        return next({
+          text: appended,
+          utterances: [...state.utterances, trimmed],
+          answers: record(trimmed),
+        });
+      }
+
+      return spliced;
     }
 
     case "when": {

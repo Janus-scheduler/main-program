@@ -205,9 +205,29 @@ function matchCatalog(text: string, entries: CatalogEntry[]): EntityMatch[] {
   return kept.sort((a, b) => a.start - b.start);
 }
 
-/** The frozen verb lexicon, flattened and longest-first by word count. */
-const ALL_VERB_PHRASES = [...new Set(Object.values(INTENT_VERBS).flat())].sort(
-  (a, b) => b.split(" ").length - a.split(" ").length,
+/**
+ * The frozen verb lexicon, flattened and longest-first by word count.
+ *
+ * Plus the HEAD of every multi-word phrase. The frozen list holds “set up”,
+ * “block off”, “line up”, “take off” — but people drop the particle: “set a
+ * meeting today at 10am”. With only the full phrase known, `set` was not a
+ * verb, so the whole clause fell through and “set a meeting” became the
+ * event's NAME. Worse, that name then spanned the verb, so editing the name
+ * replaced the verb too and the sentence stopped classifying at all.
+ *
+ * Derived from the frozen list rather than hand-written, so the two cannot
+ * drift. Longest first, so “set up” is still preferred over “set”.
+ */
+const ALL_VERB_PHRASES = [
+  ...new Set(
+    Object.values(INTENT_VERBS)
+      .flat()
+      .flatMap((phrase) =>
+        phrase.includes(" ") ? [phrase, phrase.split(" ")[0]] : [phrase],
+      ),
+  ),
+].sort(
+  (a, b) => b.split(" ").length - a.split(" ").length || b.length - a.length,
 );
 
 /**

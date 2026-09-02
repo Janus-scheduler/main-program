@@ -35,8 +35,8 @@ Legend: ⬜ not run · 🟨 partly · ✅ passed · ❌ failed (see notes)
 >
 > An agent must NOT mark that passed; record who reported it and when.
 >
-> Everything through step 10 is committed as `eae0901`
-> (“feat: improvements in nlp module phase 3”).
+> Committed: `eae0901` (steps 00-08, 10, and the 11 Phase K fixes) and
+> `112e727` (the named-timezone work, K-12).
 
 ## How to run a step
 

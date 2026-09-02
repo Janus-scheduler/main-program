@@ -474,4 +474,101 @@ describe("ChatController", () => {
       expect(c.session?.draft?.title).toBe(before);
     });
   });
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  “set a meeting today at 10am” — three defects in one screenshot
+  //
+  //  1. `set` is not in the frozen verb list (only `set up`), so the whole
+  //     clause fell through and “set a meeting” became the event's NAME.
+  //  2. That name then SPANNED the verb, so renaming it deleted `set`, the
+  //     sentence lost its only verb, and a finished booking turned into
+  //     “I didn't quite follow that”.
+  //  3. Tapping a field chip printed its sentinel back: “Got it —
+  //     __edit__:title.”
+  // ══════════════════════════════════════════════════════════════════════
+
+  describe("a dropped verb particle", () => {
+    const CATALOG = {
+      resources: [{ id: "r1", name: "Operating Room 1", type: "room" }],
+      participants: [{ id: "p1", name: "Dr. Ann sherin", type: "person" }],
+    };
+    const settle = () => new Promise((res) => setTimeout(res, 350));
+    const start = async (text: string) => {
+      const c = new ChatController({
+        engine,
+        catalog: CATALOG,
+        requires: { add_event: ["when", "duration", "resource", "title"] },
+        timezone: "UTC",
+      });
+      c.submit(text);
+      await settle();
+      return c;
+    };
+
+    it.each([
+      ["set a meeting today at 10am", "meeting"],
+      ["block Operating Room 1 today at 10am", undefined],
+      ["line up a review today at 10am", "review"],
+    ])("%s does not put the verb in the title", async (text, title) => {
+      const c = await start(text as string);
+      expect(c.session?.draft?.title).toBe(title);
+    });
+
+    it("renaming does not destroy the booking", async () => {
+      const c = await start("set a meeting today at 10am");
+      let guard = 0;
+      while (c.session?.status === "awaiting" && guard++ < 4) {
+        const slot = c.session.question?.slot;
+        c.choose(
+          slot === "duration"
+            ? "45 min"
+            : slot === "resource"
+              ? "Operating Room 1"
+              : "Rounds",
+        );
+        await settle();
+      }
+      expect(c.session?.status).toBe("ready");
+
+      c.edit();
+      c.choose("Name");
+      await settle();
+      c.submit("Standup meeting");
+      await settle();
+
+      // THE regression: this used to end `declined`.
+      expect(c.session?.status).toBe("ready");
+      expect(c.session?.draft?.title).toBe("Standup meeting");
+      expect(c.session?.draft?.time?.localTime).toBe("10:00");
+    });
+
+    it("never reads a sentinel back to the user", async () => {
+      const c = await start("set a meeting today at 10am");
+      let guard = 0;
+      while (c.session?.status === "awaiting" && guard++ < 4) {
+        const slot = c.session.question?.slot;
+        c.choose(
+          slot === "duration"
+            ? "45 min"
+            : slot === "resource"
+              ? "Operating Room 1"
+              : "Rounds",
+        );
+        await settle();
+      }
+      c.edit();
+      c.choose("Name");
+      await settle();
+
+      for (const m of c.thread) {
+        const text =
+          m.kind === "text"
+            ? m.text
+            : m.kind === "clarify"
+              ? `${m.ack ?? ""} ${m.lead ?? ""} ${m.question}`
+              : "";
+        expect(text).not.toMatch(/__/);
+      }
+    });
+  });
 });
