@@ -10,6 +10,7 @@ import {
   viewChild,
   ChangeDetectionStrategy,
 } from "@angular/core";
+import type { ViewType, TopbarDateLabelClickDetail } from "./types";
 // Side-effect import: ensures the <janus-topbar> custom element is registered
 import { JanusTopbar } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
@@ -37,16 +38,24 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly navLabel = input<string | undefined>(undefined);
   readonly dayName = input<string | undefined>(undefined);
   readonly shortDate = input<string | undefined>(undefined);
-  readonly view = input<"Timeline" | "Month" | undefined>(undefined);
+  readonly view = input<ViewType | undefined>(undefined);
+  /** Which view tabs to show, in order. Default: Day, Week, Month, Timeline. */
+  readonly views = input<ViewType[] | undefined>(undefined);
   readonly allowCreate = input<boolean>(false);
   readonly zoomPercent = input<number>(100);
   readonly zoomUnit = input<string | undefined>(undefined);
+  /** Whether Google Calendar is currently connected — controls the connect button's label/state. */
+  readonly isGoogleCalendarConnected = input<boolean>(false);
 
   readonly prevClick = output<void>();
   readonly nextClick = output<void>();
   readonly todayClick = output<void>();
-  readonly viewSwitch = output<{ view: "Timeline" | "Month" }>();
+  readonly viewSwitch = output<{ view: ViewType }>();
   readonly toggleCreate = output<void>();
+  /** Fired when the user clicks the Google Calendar connect/disconnect button. */
+  readonly connectCalendar = output<void>();
+  /** Fired when the user clicks the center date title/label */
+  readonly dateLabelClick = output<TopbarDateLabelClickDetail>();
 
   private readonly _prevClickHandler = (e: Event) => {
     e.stopPropagation();
@@ -62,13 +71,21 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
   };
   private readonly _viewSwitchHandler = (e: Event) => {
     e.stopPropagation();
-    this.viewSwitch.emit(
-      (e as CustomEvent<{ view: "Timeline" | "Month" }>).detail,
-    );
+    this.viewSwitch.emit((e as CustomEvent<{ view: ViewType }>).detail);
   };
   private readonly _toggleCreateHandler = (e: Event) => {
     e.stopPropagation();
     this.toggleCreate.emit();
+  };
+  private readonly _connectCalendarHandler = (e: Event) => {
+    e.stopPropagation();
+    this.connectCalendar.emit();
+  };
+  private readonly _dateLabelClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.dateLabelClick.emit(
+      (e as CustomEvent<TopbarDateLabelClickDetail>).detail,
+    );
   };
 
   ngAfterViewInit(): void {
@@ -78,6 +95,8 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("today-click", this._todayClickHandler);
     el.addEventListener("view-switch", this._viewSwitchHandler);
     el.addEventListener("toggle-create", this._toggleCreateHandler);
+    el.addEventListener("connect-calendar", this._connectCalendarHandler);
+    el.addEventListener("date-label-click", this._dateLabelClickHandler);
 
     this._syncInputs();
   }
@@ -93,6 +112,8 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("today-click", this._todayClickHandler);
     el?.removeEventListener("view-switch", this._viewSwitchHandler);
     el?.removeEventListener("toggle-create", this._toggleCreateHandler);
+    el?.removeEventListener("connect-calendar", this._connectCalendarHandler);
+    el?.removeEventListener("date-label-click", this._dateLabelClickHandler);
   }
 
   private _syncInputs(): void {
@@ -115,11 +136,15 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     // Props
     const element = el as HTMLElement & {
       view?: string;
+      views?: ViewType[];
       allowCreate?: boolean;
       zoomPercent?: number;
+      isGoogleCalendarConnected?: boolean;
     };
     element.view = this.view();
+    if (this.views() !== undefined) element.views = this.views();
     element.allowCreate = this.allowCreate();
     element.zoomPercent = this.zoomPercent();
+    element.isGoogleCalendarConnected = this.isGoogleCalendarConnected();
   }
 }

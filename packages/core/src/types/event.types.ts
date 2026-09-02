@@ -10,4 +10,5 @@ export interface EventData {
   color?: string;
   allDay?: boolean;
   recurrenceRule?: string;
+  timezone?: string;
 }

@@ -108,7 +108,12 @@ import { SchedulerManager } from "@janus-scheduler/core";
 
 // Initialize core state manager
 const manager = new SchedulerManager();
-manager.addResource({ id: "1", name: "Alice", type: "person" });
+manager.addResource({
+  id: "1",
+  name: "Alice",
+  type: "person",
+  email: "alice@example.com",
+});
 
 function App() {
   return <Timeline onAddEvent={() => console.log("Add event clicked")} />;

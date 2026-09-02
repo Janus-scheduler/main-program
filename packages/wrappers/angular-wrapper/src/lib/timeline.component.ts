@@ -21,8 +21,12 @@ import type {
   EventMoveDetail,
   EventResizeDetail,
   EventCreateDetail,
+  ViewType,
+  ResourceTypeConfig,
+  TimelineResourceClickDetail,
+  TimelineHeaderDateClickDetail,
+  TimelineConflictClickDetail,
 } from "./types";
-import { schedulerStore, isoToZonedDisplay } from "@janus-scheduler/core";
 
 /**
  * TimelineComponent
@@ -60,6 +64,11 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Timeline resource data to display — leave unset to use built-in sample data */
   readonly resources = input<TimelineResource[] | undefined>(undefined);
 
+  /** Custom resource type mapping config */
+  readonly resourceTypeConfig = input<ResourceTypeConfig | undefined>(
+    undefined,
+  );
+
   /** When true, dragging on empty row space creates a new event */
   readonly allowCreate = input<boolean>(false);
 
@@ -68,6 +77,9 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   /** When true, resource conflicts/double-bookings are strictly blocked */
   readonly preventConflicts = input<boolean>(false);
+
+  /** Explicit display timezone */
+  readonly timezone = input<string | undefined>(undefined);
 
   /** Emitted when an event is clicked */
   readonly eventClick = output<TimelineEvent>();
@@ -85,10 +97,20 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly eventCreate = output<EventCreateDetail>();
 
   /** Emitted when the user toggles the view */
-  readonly viewChange = output<{ view: "Timeline" | "Month" }>();
+  readonly viewChange = output<{ view: ViewType }>();
 
   /** Emitted when the date/zoom nav state changes */
   readonly navChange = output<Record<string, unknown>>();
+
+  /** Emitted when a resource row/card in the left column is clicked */
+  readonly resourceClick = output<TimelineResourceClickDetail>();
+
+  /** Emitted when a super-header date on the time ruler is clicked */
+  readonly headerDateClick = output<TimelineHeaderDateClickDetail>();
+
+  /** Emitted when a conflict warning banner or badge is clicked */
+  readonly conflictClick = output<TimelineConflictClickDetail>();
+
   /** Emitted when a resource conflict is detected */
   readonly conflictDetected = output<{
     message: string;
@@ -137,6 +159,18 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.navChange.emit((e as CustomEvent).detail);
   };
+  private _resourceClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.resourceClick.emit((e as CustomEvent).detail);
+  };
+  private _headerDateClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.headerDateClick.emit((e as CustomEvent).detail);
+  };
+  private _conflictClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.conflictClick.emit((e as CustomEvent).detail);
+  };
 
   public goToPrev(): void {
     (
@@ -156,7 +190,15 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     ).goToToday();
   }
 
-  public setView(view: "Timeline" | "Month"): void {
+  public goToDate(date: string | number | Date): void {
+    (
+      this._elRef().nativeElement as HTMLElement & {
+        goToDate: (d: string | number | Date) => void;
+      }
+    ).goToDate(date);
+  }
+
+  public setView(view: ViewType): void {
     (
       this._elRef().nativeElement as HTMLElement & {
         setView: (v: string) => void;
@@ -184,21 +226,26 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("view-change", this._viewChangeHandler);
     el.addEventListener("nav-change", this._navChangeHandler);
     el.addEventListener("conflict-detected", this._conflictDetectedHandler);
+    el.addEventListener("resource-click", this._resourceClickHandler);
+    el.addEventListener("header-date-click", this._headerDateClickHandler);
+    el.addEventListener("conflict-click", this._conflictClickHandler);
 
     this._applyAllowCreate();
 
     // If an explicit resources input is provided, use it directly.
-    // Otherwise, subscribe to the Zustand store so the web component
-    // stays in sync when data is seeded/mutated by the SchedulerManager.
+    // The web component natively subscribes to the Zustand store internally,
+    // so we don't need to do it here.
     if (this.resources() !== undefined) {
       this._syncResources();
-    } else {
-      this._subscribeToStore();
     }
+
+    // Pass config if provided
+    this._syncConfig();
   }
 
   ngOnChanges(): void {
     this._syncResources();
+    this._syncConfig();
     this._applyAllowCreate();
   }
 
@@ -212,120 +259,29 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("view-change", this._viewChangeHandler);
     el?.removeEventListener("nav-change", this._navChangeHandler);
     el?.removeEventListener("conflict-detected", this._conflictDetectedHandler);
+    el?.removeEventListener("resource-click", this._resourceClickHandler);
+    el?.removeEventListener("header-date-click", this._headerDateClickHandler);
+    el?.removeEventListener("conflict-click", this._conflictClickHandler);
     this._unsubStore?.();
   }
 
-  private _subscribeToStore(): void {
-    // Immediately sync with the current store state
-    this._pushStoreToElement(schedulerStore.getState());
-
-    // Subscribe to future changes
-    this._unsubStore = schedulerStore.subscribe((state) => {
-      this._pushStoreToElement(state);
-    });
-  }
-
-  private _pushStoreToElement(
-    state: ReturnType<typeof schedulerStore.getState>,
-  ): void {
-    const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { resources: TimelineResource[] })
-      | undefined;
-    if (!el) return;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const resources = Object.values(state.resources) as any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const events = Object.values(state.events) as any[];
-
-    if (resources.length === 0) return;
-
-    const typeOrder: Record<string, number> = {
-      person: 1,
-      room: 2,
-      equipment: 3,
+  private _syncConfig(): void {
+    const config = this.resourceTypeConfig();
+    if (!config) return;
+    type TimelineElement = HTMLElement & {
+      resourceTypeConfig: ResourceTypeConfig;
     };
-    const sorted = [...resources].sort(
-      (a, b) =>
-        (typeOrder[a.type || "person"] || 99) -
-        (typeOrder[b.type || "person"] || 99),
-    );
-
-    let currentGroupType = "";
-    const mapped: TimelineResource[] = sorted.map((res) => {
-      const resEvents = events
-
-        .filter(
-          (
-            e: TimelineEvent & { resourceIds?: string[]; resourceId?: string },
-          ) =>
-            (e.resourceIds && e.resourceIds.includes(res.id)) ||
-            e.resourceId === res.id,
-        )
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((e: any) => {
-          const startD = new Date(e.startTime);
-          const endD = new Date(e.endTime);
-          const tz = state.timezone;
-          const { time: startTime } = isoToZonedDisplay(e.startTime, tz);
-          const { time: endTime, date } = isoToZonedDisplay(e.endTime, tz);
-          return {
-            id: e.id,
-            title: e.title,
-            startTime,
-            endTime,
-            startMs: startD.getTime(),
-            endMs: endD.getTime(),
-            color: "blue" as const,
-            date,
-          };
-        });
-
-      let avatarType: "initials" | "icon" = "initials";
-      let avatarIcon: "room" | "equipment" | undefined = undefined;
-      let groupLabel: string | undefined = undefined;
-      const type = res.type || "person";
-
-      if (type !== currentGroupType) {
-        currentGroupType = type;
-        if (type === "person") groupLabel = "STAFF";
-        else if (type === "room") groupLabel = "ROOMS";
-        else if (type === "equipment") groupLabel = "EQUIPMENT";
-      }
-
-      if (type === "room") {
-        avatarType = "icon";
-        avatarIcon = "room";
-      } else if (type === "equipment") {
-        avatarType = "icon";
-        avatarIcon = "equipment";
-      }
-
-      return {
-        id: res.id,
-        name: res.name,
-        subtitle:
-          type === "person"
-            ? "Staff"
-            : type === "room"
-              ? "Facility"
-              : "Equipment",
-        avatarType,
-        avatarIcon,
-        groupLabel,
-        events: resEvents,
-      };
-    });
-
-    el.resources = mapped;
+    const el = this._elRef()?.nativeElement as TimelineElement | undefined;
+    if (el) {
+      el.resourceTypeConfig = config;
+    }
   }
 
   private _syncResources(): void {
     const data = this.resources();
     if (!data) return;
     const el = this._elRef()?.nativeElement as
-      | (HTMLElement & { resources: TimelineResource[] })
-      | undefined;
+      (HTMLElement & { resources: TimelineResource[] }) | undefined;
     if (el) {
       el.resources = data;
     }
@@ -337,12 +293,14 @@ export class TimelineComponent implements AfterViewInit, OnDestroy, OnChanges {
           allowCreate: boolean;
           showFab: boolean;
           preventConflicts: boolean;
+          timezone?: string;
         })
       | undefined;
     if (el) {
       el.allowCreate = this.allowCreate();
       el.showFab = this.showFab();
       el.preventConflicts = this.preventConflicts();
+      if (this.timezone() !== undefined) el.timezone = this.timezone();
     }
   }
 }

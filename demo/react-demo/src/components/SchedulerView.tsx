@@ -2,19 +2,32 @@ import { useEffect, useRef, useState } from "react";
 import {
   Timeline,
   MonthGrid,
+  DayGrid,
+  WeekGrid,
+  YearGrid,
   Scheduler,
-  AiBar,
   Topbar,
-} from "@janus-scheduler/react";
-import type { ViewType } from "@janus-scheduler/react";
-import type { SchedulerManager } from "@janus-scheduler/react";
-import {
   isoToZonedDisplay,
   zonedInputToISO,
   schedulerStore,
 } from "@janus-scheduler/react";
+import type { ViewType, SchedulerManager } from "@janus-scheduler/react";
+import type { JanusTimeline, JanusMonthGrid } from "@janus-scheduler/ui";
 
 import { loadDenseBenchmarkData } from "../utils/benchmarkDataGenerator";
+import { ChatSidebar } from "./ChatDock";
+
+const TIMELINE_RESOURCE_CONFIG = {
+  person: { label: "STAFF", subtitle: "Staff", order: 1 },
+  room: { label: "ROOMS", subtitle: "Facility", order: 2 },
+  equipment: { label: "EQUIPMENT", subtitle: "Equipment", order: 3 },
+  vehicle: {
+    label: "VEHICLES",
+    subtitle: "Fleet",
+    order: 4,
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11h12Zm0 0h2.5a2.5 2.5 0 0 0 2.5-2.5V11l-4-3v10Z"/><circle cx="6" cy="18" r="2"/><circle cx="16" cy="18" r="2"/></svg>`,
+  },
+};
 
 interface SchedulerViewProps {
   /** Currently active view — controls which Janus component is mounted */
@@ -32,6 +45,8 @@ interface SchedulerViewProps {
   /** The SchedulerManager instance — used to mutate store state */
   manager: SchedulerManager;
   preventConflicts: boolean;
+  /** Whether Google Calendar is currently connected — shown on the topbar's connect button. */
+  isGoogleCalendarConnected: boolean;
   /**
    * @param eventId - string when opening in edit mode (event was clicked),
    *                  undefined/null when opening in create mode (FAB was clicked).
@@ -39,6 +54,10 @@ interface SchedulerViewProps {
   onViewChange: (view: ViewType) => void;
   onOpenScheduler: (eventId?: string) => void;
   onCloseScheduler: () => void;
+  /** Fired when the user clicks the topbar's Google Calendar connect/disconnect button. */
+  onConnectCalendar: () => void;
+  canUndo?: boolean;
+  onUndo?: () => void;
 }
 
 /**
@@ -49,7 +68,7 @@ function readBenchmarkCountFromUrl(): number | null {
   const params = new URLSearchParams(window.location.search);
   const raw = params.get("resources") ?? params.get("count");
   if (!raw) return null;
-  const count = parseInt(raw, 10);
+  const count = Number.parseInt(raw, 10);
   return Number.isNaN(count) || count <= 0 ? null : count;
 }
 
@@ -81,10 +100,14 @@ export function SchedulerView({
   selectedEventId,
   manager,
   preventConflicts,
+  isGoogleCalendarConnected,
   onViewChange,
   onOpenScheduler,
   onCloseScheduler,
-}: SchedulerViewProps) {
+  onConnectCalendar,
+  canUndo,
+  onUndo,
+}: Readonly<SchedulerViewProps>) {
   const [tempEventData, setTempEventData] = useState<{
     startDate?: string;
     startTime?: string;
@@ -96,32 +119,104 @@ export function SchedulerView({
 
   // ── Helper to split ISO ────────────────────────────────────────────────
   // Convert a UTC ISO string → local { date, time } for display in the modal.
-  // Uses the store's selected timezone for consistent display.
+  // Uses the event's timezone (or store display timezone) for display.
+  const storeEvent = selectedEventId ? manager.getEvent(selectedEventId) : null;
+  const eventTz = storeEvent?.timezone || schedulerStore.getState().timezone;
   const splitISO = (iso: string) => {
     if (!iso) return { date: "", time: "" };
-    return isoToZonedDisplay(iso, schedulerStore.getState().timezone);
+    return isoToZonedDisplay(iso, eventTz);
   };
 
-  const storeEvent = selectedEventId ? manager.getEvent(selectedEventId) : null;
   const startParts = storeEvent ? splitISO(storeEvent.startTime) : null;
   const endParts = storeEvent ? splitISO(storeEvent.endTime) : null;
 
   const timelineRef = useRef<
-    HTMLElement & {
-      goToPrev: () => void;
-      goToNext: () => void;
-      goToToday: () => void;
-      toggleCreate: () => void;
-      goToDate: (date: string | number | Date) => void;
-    }
+    | (JanusTimeline & {
+        goToPrev: () => void;
+        goToNext: () => void;
+        goToToday: () => void;
+        toggleCreate: () => void;
+        goToDate: (date: string | number | Date) => void;
+      })
+    | null
   >(null);
   const monthGridRef = useRef<
+    | (JanusMonthGrid & {
+        goToPrev: () => void;
+        goToNext: () => void;
+        goToToday: () => void;
+      })
+    | null
+  >(null);
+  const yearGridRef = useRef<
     HTMLElement & {
       goToPrev: () => void;
       goToNext: () => void;
       goToToday: () => void;
     }
   >(null);
+
+  /** Day and Week grids share the same imperative navigation API. */
+  type TimeGridHandle = HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+    goToDate: (date: string | number | Date) => void;
+  };
+  const dayGridRef = useRef<TimeGridHandle>(null);
+  const weekGridRef = useRef<TimeGridHandle>(null);
+
+  /**
+   * The nav surface every view exposes. `goToDate` is optional because Month
+   * navigates by month rather than by day.
+   */
+  type NavHandle = HTMLElement & {
+    goToPrev: () => void;
+    goToNext: () => void;
+    goToToday: () => void;
+    goToDate?: (date: string | number | Date) => void;
+  };
+
+  /** The nav-capable component currently on screen, or null if none is. */
+  const activeNavRef = (): NavHandle | null => {
+    if (currentView === "Timeline") return timelineRef.current;
+    if (currentView === "Month") return monthGridRef.current;
+    if (currentView === "Day") return dayGridRef.current;
+    if (currentView === "Week") return weekGridRef.current;
+    return yearGridRef.current;
+  };
+
+  /**
+   * Date a view-switch should land on, set by a day-click in another view.
+   * A ref (not state) so the useEffect below can't read a stale value.
+   */
+  const pendingDate = useRef<string | null>(null);
+
+  // After a view switch, navigate the newly mounted view to the pending date
+  // (set by a day-click in another view).
+  useEffect(() => {
+    const target = pendingDate.current;
+    pendingDate.current = null; // consume it
+
+    // Timeline does not start on today's date the way the calendar views do,
+    // so it needs an explicit reset whenever it is mounted without a target —
+    // otherwise it opens on a stale window and appears to have no events.
+    const needsTodayReset = !target && currentView === "Timeline";
+    if (!target && !needsTodayReset) return;
+
+    // The new view mounts on the next tick, so resolve the ref inside the
+    // timeout rather than capturing a ref that is still null right now.
+    const timer = setTimeout(() => {
+      const el = activeNavRef();
+      if (!el) return;
+      // Month has no goToDate — it navigates by month, not by day.
+      if (target) el.goToDate?.(target);
+      else el.goToToday();
+    }, 50);
+    return () => clearTimeout(timer);
+    // activeNavRef reads refs only — currentView is the real dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentView]);
 
   const [navData, setNavData] = useState({
     navLabel: "",
@@ -130,20 +225,13 @@ export function SchedulerView({
     zoomPercent: 100,
     zoomUnit: "",
   });
-  const [allowCreate, setAllowCreate] = useState(false);
+  const [allowCreate, setAllowCreate] = useState(true);
 
   // Seed the store once for the URL-selected dataset (?resources=N or ?count=N).
   useEffect(() => {
     const count = readBenchmarkCountFromUrl();
     if (count !== null) loadDenseBenchmarkData(count);
   }, []);
-
-  // Re-center timeline on current time whenever switching to Timeline view
-  useEffect(() => {
-    if (currentView === "Timeline") {
-      timelineRef.current?.goToToday();
-    }
-  }, [currentView]);
 
   const handleNavChange = (detail: Record<string, unknown>) => {
     setNavData({
@@ -155,198 +243,367 @@ export function SchedulerView({
     });
   };
 
+  /**
+   * Day / Week grids report slot selections already split into date + time in
+   * the display timezone, so they can be handed straight to the modal —
+   * unlike Timeline's onEventCreate, which reports ISO instants.
+   */
+  const handleSlotSelect = (detail: {
+    date: string;
+    startTime: string;
+    endTime: string;
+  }) => {
+    setTempEventData({
+      startDate: detail.date,
+      startTime: detail.startTime,
+      endDate: detail.date,
+      endTime: detail.endTime,
+      // Day/Week have no resource axis, so the user picks participants in the
+      // modal — leave it undefined rather than forcing an empty selection.
+      showConfirmOnCreate: true,
+    });
+    onOpenScheduler();
+  };
+
+  /**
+   * Day / Week grids report drag results as wall-clock date+time (like
+   * onSlotSelect), not ISO instants like Timeline — so both handlers convert
+   * via `zonedInputToISO` before writing to the store.
+   */
+  const handleTimeGridMove = ({
+    event,
+    newDate,
+    newStartTime,
+    newEndTime,
+  }: {
+    event: { id: string };
+    newDate: string;
+    newStartTime: string;
+    newEndTime: string;
+  }) => {
+    const tz = schedulerStore.getState().timezone;
+    manager.updateEvent(event.id, {
+      startTime: zonedInputToISO(newDate, newStartTime, tz),
+      endTime: zonedInputToISO(newDate, newEndTime, tz),
+    });
+  };
+
+  const handleTimeGridResize = ({
+    event,
+    date,
+    newStartTime,
+    newEndTime,
+  }: {
+    event: { id: string };
+    date: string;
+    newStartTime: string;
+    newEndTime: string;
+  }) => {
+    const tz = schedulerStore.getState().timezone;
+    manager.updateEvent(event.id, {
+      startTime: zonedInputToISO(date, newStartTime, tz),
+      endTime: zonedInputToISO(date, newEndTime, tz),
+    });
+  };
+
+  let schedulerTitle = "";
+  if (storeEvent) {
+    schedulerTitle = storeEvent.title;
+  } else if (tempEventData) {
+    schedulerTitle = "New Event";
+  }
+
+  let schedulerParticipants = tempEventData?.participants;
+  if (storeEvent) {
+    schedulerParticipants = storeEvent.resourceIds || undefined;
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Topbar
-        navLabel={navData.navLabel}
-        dayName={navData.dayName}
-        shortDate={navData.shortDate}
-        view={currentView}
-        allowCreate={allowCreate}
-        zoomPercent={navData.zoomPercent}
-        zoomUnit={navData.zoomUnit}
-        onPrevClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToPrev();
-          else monthGridRef.current?.goToPrev();
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        height: "100%",
+        width: "100%",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minWidth: 0,
+          height: "100%",
         }}
-        onNextClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToNext();
-          else monthGridRef.current?.goToNext();
-        }}
-        onTodayClick={() => {
-          if (currentView === "Timeline") timelineRef.current?.goToToday();
-          else monthGridRef.current?.goToToday();
-        }}
-        onViewSwitch={(detail) => onViewChange(detail.view)}
-        onToggleCreate={() => {
-          if (currentView === "Timeline") timelineRef.current?.toggleCreate();
-          setAllowCreate(!allowCreate);
-        }}
-      />
-      {currentView === "Timeline" && (
-        <Timeline
-          ref={timelineRef}
+      >
+        <Topbar
+          navLabel={navData.navLabel}
+          dayName={navData.dayName}
+          shortDate={navData.shortDate}
+          view={currentView}
           allowCreate={allowCreate}
-          showFab={true}
-          preventConflicts={preventConflicts}
-          onAddEvent={() => onOpenScheduler()}
-          onEventClick={(ev) => onOpenScheduler(ev?.id)}
-          onEventMove={({
-            event,
-            oldResourceId,
-            newResourceId,
-            newStartTime,
-            newEndTime,
-          }) => {
-            const currentEvent = manager.getEvent(event.id);
-            if (!currentEvent) return;
-            const updatedResourceIds = currentEvent.resourceIds.map((id) =>
-              id === oldResourceId ? newResourceId : id,
-            );
-            manager.updateEvent(event.id, {
-              resourceIds: updatedResourceIds,
-              startTime: newStartTime,
-              endTime: newEndTime,
-            });
+          canUndo={canUndo}
+          zoomPercent={navData.zoomPercent}
+          zoomUnit={navData.zoomUnit}
+          isGoogleCalendarConnected={isGoogleCalendarConnected}
+          onConnectCalendar={onConnectCalendar}
+          onPrevClick={() => activeNavRef()?.goToPrev()}
+          onNextClick={() => activeNavRef()?.goToNext()}
+          onTodayClick={() => activeNavRef()?.goToToday()}
+          onViewSwitch={(detail) => onViewChange(detail.view)}
+          onToggleCreate={() => {
+            if (currentView === "Timeline") timelineRef.current?.toggleCreate();
+            setAllowCreate(!allowCreate);
           }}
-          onEventResize={({ event, newStartTime, newEndTime }) => {
-            manager.updateEvent(event.id, {
-              startTime: newStartTime,
-              endTime: newEndTime,
-            });
+          onUndoClick={() => {
+            if (onUndo) onUndo();
           }}
-          onEventCreate={({ resourceId, startTime, endTime }) => {
-            const startStr = splitISO(startTime);
-            const endStr = splitISO(endTime);
-            setTempEventData({
-              startDate: startStr.date,
-              startTime: startStr.time,
-              endDate: endStr.date,
-              endTime: endStr.time,
-              participants: [resourceId],
-              showConfirmOnCreate: true,
-            });
-            onOpenScheduler();
-          }}
-          onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
         />
-      )}
 
-      {currentView === "Month" && (
-        <MonthGrid
-          showFab={false}
-          onAddEvent={() => onOpenScheduler()}
-          onEventClick={(ev) => onOpenScheduler(ev?.id)}
-          onDayClick={(detail) => {
-            onViewChange("Timeline");
-            setTimeout(() => {
-              if (timelineRef.current && timelineRef.current.goToDate) {
-                timelineRef.current.goToDate(detail.date);
-              }
-            }, 100);
+        <div
+          style={{
+            display: currentView === "Timeline" ? "flex" : "none",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
           }}
-          onViewChange={(detail) => onViewChange(detail.view)}
-          onNavChange={handleNavChange}
-          ref={monthGridRef}
-        />
-      )}
-
-      {showScheduler && (
-        <Scheduler
-          preventConflicts={preventConflicts}
-          eventId={selectedEventId}
-          error={schedulerError}
-          title={
-            storeEvent ? storeEvent.title : tempEventData ? "New Event" : ""
-          }
-          startDate={storeEvent ? startParts?.date : tempEventData?.startDate}
-          startTime={storeEvent ? startParts?.time : tempEventData?.startTime}
-          endDate={storeEvent ? endParts?.date : tempEventData?.endDate}
-          endTime={storeEvent ? endParts?.time : tempEventData?.endTime}
-          participants={
-            storeEvent
-              ? storeEvent.resourceIds
-                ? storeEvent.resourceIds
-                : undefined
-              : tempEventData?.participants
-          }
-          description={storeEvent?.description}
-          activeColor={storeEvent?.color}
-          allDay={storeEvent?.allDay}
-          recurrenceRule={storeEvent?.recurrenceRule}
-          showConfirmOnCreate={
-            !selectedEventId && !!tempEventData?.showConfirmOnCreate
-          }
-          onSave={(data) => {
-            const today = new Date().toISOString().split("T")[0];
-            try {
-              if (data.id) {
-                manager.updateEvent(data.id, {
-                  title: data.title,
-                  startTime: zonedInputToISO(
-                    data.startDate || today,
-                    data.startTime,
-                    data.timezone,
-                  ),
-                  endTime: zonedInputToISO(
-                    data.endDate || today,
-                    data.endTime,
-                    data.timezone,
-                  ),
-                  resourceIds: data.participants || ["r1"],
-                  description: data.description,
-                  status: "confirmed",
-                  color: data.activeColor,
-                  allDay: data.allDay,
-                  recurrenceRule: data.recurrenceRule,
-                });
-              } else {
-                manager.addEvent({
-                  id: `evt_${Date.now()}`,
-                  title: data.title || "New Event",
-                  startTime: zonedInputToISO(
-                    data.startDate || today,
-                    data.startTime,
-                    data.timezone,
-                  ),
-                  endTime: zonedInputToISO(
-                    data.endDate || today,
-                    data.endTime,
-                    data.timezone,
-                  ),
-                  resourceIds: data.participants || ["r1"],
-                  description: data.description,
-                  status: "confirmed",
-                  color: data.activeColor,
-                  allDay: data.allDay,
-                  recurrenceRule: data.recurrenceRule,
-                });
-                console.log("Event added:", data);
+        >
+          <Timeline
+            ref={timelineRef}
+            allowCreate={allowCreate}
+            showFab={true}
+            preventConflicts={preventConflicts}
+            resourceTypeConfig={TIMELINE_RESOURCE_CONFIG}
+            onAddEvent={() => onOpenScheduler()}
+            onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onHeaderDateClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
+            onEventMove={({
+              event,
+              oldResourceId,
+              newResourceId,
+              newStartTime,
+              newEndTime,
+            }) => {
+              const currentEvent = manager.getEvent(event.id);
+              if (!currentEvent) return;
+              const updatedResourceIds = currentEvent.resourceIds.map((id) =>
+                id === oldResourceId ? newResourceId : id,
+              );
+              manager.updateEvent(event.id, {
+                resourceIds: updatedResourceIds,
+                startTime: newStartTime,
+                endTime: newEndTime,
+              });
+            }}
+            onEventResize={({ event, newStartTime, newEndTime }) => {
+              manager.updateEvent(event.id, {
+                startTime: newStartTime,
+                endTime: newEndTime,
+              });
+            }}
+            onEventCreate={({ resourceId, startTime, endTime }) => {
+              const startStr = splitISO(startTime);
+              const endStr = splitISO(endTime);
+              setTempEventData({
+                startDate: startStr.date,
+                startTime: startStr.time,
+                endDate: endStr.date,
+                endTime: endStr.time,
+                participants: [resourceId],
+                showConfirmOnCreate: true,
+              });
+              onOpenScheduler();
+            }}
+            onViewChange={(detail) => onViewChange(detail.view)}
+            onNavChange={(detail) => {
+              if (currentView === "Timeline") {
+                handleNavChange(detail);
               }
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            display: currentView === "Month" ? "flex" : "none",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
+          <MonthGrid
+            showFab={true}
+            navLinks={true}
+            onAddEvent={() => onOpenScheduler()}
+            onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onDayHeaderClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
+            onSlotSelect={(detail) => {
+              setTempEventData({
+                startDate: detail.date,
+                startTime: "09:00",
+                endDate: detail.date,
+                endTime: "10:00",
+                showConfirmOnCreate: true,
+              });
+              onOpenScheduler();
+            }}
+            onViewChange={(detail) => onViewChange(detail.view)}
+            onNavChange={(detail) => {
+              if (currentView === "Month") {
+                handleNavChange(detail);
+              }
+            }}
+            ref={monthGridRef}
+          />
+        </div>
+
+        {currentView === "Year" && (
+          <YearGrid
+            ref={yearGridRef}
+            navLinks={true}
+            onNavChange={handleNavChange}
+            onMonthHeaderClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Month");
+            }}
+            onDayClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
+            onViewChange={(detail) => onViewChange(detail.view)}
+          />
+        )}
+
+        {currentView === "Week" && (
+          <WeekGrid
+            ref={weekGridRef}
+            showFab={true}
+            navLinks={true}
+            allowCreate={allowCreate}
+            onAddEvent={() => onOpenScheduler()}
+            onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onDayHeaderClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
+            onDayClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
+            onSlotSelect={handleSlotSelect}
+            onEventMove={handleTimeGridMove}
+            onEventResize={handleTimeGridResize}
+            onViewChange={(detail) => onViewChange(detail.view)}
+            onNavChange={handleNavChange}
+          />
+        )}
+
+        {currentView === "Day" && (
+          <DayGrid
+            ref={dayGridRef}
+            showFab={true}
+            navLinks={true}
+            allowCreate={allowCreate}
+            onAddEvent={() => onOpenScheduler()}
+            onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onSlotSelect={handleSlotSelect}
+            onEventMove={handleTimeGridMove}
+            onEventResize={handleTimeGridResize}
+            onViewChange={(detail) => onViewChange(detail.view)}
+            onNavChange={handleNavChange}
+          />
+        )}
+
+        {showScheduler && (
+          <Scheduler
+            preventConflicts={preventConflicts}
+            eventId={selectedEventId}
+            error={schedulerError}
+            title={schedulerTitle}
+            startDate={storeEvent ? startParts?.date : tempEventData?.startDate}
+            startTime={storeEvent ? startParts?.time : tempEventData?.startTime}
+            endDate={storeEvent ? endParts?.date : tempEventData?.endDate}
+            endTime={storeEvent ? endParts?.time : tempEventData?.endTime}
+            participants={schedulerParticipants}
+            description={storeEvent?.description}
+            activeColor={storeEvent?.color}
+            allDay={storeEvent?.allDay}
+            recurrenceRule={storeEvent?.recurrenceRule}
+            showConfirmOnCreate={
+              !selectedEventId && !!tempEventData?.showConfirmOnCreate
+            }
+            onSave={(data) => {
+              const today = new Date().toISOString().split("T")[0];
+              try {
+                if (data.id) {
+                  manager.updateEvent(data.id, {
+                    title: data.title,
+                    startTime: zonedInputToISO(
+                      data.startDate || today,
+                      data.startTime,
+                      data.timezone,
+                    ),
+                    endTime: zonedInputToISO(
+                      data.endDate || today,
+                      data.endTime,
+                      data.timezone,
+                    ),
+                    resourceIds: data.participants || ["r1"],
+                    description: data.description,
+                    status: "confirmed",
+                    color: data.activeColor,
+                    allDay: data.allDay,
+                    recurrenceRule: data.recurrenceRule,
+                  });
+                } else {
+                  manager.addEvent({
+                    id: `evt_${Date.now()}`,
+                    title: data.title || "New Event",
+                    startTime: zonedInputToISO(
+                      data.startDate || today,
+                      data.startTime,
+                      data.timezone,
+                    ),
+                    endTime: zonedInputToISO(
+                      data.endDate || today,
+                      data.endTime,
+                      data.timezone,
+                    ),
+                    resourceIds: data.participants || ["r1"],
+                    description: data.description,
+                    status: "confirmed",
+                    color: data.activeColor,
+                    allDay: data.allDay,
+                    recurrenceRule: data.recurrenceRule,
+                  });
+                  console.log("Event added:", data);
+                }
+                setTempEventData(null);
+                onCloseScheduler();
+              } catch (err: unknown) {
+                console.error("Store rejected the event:", err);
+              }
+            }}
+            onDelete={({ id }) => {
+              if (id) manager.deleteEvent(id);
               setTempEventData(null);
               onCloseScheduler();
-            } catch (err: unknown) {
-              console.error("Store rejected the event:", err);
-            }
-          }}
-          onDelete={({ id }) => {
-            if (id) manager.deleteEvent(id);
-            setTempEventData(null);
-            onCloseScheduler();
-          }}
-          onClose={() => {
-            setTempEventData(null);
-            onCloseScheduler();
-          }}
-        />
-      )}
-      <AiBar
-        onAiSubmit={({ prompt }) => {
-          console.log("AI prompt submitted:", prompt);
-          // TODO: hook into your NLP integration here
-        }}
-      />
+            }}
+            onClose={() => {
+              setTempEventData(null);
+              onCloseScheduler();
+            }}
+          />
+        )}
+      </div>
+      {/* The chat must honour the SAME conflict policy as the timeline. */}
+      <ChatSidebar manager={manager} preventConflicts={preventConflicts} />
     </div>
   );
 }

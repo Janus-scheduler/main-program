@@ -65,4 +65,61 @@ describe("Time Utilities", () => {
     expect(list.length).toBeGreaterThan(0);
     expect(list).toContain("Europe/London");
   });
+
+  it("should accurately round-trip date and time across various timezones", () => {
+    const testCases = [
+      { tz: "America/New_York", date: "2026-01-15", time: "09:30" }, // Winter (EST, UTC-5)
+      { tz: "America/New_York", date: "2026-07-15", time: "14:00" }, // Summer (EDT, UTC-4)
+      { tz: "Europe/London", date: "2026-01-15", time: "10:00" }, // GMT (UTC+0)
+      { tz: "Europe/London", date: "2026-07-15", time: "10:00" }, // BST (UTC+1)
+      { tz: "Asia/Colombo", date: "2026-06-02", time: "17:45" }, // UTC+5:30
+      { tz: "Asia/Tokyo", date: "2026-11-20", time: "23:15" }, // UTC+9
+      { tz: "America/St_Johns", date: "2026-07-10", time: "08:30" }, // Newfoundland (UTC-2:30)
+    ];
+
+    for (const { tz, date, time } of testCases) {
+      const iso = zonedInputToISO(date, time, tz);
+      const display = isoToZonedDisplay(iso, tz);
+      expect(display.date).toBe(date);
+      expect(display.time).toBe(time);
+    }
+  });
+
+  it("should correctly handle DST transitions with 2-pass sampling", () => {
+    // US Spring forward 2026: March 8, 2026 at 2:00 AM -> 3:00 AM
+    const preDst = zonedInputToISO("2026-03-08", "01:30", "America/New_York");
+    const postDst = zonedInputToISO("2026-03-08", "03:30", "America/New_York");
+
+    expect(isoToZonedDisplay(preDst, "America/New_York")).toEqual({
+      date: "2026-03-08",
+      time: "01:30",
+    });
+    expect(isoToZonedDisplay(postDst, "America/New_York")).toEqual({
+      date: "2026-03-08",
+      time: "03:30",
+    });
+
+    // Exactly 1 hour difference in real time between 1:30 AM EST and 3:30 AM EDT
+    const diffMs = new Date(postDst).getTime() - new Date(preDst).getTime();
+    expect(diffMs).toBe(60 * 60 * 1000);
+  });
+
+  it("should fallback to default timezones when Intl.supportedValuesOf throws or is unavailable", () => {
+    const originalSupported = Intl.supportedValuesOf;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (Intl as any).supportedValuesOf = undefined;
+      const list = getAllTimezones();
+      expect(list).toContain("UTC");
+      expect(list).toContain("America/New_York");
+    } finally {
+      Intl.supportedValuesOf = originalSupported;
+    }
+  });
+
+  it("should handle toFakeLocalDate edge cases and hour 24 wrap-around", () => {
+    const ts = new Date("2026-06-02T23:59:59Z").getTime();
+    const fake = toFakeLocalDate(ts, "UTC");
+    expect(fake.getUTCFullYear()).toBe(2026);
+  });
 });

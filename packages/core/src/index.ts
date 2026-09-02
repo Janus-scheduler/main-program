@@ -1,5 +1,9 @@
 export { SchedulerManager } from "./services/SchedulerManager.service";
-export type { SchedulerHooks } from "./services/SchedulerManager.service";
+export type {
+  SchedulerHooks,
+  SchedulerConfig,
+  UndoAction,
+} from "./services/SchedulerManager.service";
 export * from "./store";
 export * from "./api/api.init";
 export type {
@@ -33,6 +37,7 @@ export {
 export { expandEvents } from "./utils/recurrence";
 export {
   computeTimelineConflicts,
+  computeSingleResourceConflicts,
   checkSlotConflict,
   checkDraftConflict,
 } from "./utils/conflict";

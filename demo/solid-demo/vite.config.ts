@@ -9,6 +9,7 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
+    emptyOutDir: false,
   },
   resolve: {
     alias: {
@@ -19,6 +20,14 @@ export default defineConfig({
       "@janus-scheduler/ui": path.resolve(
         __dirname,
         "../../packages/ui/src/index.ts",
+      ),
+      "@janus-scheduler/integrations": path.resolve(
+        __dirname,
+        "../../packages/integrations/src/index.ts",
+      ),
+      "@janus-scheduler/core": path.resolve(
+        __dirname,
+        "../../packages/core/src/index.ts",
       ),
     },
   },

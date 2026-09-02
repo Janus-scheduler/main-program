@@ -5,6 +5,9 @@ import path from "path";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    emptyOutDir: false,
+  },
   resolve: {
     alias: {
       "@janus-scheduler/react": path.resolve(
@@ -14,6 +17,10 @@ export default defineConfig({
       "@janus-scheduler/ui": path.resolve(
         __dirname,
         "../../packages/ui/src/index.ts",
+      ),
+      "@janus-scheduler/integrations": path.resolve(
+        __dirname,
+        "../../packages/integrations/src/index.ts",
       ),
     },
   },

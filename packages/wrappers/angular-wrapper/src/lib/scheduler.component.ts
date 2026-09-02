@@ -60,6 +60,7 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly activeColor = input<string | undefined>(undefined);
   readonly allDay = input<boolean | undefined>(undefined);
   readonly recurrenceRule = input<string | undefined>(undefined);
+  readonly timezone = input<string | undefined>(undefined);
   readonly preventConflicts = input<boolean | undefined>(undefined);
   readonly showConfirmOnCreate = input<boolean | undefined>(undefined);
 
@@ -122,6 +123,7 @@ export class SchedulerComponent implements AfterViewInit, OnDestroy, OnChanges {
       if (this.allDay() !== undefined) el.allDay = this.allDay();
       if (this.recurrenceRule() !== undefined)
         el.recurrenceRule = this.recurrenceRule();
+      if (this.timezone() !== undefined) el.timezone = this.timezone();
       if (this.preventConflicts() !== undefined)
         el.preventConflicts = this.preventConflicts();
       if (this.showConfirmOnCreate() !== undefined)

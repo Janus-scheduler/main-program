@@ -3,11 +3,18 @@ import {
   getBrowserTimezone,
   zonedInputToISO,
 } from "@janus-scheduler/core";
+import {
+  GoogleSyncManager,
+  GoogleCalendarClient,
+  GoogleEventMapper,
+} from "@janus-scheduler/integrations";
 
 export interface HookError {
   operation: string;
   message: string;
 }
+
+const BACKEND_URL = "http://localhost:3001";
 
 /**
  * useSchedulerManager
@@ -17,17 +24,18 @@ export interface HookError {
  *
  * Since the Zustand store is a module-level singleton, calling this multiple
  * times (e.g. during HMR) is safe — the guard prevents duplicate seeding.
+ *
+ * @returns `{ manager, syncManager }` — the caller needs `syncManager` too,
+ *   for the Google Calendar connect/disconnect and real-time sync lifecycle.
  */
 export function useSchedulerManager(onError: (err: HookError) => void) {
+  // Set up Google sync infrastructure
+  const client = new GoogleCalendarClient({ backendUrl: BACKEND_URL });
+  const mapper = new GoogleEventMapper();
+  const syncManager = new GoogleSyncManager(client, mapper);
+
   const manager = new SchedulerManager({
-    // ── onEventAdd ──────────────────────────────────────────────────────
-    // Fires AFTER the store is updated (optimistic). If this throws,
-    // SchedulerManager automatically rolls back the store and calls onError.
-    onEventAdd: async (_event) => {
-      await new Promise((r) => setTimeout(r, 400)); // simulate network latency
-      console.log(_event);
-      return; // ← success path
-    },
+    ...syncManager.getHooks(),
 
     // ── onError ─────────────────────────────────────────────────────────
     // The store has already been rolled back before this fires.
@@ -44,17 +52,37 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
   if (manager.getResourceCount() === 0) {
     console.log("🌱 Seeding initial data to core manager...");
 
-    manager.addResource({ id: "r1", name: "Dr. Sarah Chen", type: "person" });
+    manager.addResource({
+      id: "r1",
+      name: "Dr. Sarah Chen",
+      type: "person",
+      email: "sarah.chen@example.com",
+      subtitle: "Specialist",
+      avatar:
+        "https://tse4.mm.bing.net/th/id/OIP.Fg0RUhBQm2fns8AIOTXtJwHaHa?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+    });
     manager.addResource({
       id: "r2",
       name: "Dr. Michael Ross",
       type: "person",
+      email: "michael.ross@example.com",
+      subtitle: "Manager",
+      avatar:
+        "https://img.magnific.com/premium-photo/handsome-young-male-medical-doctor-portrait-with-stethoscope-hospital_744655-345.jpg?w=2000",
     });
-    manager.addResource({ id: "r3", name: "Operating Room 1", type: "room" });
+    manager.addResource({
+      id: "r3",
+      name: "Operating Room 1",
+      type: "room",
+      avatar:
+        "https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&q=80&w=120&h=120",
+    });
     manager.addResource({
       id: "r4",
       name: "MRI Scanner A",
       type: "equipment",
+      avatar:
+        "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=120&h=120",
     });
 
     const today = new Date().toISOString().split("T")[0];
@@ -81,5 +109,5 @@ export function useSchedulerManager(onError: (err: HookError) => void) {
     console.log("✅ Seeding complete");
   }
 
-  return manager;
+  return { manager, syncManager };
 }

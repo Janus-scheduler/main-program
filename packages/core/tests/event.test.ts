@@ -81,5 +81,13 @@ describe("Event", () => {
       const event = new Event(validData);
       expect(event.description).toBe("");
     });
+
+    it("should retain timezone property if provided", () => {
+      const event = new Event({
+        ...validData,
+        timezone: "Asia/Tokyo",
+      });
+      expect(event.timezone).toBe("Asia/Tokyo");
+    });
   });
 });
