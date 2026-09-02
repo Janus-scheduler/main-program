@@ -214,9 +214,15 @@ export const timelineStyles = css`
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     overflow: hidden;
+    cursor: pointer;
     transition:
       padding 0.2s ease,
-      gap 0.2s ease;
+      gap 0.2s ease,
+      background-color 0.15s ease;
+  }
+
+  .tl-res-row:hover {
+    background-color: #fafafa;
   }
 
   .tl-res-info {
@@ -346,6 +352,15 @@ export const timelineStyles = css`
     overflow: hidden;
     text-overflow: ellipsis;
     padding: 0 8px;
+    cursor: pointer;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
+  }
+
+  .tl-super-cell:hover {
+    background-color: var(--today-bg, rgba(0, 0, 0, 0.04));
+    color: var(--orange, #f97316);
   }
 
   /* Hour header (column labels) */

@@ -376,6 +376,10 @@ export function SchedulerView({
             resourceTypeConfig={TIMELINE_RESOURCE_CONFIG}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onHeaderDateClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
             onEventMove={({
               event,
               oldResourceId,
@@ -432,11 +436,22 @@ export function SchedulerView({
         >
           <MonthGrid
             showFab={true}
+            navLinks={true}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}
-            onDayClick={(detail) => {
+            onDayHeaderClick={(detail) => {
               pendingDate.current = detail.date;
               onViewChange("Day");
+            }}
+            onSlotSelect={(detail) => {
+              setTempEventData({
+                startDate: detail.date,
+                startTime: "09:00",
+                endDate: detail.date,
+                endTime: "10:00",
+                showConfirmOnCreate: true,
+              });
+              onOpenScheduler();
             }}
             onViewChange={(detail) => onViewChange(detail.view)}
             onNavChange={(detail) => {
@@ -451,7 +466,12 @@ export function SchedulerView({
         {currentView === "Year" && (
           <YearGrid
             ref={yearGridRef}
+            navLinks={true}
             onNavChange={handleNavChange}
+            onMonthHeaderClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Month");
+            }}
             onDayClick={(detail) => {
               pendingDate.current = detail.date;
               onViewChange("Day");
@@ -464,9 +484,14 @@ export function SchedulerView({
           <WeekGrid
             ref={weekGridRef}
             showFab={true}
+            navLinks={true}
             allowCreate={allowCreate}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}
+            onDayHeaderClick={(detail) => {
+              pendingDate.current = detail.date;
+              onViewChange("Day");
+            }}
             onDayClick={(detail) => {
               pendingDate.current = detail.date;
               onViewChange("Day");
@@ -483,6 +508,7 @@ export function SchedulerView({
           <DayGrid
             ref={dayGridRef}
             showFab={true}
+            navLinks={true}
             allowCreate={allowCreate}
             onAddEvent={() => onOpenScheduler()}
             onEventClick={(ev) => onOpenScheduler(ev?.id)}

@@ -186,7 +186,7 @@ export const monthGridStyles = css`
     background: var(--today-bg);
   }
 
-  /* ── Day number ── */
+  /* ── Day number & Header button (navLinks) ── */
   .mg-day-cell__top {
     display: flex;
     align-items: center;
@@ -195,11 +195,55 @@ export const monthGridStyles = css`
     height: 24px;
   }
 
+  .mg-day-cell__num-btn {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    border-radius: 12px;
+    padding: 1px 4px;
+    margin: -1px -4px;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease,
+      transform 0.1s ease;
+    font-family: inherit;
+  }
+
+  .mg-day-cell__num-btn:hover {
+    background-color: var(--c-primary-bg, rgba(0, 0, 0, 0.05));
+  }
+
+  .mg-day-cell__num-btn:hover .mg-day-cell__num {
+    color: var(--orange);
+    font-weight: 600;
+  }
+
+  .mg-day-cell__num-btn:active {
+    transform: scale(0.96);
+  }
+
+  .mg-day-cell__num-btn:focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: 1px;
+  }
+
+  .mg-day-cell__num-btn--today:hover {
+    background-color: transparent;
+  }
+
+  .mg-day-cell__num-btn--today:hover .mg-today-badge {
+    filter: brightness(1.1);
+    transform: scale(1.05);
+  }
+
   .mg-day-cell__num {
     font-size: 13px;
     font-weight: 500;
     color: var(--text-1);
     line-height: 1;
+    transition: color 0.15s ease;
   }
 
   /* Selected day — orange outline */
@@ -222,6 +266,9 @@ export const monthGridStyles = css`
     font-weight: 700;
     line-height: 1;
     flex-shrink: 0;
+    transition:
+      transform 0.12s ease,
+      filter 0.12s ease;
   }
 
   /* "TODAY" label shown beside the badge */

@@ -535,6 +535,12 @@ function App() {
                 setSchedulerError(null);
                 setShowScheduler(true);
               }}
+              onHeaderDateClick={(detail) => {
+                setCurrentView("Day");
+                setTimeout(() => {
+                  dayGridRef?.goToDate?.(detail.date);
+                }, 100);
+              }}
               onEventMove={({
                 event,
                 oldResourceId,
@@ -586,6 +592,8 @@ function App() {
               ref={(el) =>
                 (monthGridRef = el as unknown as typeof monthGridRef)
               }
+              showFab={true}
+              navLinks={true}
               onAddEvent={() => {
                 setSelectedEventId(null);
                 setSchedulerError(null);
@@ -606,17 +614,23 @@ function App() {
                   zoomUnit: (detail.zoomUnit as string) || "",
                 });
               }}
-              onDayClick={(detail) => {
-                setCurrentView("Timeline");
+              onDayHeaderClick={(detail) => {
+                setCurrentView("Day");
                 setTimeout(() => {
-                  timelineRef?.goToDate?.(detail.date);
+                  dayGridRef?.goToDate?.(detail.date);
                 }, 100);
+              }}
+              onSlotSelect={() => {
+                setSelectedEventId(null);
+                setSchedulerError(null);
+                setShowScheduler(true);
               }}
             />
           </Show>
           <Show when={currentView() === "Year"}>
             <YearGrid
               ref={(el) => (yearGridRef = el as unknown as typeof yearGridRef)}
+              navLinks={true}
               onViewChange={(detail) => setCurrentView(detail.view)}
               onNavChange={(detail) => {
                 setNavData({
@@ -627,10 +641,16 @@ function App() {
                   zoomUnit: (detail.zoomUnit as string) || "",
                 });
               }}
-              onDayClick={(detail) => {
-                setCurrentView("Timeline");
+              onMonthHeaderClick={(detail) => {
+                setCurrentView("Month");
                 setTimeout(() => {
-                  timelineRef?.goToDate?.(detail.date);
+                  monthGridRef?.goToDate?.(detail.date);
+                }, 100);
+              }}
+              onDayClick={(detail) => {
+                setCurrentView("Day");
+                setTimeout(() => {
+                  dayGridRef?.goToDate?.(detail.date);
                 }, 100);
               }}
             />

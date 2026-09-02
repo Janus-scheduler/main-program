@@ -105,11 +105,38 @@ export const topbarStyles = css`
     border-color: var(--orange);
   }
 
+  .tl-nav__date-btn {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 3px 6px;
+    margin-left: 2px;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+    font-family: inherit;
+    min-width: 0;
+  }
+
+  .tl-nav__date-btn:hover {
+    background-color: var(--bg, #f4f4f5);
+  }
+
+  .tl-nav__date-btn:hover .tl-nav__date {
+    color: var(--orange);
+  }
+
+  .tl-nav__date-btn:focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: 1px;
+  }
+
   .tl-nav__date {
     font-size: 15px;
     font-weight: 600;
     color: var(--text-1);
-    margin-left: 6px;
     letter-spacing: -0.3px;
     white-space: nowrap;
     overflow: hidden;
@@ -117,6 +144,7 @@ export const topbarStyles = css`
     flex: 0 1 auto;
     max-width: fit-content;
     min-width: 0;
+    transition: color 0.15s ease;
   }
 
   .tl-nav__date--short {
@@ -124,7 +152,6 @@ export const topbarStyles = css`
     font-size: 13px;
     font-weight: 600;
     color: var(--text-1);
-    margin-left: 8px;
     letter-spacing: -0.2px;
   }
 

@@ -121,11 +121,8 @@ export const timeGridStyles = css`
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    padding: 8px 6px;
+    padding: 4px 6px;
     border-right: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.12s;
     min-width: 0;
   }
 
@@ -133,16 +130,52 @@ export const timeGridStyles = css`
     border-right: none;
   }
 
-  .tg-head__cell:hover {
-    background: #fafafa;
-  }
-
   .tg-head__cell--today {
     background: var(--today-bg);
   }
 
-  .tg-head__cell--today:hover {
-    background: var(--today-bg);
+  .tg-head__btn {
+    all: unset;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      transform 0.1s ease;
+    font-family: inherit;
+  }
+
+  .tg-head__btn:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  .tg-head__btn:active {
+    transform: scale(0.97);
+  }
+
+  .tg-head__btn:focus-visible {
+    outline: 2px solid var(--orange);
+    outline-offset: -2px;
+  }
+
+  .tg-head__btn--today:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  .tg-head__static {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    height: 100%;
   }
 
   .tg-head__dow {
@@ -176,7 +209,6 @@ export const timeGridStyles = css`
     font-weight: 700;
   }
 
-  /* ── All-day row (sticky row 2 inside .tg-grid) ── */
   .tg-allday__label,
   .tg-allday__cell {
     position: sticky;
@@ -184,8 +216,22 @@ export const timeGridStyles = css`
     z-index: 15;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+  }
+
+  .tg-allday__cell {
+    border-right: 1px solid var(--border);
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     max-height: 96px;
     overflow-y: auto;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+  }
+
+  .tg-allday__cell:hover {
+    background-color: #fafafa;
   }
 
   .tg-allday__label {
@@ -302,9 +348,9 @@ export const timeGridStyles = css`
     display: flex;
     flex-direction: column;
     gap: 1px;
-    border: 1px solid transparent;
+    border: none;
     border-left: 3px solid transparent;
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 4px 7px;
     font-family: inherit;
     text-align: left;
@@ -312,20 +358,25 @@ export const timeGridStyles = css`
     touch-action: none;
     overflow: hidden;
     z-index: 2;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
     transition:
-      filter 0.12s,
-      box-shadow 0.12s;
+      filter 0.15s,
+      transform 0.12s,
+      background-color 0.15s,
+      box-shadow 0.15s;
   }
 
   .tg-event:hover,
   .tg-event--hovered {
     filter: brightness(0.96);
-    box-shadow: 0 2px 8px rgba(24, 24, 27, 0.12);
+    transform: scaleY(1.02);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.14);
     z-index: 4;
   }
 
   .tg-event:active {
-    filter: brightness(0.92);
+    transform: scale(0.98);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
     cursor: grabbing;
   }
 
@@ -365,12 +416,12 @@ export const timeGridStyles = css`
   }
 
   .tg-event__time {
-    font-size: 10.5px;
-    font-weight: 500;
-    color: var(--text-2);
+    font-size: 11px;
+    font-family: "DM Mono", monospace;
+    white-space: nowrap;
+    opacity: 0.85;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .tg-event--compact .tg-event__title {
@@ -523,7 +574,7 @@ export const timeGridStyles = css`
     justify-content: center;
     gap: 2px;
     border: 1.5px dashed;
-    border-radius: 6px;
+    border-radius: 7px;
     padding: 4px 7px;
     z-index: 6;
     pointer-events: none;
@@ -543,76 +594,76 @@ export const timeGridStyles = css`
   }
 
   .tg-drag-ghost__time {
-    font-size: 10.5px;
-    font-weight: 500;
+    font-size: 11px;
+    font-family: "DM Mono", monospace;
     opacity: 0.85;
     white-space: nowrap;
   }
 
   .tg-drag-ghost--primary {
-    background: var(--c-primary-bg);
+    background: color-mix(in srgb, var(--c-primary-bg) 40%, var(--white));
     border-color: var(--c-primary-bd);
     color: var(--c-primary-tx);
   }
   .tg-drag-ghost--orange {
-    background: var(--c-orange-bg);
+    background: color-mix(in srgb, var(--c-orange-bg) 40%, var(--white));
     border-color: var(--c-orange-bd);
     color: var(--c-orange-tx);
   }
   .tg-drag-ghost--blue {
-    background: var(--c-blue-bg);
+    background: color-mix(in srgb, var(--c-blue-bg) 40%, var(--white));
     border-color: var(--c-blue-bd);
     color: var(--c-blue-tx);
   }
   .tg-drag-ghost--yellow {
-    background: var(--c-yellow-bg);
+    background: color-mix(in srgb, var(--c-yellow-bg) 40%, var(--white));
     border-color: var(--c-yellow-bd);
     color: var(--c-yellow-tx);
   }
   .tg-drag-ghost--purple {
-    background: var(--c-purple-bg);
+    background: color-mix(in srgb, var(--c-purple-bg) 40%, var(--white));
     border-color: var(--c-purple-bd);
     color: var(--c-purple-tx);
   }
   .tg-drag-ghost--green {
-    background: var(--c-green-bg);
+    background: color-mix(in srgb, var(--c-green-bg) 40%, var(--white));
     border-color: var(--c-green-bd);
     color: var(--c-green-tx);
   }
   .tg-drag-ghost--red {
-    background: var(--c-red-bg);
+    background: color-mix(in srgb, var(--c-red-bg) 40%, var(--white));
     border-color: var(--c-red-bd);
     color: var(--c-red-tx);
   }
   .tg-drag-ghost--pink {
-    background: var(--c-pink-bg);
+    background: color-mix(in srgb, var(--c-pink-bg) 40%, var(--white));
     border-color: var(--c-pink-bd);
     color: var(--c-pink-tx);
   }
   .tg-drag-ghost--indigo {
-    background: var(--c-indigo-bg);
+    background: color-mix(in srgb, var(--c-indigo-bg) 40%, var(--white));
     border-color: var(--c-indigo-bd);
     color: var(--c-indigo-tx);
   }
   .tg-drag-ghost--cyan {
-    background: var(--c-cyan-bg);
+    background: color-mix(in srgb, var(--c-cyan-bg) 40%, var(--white));
     border-color: var(--c-cyan-bd);
     color: var(--c-cyan-tx);
   }
   .tg-drag-ghost--teal {
-    background: var(--c-teal-bg);
+    background: color-mix(in srgb, var(--c-teal-bg) 40%, var(--white));
     border-color: var(--c-teal-bd);
     color: var(--c-teal-tx);
   }
 
-  /* All-day chip — same colours, flat layout */
+  /* All-day chip — same colours, flat layout matching Month chips */
   .tg-chip {
     display: flex;
     align-items: center;
     border: none;
     border-left: 3px solid transparent;
-    border-radius: 4px;
-    padding: 3px 7px;
+    border-radius: 5px;
+    padding: 4px 6px;
     font-family: inherit;
     font-size: 11.5px;
     font-weight: 600;
@@ -623,79 +674,125 @@ export const timeGridStyles = css`
     text-overflow: ellipsis;
     width: 100%;
     flex-shrink: 0;
-    transition: filter 0.12s;
+    transition:
+      filter 0.12s,
+      transform 0.1s;
   }
 
   .tg-chip:hover {
     filter: brightness(0.95);
+    transform: scaleX(0.99);
   }
 
-  /* Colour variants — identical mapping to timeline + month */
+  /* Colour variants — matching Timeline soft-mix and Month palette */
   .tg-event--primary,
   .tg-chip--primary {
-    background: var(--c-primary-bg);
+    background: color-mix(in srgb, var(--c-primary-bg) 32%, var(--white));
     border-color: var(--c-primary-bd);
     color: var(--c-primary-tx);
   }
+  .tg-event--primary:hover {
+    background: color-mix(in srgb, var(--c-primary-bg) 55%, var(--white));
+  }
+
   .tg-event--orange,
   .tg-chip--orange {
-    background: var(--c-orange-bg);
+    background: color-mix(in srgb, var(--c-orange-bg) 32%, var(--white));
     border-color: var(--c-orange-bd);
     color: var(--c-orange-tx);
   }
+  .tg-event--orange:hover {
+    background: color-mix(in srgb, var(--c-orange-bg) 55%, var(--white));
+  }
+
   .tg-event--blue,
   .tg-chip--blue {
-    background: var(--c-blue-bg);
+    background: color-mix(in srgb, var(--c-blue-bg) 32%, var(--white));
     border-color: var(--c-blue-bd);
     color: var(--c-blue-tx);
   }
+  .tg-event--blue:hover {
+    background: color-mix(in srgb, var(--c-blue-bg) 55%, var(--white));
+  }
+
   .tg-event--yellow,
   .tg-chip--yellow {
-    background: var(--c-yellow-bg);
+    background: color-mix(in srgb, var(--c-yellow-bg) 32%, var(--white));
     border-color: var(--c-yellow-bd);
     color: var(--c-yellow-tx);
   }
+  .tg-event--yellow:hover {
+    background: color-mix(in srgb, var(--c-yellow-bg) 55%, var(--white));
+  }
+
   .tg-event--purple,
   .tg-chip--purple {
-    background: var(--c-purple-bg);
+    background: color-mix(in srgb, var(--c-purple-bg) 32%, var(--white));
     border-color: var(--c-purple-bd);
     color: var(--c-purple-tx);
   }
+  .tg-event--purple:hover {
+    background: color-mix(in srgb, var(--c-purple-bg) 55%, var(--white));
+  }
+
   .tg-event--green,
   .tg-chip--green {
-    background: var(--c-green-bg);
+    background: color-mix(in srgb, var(--c-green-bg) 32%, var(--white));
     border-color: var(--c-green-bd);
     color: var(--c-green-tx);
   }
+  .tg-event--green:hover {
+    background: color-mix(in srgb, var(--c-green-bg) 55%, var(--white));
+  }
+
   .tg-event--red,
   .tg-chip--red {
-    background: var(--c-red-bg);
+    background: color-mix(in srgb, var(--c-red-bg) 32%, var(--white));
     border-color: var(--c-red-bd);
     color: var(--c-red-tx);
   }
+  .tg-event--red:hover {
+    background: color-mix(in srgb, var(--c-red-bg) 55%, var(--white));
+  }
+
   .tg-event--pink,
   .tg-chip--pink {
-    background: var(--c-pink-bg);
+    background: color-mix(in srgb, var(--c-pink-bg) 32%, var(--white));
     border-color: var(--c-pink-bd);
     color: var(--c-pink-tx);
   }
+  .tg-event--pink:hover {
+    background: color-mix(in srgb, var(--c-pink-bg) 55%, var(--white));
+  }
+
   .tg-event--indigo,
   .tg-chip--indigo {
-    background: var(--c-indigo-bg);
+    background: color-mix(in srgb, var(--c-indigo-bg) 32%, var(--white));
     border-color: var(--c-indigo-bd);
     color: var(--c-indigo-tx);
   }
+  .tg-event--indigo:hover {
+    background: color-mix(in srgb, var(--c-indigo-bg) 55%, var(--white));
+  }
+
   .tg-event--cyan,
   .tg-chip--cyan {
-    background: var(--c-cyan-bg);
+    background: color-mix(in srgb, var(--c-cyan-bg) 32%, var(--white));
     border-color: var(--c-cyan-bd);
     color: var(--c-cyan-tx);
   }
+  .tg-event--cyan:hover {
+    background: color-mix(in srgb, var(--c-cyan-bg) 55%, var(--white));
+  }
+
   .tg-event--teal,
   .tg-chip--teal {
-    background: var(--c-teal-bg);
+    background: color-mix(in srgb, var(--c-teal-bg) 32%, var(--white));
     border-color: var(--c-teal-bd);
     color: var(--c-teal-tx);
+  }
+  .tg-event--teal:hover {
+    background: color-mix(in srgb, var(--c-teal-bg) 55%, var(--white));
   }
 
   /* ── Now line ───────────────────────────────────────────────────────────── */

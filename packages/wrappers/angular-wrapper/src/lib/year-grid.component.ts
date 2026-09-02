@@ -15,7 +15,11 @@ import { JanusYearGrid } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _yg = JanusYearGrid;
-import { type ViewType } from "@janus-scheduler/core";
+import {
+  type ViewType,
+  type YearDayClickDetail,
+  type YearMonthHeaderClickDetail,
+} from "./types";
 
 @Component({
   selector: "janus-year-grid-ng",
@@ -36,8 +40,10 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
     viewChild.required<ElementRef<HTMLElement>>("yearGridEl");
 
   readonly viewYear = input<number | undefined>(undefined);
+  readonly navLinks = input<boolean>(true);
 
-  readonly dayClick = output<{ date: string }>();
+  readonly dayClick = output<YearDayClickDetail>();
+  readonly monthHeaderClick = output<YearMonthHeaderClickDetail>();
   readonly viewChange = output<{ view: ViewType }>();
   readonly navChange = output<Record<string, unknown>>();
 
@@ -50,6 +56,10 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
   private readonly _dayClickHandler = (e: Event) => {
     e.stopPropagation();
     this.dayClick.emit((e as CustomEvent).detail);
+  };
+  private readonly _monthHeaderClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.monthHeaderClick.emit((e as CustomEvent).detail);
   };
   private readonly _viewChangeHandler = (e: Event) => {
     e.stopPropagation();
@@ -97,6 +107,7 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
     el.addEventListener("day-click", this._dayClickHandler);
+    el.addEventListener("month-header-click", this._monthHeaderClickHandler);
     el.addEventListener("view-change", this._viewChangeHandler);
     el.addEventListener("nav-change", this._navChangeHandler);
     this._syncProps();
@@ -105,9 +116,12 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
   private _syncProps(): void {
     try {
       const el = this._elRef()?.nativeElement as
-        (HTMLElement & { viewYear?: number }) | undefined;
-      if (el && this.viewYear() !== undefined) {
-        el.viewYear = this.viewYear()!;
+        (HTMLElement & { viewYear?: number; navLinks?: boolean }) | undefined;
+      if (el) {
+        if (this.viewYear() !== undefined) {
+          el.viewYear = this.viewYear()!;
+        }
+        el.navLinks = this.navLinks();
       }
     } catch {
       // ViewChild might not be initialized yet before first view init
@@ -118,6 +132,10 @@ export class YearGridComponent implements AfterViewInit, OnDestroy {
     const el = this._elRef()?.nativeElement;
     if (el) {
       el.removeEventListener("day-click", this._dayClickHandler);
+      el.removeEventListener(
+        "month-header-click",
+        this._monthHeaderClickHandler,
+      );
       el.removeEventListener("view-change", this._viewChangeHandler);
       el.removeEventListener("nav-change", this._navChangeHandler);
     }

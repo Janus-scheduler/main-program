@@ -21,6 +21,7 @@ const _dg = JanusDayGrid;
 const _wg = JanusWeekGrid;
 import type {
   TimeGridEvent,
+  DayHeaderClickDetail,
   SlotSelectDetail,
   TimeGridEventMoveDetail,
   TimeGridEventResizeDetail,
@@ -52,6 +53,9 @@ export abstract class TimeGridBaseComponent
   /** When true, renders a + Floating Action Button */
   readonly showFab = input<boolean>(false);
 
+  /** When true, header dates and week numbers are rendered as interactive buttons. Default: true */
+  readonly navLinks = input<boolean>(true);
+
   /** Emit `slotSelect` when an empty slot is clicked. Default: true */
   readonly allowCreate = input<boolean>(true);
 
@@ -75,6 +79,7 @@ export abstract class TimeGridBaseComponent
 
   readonly eventClick = output<TimeGridEvent>();
   readonly dayClick = output<{ date: string }>();
+  readonly dayHeaderClick = output<DayHeaderClickDetail>();
   readonly slotSelect = output<SlotSelectDetail>();
   readonly eventMove = output<TimeGridEventMoveDetail>();
   readonly eventResize = output<TimeGridEventResizeDetail>();
@@ -89,6 +94,10 @@ export abstract class TimeGridBaseComponent
   private readonly _dayClickHandler = (e: Event) => {
     e.stopPropagation();
     this.dayClick.emit((e as CustomEvent).detail);
+  };
+  private readonly _dayHeaderClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.dayHeaderClick.emit((e as CustomEvent).detail);
   };
   private readonly _slotSelectHandler = (e: Event) => {
     e.stopPropagation();
@@ -151,6 +160,7 @@ export abstract class TimeGridBaseComponent
     const el = this.elRef.nativeElement;
     el.addEventListener("event-click", this._eventClickHandler);
     el.addEventListener("day-click", this._dayClickHandler);
+    el.addEventListener("day-header-click", this._dayHeaderClickHandler);
     el.addEventListener("slot-select", this._slotSelectHandler);
     el.addEventListener("event-move", this._eventMoveHandler);
     el.addEventListener("event-resize", this._eventResizeHandler);
@@ -169,6 +179,7 @@ export abstract class TimeGridBaseComponent
     const el = this.elRef?.nativeElement;
     el?.removeEventListener("event-click", this._eventClickHandler);
     el?.removeEventListener("day-click", this._dayClickHandler);
+    el?.removeEventListener("day-header-click", this._dayHeaderClickHandler);
     el?.removeEventListener("slot-select", this._slotSelectHandler);
     el?.removeEventListener("event-move", this._eventMoveHandler);
     el?.removeEventListener("event-resize", this._eventResizeHandler);
@@ -187,6 +198,7 @@ export abstract class TimeGridBaseComponent
     if (this.events() !== undefined) el["events"] = this.events();
 
     el["showFab"] = this.showFab();
+    el["navLinks"] = this.navLinks();
     el["allowCreate"] = this.allowCreate();
     el["startHour"] = this.startHour();
     el["endHour"] = this.endHour();

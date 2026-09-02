@@ -10,7 +10,7 @@ import {
   viewChild,
   ChangeDetectionStrategy,
 } from "@angular/core";
-import type { ViewType } from "@janus-scheduler/core";
+import type { ViewType, TopbarDateLabelClickDetail } from "./types";
 // Side-effect import: ensures the <janus-topbar> custom element is registered
 import { JanusTopbar } from "@janus-scheduler/ui";
 // Ensure the class is not dropped
@@ -54,6 +54,8 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
   readonly toggleCreate = output<void>();
   /** Fired when the user clicks the Google Calendar connect/disconnect button. */
   readonly connectCalendar = output<void>();
+  /** Fired when the user clicks the center date title/label */
+  readonly dateLabelClick = output<TopbarDateLabelClickDetail>();
 
   private readonly _prevClickHandler = (e: Event) => {
     e.stopPropagation();
@@ -79,6 +81,12 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     e.stopPropagation();
     this.connectCalendar.emit();
   };
+  private readonly _dateLabelClickHandler = (e: Event) => {
+    e.stopPropagation();
+    this.dateLabelClick.emit(
+      (e as CustomEvent<TopbarDateLabelClickDetail>).detail,
+    );
+  };
 
   ngAfterViewInit(): void {
     const el = this._elRef().nativeElement;
@@ -88,6 +96,7 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     el.addEventListener("view-switch", this._viewSwitchHandler);
     el.addEventListener("toggle-create", this._toggleCreateHandler);
     el.addEventListener("connect-calendar", this._connectCalendarHandler);
+    el.addEventListener("date-label-click", this._dateLabelClickHandler);
 
     this._syncInputs();
   }
@@ -104,6 +113,7 @@ export class TopbarComponent implements AfterViewInit, OnDestroy, OnChanges {
     el?.removeEventListener("view-switch", this._viewSwitchHandler);
     el?.removeEventListener("toggle-create", this._toggleCreateHandler);
     el?.removeEventListener("connect-calendar", this._connectCalendarHandler);
+    el?.removeEventListener("date-label-click", this._dateLabelClickHandler);
   }
 
   private _syncInputs(): void {

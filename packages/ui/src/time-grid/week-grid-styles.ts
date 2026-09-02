@@ -21,14 +21,15 @@ export const weekGridStyles = [
     /* Week columns get tighter event padding than the Day view */
     .tg-event {
       padding: 3px 6px;
+      border-radius: 6px;
     }
 
     .tg-event__title {
-      font-size: 11px;
+      font-size: 11.5px;
     }
 
     .tg-event__time {
-      font-size: 9.5px;
+      font-size: 10px;
     }
 
     /*
@@ -51,7 +52,7 @@ export const weekGridStyles = [
 
       .tg-event {
         padding: 3px 4px;
-        border-radius: 5px;
+        border-radius: 6px;
       }
     }
   `,

@@ -93,6 +93,51 @@ export interface MonthEvent {
   startDate?: string;
   endDate?: string;
 }
+
+/**
+ * Detailed payload emitted when a day cell, header, or overflow link is clicked in Month Grid.
+ */
+export interface DayClickDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  /** Exact click target source */
+  source?: "header" | "cell" | "more";
+  /** All month events occurring on this date */
+  events?: MonthEvent[];
+  /** The native browser click event if available */
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when a day header/number badge is clicked (typically navigates to Day View).
+ */
+export interface DayHeaderClickDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when an empty slot or cell body in the Month Grid is clicked to create an event.
+ */
+export interface MonthSlotSelectDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when the "+N more" overflow indicator on a Month Grid day cell is clicked.
+ */
+export interface MonthMoreClickDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  /** All events occurring on this day */
+  events: MonthEvent[];
+  /** Number of hidden events that could not fit in the cell row */
+  hiddenCount: number;
+  jsEvent?: MouseEvent;
+}
 /**
  * A resource attached to an hour-grid event, resolved down to just what the
  * event card needs to draw an avatar.
@@ -146,6 +191,66 @@ export interface TimeGridEvent {
 }
 
 /**
+ * Payload emitted when a Year Grid month card header (e.g. "March") is clicked.
+ */
+export interface YearMonthHeaderClickDetail {
+  year: number;
+  month: number; // 0-based
+  monthName: string;
+  /** "YYYY-MM-01" */
+  date: string;
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when a day cell is clicked in Year Grid.
+ */
+export interface YearDayClickDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  source: "cell";
+  year: number;
+  month: number;
+  day: number;
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when a resource header/card is clicked in Timeline.
+ */
+export interface TimelineResourceClickDetail {
+  resource: TimelineResource;
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when a super-header date on the Timeline ruler is clicked.
+ */
+export interface TimelineHeaderDateClickDetail {
+  /** "YYYY-MM-DD" */
+  date: string;
+  timestamp: number;
+  jsEvent?: MouseEvent;
+}
+
+/**
+ * Payload emitted when a conflict badge or banner item in Timeline is clicked.
+ */
+export interface TimelineConflictClickDetail {
+  conflictingEventIds: string[];
+  messages: string[];
+}
+
+/**
+ * Payload emitted when the TopBar date label is clicked.
+ */
+export interface TopbarDateLabelClickDetail {
+  navLabel: string;
+  view: ViewType;
+  jsEvent?: MouseEvent;
+}
+
+/**
  * Fired when the user clicks/drags an empty region of an hour grid.
  * Times are "HH:MM" in the scheduler's display timezone.
  */
@@ -153,6 +258,8 @@ export interface SlotSelectDetail {
   date: string; // "YYYY-MM-DD"
   startTime: string; // "HH:MM"
   endTime: string; // "HH:MM"
+  allDay?: boolean;
+  jsEvent?: MouseEvent;
 }
 
 /**

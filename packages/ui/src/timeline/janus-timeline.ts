@@ -1173,6 +1173,53 @@ export class JanusTimeline extends LitElement {
     );
   }
 
+  private _handleResourceClick(
+    resource: TimelineResource,
+    jsEvent?: MouseEvent,
+  ) {
+    this.dispatchEvent(
+      new CustomEvent("resource-click", {
+        detail: {
+          resource,
+          jsEvent,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _handleHeaderDateClick(
+    dateStr: string,
+    timestamp: number,
+    jsEvent?: MouseEvent,
+  ) {
+    this.dispatchEvent(
+      new CustomEvent("header-date-click", {
+        detail: {
+          date: dateStr,
+          timestamp,
+          jsEvent,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _handleConflictClick(conflicts: ConflictState) {
+    this.dispatchEvent(
+      new CustomEvent("conflict-click", {
+        detail: {
+          conflictingEventIds: Array.from(conflicts.conflictingEventIds),
+          messages: conflicts.messages,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   public setView(v: ViewType) {
     this.view = v;
     // Let the parent app know so it can swap components if needed
@@ -1651,12 +1698,18 @@ export class JanusTimeline extends LitElement {
           `;
 
     return html`
-      <div class="tl-conflict-banner">
+      <div
+        class="tl-conflict-banner"
+        @click=${() => this._handleConflictClick(conflicts)}
+      >
         <span class="tl-conflict-banner__icon">⚠</span>
         <div class="tl-conflict-banner__content">${contentHtml}</div>
         <button
           class="tl-conflict-banner__close"
-          @click=${() => (this._isConflictsBannerDismissed = true)}
+          @click=${(e: MouseEvent) => {
+            e.stopPropagation();
+            this._isConflictsBannerDismissed = true;
+          }}
           aria-label="Dismiss warning"
         >
           ×
@@ -1682,6 +1735,7 @@ export class JanusTimeline extends LitElement {
             class="tl-res-row"
             style="height: ${item.height}px"
             title="${r.name} · ${r.subtitle}"
+            @click=${(e: MouseEvent) => this._handleResourceClick(r, e)}
           >
             ${this.renderAvatar(r)}
             <div class="tl-res-info">
@@ -2049,6 +2103,19 @@ export class JanusTimeline extends LitElement {
                               <div
                                 class="tl-super-cell"
                                 style="left: ${sl.px}px; width: ${sl.width}px;"
+                                title="View ${sl.label}"
+                                @click=${(e: MouseEvent) => {
+                                  const dateStr = sl.startMs
+                                    ? new Date(sl.startMs)
+                                        .toISOString()
+                                        .slice(0, 10)
+                                    : "";
+                                  this._handleHeaderDateClick(
+                                    dateStr,
+                                    sl.startMs || 0,
+                                    e,
+                                  );
+                                }}
                               >
                                 ${sl.label}
                               </div>
